@@ -1,0 +1,17 @@
+{
+  "name": "streaming-center-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/plugin-api",
+    "packages/media/*",
+    "packages/sync/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}
