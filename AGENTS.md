@@ -162,6 +162,18 @@ the test of whether this architecture is real.
 
 ---
 
+## Skills
+
+`.agents/skills/` in this repository:
+
+- **`sc-add-plugin`** — create a new plugin for a service that has none.
+- **`sc-plugin-roles`** — add or change a role on an existing plugin. Use this,
+  not `sc-add-plugin`, when the service already has a folder.
+- **`sc-verify-plugins`** — verification, including the boundary greps and the
+  cross-repository check after touching `api`.
+
+---
+
 ## Current state
 
 Twelve packages: `api` plus eleven plugins. Each is a `package.json`, a
