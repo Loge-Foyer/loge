@@ -72,12 +72,14 @@ Docs: https://docs.expo.dev/eas/index.md
 These are specific to Streaming Center and matter more than anything above.
 
 1. **Never define a domain type here.** `MediaItem`, `GlobalMediaKey`, the
-   capability types and every plugin contract live in `@sc/plugin-api`, in the
+   capability types and every plugin contract live in `@sc/api`, in the
    plugins repository. Defining them here makes the dependency graph circular.
 
 2. **No plugin names above the composition root.** There must never be an
    `if (providerId === 'jellyfin')` in a screen, component or service. Branch on
-   declared capabilities.
+   **effective** capabilities — what the plugin declares, intersected with what
+   the user enabled for that connection. Branching on declared alone calls
+   features the user switched off.
 
 3. **Only the composition root imports a concrete plugin.** Screens resolve what
    they need from injected services. This is what keeps the boundary real rather
@@ -125,7 +127,7 @@ local development use a `file:` dependency plus a Metro watch folder:
 ```jsonc
 // package.json
 "dependencies": {
-  "@sc/plugin-api": "file:../streaming_center_plugins/packages/plugin-api"
+  "@sc/api": "file:../streaming_center_plugins/api"
 }
 ```
 

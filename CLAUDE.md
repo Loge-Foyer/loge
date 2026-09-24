@@ -23,7 +23,7 @@ that wires everything together.
 
 **Does not own:** domain types, plugin contracts, or any adapter. Those are in
 `../streaming_center_plugins`. If you find yourself writing a `MediaItem`
-interface here, stop — it belongs in `@sc/plugin-api`.
+interface here, stop — it belongs in `@sc/api`.
 
 ## The three mistakes to avoid
 
