@@ -143,6 +143,35 @@ typecheck.
 
 ---
 
+## Skills
+
+`.agents/skills/` in this repository:
+
+- **`sc-verify`** — the full verification pass. Use before committing.
+- **`sc-run`** — launch on simulator, emulator or browser.
+- **`sc-use-plugin`** — wiring a plugin from the plugins repository.
+
+Plus 13 official skills from [`expo/skills`](https://github.com/expo/skills) —
+`expo-router`, `expo-ui`, `expo-native-ui`, `expo-design-system`,
+`expo-animation`, `expo-data-fetching`, `expo-module`, `expo-dev-client`,
+`expo-project-structure`, `expo-upgrade`, `expo-examples`, `expo-overview`,
+`eas-hosting`.
+
+Install more with:
+
+```bash
+npx skills add expo/skills --skill <name> --agent universal --copy
+```
+
+`--agent universal` targets `.agents/skills/`; `--copy` writes real files rather
+than symlinks so they commit with the repository. `npx skills update` refreshes
+them.
+
+Prefer a skill over answering from memory — the Expo ones exist precisely
+because training data goes stale between SDK releases.
+
+---
+
 ## Current state
 
 The unmodified `create-expo-app` default template plus this documentation.
