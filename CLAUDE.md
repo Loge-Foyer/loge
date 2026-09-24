@@ -1,15 +1,15 @@
 # CLAUDE.md — streaming_center_plugins
 
-Every adapter Streaming Center has to the outside world, plus `plugin-api` —
-the vocabulary the app and all plugins are written in.
+Every adapter Streaming Center has to the outside world, plus `api` — the
+vocabulary the app and all plugins are written in.
 
 ## Reading protocol — before you plan, edit or run anything
 
 1. `../.claude/streaming-center-architecture.md` — the architecture
-   specification. Sections 7 and 8 define the two plugin contracts.
+   specification. Section 7 defines the plugin model; section 8 is the roster.
 2. `../CLAUDE.md` — how the three repositories relate.
 3. `AGENTS.md` here — imported below, read it fully.
-4. `docs/` for the area you are touching, then the target package's `README.md`.
+4. `docs/` for the area you are touching, then the target plugin's `README.md`.
 
 Only then start work.
 
@@ -17,26 +17,44 @@ Only then start work.
 
 ## Why this repository is the centre
 
-`plugin-api` is what the app and every plugin agree on. Both sides need
-`MediaItem`, `GlobalMediaKey` and the capability types, so those cannot live in
-the app — that would make plugins depend on the app and the dependency graph
-circular.
+`api` is what the app and every plugin agree on. Both sides need `MediaItem`,
+`GlobalMediaKey` and the capability types, so those cannot live in the app —
+that would make plugins depend on the app and the dependency graph circular.
 
-So this repository depends on nothing, and everything else points at it. Keep it
-that way. An `import` of React, Expo or the app anywhere in `plugin-api` breaks
-the property the whole split exists to provide.
+So this repository depends on nothing, and everything else points at it. An
+`import` of React, Expo or the app anywhere in `api` breaks the property the
+whole split exists to provide.
+
+## One plugin per service
+
+A plugin is defined by the **service** it talks to, not by what it does with it.
+Jellyfin serves a library and holds viewing state — that is one package with two
+roles.
+
+Do not split a service into `jellyfin` and `jellyfin-sync`. If a service gains a
+role, add it to the existing manifest.
 
 ## The mistake that costs the most
 
-**Overstating a sync plugin's capabilities.** The sync engine filters the change
-journal by what you declare it can carry. Claim you handle watch progress when
-you do not, and the engine hands you those changes, you drop them, and the
-checkpoint advances past them. The state is gone, nothing errors, and it
-surfaces weeks later as "my progress disappeared."
+**Overstating a capability.** The sync engine filters the change journal by what
+you declare it can carry. Claim you handle watch progress when you do not, and
+the engine hands you those changes, you drop them, and the checkpoint advances
+past them. The state is gone, nothing errors, and it surfaces weeks later as "my
+progress disappeared."
 
-Declare honestly. It is better to carry less than to pretend.
+Declare honestly. Carrying less is always better than pretending.
 
-## The second mistake
+## The mistake that is new
+
+**Branching on declared capabilities instead of effective ones.** A plugin
+declares what it *can* do; the user decides per connection what it *may* do.
+Effective = declared ∩ enabled, and that is what the app must read.
+
+Every sync toggle defaults to **off**. Connecting Jellyfin for media must never
+silently begin pushing watch state to it. That independence is the reason
+merging the packages was safe in the first place.
+
+## The third mistake
 
 **Letting an external type escape.** A Jellyfin response shape in a return value
 means the app now knows about Jellyfin, and every later plugin has to imitate
@@ -44,17 +62,19 @@ its quirks. Map inside the package, always.
 
 ## Order of work
 
-`plugin-api` first. It is empty, and nothing else can be built correctly until
-the vocabulary exists. Then `media/mock`, because it is how the app gets built
-without a real server — and it should deliberately *not* support every
-capability, so the app's capability handling stays genuinely exercised.
+`api` first. It is empty, and nothing else can be built correctly until the
+vocabulary exists. Then `mock`, because it is how the app gets built without a
+real server — and it carries both roles so syncing can be exercised too. It
+should deliberately decline some capabilities, so the app's capability handling
+stays genuinely tested.
 
-Then Jellyfin, which is the real target and the true test of the abstraction.
+Then Jellyfin, which is the real target and the true test of the abstraction —
+and the first plugin to exercise both roles against a real service.
 
 ## Current state
 
-Skeleton. Thirteen packages, each a `package.json`, an `export {}` and a README.
-No implementation anywhere, including `plugin-api`.
+Skeleton. `api` plus eleven plugins, each a `package.json`, an `export {}` and a
+README. No implementation anywhere, including `api`.
 
 ## Git
 

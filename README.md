@@ -18,74 +18,76 @@ The payoff is that adding a new service should be one new folder here plus one
 line registering it — not a redesign of the home screen. If it ever costs more
 than that, something shared is wrong, and that is what should be fixed.
 
-## Two kinds of plugin
+## One plugin per service, not per job
 
-**Media plugins** give you something to watch.
+A service can do two different things for you. Jellyfin can *serve your films*,
+and it can *remember what you watched*. Those are genuinely different jobs, but
+they are the same server, with the same address and the same password.
 
-| Plugin | What it connects to |
-| --- | --- |
-| `jellyfin` | Self-hosted film and TV server. The main target |
-| `plex` | Plex Media Server |
-| `emby` | Emby server, closely related to Jellyfin |
-| `yattee` | Yattee Server — YouTube and web video |
-| `invidious` | Invidious, a privacy-respecting YouTube front end |
-| `webdav` | Plain files on a NAS, over WebDAV |
-| `mock` | A pretend server, so the app can be built with no network at all |
+So there is one Jellyfin plugin, and it does both. Which of them it actually
+does is up to you.
 
-**Sync plugins** carry *your* state somewhere else — what you watched, where you
-got to, what you favourited.
+| Plugin | Can serve media | Can hold your state |
+| --- | :---: | :---: |
+| Jellyfin, Emby, Plex | ✓ | ✓ |
+| iCloud, Google | ✓ — files on Drive | ✓ |
+| Yattee, Invidious, WebDAV | ✓ | — |
+| Your own sync server | — | ✓ |
+| This device only | — | ✓ |
+| Mock, for development | ✓ | ✓ |
 
-| Plugin | Where your state goes |
-| --- | --- |
-| `local` | Nowhere. It stays on the device |
-| `icloud` | Between your own Apple devices |
-| `google` | The Android counterpart |
-| `custom-server` | A small server you run yourself |
-| `jellyfin` | Back to your Jellyfin server |
+## You decide what each one is allowed to do
 
-## Why Jellyfin appears twice
+This is the part that matters.
 
-Because they are genuinely two different jobs. One teaches the app to *read a
-library*. The other teaches it to *store your viewing state*. Keeping them
-apart is what allows the arrangement most people actually want: films from your
-Jellyfin server, viewing history backed up to iCloud.
+Connecting Jellyfin so you can watch your films does **not** mean your viewing
+history starts going there. Every one of those switches starts off. You turn on
+what you want.
 
-If they were one piece, choosing Jellyfin for films would force it for
-everything.
+Which means the arrangement most people actually want is just… a setting:
+
+```
+Jellyfin      films ✓    history ✗
+iCloud        films ✗    history ✓
+```
+
+Films from the server in your cupboard. History backed up to iCloud. Neither
+choice forces the other, and you can change your mind without disconnecting
+anything.
 
 ## Not every destination can hold everything
 
 A Jellyfin server has somewhere to put "watched up to 42 minutes". It has
 nowhere sensible to put "this person prefers dark mode". iCloud can hold both.
 
-So every sync plugin states plainly what it can carry, and the app sends it only
+So every plugin states plainly what it can carry, and the app sends it only
 that. Nothing is silently dropped, and no destination is asked to pretend.
 
 This is the part that matters most to get right. A plugin that claims it can
 hold something and then quietly discards it causes the worst kind of bug — your
 progress vanishes, and nothing reports an error.
 
-## `plugin-api`
+## `api`
 
 The shared vocabulary. What a film is, what a profile is, what watch progress
 means, and the contracts every plugin implements.
 
 It depends on nothing at all — not React, not Expo, not the app. That is what
-lets the app and a dozen plugins agree without any of them knowing about each
+lets the app and eleven plugins agree without any of them knowing about each
 other.
 
 ## Current state
 
-**Skeleton.** Thirteen folders, each with a README saying what will go in it,
-and no code — including `plugin-api` itself.
+**Skeleton.** Twelve folders — `api` and eleven plugins — each with a README
+saying what will go in it, and no code.
 
-`plugin-api` comes first. Nothing else can be built properly until the shared
+`api` comes first. Nothing else can be built properly until the shared
 vocabulary exists.
 
 ## Documentation
 
-`docs/` covers the plugin API, writing each kind of plugin, the capability
-model, testing and publishing.
+`docs/` covers the API, writing a plugin, the two roles, the capability model,
+settings, testing and publishing.
 
 The full architecture is in
 [`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).

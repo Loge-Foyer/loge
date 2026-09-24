@@ -11,7 +11,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "@sc/plugin-api": ["./packages/plugin-api/src/index.ts"]
+      "@sc/api": ["./api/src/index.ts"]
     }
   }
 }

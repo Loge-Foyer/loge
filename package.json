@@ -4,9 +4,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/plugin-api",
-    "packages/media/*",
-    "packages/sync/*"
+    "api",
+    "plugins/*"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit"
