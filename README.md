@@ -1,56 +1,73 @@
-# Welcome to your Expo app 👋
+# Streaming Center — the app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The client itself. Everything you see and tap.
 
-## Get started
+It runs on iPhone, on Android, and in a browser, from one codebase. Built with
+Expo and React Native.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## What it is for
 
-2. Start the app
+You have films and shows somewhere — a Jellyfin server in a cupboard, a Plex
+library, a folder on a NAS, a Yattee or Invidious instance. Each of those has its
+own app, and they all present your collection differently.
 
-   ```bash
-   npx expo start
-   ```
+This is one app for all of them. Same rows, same detail pages, same search, same
+sense of where you got to — regardless of which machine the file actually lives
+on. You should not have to think about which server something came from unless
+you want to.
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Running it
 
 ```bash
-npm run reset-project
+npm install
+npm run ios       # or: npm run android, npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## How it is put together
 
-### Other setup steps
+Four ideas, and the rest follows from them.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**The app has its own vocabulary.** It knows what a film is, what a profile is,
+what "halfway through episode 3" means. Every server it talks to gets translated
+into that vocabulary at the edge. The home screen has never heard of Jellyfin.
 
-## Learn more
+**Servers are plugins, and they live somewhere else.** They are in a separate
+repository entirely, so the app cannot accidentally grow a dependency on one.
+Adding Plex should mean one new folder over there and one line here.
 
-To learn more about developing your project with Expo, look at the following resources:
+**Your data is yours and it is local.** What you have watched, what you have
+favourited, where you got to — the app keeps its own copy in a local database.
+That is why favouriting works in airplane mode and your history survives a
+server going down. Sending that record anywhere else is optional and separate.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**Profiles are real.** Not a colour scheme — genuinely separate preferences,
+history, connections and favourites, enforced by the database rather than by
+remembering to filter.
 
-## Join the community
+## Platforms
 
-Join our community of developers creating universal apps.
+iOS, Android and web are all first-class. Web is the newest and the least
+settled: the local database runs as WebAssembly in the browser, which Expo still
+labels alpha and which needs particular headers from whatever serves the page.
+`docs/platforms/web/` is where that gets worked out.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+TV layouts are a later goal. The design system is built so those would be new
+screens rather than a new app.
+
+## Current state
+
+**Skeleton.** This is a fresh Expo project with documentation. The screens are
+still the template's demo screens; none of the architecture above is built yet.
+
+## Documentation
+
+`docs/` is broken down by topic — getting started, architecture, platforms, UI,
+playback, data, plugins, development. Each folder explains what belongs there.
+
+The full architecture, with the reasoning, is in
+[`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).
+
+`CLAUDE.md` and `AGENTS.md` are written for AI coding assistants — denser, and
+full of rules. This file is the one written for you.
