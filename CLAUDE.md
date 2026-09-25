@@ -40,9 +40,11 @@ in one transaction, then return. The sync engine drains the journal later.
 
 ## Current state
 
-First pass. This is the unmodified `create-expo-app` template plus
-documentation — `src/app/index.tsx` and `src/app/explore.tsx` are still the
-template's demo screens. Nothing in the architecture is implemented.
+First slice. The template is gone; the app is Tamagui with three tabs (Media,
+Videos, Settings), a session gate, profiles with PIN lock, device-level plugin
+installation with optional per-profile configuration, and connection forms
+rendered from plugin manifests. Storage is in memory; no plugin implements a
+role, so Media and Videos show skeletons.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

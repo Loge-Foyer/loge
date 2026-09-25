@@ -85,8 +85,10 @@ These are specific to Streaming Center and matter more than anything above.
    they need from injected services. This is what keeps the boundary real rather
    than aspirational.
 
-4. **Secrets never reach SQLite.** The database stores opaque refs; values live
-   in the keychain. Never log a token, a header or a PIN.
+4. **Secrets never reach the database** — SQLite on native, IndexedDB on web.
+   The database stores opaque refs; values live behind `SecureCredentialStore`
+   (keychain on native, encrypted IndexedDB on web, in memory today). A secret
+   is exactly a manifest `password` field. Never log a token, a header or a PIN.
 
 5. **Writes are local-first.** A user action writes to the local database and
    appends a change-journal entry in one transaction, then returns. The sync
@@ -95,7 +97,10 @@ These are specific to Streaming Center and matter more than anything above.
 
 6. **Profile separation is enforced twice.** Every user-owned table carries
    `user_id` with a cascade from `users`, *and* every query cache key is
-   prefixed with the active user. The database alone is not enough.
+   prefixed with the active user (`userKey()` / `deviceKey()` in
+   `src/services/query-keys.ts`). The database alone is not enough.
+   Connections of a plugin in device mode are device-owned and shared on
+   purpose; per-profile mode makes them user-owned.
 
 7. **Components take domain types.** `<MediaCard item={item} />`, never
    `<JellyfinPoster raw={payload} />`. Artwork goes through a resolver, never a
@@ -106,40 +111,58 @@ These are specific to Streaming Center and matter more than anything above.
 
 ## Web is a first-class target
 
-Not an afterthought. Two things to know:
+Not an afterthought. Things to know:
 
-- `expo-sqlite` web support is officially **alpha**. The whole local-first
-  design rests on SQLite, so this is the main risk on web.
-- The web build needs wasm Metro configuration and
-  `Cross-Origin-Embedder-Policy: credentialless` plus
-  `Cross-Origin-Opener-Policy: same-origin` on whatever serves the bundle,
-  because it needs `SharedArrayBuffer`.
-
-Both belong in `docs/platforms/web/` as they are worked out.
+- **Storage on web is IndexedDB, not SQLite** (decided; in memory today). No
+  SQLite-wasm, no COOP/COEP headers. Not localStorage either: a local-first
+  write needs the data and its journal entry in one transaction.
+- `web.output` is `"single"` — an SPA. Nothing is pre-rendered; do not add
+  `+html.tsx` or server-only assumptions.
+- `src/app/_layout.tsx` imports `@tamagui/core/reset.css`; without it browser
+  defaults (button padding) break components.
+- Tabs on web are `src/components/app-tabs.web.tsx`, a top navigation bar.
 
 ---
 
 ## Consuming plugins
 
-The plugins are a separate repository, so npm workspaces cannot span them. For
-local development use a `file:` dependency plus a Metro watch folder:
-
-```jsonc
-// package.json
-"dependencies": {
-  "@sc/api": "file:../streaming_center_plugins/api"
-}
-```
+The plugins are a separate repository, so npm workspaces cannot span them. They
+are linked with `file:` dependencies — `@sc/api` plus one `@sc/plugin-<id>` per
+plugin — and Metro watches the folder:
 
 ```js
-// metro.config.js
-config.watchFolders = [path.resolve(__dirname, '../streaming_center_plugins')];
+// metro.config.js — this is all of it
+config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../streaming_center_plugins')];
 ```
 
-**This is the main technical risk in the repository split.** Metro resolution
-across a repository boundary — symlinks, duplicate React copies, hoisting — is
-exactly the class of problem `tsc` cannot see. Verify with a real export, not a
-typecheck.
+- Install the plugins repository first; plugin files resolve `@sc/api` from it.
+- Plugins take `@sc/api` as a **peer** dependency: one copy, one set of brands.
+- `npm ls --all` shows `UNMET DEPENDENCY @sc/api@*` under each linked plugin.
+  Cosmetic — npm does not resolve deps of links outside the root.
+- No `resolver.nodeModulesPaths` is needed: babel-preset-expo imports its
+  runtime helpers by absolute path (verified in dev and production bundles).
+- Register a plugin in `src/composition/plugins.ts` — the only file that may
+  import one; lint enforces it. Every plugin exports `plugin`.
+
+**This is the main technical risk in the repository split.** Verify with a
+real export, not a typecheck.
+
+---
+
+## UI
+
+- **Tamagui 2.7.7** (`v5` preset) is the one component system. Pin every
+  `@tamagui/*` package to the same exact version.
+- **One theme entry point:** `src/tamagui.config.ts`. Never add a second theme
+  or styling system beside it. `@expo/ui` is installed because expo-router
+  depends on it — do not use it for screens.
+- v5 is **shorthands-only** (`bg`, `p`, `rounded`, `items`…); media keys are
+  min-width (`$sm`, `$md`, `$lg`, `$xl`).
+- Native-drawn chrome (NativeTabs, stack headers, native switches) takes
+  resolved colours: `String(theme.x.val)`.
+- Scrolling surfaces are React Native `ScrollView`/`FlatList`, not Tamagui's.
+- Forms render from manifests (`src/components/manifest-form/`), switching on
+  `field.type` only. Never write a form for a specific plugin.
 
 ---
 
@@ -174,19 +197,30 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-The unmodified `create-expo-app` default template plus this documentation.
-`src/app/` still contains the template's `index.tsx` and `explore.tsx`; `src/`
-contains its demo components. None of the architecture described above is
-implemented yet.
+First slice, storage **in memory**:
 
-Do not assume anything described here exists. Build it, then update the docs in
-the same commit.
+- Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
+  source), Settings (profiles, PIN lock, plugins).
+- Plugins are installed per device; each can be configured per profile
+  (off by default); connections are created from each plugin's manifest.
+- Media and Videos render skeletons: no plugin implements a role, so there are
+  no titles. `MediaItem` does not exist yet.
+- The service graph is a runtime singleton (`src/composition/provider.tsx`) —
+  a router remount must never rebuild it.
+- No app-side tests yet.
+
+Do not assume anything else described here exists. Build it, then update the
+docs in the same commit.
 
 ## Verify
 
 ```bash
+npx expo start          # once: generates the typed-route types
 npx tsc --noEmit
-npx expo lint
+npx expo lint           # includes the import-boundary rules
 npx expo-doctor
+npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web
 ```
+
+Never run Metro with `CI=1` while iterating: CI mode disables file watching.

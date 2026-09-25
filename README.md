@@ -21,6 +21,7 @@ you want to.
 ## Running it
 
 ```bash
+(cd ../streaming_center_plugins && npm install)   # the plugins, which the app links to
 npm install
 npm run ios       # or: npm run android, npm run web
 ```
@@ -43,23 +44,35 @@ That is why favouriting works in airplane mode and your history survives a
 server going down. Sending that record anywhere else is optional and separate.
 
 **Profiles are real.** Not a colour scheme — genuinely separate preferences,
-history, connections and favourites, enforced by the database rather than by
-remembering to filter.
+history and favourites, enforced by the database rather than by remembering to
+filter. Sources are set up once for the whole device and shared, which is what
+a household with one media server wants; switch a plugin to *configure per
+profile* and every profile gets its own — everyone's own account, a Kids-only
+server — kept apart just as strictly. A PIN keeps a profile for its owner.
 
 ## Platforms
 
-iOS, Android and web are all first-class. Web is the newest and the least
-settled: the local database runs as WebAssembly in the browser, which Expo still
-labels alpha and which needs particular headers from whatever serves the page.
-`docs/platforms/web/` is where that gets worked out.
+iOS, Android and web are all first-class. On a phone the tab bar and headers
+are the platform's own; in a browser the tabs become a top navigation bar. The
+web keeps its data in the browser's own database rather than SQLite, so it runs
+from any static host with no special headers — see `docs/platforms/web/`.
 
 TV layouts are a later goal. The design system is built so those would be new
 screens rather than a new app.
 
 ## Current state
 
-**Skeleton.** This is a fresh Expo project with documentation. The screens are
-still the template's demo screens; none of the architecture above is built yet.
+**First slice.** Three tabs, built with [Tamagui](https://tamagui.dev):
+
+- **Media** — films, series and anime from every source, as one library.
+- **Videos** — web video and plain files, one tab per source.
+- **Settings** — profiles, PIN lock, and every plugin: install it, choose shared
+  or per-profile setup, and connect it through a form the plugin itself
+  describes.
+
+What is not there yet: nothing is saved between launches (it all lives in
+memory for now), and no plugin can talk to its service, so the shelves show
+their shape rather than titles.
 
 ## Documentation
 
