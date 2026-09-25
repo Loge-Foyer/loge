@@ -1,10 +1,26 @@
 /**
- * @sc/plugin-yattee — placeholder.
+ * Yattee Server — media only: YouTube and other web video.
  *
- * Roles: **Media** — exposes content. No sync role.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so the list is empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('yattee'),
+    displayName: 'Yattee Server',
+    description: 'Backend for YouTube and other web video.',
+    media: { contentKinds: ['videos'], capabilities: [] },
+    connectionFields: [
+      {
+        key: 'serverUrl',
+        label: 'Server URL',
+        type: 'url',
+        required: true,
+        placeholder: 'https://yattee.example.com',
+      },
+    ],
+    settings: [],
+  },
+};

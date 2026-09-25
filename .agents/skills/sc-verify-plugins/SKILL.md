@@ -8,10 +8,13 @@ description: Run the verification pass for the Streaming Center plugins reposito
 ```bash
 npm install
 npm run typecheck
+npm test
 ```
 
-That is the whole automated suite today. There are no tests yet, because there
-is no implementation to test — every package is an `export {}`.
+`npm test` runs vitest over `test/`: the effective-roles rule, manifest
+validation, and a conformance check running `validateManifest` over every
+plugin. Tests live in `test/`, never in `api/src` — a `from 'vitest'` there
+would break the first boundary check below.
 
 ## After changing `api`
 
@@ -20,9 +23,10 @@ plugin **and** into the app, and **nothing enforces cross-repository
 consistency**. Verify by hand, in this order:
 
 ```bash
-npm run typecheck                                   # this repo
+npm run typecheck && npm test                       # this repo
 cd ../streaming_center_app && npm run typecheck     # the consumer
 cd ../streaming_center_app && npx expo export --platform ios --output-dir /tmp/sc-ios
+cd ../streaming_center_app && npx expo export --platform web --output-dir /tmp/sc-web
 ```
 
 The bundle matters because the app depends on this repository through a `file:`
@@ -38,7 +42,7 @@ These are rules, not lint, until someone writes the lint. Check by reading:
 grep -rn "from '" api/src/ | grep -v "from '\./" | grep -v "from '\.\./"
 
 # no plugin may import another plugin
-grep -rn "@sc/plugin-" plugins/*/src/
+grep -rnE "(from|import\(|require\()\s*['\"]@sc/plugin-" plugins/*/src/
 
 # no framework in any plugin
 grep -rnE "from 'react|from 'expo|react-native" plugins/*/src/ api/src/
@@ -52,7 +56,9 @@ split exists to prevent exactly those.
 For each plugin, confirm by reading its manifest:
 
 - every declared sync capability has a **toggle defaulting to `false`**
-- no capability is declared that the implementation cannot actually honour
+  (`validateManifest` enforces this, and the conformance test runs it)
+- no capability is declared that the implementation cannot actually honour —
+  today no role is implemented, so only `mock` may declare any
 - the roles in `README.md` match the roles in the manifest
 - the roster in `../.claude/streaming-center-architecture.md` section 8 matches
   reality
@@ -64,5 +70,6 @@ them. Silent data loss, no error.
 
 ## Current state
 
-`api` plus eleven plugins, all placeholders. `npm run typecheck` passing proves
-the workspace wiring is sound and nothing more.
+`api` holds the manifest vocabulary; eleven plugins export manifests only. No
+role is implemented, so passing checks prove the vocabulary and the manifests
+are sound — nothing more.

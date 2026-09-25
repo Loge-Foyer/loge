@@ -16,8 +16,9 @@ stay a leaf.
 
 ## Status
 
-Placeholder. Nothing implemented yet — the contracts are specified in
-`../../.claude/streaming-center-architecture.md` but not written as code.
+The manifest half is written: branded IDs, content kinds, capability flags,
+field descriptors, the plugin manifest, connections, profiles, the
+effective-roles rule and manifest validation. See `../docs/api/`.
 
-**This comes first.** Nothing else can be built correctly until the vocabulary
-exists.
+Still to come: the role contracts (`MediaRole`, `SyncRole`), `MediaItem`,
+playback descriptors and the error model.

@@ -1,10 +1,29 @@
 /**
- * @sc/plugin-emby — placeholder.
+ * Emby — media and sync, one manifest.
  *
- * Roles: **Media** — exposes content. **Sync** — carries your user state.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so both lists are empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('emby'),
+    displayName: 'Emby',
+    description: 'Media server for films and TV, a close relative of Jellyfin.',
+    media: { contentKinds: ['movies', 'shows'], capabilities: [] },
+    sync: { capabilities: [] },
+    connectionFields: [
+      {
+        key: 'serverUrl',
+        label: 'Server URL',
+        type: 'url',
+        required: true,
+        placeholder: 'https://emby.example.com',
+      },
+      { key: 'username', label: 'Username', type: 'text', required: true },
+      { key: 'password', label: 'Password', type: 'password' },
+    ],
+    settings: [],
+  },
+};

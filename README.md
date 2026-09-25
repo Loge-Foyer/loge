@@ -27,14 +27,19 @@ they are the same server, with the same address and the same password.
 So there is one Jellyfin plugin, and it does both. Which of them it actually
 does is up to you.
 
-| Plugin | Can serve media | Can hold your state |
-| --- | :---: | :---: |
-| Jellyfin, Emby, Plex | ✓ | ✓ |
-| iCloud, Google | ✓ — files on Drive | ✓ |
-| Yattee, Invidious, WebDAV | ✓ | — |
-| Your own sync server | — | ✓ |
-| This device only | — | ✓ |
-| Mock, for development | ✓ | ✓ |
+| Plugin | Can serve media | Brings | Can hold your state |
+| --- | :---: | --- | :---: |
+| Jellyfin, Emby, Plex | ✓ | movies, shows | ✓ |
+| iCloud, Google | ✓ | files on Drive | ✓ |
+| WebDAV | ✓ | files | — |
+| Yattee, Invidious | ✓ | videos | — |
+| Your own sync server | — | — | ✓ |
+| This device only | — | — | ✓ |
+| Mock, for development | ✓ | everything | ✓ |
+
+What a plugin brings — movies, shows, anime, videos or files — is part of its
+manifest. The app uses it to decide where things appear: films and series on
+the Media tab, web video and plain files on the Videos tab.
 
 ## You decide what each one is allowed to do
 
@@ -78,11 +83,14 @@ other.
 
 ## Current state
 
-**Skeleton.** Twelve folders — `api` and eleven plugins — each with a README
-saying what will go in it, and no code.
+**Manifests, no implementations.** `api` has the vocabulary a plugin needs to
+describe itself — what it brings, what a connection asks for, which of its
+abilities you have switched on — and every plugin now describes itself with it.
+None of them talks to a real service yet.
 
-`api` comes first. Nothing else can be built properly until the shared
-vocabulary exists.
+Each plugin also says what it needs to connect — a server address, a username,
+a password — and the app builds its settings screen from exactly that. There is
+no form in the app written for any particular plugin.
 
 ## Documentation
 

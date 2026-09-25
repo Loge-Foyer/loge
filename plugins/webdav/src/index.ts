@@ -1,10 +1,28 @@
 /**
- * @sc/plugin-webdav — placeholder.
+ * WebDAV — media only. Plain files: no server supplies titles or artwork.
  *
- * Roles: **Media** — exposes content. No sync role.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so the list is empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('webdav'),
+    displayName: 'WebDAV',
+    description: 'Plain video files on a NAS or any WebDAV share.',
+    media: { contentKinds: ['files'], capabilities: [] },
+    connectionFields: [
+      {
+        key: 'serverUrl',
+        label: 'Server URL',
+        type: 'url',
+        required: true,
+        placeholder: 'https://nas.local/webdav',
+      },
+      { key: 'username', label: 'Username', type: 'text' },
+      { key: 'password', label: 'Password', type: 'password' },
+    ],
+    settings: [],
+  },
+};

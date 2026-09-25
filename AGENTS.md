@@ -13,11 +13,14 @@ api/                 @sc/api — domain types + every contract. Depends on NOTHI
 plugins/
   jellyfin/ emby/ plex/ icloud/ google/ mock/
   yattee/ invidious/ webdav/ custom-server/ local/
+test/                vitest — effective roles, manifest validation, conformance
 docs/
 ```
 
 npm workspaces (`["api", "plugins/*"]`), source-only —
-`"exports": "./src/index.ts"`, no build step.
+`"exports": "./src/index.ts"`, no build step. Every plugin lists `@sc/api` as a
+**peer** dependency: the host supplies the one instance, so branded IDs from
+the app and from a plugin are the same type.
 
 ## One plugin per service
 
@@ -55,17 +58,35 @@ boundary.
 
 ## The manifest
 
+Each plugin's `src/index.ts` exports `plugin: Plugin` — the same name
+everywhere, so the app's registration line is always
+`import { plugin as x } from '@sc/plugin-x'`.
+
 ```ts
 interface PluginManifest {
   readonly id: PluginId;
   readonly displayName: string;
-  readonly media?: { capabilities: MediaCapabilities; connectionFields: Field[] };
-  readonly sync?: { capabilities: SyncCapabilities; connectionFields: Field[] };
-  readonly settings: readonly PluginSettingDescriptor[];
+  readonly description: string;
+  readonly media?: { contentKinds: readonly ContentKind[]; capabilities: readonly MediaCapability[] };
+  readonly sync?: { capabilities: readonly SyncCapability[] };
+  readonly connectionFields: readonly Field[];               // shared by every role
+  readonly settings: readonly PluginSettingDescriptor[];     // never a password
 }
 ```
 
 A role you do not declare is absent, and the app never asks for it.
+
+- **`contentKinds`** — what the source brings: `movies`, `shows`, `anime`,
+  `videos`, `files`. The app decides where each kind appears; a plugin never
+  names a tab.
+- **`connectionFields`** — endpoint, account, secrets; one list for every role,
+  because one connection has one endpoint and one set of credentials. The app
+  renders them. A `password` field is the only secret.
+- **Capabilities** are declared with the code that honours them. No role is
+  implemented yet, so every real plugin declares empty lists; only `mock`
+  declares some.
+- `validateManifest()` in `api` enforces the rules below; `npm test` runs it over
+  every plugin.
 
 ### Media role
 
@@ -90,15 +111,21 @@ The distinction that matters most in this repository.
 The app branches on **effective**. A setting can gate a capability:
 
 ```ts
-interface PluginSettingDescriptor {
-  readonly key: string;              // 'syncWatchProgress'
+type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting;
+
+interface ToggleSetting {
+  readonly key: string;                        // 'syncWatchProgress'
   readonly label: string;
-  readonly type: 'boolean' | 'text' | 'url' | 'password' | 'select';
-  readonly default: unknown;         // false for every sync toggle
-  readonly gates?: readonly CapabilityKey[];
-  readonly secret?: boolean;
+  readonly type: 'boolean';
+  readonly default: boolean;                   // false for every sync toggle
+  readonly gates?: readonly CapabilityKey[];   // 'sync.watchProgress' — one role per toggle
 }
 ```
+
+`effectiveRoles(manifest, connection)` is the one definition: a role is in
+effect when declared **and** switched on (missing means off); a declared
+capability when every toggle gating it is on (stored value, else default); an
+ungated capability follows its role.
 
 **Every sync toggle defaults to off.** Connecting Jellyfin as a media source
 must never start pushing watch state there. Merging the packages was allowed
@@ -118,10 +145,11 @@ merge has broken the property it was supposed to preserve.
    package. No external type may appear in a return value. Anything the adapter
    needs on a later call goes in provider-scoped metadata nothing else reads.
 
-3. **Secrets through the injected credential store.** A connection stores only
-   an opaque `credentialsRef`. Settings are a plain database column — never put
-   a token there. Artwork needing auth carries a `headersRef`, never an inline
-   header.
+3. **Secrets through the injected credential store.** A secret is a `password`
+   connection field; the connection stores only an opaque `credentialsRef`.
+   Settings are a plain database column and cannot be `password` — the type
+   refuses it, and `validateManifest` flags secret-looking keys on other field
+   types. Artwork needing auth carries a `headersRef`, never an inline header.
 
 4. **Normalize errors.** Throw a typed application error with a known code. A
    raw HTTP error reaching the UI is a bug.
@@ -176,17 +204,18 @@ the test of whether this architecture is real.
 
 ## Current state
 
-Twelve packages: `api` plus eleven plugins. Each is a `package.json`, a
-`src/index.ts` containing `export {}`, and a README stating its roles and what
-belongs there. **`api` is empty too** — the contracts above are specified in
-`../.claude/streaming-center-architecture.md` but not yet written as code.
+`api` holds the manifest vocabulary: branded IDs, content kinds, capability
+flags, field descriptors, `PluginManifest`, `Connection`, `AppUser`,
+`effectiveRoles` and `validateManifest`. The role contracts (`MediaRole`,
+`SyncRole`), `MediaItem` and the error model are **not written yet**.
 
-Implement `api` before any plugin. Nothing else can be built correctly until the
-vocabulary exists.
+All eleven plugins export a manifest — roles, content kinds, connection fields —
+and nothing else. No role is implemented anywhere.
 
 ## Verify
 
 ```bash
 npm install
 npm run typecheck
+npm test
 ```

@@ -62,8 +62,8 @@ its quirks. Map inside the package, always.
 
 ## Order of work
 
-`api` first. It is empty, and nothing else can be built correctly until the
-vocabulary exists. Then `mock`, because it is how the app gets built without a
+`api` first — nothing else can be built correctly until the vocabulary exists.
+The manifest half is written; the role contracts come next. Then `mock`, because it is how the app gets built without a
 real server — and it carries both roles so syncing can be exercised too. It
 should deliberately decline some capabilities, so the app's capability handling
 stays genuinely tested.
@@ -73,8 +73,11 @@ and the first plugin to exercise both roles against a real service.
 
 ## Current state
 
-Skeleton. `api` plus eleven plugins, each a `package.json`, an `export {}` and a
-README. No implementation anywhere, including `api`.
+`api` holds the manifest vocabulary (IDs, content kinds, capabilities, fields,
+manifest, connection, effective roles, validation); the role contracts are not
+written yet. Every plugin exports a manifest and nothing else — no role is
+implemented, so no real plugin declares a capability. `npm test` runs the
+effective-roles, validation and conformance tests.
 
 ## Git
 

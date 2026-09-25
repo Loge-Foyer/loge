@@ -1,10 +1,27 @@
 /**
- * @sc/plugin-invidious — placeholder.
+ * Invidious — media only. Instance-based, so a connection is an instance URL
+ * rather than an account.
  *
- * Roles: **Media** — exposes content. No sync role.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so the list is empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('invidious'),
+    displayName: 'Invidious',
+    description: 'A privacy-respecting YouTube front end.',
+    media: { contentKinds: ['videos'], capabilities: [] },
+    connectionFields: [
+      {
+        key: 'instanceUrl',
+        label: 'Instance URL',
+        type: 'url',
+        required: true,
+        placeholder: 'https://invidious.example.com',
+      },
+    ],
+    settings: [],
+  },
+};

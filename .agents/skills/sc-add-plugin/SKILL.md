@@ -28,26 +28,44 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 ## Checklist
 
 1. **Create `plugins/<id>/`** with `package.json` (`@sc/plugin-<id>`,
-   `"exports": "./src/index.ts"`, depending only on `@sc/api`), `src/index.ts`
-   and a `README.md` stating its roles.
+   `"exports": "./src/index.ts"`, `@sc/api` as its only **peer** dependency —
+   the host supplies the one instance, so branded IDs match), `src/index.ts`
+   and a `README.md` stating its roles and what it brings.
 
-2. **Write the manifest.** Declare only the roles the service actually has:
+2. **Write the manifest** and export it as `plugin`. Declare only the roles the
+   service actually has:
 
    ```ts
-   {
-     id, displayName,
-     media?: { capabilities, connectionFields },
-     sync?:  { capabilities, connectionFields },
-     settings: [...]
-   }
+   import { pluginId, type Plugin } from '@sc/api';
+
+   export const plugin: Plugin = {
+     manifest: {
+       id: pluginId('<id>'),
+       displayName: '…',
+       description: 'One sentence for the plugin list.',
+       media: { contentKinds: ['movies', 'shows'], capabilities: [] },
+       sync: { capabilities: [] },
+       connectionFields: [
+         { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
+         { key: 'password', label: 'Password', type: 'password' },
+       ],
+       settings: [],
+     },
+   };
    ```
 
    A role you do not declare is absent, and the app never asks for it.
+   `contentKinds` is what the source brings — `movies`, `shows`, `anime`,
+   `videos`, `files`; the app decides where each appears. `connectionFields`
+   are shared by every role (one connection, one endpoint, one set of
+   credentials), and the Settings screen renders them — never hard-code a form
+   in the app.
 
 3. **Declare capabilities honestly.** They are not documentation — application
-   code branches on them. Declaring `search: true` while `search()` throws turns
-   every query into a `sourceError`. Declaring `false` means the method is never
-   called.
+   code branches on them. Listing `search` while `search()` throws turns every
+   query into a `sourceError`; leaving it out means the method is never called.
+   Declare a capability in the same change that implements it — until then the
+   list stays empty.
 
 4. **Give every sync capability a toggle, defaulting to `false`.** Connecting a
    server for media must never start pushing viewing state to it. This
@@ -58,15 +76,20 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    package. No external type may appear in a return value. Adapter-only data
    goes in provider-scoped metadata nothing else reads.
 
-6. **Route secrets through the injected credential store.** The connection holds
-   an opaque `credentialsRef`. `settings` is a plain database column — never put
-   a token there. Artwork needing auth carries a `headersRef`, never an inline
-   header.
+6. **Route secrets through the injected credential store.** A secret is a
+   `password` connection field; the app stores it behind an opaque
+   `credentialsRef`. `settings` is a plain database column and cannot hold a
+   `password` field at all. Artwork needing auth carries a `headersRef`, never
+   an inline header.
 
 7. **Normalize errors** to a typed application error with a known code. A raw
    HTTP error reaching the UI is a bug.
 
-8. **Register it** in the app's composition root — one line.
+8. **Add it to `test/manifests.test.ts`**, the conformance check that runs
+   `validateManifest` over every plugin.
+
+9. **Register it** in the app's composition root —
+   `streaming_center_app/src/composition/plugins.ts`, one line.
 
 ## If it has a sync role
 
@@ -91,10 +114,12 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 ```bash
 npm install
 npm run typecheck
+npm test
 ```
 
 ## Current state
 
-`api` is **empty** — the contracts are specified in the architecture document
-but not written as code. Implement `api` before any plugin; nothing else can be
-built correctly until the vocabulary exists.
+`api` holds the manifest vocabulary — IDs, content kinds, fields, capabilities,
+connections, effective roles and `validateManifest`. The role contracts
+(`MediaRole`, `SyncRole`, `MediaItem`) are not written yet, so every real plugin
+is a manifest with empty capability lists.

@@ -26,12 +26,13 @@ configure the same server twice.
 1. **Add the role to the manifest.** `media` and `sync` are both optional:
 
    ```ts
-   {
-     id: 'plex',
+   manifest: {
+     id: pluginId('plex'),
      displayName: 'Plex',
-     media: { capabilities, connectionFields },
-     sync:  { capabilities, connectionFields },   // ← the new one
-     settings: [...]
+     media: { contentKinds: ['movies', 'shows'], capabilities: [...] },
+     sync:  { capabilities: [...] },              // ← the new one
+     connectionFields: [...],                     // shared by both roles
+     settings: [...],
    }
    ```
 
@@ -57,12 +58,12 @@ configure the same server twice.
    month to watch films must not discover their history is now being uploaded
    because you shipped a new role.
 
-4. **Do not widen the connection form unnecessarily.** If the new role uses the
-   same endpoint and credentials as the existing one — which it usually does,
-   being the same server — reuse them. Adding required fields breaks existing
-   connections.
+4. **Do not widen the connection form unnecessarily.** `connectionFields` are
+   shared by every role, so the new role already has the existing endpoint and
+   credentials. Adding required fields breaks existing connections.
 
-5. **Update the plugin's `README.md` roles table** in the same commit.
+5. **Update the plugin's `README.md`** (Roles, Brings, Settings) in the same
+   commit.
 
 6. **Update the roster** in `../.claude/streaming-center-architecture.md`
    section 8 and the table in this repository's `AGENTS.md` and `README.md`.
@@ -71,7 +72,8 @@ configure the same server twice.
 
 Existing connections were stored without the new role. They must keep working,
 with the new role **off**, and no migration prompt. A role appearing enabled on
-an existing connection is a bug, not a feature.
+an existing connection is a bug, not a feature. `effectiveRoles` already treats
+a role missing from `connection.roles` as off — keep it that way.
 
 ## Removing a role
 
@@ -83,6 +85,7 @@ declaring the role until there is a migration story.
 
 ```bash
 npm run typecheck
+npm test
 ```
 
 And in the app, confirm it branches on **effective** capabilities — declared

@@ -1,10 +1,28 @@
 /**
- * @sc/plugin-custom-server — placeholder.
+ * Custom server — sync only, to a server you run yourself
+ * (streaming_center_sync).
  *
- * Roles: **Sync** — carries your user state. No media role.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so the list is empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('custom-server'),
+    displayName: 'Sync server',
+    description: 'Your own Streaming Center sync server.',
+    sync: { capabilities: [] },
+    connectionFields: [
+      {
+        key: 'serverUrl',
+        label: 'Server URL',
+        type: 'url',
+        required: true,
+        placeholder: 'https://sync.example.com',
+      },
+      { key: 'accessToken', label: 'Access token', type: 'password', required: true },
+    ],
+    settings: [],
+  },
+};

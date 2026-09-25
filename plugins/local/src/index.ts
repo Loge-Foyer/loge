@@ -1,10 +1,19 @@
 /**
- * @sc/plugin-local — placeholder.
+ * Local — sync only, and a terminus rather than a transport: "this device
+ * only" is an ordinary destination instead of a branch in the sync engine.
  *
- * Roles: **Sync** — carries your user state. No media role.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so the list is empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('local'),
+    displayName: 'This device',
+    description: 'Keeps your state on this device only.',
+    sync: { capabilities: [] },
+    connectionFields: [],
+    settings: [],
+  },
+};

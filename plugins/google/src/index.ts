@@ -1,10 +1,20 @@
 /**
- * @sc/plugin-google — placeholder.
+ * Google — media (files on Drive) and sync, one manifest. Signing in is an
+ * OAuth flow that arrives with the implementation, so there are no fields yet.
  *
- * Roles: **Media** — exposes content. **Sync** — carries your user state.
- *
- * One plugin, one manifest. Roles it does not declare are simply absent —
- * the app never asks for them. Roles it does declare are still gated by the
- * user's per-connection settings. See README.md.
+ * Capabilities are declared together with their implementation. None exists
+ * yet, so both lists are empty and nothing will ask this plugin to act.
  */
-export {};
+import { pluginId, type Plugin } from '@sc/api';
+
+export const plugin: Plugin = {
+  manifest: {
+    id: pluginId('google'),
+    displayName: 'Google Drive',
+    description: 'Video files from Google Drive, and a home for your state.',
+    media: { contentKinds: ['files'], capabilities: [] },
+    sync: { capabilities: [] },
+    connectionFields: [],
+    settings: [],
+  },
+};
