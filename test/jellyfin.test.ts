@@ -160,11 +160,10 @@ describe('Jellyfin — local network only', () => {
     const { provider } = await connect({
       routes: { 'GET /System/Info/Public': new TransportError('timeout') },
     });
-    await expect(provider.check()).rejects.toMatchObject({
-      code: 'TIMEOUT',
-      retry: 'network-change',
-      reason: 'local-network-only',
-    });
+    const error = await provider.check().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ code: 'TIMEOUT', retry: 'network-change' });
+    // Not on mobile data: the server may be down, or this may be someone else's network.
+    expect(error).not.toHaveProperty('reason', 'local-network-only');
   });
 
   it('backs off instead for a server out on the internet', async () => {

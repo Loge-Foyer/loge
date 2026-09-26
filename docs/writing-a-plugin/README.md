@@ -43,8 +43,17 @@ holds your state is one package with two roles, not two packages.
     such as a home server seen from mobile data.
   - `backoff` — a server that is starting up or overloaded.
   - `never` — a wrong password, or a missing item.
+  - `reason: 'local-network-only'` only when you know the device is away from
+    home — the network reports mobile data and the source is local-only. A local
+    server that cannot be reached may simply be down, so it waits for another
+    network without the reason; the app words the two differently.
   - A raw transport error reaching the app is a bug. Aborted requests are the
     exception, and are rethrown as they are.
+- **Your code runs on Hermes** in the iOS and Android apps. Hermes lacks
+  `Array.prototype.toSorted`, `Object.groupBy` and `crypto.randomUUID`; they
+  typecheck and pass on Node, then throw on a phone. Copy, then sort — on an
+  array you just made with `filter` or `map`, sorting in place is fine.
+  `test/engine.test.ts` fails if a source uses one.
 - **Artwork** is an `ImageRef` you build and later resolve synchronously into an
   address. If an image needs a header, return a `headersRef` and resolve it in
   `resolveHeaders` — never put a token in a URL.

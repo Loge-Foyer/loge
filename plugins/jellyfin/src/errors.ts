@@ -3,10 +3,11 @@ import { AppError, type TransportError } from '@sc/api';
 /**
  * A request that got no response. A local-only server that cannot be reached
  * is most likely just not on this network, so it waits for the network to
- * change instead of being tried again and again.
+ * change instead of being tried again and again. It carries no reason: only
+ * the mobile-data check knows the device is away from home.
  */
 export function transportError(error: TransportError, localOnly: boolean): AppError | TransportError {
-  const away = localOnly ? ({ retry: 'network-change', reason: 'local-network-only' } as const) : ({ retry: 'backoff' } as const);
+  const away = localOnly ? ({ retry: 'network-change' } as const) : ({ retry: 'backoff' } as const);
   switch (error.kind) {
     case 'aborted':
       return error;

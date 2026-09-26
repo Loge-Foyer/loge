@@ -45,7 +45,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         const all = visible
           .map((entry) => entry.item)
           .filter((item) => kindOf(item) === query.kind)
-          .toSorted(compareItems(query.sort));
+          .sort(compareItems(query.sort));
         const offset = query.cursor ? Number(query.cursor) : 0;
         const items = all.slice(offset, offset + query.limit);
         const next = offset + items.length;
@@ -83,7 +83,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         const episodes = [...catalogue.episodes.values()].flat().filter((episode) => shows.has(episode.show.externalId));
         return [...movies, ...episodes]
           .filter((item) => item.watch?.positionMs !== undefined && !item.watch.played)
-          .toSorted((a, b) => (b.watch?.lastPlayedAt ?? '').localeCompare(a.watch?.lastPlayedAt ?? ''))
+          .sort((a, b) => (b.watch?.lastPlayedAt ?? '').localeCompare(a.watch?.lastPlayedAt ?? ''))
           .slice(0, limit);
       }),
 

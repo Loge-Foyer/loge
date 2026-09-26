@@ -55,6 +55,15 @@ All four should return nothing. The compiler already refuses host globals
 (`lib: ["esnext"]`); the last grep catches them in files it has not seen yet. Any hit is a boundary violation, and the whole
 split exists to prevent exactly those.
 
+## Built-ins Hermes lacks
+
+The compiler cannot help with the opposite problem: `esnext` offers built-ins
+that Hermes — the engine running plugins on iOS and Android — does not have.
+`Array.prototype.toSorted`, `Object.groupBy` and `crypto.randomUUID` typecheck,
+pass every test on Node, and throw on a phone. `test/engine.test.ts` scans every
+source for them, so `npm test` fails on a new use. When Hermes turns out to lack
+something else, add it to that list and to the app's lint rule together.
+
 ## Manifest sanity
 
 For each plugin, confirm by reading its manifest:

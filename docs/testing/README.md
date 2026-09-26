@@ -24,7 +24,9 @@ Vitest, run over `test/` at the repository root.
   (`fixtures/jellyfin.ts`). It covers:
   - the sign-in header and the device id
   - single-flight sign-in, one re-login, and no retry of a refused password
-  - local-only on mobile data and timeouts
+  - local-only on mobile data (no request, the `local-network-only` reason),
+    an unreachable local server (waits for another network, no reason), and
+    timeouts
   - query parameters, and library scoping
   - paging across libraries with no duplicates or gaps
   - mapping every item type
@@ -35,6 +37,11 @@ Vitest, run over `test/` at the repository root.
   plugin that declares a media capability implements its members, media
   servers stay media-only, and ids are unique. It is the one file allowed to
   import every plugin.
+- `engine.test.ts` — no source in `api/` or `plugins/` uses a built-in that
+  Hermes lacks (`Array.prototype.toSorted`, `Object.groupBy`,
+  `crypto.randomUUID`). Plugins run on Hermes in the iOS and Android apps; the
+  compiler and Node both accept these, so without this check a plugin passes
+  everything here and throws on a phone.
 
 **The fake context** (`fakeContext()`) gives a plugin an in-memory session,
 credentials, a network the test can switch, a client identity and a clock whose
