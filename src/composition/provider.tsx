@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { ServicesContext } from '@/hooks/services-context';
 import type { Services } from '@/services';
 
-import { devSeedFrom, seedDevelopmentData } from './dev-seed';
+import { devSeedFrom, devSeedIds, seedDevelopmentData } from './dev-seed';
 import { createServices } from './services';
 
 interface AppGraph {
@@ -22,7 +22,8 @@ let graph: AppGraph | undefined;
  */
 function appGraph(): AppGraph {
   if (graph) return graph;
-  const services = createServices();
+  const seed = __DEV__ ? devSeedFrom(process.env.EXPO_PUBLIC_DEV_SEED) : null;
+  const services = createServices(seed ? { ids: devSeedIds(seed) } : {});
   graph = {
     services,
     queryClient: new QueryClient({
@@ -38,7 +39,6 @@ function appGraph(): AppGraph {
       return () => subscription.remove();
     });
   }
-  const seed = __DEV__ ? devSeedFrom(process.env.EXPO_PUBLIC_DEV_SEED) : null;
   void (async () => {
     if (seed) await seedDevelopmentData(services, seed);
     await services.session.start();

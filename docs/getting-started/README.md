@@ -41,6 +41,11 @@ The script seeds the same profiles plus one shared Jellyfin connection, filled
 in by field type, so it is there again after every reload. It prints only the
 key names it found. `SC_JELLYFIN_ENV` points it at another file.
 
+A reload signs in as the same device: a seeded build's ids come out the same on
+every launch, and the script pins the device key per machine and platform. The
+server's device list gains one entry for the browser, one for the iOS
+simulator and one for Android — not one per reload.
+
 **Use a test account.** The password is inlined into the development bundle,
 which Metro serves to anyone on your network. The script refuses to run under
 `CI`, and a production export never contains it — `sc-verify` checks.

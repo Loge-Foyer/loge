@@ -2,6 +2,7 @@ import type { Plugin } from '@sc/api';
 
 import type { Services } from '@/services';
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';
+import type { IdGenerator } from '@/services/ports';
 
 import { jellyfinPlugin, mockPlugin } from './plugins';
 
@@ -16,6 +17,16 @@ export function devSeedFrom(value: string | undefined): DevSeed | null {
   if (value === 'locked') return 'locked';
   if (value === 'jellyfin') return 'jellyfin';
   return null;
+}
+
+/**
+ * Ids that come out the same on every launch of a seeded build. Each reload
+ * creates the seed again, and with fresh random ids its connection would sign
+ * in to a real server as a new device every time, leaving an entry behind.
+ */
+export function devSeedIds(seed: DevSeed): IdGenerator {
+  let count = 0;
+  return { next: () => `dev-${seed}-${(count++).toString(36).padStart(4, '0')}` };
 }
 
 interface Server {

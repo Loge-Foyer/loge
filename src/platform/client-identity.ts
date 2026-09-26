@@ -11,7 +11,8 @@ const APP_NAME = 'Streaming Center';
  * between launches, or a media server counts a new device every time:
  *
  * - on iOS and Android it comes from the platform's per-app identifier;
- * - in a development build the start script can pin it;
+ * - in a development build the start script can pin it, per platform — a
+ *   browser and a simulator sharing one would end each other's sessions;
  * - on the web it lasts only as long as the page until storage exists.
  */
 export function createClientIdentitySource(): ClientIdentitySource {
@@ -32,7 +33,7 @@ async function load(): Promise<ClientIdentity> {
 
 async function deviceKey(): Promise<string> {
   const pinned = __DEV__ ? process.env.EXPO_PUBLIC_DEV_INSTALLATION_ID : undefined;
-  if (pinned) return pinned;
+  if (pinned) return `${pinned}:${process.env.EXPO_OS ?? 'unknown'}`;
   const platformId = await platformIdentifier();
   // Hashed, so the platform's own identifier never leaves the device.
   return platformId ? digestStringAsync(CryptoDigestAlgorithm.SHA256, `${APP_NAME}:${platformId}`) : randomUUID();

@@ -24,10 +24,11 @@ bundle.
 
 `npm test` runs vitest over `test/`: connections and per-profile values, session
 binding, the provider pool, merged rows, grid pages and Continue Watching, the
-home layout, the HTTP client, the draft helpers, boot, and the Jellyfin start
-script. `test/support/services.ts` builds the real service graph on in-memory
-stores, with fakes for the clock, the network, `fetch` and a media plugin, so a
-test exercises services exactly as the app wires them.
+home layout, the HTTP client, the draft helpers, boot, the development seed's
+stable ids, and the Jellyfin start script. `test/support/services.ts` builds
+the real service graph on in-memory stores, with fakes for the clock, the
+network, `fetch` and a media plugin, so a test exercises services exactly as
+the app wires them.
 
 Tests run on Node, which has built-ins Hermes does not. What passes here can
 still throw on a phone — which is why lint rejects the known gaps in `src/` —

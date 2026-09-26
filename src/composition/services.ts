@@ -16,16 +16,17 @@ import { systemClock } from '@/platform/clock';
 import { createMemoryCredentialStore } from '@/platform/credential-store';
 import { createPlatformHttpClient } from '@/platform/http';
 import { uuidGenerator } from '@/platform/ids';
+import type { IdGenerator } from '@/services/ports';
 import { consoleLogger } from '@/platform/log';
 import { createNetworkMonitor } from '@/platform/network';
 
 import { plugins } from './plugins';
 
 /** Builds the whole service graph. The only place concrete implementations are chosen. */
-export function createServices(): Services {
+export function createServices(options: { ids?: IdGenerator } = {}): Services {
   const stores = createMemoryStores();
   const credentials = createMemoryCredentialStore();
-  const ids = uuidGenerator;
+  const ids = options.ids ?? uuidGenerator;
   const log = consoleLogger;
   const network = createNetworkMonitor();
   const sessions = createSessions(credentials);
