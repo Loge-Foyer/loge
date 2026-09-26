@@ -40,11 +40,12 @@ in one transaction, then return. The sync engine drains the journal later.
 
 ## Current state
 
-First slice. The template is gone; the app is Tamagui with three tabs (Media,
-Videos, Settings), a session gate, profiles with PIN lock, device-level plugin
-installation with optional per-profile configuration, and connection forms
-rendered from plugin manifests. Storage is in memory; no plugin implements a
-role, so Media and Videos show skeletons.
+Phase 1 — Jellyfin as a media source. Media shows real titles from every live
+source, merged: Continue Watching, per-profile rows, a full-screen grid per
+row, and detail pages. Connections belong to the device and decide per
+connection what each profile keeps for itself (`perProfile`). Storage is still
+in memory, nothing plays, and Videos still shows skeletons. vitest covers the
+service layer.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

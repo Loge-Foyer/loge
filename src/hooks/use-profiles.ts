@@ -25,10 +25,10 @@ export function useProfileActions() {
   const refresh = useRefreshLocalState();
 
   return {
-    create: useMutation({ mutationFn: (name: string) => profiles.create(name), onSuccess: refresh }),
+    create: useMutation({ mutationFn: (name: string) => profiles.create(name), onSuccess: () => refresh() }),
     rename: useMutation({
       mutationFn: ({ id, name }: { id: UserId; name: string }) => profiles.rename(id, name),
-      onSuccess: refresh,
+      onSuccess: () => refresh(),
     }),
     remove: useMutation({
       mutationFn: (id: UserId) => profiles.remove(id),
@@ -37,6 +37,6 @@ export function useProfileActions() {
         await refresh();
       },
     }),
-    setDefault: useMutation({ mutationFn: (id: UserId) => profiles.setDefault(id), onSuccess: refresh }),
+    setDefault: useMutation({ mutationFn: (id: UserId) => profiles.setDefault(id), onSuccess: () => refresh() }),
   };
 }

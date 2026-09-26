@@ -1,5 +1,7 @@
 import type { ConnectionService } from './connections';
 import type { DevicePlugins } from './device-plugins';
+import type { HomeLayoutService } from './home-layout';
+import type { MediaService } from './media';
 import type { PinService } from './pins';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
@@ -15,4 +17,6 @@ export interface Services {
   readonly pins: PinService;
   readonly connections: ConnectionService;
   readonly sources: SourceService;
+  readonly homeLayout: HomeLayoutService;
+  readonly media: MediaService;
 }

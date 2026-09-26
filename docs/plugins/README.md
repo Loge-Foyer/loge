@@ -21,22 +21,74 @@ not a missing package.
 `src/composition/plugins.ts` is the only file that names a plugin. Adding one is
 an import and an entry in its list. The catalogue checks every manifest when the
 app starts: a broken manifest stops a development build and is left out of a
-production one.
+production one. A plugin that implements a role exports it beside its manifest
+(`plugin.media`); the catalogue hands it to the media service, and nothing else
+ever holds it.
 
-## Installed per device
+## Installed per device, configured per connection
 
 A plugin does nothing until someone installs it on the device — in Settings,
-*All plugins*. What happens next depends on one switch per plugin, **Configure
-per profile**, which starts off:
+*All plugins*. Its connections belong to the device too; a plugin can have
+several, and two Jellyfin servers are normal.
 
-- **Off** — the plugin's connections belong to the device and every profile
-  sees them. One Jellyfin server for the whole household.
-- **On** — each profile sets up its own, for example everyone's own account.
-  The shared connections are kept, just not used, until the switch goes off
-  again.
+Each connection decides what every profile keeps for itself, with **Separate
+config per profile**:
 
-A plugin can have several connections either way — two Jellyfin servers are
-normal.
+| Mode | Each profile keeps | Typical use |
+| --- | --- | --- |
+| None | nothing: every profile uses the same values | one household account |
+| Credentials | its own sign-in — the password fields and any field the manifest marks `credential` | an account per person on one server |
+| All | its own value for every field and setting | different servers, or different libraries, per person |
+
+The form only offers the modes the manifest can support. Under Credentials and
+All, profile tabs sit right above the first field that differs per profile, and
+each per-profile input shows the tab's avatar beside its label. Switching away
+from None keeps the login with the profile doing the editing — the saved
+password is moved, never shown — and every other profile signs in on its own
+tab; saving warns before per-profile values would be discarded.
+
+- **A profile that has not filled in its tab** sees "Finish setting up" on its
+  Media tab, linking straight to its own tab of the form.
+- **"Don't use for {profile}"** switches the connection off for that profile:
+  its details are dropped and it neither sees the connection nor is asked to
+  finish it. "Use for {profile}" brings it back.
+- **A PIN-protected profile's tab** stays locked behind its PIN for the rest of
+  the form, and so does switching it off, so a child cannot replace or remove a
+  parent's sign-in.
+
+## Asking the server, only when told to
+
+**Test connection** and **Load libraries** are buttons, never an automatic probe
+while someone types: a server may lock an account after a few failed sign-ins.
+Each tries the selected tab's values as they stand in the form, on a provider
+outside the pool with its own installation id, so a probe never ends a running
+session. Results name the server and its version, or say what went wrong in
+words.
+
+A `libraries` setting renders as *All*, *Only these* or *All except these*, with
+the server's libraries listed once loaded. Libraries the server no longer
+reports stay chosen, in case they come back.
+
+## What a plugin is given
+
+Plugins have no host globals — `@sc/api` compiles against `lib: ["esnext"]`
+alone — so everything reaches them through the `MediaContext` built in
+`services/media/pool.ts`:
+
+| Port | What the app supplies |
+| --- | --- |
+| `http` | `platform/http-client.ts`: answers every status, fails only with a `TransportError` (`offline`, `unreachable`, `timeout`, `aborted`), times out reading the body too, and logs method, host, path, status and duration — never a query string, header or body |
+| `credentials` | the password fields of this connection's scope, read from the credential store on demand |
+| `session` | the scope's token, bound to the identity that signed in (see `docs/data`) |
+| `network` | the network kind from `expo-network`; a browser only knows online or offline |
+| `client` | app name and version, device name, and an installation id stable per device, connection and credential scope |
+| `clock` | `now()`, and a `sleep()` that honours cancellation |
+
+The installation id hashes a device key — the vendor id on iOS, the Android id,
+a random id per page load on the web until storage is durable — with the
+connection and scope. A server that
+keeps one token per device then keeps one per profile that signs in, instead of
+each sign-in ending the last one's session.
 
 ## What a plugin brings
 
@@ -49,14 +101,16 @@ files — and the app decides where that appears:
 | Videos | videos, files — one tab per source |
 
 That mapping lives in one place, `src/services/tab-content.ts`. Nothing in the
-app ever asks *which* plugin a source is.
+app ever asks *which* plugin a source is: it branches on the effective
+capabilities of a resolved source.
 
-## Forms come from the plugin
+## Plugins run on Hermes
 
-What a connection needs — a server address, a username, a password — is
-declared in the plugin's manifest, and the connection screen renders exactly
-that. Passwords go to the credential store and are never shown again; everything
-else is plain configuration.
+On iOS and Android, plugin code runs on Hermes, which lacks a few built-ins
+that Node and browsers have — `Array.prototype.toSorted`, `Object.groupBy`,
+`crypto.randomUUID`. Code using them typechecks and passes every test, then
+throws on a phone. App lint rejects them in `src/`, and the plugins repository's
+tests scan its sources for them.
 
 ## The rules, enforced
 

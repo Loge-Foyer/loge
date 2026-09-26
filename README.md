@@ -26,6 +26,10 @@ npm install
 npm run ios       # or: npm run android, npm run web
 ```
 
+To try it against your own Jellyfin server, put its address and a test
+account in `../jellyfin.env` and run `npm run start:jellyfin` —
+`docs/getting-started/` has the details, and the one caveat.
+
 ## How it is put together
 
 Four ideas, and the rest follows from them.
@@ -41,14 +45,17 @@ Adding Plex should mean one new folder over there and one line here.
 **Your data is yours and it is local.** What you have watched, what you have
 favourited, where you got to — the app keeps its own copy in a local database.
 That is why favouriting works in airplane mode and your history survives a
-server going down. Sending that record anywhere else is optional and separate.
+server going down. Where a server already keeps that record, as Jellyfin does,
+the server stays the authority and the app's copy is a cache that works
+offline; for plain files and web video, the app's copy is the record.
 
 **Profiles are real.** Not a colour scheme — genuinely separate preferences,
 history and favourites, enforced by the database rather than by remembering to
-filter. Sources are set up once for the whole device and shared, which is what
-a household with one media server wants; switch a plugin to *configure per
-profile* and every profile gets its own — everyone's own account, a Kids-only
-server — kept apart just as strictly. A PIN keeps a profile for its owner.
+filter. Sources are set up once for the whole device, which is what a household
+with one media server wants. Each connection then decides what every profile
+keeps for itself — nothing, its own sign-in, or everything, down to which
+libraries it shows — and a connection can be switched off for a profile
+entirely. A PIN keeps a profile, and its sign-ins, for its owner.
 
 ## Platforms
 
@@ -62,17 +69,21 @@ screens rather than a new app.
 
 ## Current state
 
-**First slice.** Three tabs, built with [Tamagui](https://tamagui.dev):
+**Phase 1 — Jellyfin.** Three tabs, built with [Tamagui](https://tamagui.dev):
 
-- **Media** — films, series and anime from every source, as one library.
-- **Videos** — web video and plain files, one tab per source.
-- **Settings** — profiles, PIN lock, and every plugin: install it, choose shared
-  or per-profile setup, and connect it through a form the plugin itself
-  describes.
+- **Media** — films and series from every source, as one library: what you are
+  in the middle of, then a row per kind in the order and sort you choose, a
+  full-screen grid behind each row, and a page for every film, series, season
+  and episode. Jellyfin is the first real source.
+- **Videos** — web video and plain files, one tab per source. No source lists
+  them yet.
+- **Settings** — profiles, PIN lock, and every plugin: install it, connect it
+  through a form the plugin itself describes, and decide what each profile
+  keeps for itself.
 
 What is not there yet: nothing is saved between launches (it all lives in
-memory for now), and no plugin can talk to its service, so the shelves show
-their shape rather than titles.
+memory for now), nothing plays, and there is no account to carry profiles
+between devices.
 
 ## Documentation
 

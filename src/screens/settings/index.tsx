@@ -50,7 +50,7 @@ export function SettingsScreen() {
 
       <SettingsSection
         title="Plugins"
-        footer="Plugins are installed for the whole device. Their connections are shared by every profile, unless a plugin is set to be configured per profile."
+        footer="Plugins and their connections belong to the device. A connection can keep a separate sign-in, or everything, for each profile."
       >
         {installed.map((manifest) => {
           const live = sources.filter((source) => source.manifest.id === manifest.id);

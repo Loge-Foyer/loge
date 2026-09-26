@@ -20,4 +20,21 @@ npx expo export --platform web --output-dir dist
 - **Tamagui's reset** (`@tamagui/core/reset.css`) is imported by the root
   layout; the web build looks wrong without it.
 - **Tabs** are a top navigation bar (`src/components/app-tabs.web.tsx`), not
-  the native tab bar.
+  the native tab bar. There is no pull to refresh in a browser, so Media has a
+  Refresh button beside Customize.
+
+## Reaching a media server from a browser
+
+- **CORS.** The browser sends the source's requests itself, so the server must
+  allow the page's origin. Jellyfin answers `Access-Control-Allow-Origin: *` and
+  allows the `Authorization` header by default; other servers may need
+  configuring.
+- **Mixed content.** A page served over `https` cannot call an `http` server on
+  the local network; the browser blocks it before any request leaves. Serve the
+  app over `http` on the same network, or put the server behind `https`.
+- **No mobile data.** A browser only reports online or offline, never the kind
+  of network, so a local-only source is never skipped on the web — it is tried,
+  and if it cannot be reached it waits for the network to change.
+- **Unbound `fetch`.** A browser throws "Illegal invocation" when `fetch` runs
+  with any other `this`. The HTTP client calls it unbound, and a test holds it
+  to that.

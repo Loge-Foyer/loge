@@ -11,13 +11,13 @@ export function useGate(): Gate {
 }
 
 /**
- * Provided by the tab navigator, which only renders behind the `ready` gate and
+ * Provided by the `(app)` group, which only renders behind the `ready` gate and
  * is keyed by the profile — so nothing below it can outlive a profile switch.
  */
 export const ActiveUserContext = createContext<UserId | null>(null);
 
 export function useActiveUserId(): UserId {
   const userId = use(ActiveUserContext);
-  if (!userId) throw new Error('useActiveUserId() is only available inside the tabs.');
+  if (!userId) throw new Error('useActiveUserId() is only available inside the (app) group.');
   return userId;
 }

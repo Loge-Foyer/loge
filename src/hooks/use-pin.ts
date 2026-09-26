@@ -11,17 +11,17 @@ export function usePinActions() {
   return {
     create: useMutation({
       mutationFn: ({ userId, pin }: { userId: UserId; pin: string }) => pins.create(userId, pin),
-      onSuccess: refresh,
+      onSuccess: () => refresh(),
     }),
     change: useMutation({
       mutationFn: ({ userId, current, next }: { userId: UserId; current: string; next: string }) =>
         pins.change(userId, current, next),
-      onSuccess: refresh,
+      onSuccess: () => refresh(),
     }),
     remove: useMutation({
       mutationFn: ({ userId, current }: { userId: UserId; current: string }) =>
         pins.remove(userId, current),
-      onSuccess: refresh,
+      onSuccess: () => refresh(),
     }),
   };
 }

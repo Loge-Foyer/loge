@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { Paragraph, SizableText, YStack } from 'tamagui';
 
 import { AppSwitch } from '@/components/app-switch';
-import { CONTENT_KIND_LABELS, ROLE_LABELS } from '@/components/labels';
+import { CONTENT_KIND_LABELS, PER_PROFILE_SUMMARY, ROLE_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { usePluginConnections } from '@/hooks/use-connections';
@@ -18,10 +18,10 @@ import { PluginChips } from './plugins';
 export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
   const manifest = usePluginManifest(pluginId);
   const userId = useActiveUserId();
-  const profile = useProfiles().data?.find((candidate) => candidate.id === userId);
+  const { data: profiles = [] } = useProfiles();
   const state = usePluginStates().data?.get(pluginId) ?? PLUGIN_OFF;
-  const { setEnabled, setPerProfile } = usePluginActions();
-  const { data: live } = usePluginConnections(pluginId);
+  const { setEnabled } = usePluginActions();
+  const { data: connections = [] } = usePluginConnections(pluginId);
 
   if (!manifest) {
     return (
@@ -30,8 +30,6 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
       </Screen>
     );
   }
-
-  const scope = live?.owner.scope === 'user' ? (profile?.name ?? 'This profile') : 'This device';
 
   return (
     <Screen>
@@ -45,11 +43,7 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
 
       <SettingsSection
         title="On this device"
-        footer={
-          state.perProfile
-            ? 'Each profile sets up its own connections — for example, everyone’s own account.'
-            : 'One set of connections, shared by every profile on this device.'
-        }
+        footer="Installed for the whole device. Each connection decides what every profile keeps for itself — nothing, its own sign-in, or everything."
       >
         <SettingsRow
           title="Installed"
@@ -62,37 +56,36 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
             />
           }
         />
-        <SettingsRow
-          title="Configure per profile"
-          subtitle={state.perProfile ? 'Every profile has its own' : 'Shared by every profile'}
-          disabled={!state.enabled}
-          trailing={
-            <AppSwitch
-              label="Configure per profile"
-              checked={state.perProfile}
-              disabled={!state.enabled}
-              onCheckedChange={(perProfile) => setPerProfile.mutate({ id: pluginId, perProfile })}
-            />
-          }
-        />
       </SettingsSection>
 
       {state.enabled ? (
-        <SettingsSection title={`Connections — ${scope}`}>
-          {(live?.connections ?? []).map((connection) => {
+        <SettingsSection title="Connections">
+          {connections.map(({ connection, setUp, off }) => {
             const roles = (['media', 'sync'] as const).filter((role) => connection.roles[role] === true);
+            const what =
+              roles.length > 0
+                ? roles.map((role) => ROLE_LABELS[role]).join(' · ') +
+                  (roles.includes('media') && manifest.media
+                    ? ` — ${manifest.media.contentKinds.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ')}`
+                    : '')
+                : 'Switched off';
+            const who =
+              connection.perProfile === 'none'
+                ? PER_PROFILE_SUMMARY.none
+                : [
+                    PER_PROFILE_SUMMARY[connection.perProfile],
+                    off.has(userId)
+                      ? 'off for you'
+                      : setUp.has(userId)
+                        ? `${setUp.size} of ${profiles.length - off.size} set up`
+                        : 'not set up for you',
+                    ...(off.size > 0 && !off.has(userId) ? [`off for ${off.size}`] : []),
+                  ].join(' · ');
             return (
               <SettingsRow
                 key={connection.id}
                 title={connection.label}
-                subtitle={
-                  roles.length > 0
-                    ? roles.map((role) => ROLE_LABELS[role]).join(' · ') +
-                      (roles.includes('media') && manifest.media
-                        ? ` — ${manifest.media.contentKinds.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ')}`
-                        : '')
-                    : 'Switched off'
-                }
+                subtitle={`${what}\n${who}`}
                 href={{ pathname: '/settings/connections/[connectionId]', params: { connectionId: connection.id } }}
               />
             );

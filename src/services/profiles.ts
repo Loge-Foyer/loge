@@ -8,6 +8,7 @@ import type {
   UserRepository,
 } from './ports';
 import type { SessionService } from './session';
+import type { Sessions } from './sessions';
 import { toAppUser } from './users';
 
 const MAX_NAME_LENGTH = 30;
@@ -28,11 +29,14 @@ export function createProfileService(deps: {
   users: UserRepository;
   connections: ConnectionRepository;
   credentials: SecureCredentialStore;
+  sessions: Sessions;
   deviceSettings: DeviceSettingsRepository;
   session: SessionService;
   ids: IdGenerator;
+  /** The profile is gone: whatever runs for it can stop. */
+  onRemoved?: (id: UserId) => void;
 }): ProfileService {
-  const { users, connections, credentials, deviceSettings, session, ids } = deps;
+  const { users, connections, credentials, sessions, deviceSettings, session, ids, onRemoved } = deps;
 
   const cleanName = (name: string) => {
     const trimmed = name.trim();
@@ -68,10 +72,12 @@ export function createProfileService(deps: {
       if (all.length === 1) throw new Error('The last profile cannot be deleted.');
 
       // Secrets are not in the database, so its cascade cannot reach them.
-      const owned = await connections.list({ scope: 'user', userId: id });
-      for (const connection of owned) {
-        if (connection.credentialsRef) await credentials.delete(connection.credentialsRef);
+      const own = await connections.valuesOfProfile(id);
+      for (const values of own.values()) {
+        if (values.credentialsRef) await credentials.delete(values.credentialsRef);
       }
+      for (const connection of await connections.list()) await sessions.forget(connection.id, id);
+      onRemoved?.(id);
       if (user.pinCredentialRef) await credentials.delete(user.pinCredentialRef);
 
       await users.delete(id);

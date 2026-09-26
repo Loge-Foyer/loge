@@ -20,3 +20,13 @@ export function useTabSources(tab: ContentTab) {
     queryFn: () => sources.forTab(userId, tab),
   });
 }
+
+/** Connections that keep values per profile, which this profile has not filled in. */
+export function usePendingSources() {
+  const userId = useActiveUserId();
+  const { sources } = useServices();
+  return useQuery({
+    queryKey: userKey(userId, 'sources', 'pending'),
+    queryFn: () => sources.pendingFor(userId),
+  });
+}

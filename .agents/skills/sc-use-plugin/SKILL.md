@@ -1,6 +1,6 @@
 ---
 name: sc-use-plugin
-description: Wire a Streaming Center plugin from the plugins repository into the app — the file dependency, the Metro watch folder, the registration line at the composition root, and branching on effective roles. Use when connecting, registering or debugging a plugin inside the app.
+description: Wire a Streaming Center plugin from the plugins repository into the app — the file dependency, the Metro watch folder, the registration line at the composition root, per-profile connection values, effective roles on resolved values, and how a media role is called. Use when connecting, registering or debugging a plugin inside the app.
 ---
 
 # Using a plugin in the app
@@ -66,29 +66,58 @@ the app changes — Settings renders the new plugin's form from its manifest.
 
 A plugin **declares** roles, content kinds and capabilities. The user
 **enables** roles and toggles per connection. The app reads the result of
-`effectiveRoles(manifest, connection)` from `@sc/api` — the sources service
-does this for every screen:
+`effectiveRoles(manifest, { roles, settings })` from `@sc/api`, computed on the
+settings the active profile runs the connection with — the sources service does
+this for every screen:
 
 ```
 effective = declared ∩ switched on   (a missing switch is off)
 ```
 
 Branching on declared alone calls features the user switched off — for a sync
-role, pushing viewing state to a server they never asked to sync with. Every
+role, pushing viewing state to a server they never asked to sync with; for
+`offlineMetadata`, keeping artwork on a device whose owner said not to. Every
 sync toggle defaults to off for exactly this reason.
 
-## 5. Installed per device, configured once or per profile
+## 5. Installed per device, configured per connection
 
 A plugin does nothing until it is **installed** (enabled) on the device. Its
-connections are the device's and shared by every profile — unless its
-"Configure per profile" switch is on, in which case each profile has its own.
-Both sets are kept; the switch only picks the live one.
+connections are the device's. Each connection's `perProfile` mode decides what
+a profile keeps for itself — `none`, `credentials` (password fields and fields
+marked `credential: true`), or `all` — and those values live in rows the profile
+owns. `resolveValues` merges them over the shared ones; `services/sources.ts`
+gives each connection a standing per profile: **live**, **pending** (its own
+values are not filled in: Media offers "Finish setting up"), or **off** (the
+profile does not use it, and is never asked).
+
+Under `all`, two profiles can run the same connection with different settings,
+so always read capabilities from the resolved source, never from the connection
+alone.
 
 ## 6. One plugin, one or two roles
 
-A plugin is defined by the service, not the job. `@sc/plugin-jellyfin` carries
-both a media and a sync role. Enabling one must never enable the other.
-Do not look for `@sc/plugin-jellyfin-sync`. It does not exist and should not.
+A plugin is defined by the service, not the job: one plugin per service,
+declaring a media role, a sync role, or both. Enabling one must never enable the
+other. Jellyfin, Emby and Plex are **media-only** — they master their own watch
+status, which travels through the media role's watch-state capabilities. Do not
+look for `@sc/plugin-jellyfin-sync`; it does not exist and should not.
+
+## 7. How a media role is called
+
+`plugin.media.connect(target, context)` is called by `services/media/pool.ts`
+and nothing else. The target is the resolved values for one credential scope;
+the context carries every host service a plugin may use — HTTP, the scope's
+credentials, its session token, the network kind, a client identity and a
+clock — because plugins have no host globals. A declared capability means the
+provider implements its member (`browse` → `listItems`, `getItem`,
+`getChildren`; `libraries` → `getLibraries`; `watchStateRead` → `getResume`;
+`remoteImages` → `resolveImage`); the plugins repository's conformance test
+enforces it, and the media service reports a missing one as `INVALID_STATE`.
+
+Screens never call a provider. They read `useHomeRowQueries`, `useGrid`,
+`useItem` and friends (`src/hooks/use-media.ts`), which go through the media
+service: merged across sources, failures returned as `sourceErrors`, parking
+and retry handled there.
 
 ## Verifying it actually resolves
 
@@ -106,5 +135,7 @@ appear exactly once — two copies would mean two brands and two vocabularies.
 ## Current state
 
 All eleven plugins are linked and registered (`mock` in development builds
-only). They export manifests only: no role is implemented, so the app lists
-them, installs them and configures connections, but nothing talks to a service.
+only). Jellyfin and the mock implement the media role — browse, libraries,
+watch status read, and (Jellyfin) remote images and offline metadata. The rest
+export manifests only: the app lists them, installs them and configures
+connections, and says plainly that they cannot list titles yet.

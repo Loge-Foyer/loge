@@ -1,5 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { ServicesContext } from '@/hooks/services-context';
 import type { Services } from '@/services';
@@ -30,6 +31,13 @@ function appGraph(): AppGraph {
       defaultOptions: { queries: { staleTime: Infinity, retry: false } },
     }),
   };
+  // A browser reports focus by itself; on a device, coming back to the app is the focus.
+  if (process.env.EXPO_OS !== 'web') {
+    focusManager.setEventListener((setFocused) => {
+      const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
+      return () => subscription.remove();
+    });
+  }
   const seed = __DEV__ ? devSeedFrom(process.env.EXPO_PUBLIC_DEV_SEED) : null;
   void (async () => {
     if (seed) await seedDevelopmentData(services, seed);

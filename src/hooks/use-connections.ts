@@ -1,51 +1,44 @@
-import type { ConnectionId, ConnectionOwner, PluginId } from '@sc/api';
+import type { ConnectionId, PluginId } from '@sc/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import type { ConnectionDraft } from '@/services/connections';
-import { userKey } from '@/services/query-keys';
+import { deviceKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
 import { useRefreshLocalState } from './use-local-state';
-import { useActiveUserId } from './use-session';
 
-/** The plugin's connections that are live for the active profile, and who owns them. */
+/** A plugin's connections, and which profiles each is live for. Device state: every profile sees the same list. */
 export function usePluginConnections(pluginId: PluginId) {
-  const userId = useActiveUserId();
   const { connections } = useServices();
   return useQuery({
-    queryKey: userKey(userId, 'plugin-connections', pluginId),
-    queryFn: async () => {
-      const owner = await connections.liveOwner(pluginId, userId);
-      return { owner, connections: await connections.list(owner, pluginId) };
-    },
+    queryKey: deviceKey('connections', pluginId),
+    queryFn: () => connections.list(pluginId),
   });
 }
 
+/** A connection with every profile's own values — the editor shows a tab for each. */
 export function useConnection(id: ConnectionId) {
-  const userId = useActiveUserId();
   const { connections } = useServices();
   return useQuery({
-    queryKey: userKey(userId, 'connection', id),
-    queryFn: async () => {
-      const connection = await connections.get(id);
-      return connection ? { connection, savedSecrets: await connections.savedSecrets(id) } : null;
-    },
+    queryKey: deviceKey('connection', id),
+    queryFn: async () => (await connections.edit(id)) ?? null,
   });
 }
 
 export function useConnectionActions() {
   const { connections } = useServices();
   const refresh = useRefreshLocalState();
+  // A connection's values decide what its source answers, so remote results go too.
+  const refreshAll = () => refresh({ remote: true });
   return {
     create: useMutation({
-      mutationFn: ({ pluginId, owner, draft }: { pluginId: PluginId; owner: ConnectionOwner; draft: ConnectionDraft }) =>
-        connections.create(pluginId, owner, draft),
-      onSuccess: refresh,
+      mutationFn: ({ pluginId, draft }: { pluginId: PluginId; draft: ConnectionDraft }) => connections.create(pluginId, draft),
+      onSuccess: refreshAll,
     }),
     update: useMutation({
       mutationFn: ({ id, draft }: { id: ConnectionId; draft: ConnectionDraft }) => connections.update(id, draft),
-      onSuccess: refresh,
+      onSuccess: refreshAll,
     }),
-    remove: useMutation({ mutationFn: (id: ConnectionId) => connections.remove(id), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: ConnectionId) => connections.remove(id), onSuccess: refreshAll }),
   };
 }

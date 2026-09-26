@@ -1,12 +1,14 @@
 import type { Field, FieldValue, PluginSettingDescriptor } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Adapt, Button, Label, Select, Sheet, SizableText, XStack, YStack } from 'tamagui';
 
 import { AppSwitch } from '@/components/app-switch';
 import { TextInput } from '@/components/text-input';
+
+import { LibrariesField, type LibrariesProbe } from './libraries-field';
 
 export type FormField = Field | PluginSettingDescriptor;
 
@@ -21,6 +23,10 @@ export interface FieldInputProps {
   saved?: boolean;
   /** Offered for an optional password field that holds a saved value. */
   onRemoveSaved?: () => void;
+  /** Shown beside the label — whose value this is, when values differ per profile. */
+  marker?: ReactNode;
+  /** For a `libraries` field: the libraries the connection reports. */
+  libraries?: LibrariesProbe;
 }
 
 /**
@@ -28,19 +34,30 @@ export interface FieldInputProps {
  * else — no plugin is ever named here, so a new plugin needs no new form.
  */
 export function FieldInput(props: FieldInputProps) {
-  const { field, error } = props;
+  const { field, error, marker } = props;
   const id = useId();
 
   if (field.type === 'boolean') return <ToggleField {...props} field={field} id={id} />;
 
   return (
     <YStack gap="$1.5">
-      <Label htmlFor={id} size="$3" lineHeight="$3" color="$color11" fontWeight="600">
-        {field.label}
-        {'required' in field && field.required ? ' *' : ''}
-      </Label>
+      <XStack items="center" gap="$2">
+        <Label htmlFor={id} size="$3" lineHeight="$3" color="$color11" fontWeight="600">
+          {field.label}
+          {'required' in field && field.required ? ' *' : ''}
+        </Label>
+        {marker}
+      </XStack>
       {field.type === 'select' ? (
         <SelectField {...props} field={field} id={id} />
+      ) : field.type === 'libraries' ? (
+        <LibrariesField
+          field={field}
+          value={props.value}
+          onChange={props.onChange}
+          disabled={props.disabled ?? false}
+          {...(props.libraries ? { probe: props.libraries } : {})}
+        />
       ) : (
         <TextInputField {...props} id={id} />
       )}
@@ -91,17 +108,21 @@ function ToggleField({
   value,
   onChange,
   disabled,
+  marker,
   id,
 }: FieldInputProps & { field: Extract<FormField, { type: 'boolean' }>; id: string }) {
   const checked = typeof value === 'boolean' ? value : field.default;
   return (
     <XStack gap="$3" items="center" justify="space-between">
       <YStack flex={1} gap="$0.5">
-        {/* Label lines up with a control's height by default; a toggle's label
-            may wrap, so it takes the font's own line height. */}
-        <Label htmlFor={id} size="$4" lineHeight="$4" color={disabled ? '$color9' : '$color12'}>
-          {field.label}
-        </Label>
+        <XStack items="center" gap="$2">
+          {/* Label lines up with a control's height by default; a toggle's label
+              may wrap, so it takes the font's own line height. */}
+          <Label htmlFor={id} size="$4" lineHeight="$4" color={disabled ? '$color9' : '$color12'}>
+            {field.label}
+          </Label>
+          {marker}
+        </XStack>
         {field.description ? (
           <SizableText size="$2" color="$color10">
             {field.description}

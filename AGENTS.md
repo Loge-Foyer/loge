@@ -78,8 +78,9 @@ These are specific to Streaming Center and matter more than anything above.
 2. **No plugin names above the composition root.** There must never be an
    `if (providerId === 'jellyfin')` in a screen, component or service. Branch on
    **effective** capabilities — what the plugin declares, intersected with what
-   the user enabled for that connection. Branching on declared alone calls
-   features the user switched off.
+   the user enabled for that connection, on the values the active profile runs
+   it with (`services/sources.ts`). Branching on declared alone calls features
+   the user switched off.
 
 3. **Only the composition root imports a concrete plugin.** Screens resolve what
    they need from injected services. This is what keeps the boundary real rather
@@ -87,8 +88,10 @@ These are specific to Streaming Center and matter more than anything above.
 
 4. **Secrets never reach the database** — SQLite on native, IndexedDB on web.
    The database stores opaque refs; values live behind `SecureCredentialStore`
-   (keychain on native, encrypted IndexedDB on web, in memory today). A secret
-   is exactly a manifest `password` field. Never log a token, a header or a PIN.
+   (keychain on native, encrypted IndexedDB on web, in memory today). Secrets
+   are manifest `password` fields, PINs and session tokens; none of them enters
+   a row, a query key, a provider fingerprint or a log. A changed secret gets a
+   new ref — never overwrite one in place.
 
 5. **Writes are local-first.** A user action writes to the local database and
    appends a change-journal entry in one transaction, then returns. The sync
@@ -99,13 +102,21 @@ These are specific to Streaming Center and matter more than anything above.
    `user_id` with a cascade from `users`, *and* every query cache key is
    prefixed with the active user (`userKey()` / `deviceKey()` in
    `src/services/query-keys.ts`). The database alone is not enough.
-   Connections of a plugin in device mode are device-owned and shared on
-   purpose; per-profile mode makes them user-owned.
+   Connections belong to the device; what a profile keeps for itself on one —
+   its values under the connection's `perProfile` mode — is user-owned and goes
+   with the profile. What a source answered is keyed with `remoteKey()`, so a
+   local change never refetches every server.
 
-7. **Components take domain types.** `<MediaCard item={item} />`, never
-   `<JellyfinPoster raw={payload} />`. Artwork goes through a resolver, never a
-   raw URI — a reference may carry an auth header that must not sit where a
-   component can read it.
+7. **Components take domain types.** `<PosterCard item={item} />`, never
+   `<JellyfinPoster raw={payload} />`. Artwork goes through
+   `components/artwork.tsx`, which resolves a reference through the media
+   service — never a raw URI, because a reference may need an auth header that
+   must not sit where a component can read it.
+
+8. **Never try a failed sign-in again on your own.** Servers lock accounts
+   after a few failures. A source that answers `UNAUTHORIZED` is parked until
+   the user acts, a plugin signs in once per 401 at most, and Test connection /
+   Load libraries are buttons — never a probe while someone is typing.
 
 ---
 
@@ -121,6 +132,19 @@ Not an afterthought. Things to know:
 - `src/app/_layout.tsx` imports `@tamagui/core/reset.css`; without it browser
   defaults (button padding) break components.
 - Tabs on web are `src/components/app-tabs.web.tsx`, a top navigation bar.
+- A browser's `fetch` must be called unbound (`const { fetch } = deps`), and a
+  page on `https` cannot reach an `http` server on the local network.
+
+---
+
+## iOS and Android run Hermes
+
+Hermes lacks built-ins that Node and browsers have — `Array.prototype.toSorted`,
+`Object.groupBy`, `crypto.randomUUID`. Code using them typechecks, passes vitest
+(Node) and works on the web, then throws on a phone: Continue Watching broke
+exactly like that. Lint rejects them in `src/`; copy and sort
+(`[...list].sort(compare)`) instead. Plugins run on Hermes too — the plugins
+repository's tests scan for the same gaps.
 
 ---
 
@@ -160,7 +184,15 @@ real export, not a typecheck.
   min-width (`$sm`, `$md`, `$lg`, `$xl`).
 - Native-drawn chrome (NativeTabs, stack headers, native switches) takes
   resolved colours: `String(theme.x.val)`.
-- Scrolling surfaces are React Native `ScrollView`/`FlatList`, not Tamagui's.
+- Scrolling surfaces are React Native `ScrollView`/`FlatList`, not Tamagui's;
+  the full-screen grid is `@shopify/flash-list`, keyed by its column count.
+- v5 views default to `position: static` on the web. An overlay's container
+  (badges on a poster, text over a hero) needs `position="relative"`, or the
+  overlay lands on some ancestor — right on a phone, wrong in a browser.
+- React Native components take `pointerEvents` in `style`; the prop is
+  deprecated.
+- Screen kinds come from `src/components/stack-options.tsx`: tab root,
+  full-screen page, detail (transparent header), sheet.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
   `field.type` only. Never write a form for a specific plugin.
 
@@ -197,17 +229,24 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-First slice, storage **in memory**:
+Phase 1 — Jellyfin as a media source. Storage is still **in memory**:
 
 - Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
   source), Settings (profiles, PIN lock, plugins).
-- Plugins are installed per device; each can be configured per profile
-  (off by default); connections are created from each plugin's manifest.
-- Media and Videos render skeletons: no plugin implements a role, so there are
-  no titles. `MediaItem` does not exist yet.
+- Plugins are installed per device. Connections belong to the device, and each
+  decides what every profile keeps for itself: nothing, its own sign-in, or
+  everything — with PIN-gated profile tabs, "Finish setting up" for profiles
+  that have not, and "Don't use for {profile}".
+- Media is real: Continue Watching, one row per kind with per-profile order,
+  sort and card style, a full-screen grid per row, and detail pages for movies,
+  shows, seasons and episodes — from every live source, merged. Jellyfin and
+  the mock implement the media role; nothing plays yet.
+- Videos still renders skeletons: no plugin lists videos or files yet.
+- `npm run start:jellyfin` seeds a real server from the workspace's
+  `jellyfin.env`.
 - The service graph is a runtime singleton (`src/composition/provider.tsx`) —
   a router remount must never rebuild it.
-- No app-side tests yet.
+- vitest covers the service layer (`npm test`).
 
 Do not assume anything else described here exists. Build it, then update the
 docs in the same commit.
@@ -217,7 +256,8 @@ docs in the same commit.
 ```bash
 npx expo start          # once: generates the typed-route types
 npx tsc --noEmit
-npx expo lint           # includes the import-boundary rules
+npx expo lint           # includes the import-boundary and Hermes rules
+npm test                # vitest, the service layer
 npx expo-doctor
 npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web

@@ -1,5 +1,6 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import type { Stack } from 'expo-router';
+import { XStack } from 'tamagui';
 
 import { ProfileButton } from './profile-button';
 
@@ -18,13 +19,46 @@ export const tabStackOptions: StackOptions = {
 
 /**
  * A tab's first screen: a large native title with the profile switcher beside
- * it. In a browser the top navigation bar already is the header.
+ * it, and anything else the screen offers there. In a browser the top
+ * navigation bar already is the header.
  */
-export function tabRootOptions(title: string): StackOptions {
+export function tabRootOptions(title: string, options: { right?: ReactNode } = {}): StackOptions {
   return {
     title,
     headerShown: !isWeb,
-    headerLargeTitle: true,
-    headerRight: () => <ProfileButton />,
+    headerLargeTitleEnabled: true,
+    headerRight: () => (
+      <XStack gap="$3" items="center">
+        {options.right}
+        <ProfileButton />
+      </XStack>
+    ),
   };
 }
+
+/** A page pushed over the tabs: its own header, with a way back. */
+export const fullScreenOptions: StackOptions = {
+  headerShown: true,
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: 'minimal',
+};
+
+/** A detail page: the header floats over the artwork. */
+export const detailOptions: StackOptions = {
+  headerShown: true,
+  headerTransparent: true,
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: 'minimal',
+  title: '',
+};
+
+/**
+ * A native sheet on iOS and Android, a plain page in a browser. What it shows
+ * must be inline — a Tamagui portal would render behind the native sheet.
+ */
+export const sheetOptions: StackOptions = {
+  presentation: 'formSheet',
+  sheetAllowedDetents: [0.7, 1],
+  sheetGrabberVisible: true,
+  headerShown: false,
+};

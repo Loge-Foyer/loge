@@ -32,3 +32,4 @@ export const plugins: readonly Plugin[] = [
 
 /** Used by the optional development seed. */
 export const mockPlugin = mock;
+export const jellyfinPlugin = jellyfin;

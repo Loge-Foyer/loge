@@ -1,6 +1,6 @@
 ---
 name: sc-verify
-description: Run the full verification pass for the Streaming Center app — typecheck, lint (including the import-boundary rules), expo-doctor and a real bundle for each target. Use before committing, after touching config or native modules, or when asked whether the app is healthy.
+description: Run the full verification pass for the Streaming Center app — typecheck, lint (import-boundary and Hermes rules), tests, expo-doctor, a real bundle for each target, and the check that no development secret reaches a production bundle. Use before committing, after touching config or native modules, or when asked whether the app is healthy.
 ---
 
 # Verify the Streaming Center app
@@ -10,7 +10,8 @@ Run these in order. Each catches something the others cannot.
 ```bash
 npx expo start        # once, then stop it: it generates .expo/types (typed routes)
 npm run typecheck     # tsc --noEmit — strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess
-npm run lint          # expo lint, including the boundary rules below
+npm run lint          # expo lint, including the boundary and Hermes rules below
+npm test              # vitest over test/ — the service layer
 npx expo-doctor       # dependency and config diagnosis
 ```
 
@@ -29,6 +30,26 @@ npx expo export --platform web --output-dir /tmp/sc-web
 is broken, a route is invalid, or a `file:` dependency into the plugins
 repository fails to resolve. Those only surface in an export.
 
+## No development secret in a production bundle
+
+`npm run start:jellyfin` inlines a real password into the development bundle.
+Prove an export never carries it — export with sentinel values, then search:
+
+```bash
+EXPO_PUBLIC_DEV_SEED=jellyfin EXPO_PUBLIC_DEV_JELLYFIN_URL=http://sc-sentinel-host:8096 \
+EXPO_PUBLIC_DEV_JELLYFIN_USERNAME=SC_SENTINEL_USER EXPO_PUBLIC_DEV_JELLYFIN_PASSWORD=SC_SENTINEL_42 \
+  npx expo export --platform web --source-maps --output-dir /tmp/sc-web
+grep -rl -e SC_SENTINEL_42 -e SC_SENTINEL_USER -e sc-sentinel-host /tmp/sc-web   # must print nothing
+```
+
+The seed's `process.env.EXPO_PUBLIC_DEV_JELLYFIN_*` reads sit behind `__DEV__`,
+so a production build drops them. Moving one outside that check leaks the
+password into every export.
+
+While the source maps are there, check the vocabulary is bundled once: the
+`sources` of the web map should list each `streaming_center_plugins/api/src/*`
+file exactly once.
+
 ## Boundaries — a deliberate violation must fail
 
 `eslint.config.js` turns the composition-root rule (spec §15) into lint errors:
@@ -43,6 +64,15 @@ repository fails to resolve. Those only surface in an export.
 Do not trust them, prove them. Drop a throwaway file into `src/screens/` that
 imports one of each — including a relative `../platform/clock` — and run
 `npx eslint` on it. Every import must be an error. Delete the file.
+
+## Hermes rules
+
+iOS and Android run Hermes, which lacks `Array.prototype.toSorted`,
+`Object.groupBy` and `crypto.randomUUID`. Tests run on Node and the web runs V8,
+so nothing else notices until a phone throws. Lint rejects all three anywhere
+in `src/`; add `[1].toSorted()` to the throwaway file above and it must fail
+too. The plugins repository's `test/engine.test.ts` scans its sources for the
+same list.
 
 ## Why web gets its own bundle
 
@@ -69,8 +99,8 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
 
 - Storage is **in memory**: every reload is a first launch unless the dev seed
   is on (`sc-run`).
-- There are no app-side tests yet — do not invent a test command. The plugins
-  repository has vitest for `@sc/api`.
+- `npm test` covers services, not screens. Screens are proven by driving the
+  app on each platform (`sc-run`).
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

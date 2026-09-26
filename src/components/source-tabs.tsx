@@ -1,12 +1,16 @@
+import { EyeOff } from '@tamagui/lucide-icons-2/icons/EyeOff';
+import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { ScrollView } from 'react-native';
-import { Button, XStack } from 'tamagui';
+import { Button, Circle, XStack } from 'tamagui';
 
 export interface SourceTab {
   readonly id: string;
   readonly label: string;
+  /** A small sign after the label: something to finish, a PIN to enter first, or not in use. */
+  readonly marker?: 'attention' | 'locked' | 'off';
 }
 
-/** One tab per source, across the top of Videos. */
+/** One tab per choice, as pills — across the top of Videos, and for profiles in forms. */
 export function SourceTabs({
   tabs,
   selected,
@@ -33,6 +37,11 @@ export function SourceTabs({
               borderWidth={0}
               fontWeight={active ? '600' : '400'}
               onPress={() => onSelect(tab.id)}
+              {...(tab.marker === 'locked' ? { iconAfter: <Lock size={12} />, 'aria-label': `${tab.label}, locked` } : {})}
+              {...(tab.marker === 'off' ? { iconAfter: <EyeOff size={12} />, 'aria-label': `${tab.label}, not used` } : {})}
+              {...(tab.marker === 'attention'
+                ? { iconAfter: <Circle size={7} bg={active ? '$accentColor' : '$orange9'} aria-label="needs attention" /> }
+                : {})}
             >
               {tab.label}
             </Button>

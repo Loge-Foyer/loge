@@ -1,6 +1,7 @@
 import {
   validateManifest,
   type ContentKind,
+  type MediaRole,
   type Plugin,
   type PluginId,
   type PluginManifest,
@@ -14,6 +15,8 @@ export interface PluginCatalog {
    * here: nothing is called on a plugin from the catalogue.
    */
   bringing(kinds: readonly ContentKind[]): readonly PluginManifest[];
+  /** The media role's implementation, once the plugin has one. */
+  mediaRole(id: PluginId): MediaRole | undefined;
 }
 
 export interface CatalogOptions {
@@ -27,7 +30,8 @@ export function createPluginCatalog(
   { strict, warn }: CatalogOptions,
 ): PluginCatalog {
   const byId = new Map<PluginId, PluginManifest>();
-  for (const { manifest } of plugins) {
+  const roles = new Map<PluginId, MediaRole>();
+  for (const { manifest, media } of plugins) {
     const problems = [
       ...validateManifest(manifest),
       ...(byId.has(manifest.id) ? ['its id is already registered'] : []),
@@ -42,6 +46,7 @@ export function createPluginCatalog(
       continue;
     }
     byId.set(manifest.id, manifest);
+    if (media) roles.set(manifest.id, media);
   }
 
   const manifests = [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -52,5 +57,6 @@ export function createPluginCatalog(
       manifests.filter((manifest) =>
         manifest.media?.contentKinds.some((kind) => kinds.includes(kind)),
       ),
+    mediaRole: (id) => roles.get(id),
   };
 }

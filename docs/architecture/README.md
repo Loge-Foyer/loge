@@ -14,7 +14,7 @@ src/
   hooks/        React bindings: query hooks, the session gate
   services/     business logic, no React; ports.ts declares what they need
   persistence/  repository implementations (in memory today)
-  platform/     device boundary: credential store, ids, clock
+  platform/     device boundary: credentials, HTTP, network, identity, clock, logging
   composition/  builds the service graph
 ```
 
@@ -29,7 +29,9 @@ Screens and hooks reach services through `useServices()`, never through
 `composition/services.ts` wires the graph; `composition/provider.tsx` builds it
 **once per JavaScript runtime**, not once per mount. The router may remount the
 root layout — after a deep link, or the browser's back button — and that must
-never produce a second graph with empty state.
+never produce a second graph with empty state. The same file wires TanStack
+Query's focus manager to `AppState`, so returning to the app refreshes what is
+stale.
 
 ## The session gate
 
@@ -39,21 +41,80 @@ decision after launch is the pure function in `services/boot.ts`. Every root
 route sits behind exactly one `Stack.Protected` guard on that gate, so when the
 gate moves, the guards do the navigating.
 
-The tab navigator is keyed by the active profile: switching profiles remounts
-every tab, so nothing of the previous profile survives on screen.
+Everything a signed-in profile can reach lives in the `(app)` group: the tabs,
+and the pages pushed over them — the full-screen grid, detail pages and the
+customize sheet. Its layout is keyed by the active profile, so switching
+profiles remounts all of it and nothing of the previous profile survives on
+screen.
+
+`(app)` is reachable while the gate is `starting`, too, showing the boot spinner
+behind the splash screen. A link that opened the app keeps its target that way;
+were `(app)` guarded until `ready`, the router would replace the link with the
+boot screen before the app could honour it. If the gate settles anywhere else —
+a PIN to enter, a profile to pick — the guards take over as usual and the link
+is dropped.
 
 ## Where a source comes from
 
-For the active profile, `services/sources.ts` takes every plugin installed on
-the device, then its device connections — or, if the plugin is configured per
-profile, the profile's own — and asks `@sc/api`'s `effectiveRoles` what each
-connection may actually do. The tabs only ever see that result.
+Every connection belongs to the device. Its `perProfile` mode decides what each
+profile keeps for itself: nothing (`none`), its own sign-in (`credentials`), or
+its own value for every field and setting (`all`). For the active profile,
+`services/sources.ts` resolves each connection of each installed plugin to one
+of three standings:
+
+| Standing | When | What the profile sees |
+| --- | --- | --- |
+| live | shared, or the profile's own values are complete | the connection's titles |
+| pending | the profile has not filled in its own values | "Finish setting up" on Media |
+| off | the profile was switched off for it | nothing at all |
+
+A live source carries the values it runs with — shared values, with the
+profile's own where the mode separates them — and `@sc/api`'s `effectiveRoles`
+runs on those resolved values. Under `all`, two profiles can differ in what the
+same connection may do. The screens only ever see that result.
+
+## Talking to sources
+
+`services/media/` is the only place that calls a plugin's media role.
+
+- **One provider per connection and credential scope** (`pool.ts`). Every
+  profile sharing a login shares a provider and a session: a provider each
+  would sign in again and again, and a server that allows one token per device
+  would end each session with the next. A provider is replaced when the
+  resolved values change — its fingerprint covers fields, settings and the
+  credentials ref, never a secret: a changed secret gets a new ref.
+- **It never throws.** Rows, the grid and Continue Watching fan out to every
+  live source and merge what arrives; a source that failed comes back as a
+  `SourceError` beside the others' results, and the home shows one quiet line
+  for it.
+- **Retry hints decide what happens next.** `backoff` rows are asked again every
+  30 seconds. `network-change` parks the source: later calls return the parked
+  error without touching the plugin until the network changes or the user
+  refreshes. A failed sign-in (`UNAUTHORIZED`) parks it too, because servers lock
+  accounts that keep trying.
+- **Merging keeps the source's order.** Each plugin returns items in
+  `compareItems` order; rows merge sorted lists, and the grid merges buffered
+  pages that stop as soon as one source runs dry, because past that point the
+  order can no longer be proved.
+
+## Query keys
+
+Every key is prefixed with the active profile (`userKey`) or with `device`
+(`deviceKey`). What a source answered also carries `remote`
+(`remoteKey`), which splits it from local state:
+
+- Local changes — renaming a profile, editing the home layout — refresh local
+  keys only, never every server.
+- Remote queries use `networkMode: 'always'`: a server at home answers without
+  the internet, so React Query must never hold them back as "offline".
+- Refresh — pull to refresh, or the web toolbar — unparks sources and
+  invalidates the profile's remote keys; a changed network does the same.
 
 ## State ownership
 
 | State | Lives in |
 | --- | --- |
-| Profiles, connections, device settings | repositories (in memory today; SQLite / IndexedDB next) |
-| Secrets and PINs | the credential store (in memory today; keychain / encrypted IndexedDB next) |
-| Reads for screens | TanStack Query, every key prefixed by `device` or by the active profile |
+| Profiles, connections, per-profile values, preferences, device settings | repositories (in memory today; SQLite / IndexedDB next) |
+| Passwords, PINs, session tokens | the credential store (in memory today; keychain / encrypted IndexedDB next) |
+| Reads for screens, titles from sources | TanStack Query, every key prefixed by `device` or by the active profile |
 | The session gate | the session service, read with `useSyncExternalStore` |

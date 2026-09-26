@@ -12,6 +12,15 @@ export function usePosterWidth() {
   return 120;
 }
 
+/** The width of a landscape card, for continuing and for rows shown as scenes. */
+export function useLandscapeWidth() {
+  const media = useMedia();
+  if (media.xl) return 380;
+  if (media.lg) return 340;
+  if (media.md) return 300;
+  return 260;
+}
+
 export function Shelf({ title, children }: { title: string; children: ReactNode }) {
   return (
     <YStack gap="$3">

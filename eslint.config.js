@@ -19,6 +19,23 @@ const implementations = [
   },
 ];
 
+// Hermes, the engine on iOS and Android, lacks a few built-ins a browser has.
+// Code using them typechecks and works on the web, then throws on a phone.
+const missingOnHermes = {
+  'no-restricted-syntax': [
+    'error',
+    {
+      selector: "CallExpression[callee.property.name='toSorted']",
+      message: 'Hermes has no Array.prototype.toSorted. Copy, then sort: [...list].sort(compare).',
+    },
+  ],
+  'no-restricted-properties': [
+    'error',
+    { object: 'Object', property: 'groupBy', message: 'Hermes has no Object.groupBy.' },
+    { object: 'crypto', property: 'randomUUID', message: 'Hermes has no crypto.randomUUID. Use expo-crypto.' },
+  ],
+};
+
 const compositionRoot = {
   group: ['@/composition/*', '**/composition/*'],
   message: 'Only src/app/_layout.tsx mounts the composition root. Use useServices().',
@@ -28,6 +45,10 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: ['dist/*'],
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: missingOnHermes,
   },
   {
     files: ['src/**/*.{ts,tsx}'],

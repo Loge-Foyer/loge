@@ -10,7 +10,7 @@ export function usePluginManifest(id: PluginId) {
   return useServices().catalog.get(id);
 }
 
-/** Device state for every registered plugin: installed, per-profile. */
+/** Device state for every registered plugin: whether it is installed. */
 export function usePluginStates() {
   const { catalog, devicePlugins } = useServices();
   return useQuery({
@@ -31,12 +31,7 @@ export function usePluginActions() {
     setEnabled: useMutation({
       mutationFn: ({ id, enabled }: { id: PluginId; enabled: boolean }) =>
         devicePlugins.setEnabled(id, enabled),
-      onSuccess: refresh,
-    }),
-    setPerProfile: useMutation({
-      mutationFn: ({ id, perProfile }: { id: PluginId; perProfile: boolean }) =>
-        devicePlugins.setPerProfile(id, perProfile),
-      onSuccess: refresh,
+      onSuccess: () => refresh({ remote: true }),
     }),
   };
 }
