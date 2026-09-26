@@ -1,5 +1,5 @@
 import type { CapabilityKey, MediaCapability, SyncCapability } from './capabilities';
-import type { Connection } from './connection';
+import type { ConnectionRoles } from './connection';
 import type { ContentKind } from './content';
 import type { FieldValues } from './fields';
 import { isToggle, type PluginManifest, type ToggleSetting } from './manifest';
@@ -26,11 +26,12 @@ export interface EffectiveRoles {
  *
  * A role is in effect when it is declared and switched on. A declared
  * capability is in effect when every toggle gating it is on; one no toggle
- * gates follows its role.
+ * gates follows its role. `settings` are the ones the connection runs with for
+ * a profile (`resolveValues`), because a connection can keep them per profile.
  */
 export function effectiveRoles(
   manifest: PluginManifest,
-  connection: Pick<Connection, 'roles' | 'settings'>,
+  connection: { readonly roles: ConnectionRoles; readonly settings: FieldValues },
 ): EffectiveRoles {
   const toggles = manifest.settings.filter(isToggle);
   const allowed = (key: CapabilityKey) =>

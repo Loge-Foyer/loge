@@ -1,5 +1,5 @@
 export const MEDIA_CAPABILITIES = [
-  'home',
+  'browse',
   'search',
   'libraries',
   'collections',
@@ -11,6 +11,9 @@ export const MEDIA_CAPABILITIES = [
   'favoritesRead',
   'favoritesWrite',
   'remoteImages',
+  // Not a call but a permission: the source's items keep stable ids and
+  // tag-versioned artwork, so the app may keep them on the device.
+  'offlineMetadata',
 ] as const;
 
 export type MediaCapability = (typeof MEDIA_CAPABILITIES)[number];

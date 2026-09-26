@@ -11,6 +11,12 @@ export interface TextField extends FieldBase {
   readonly required?: boolean;
   readonly placeholder?: string;
   readonly default?: string;
+  /**
+   * Part of the account on the other side, such as a username. A connection
+   * that separates credentials per profile keeps it per profile, with the
+   * password fields — which always count as credentials.
+   */
+  readonly credential?: true;
 }
 
 export interface UrlField extends FieldBase {
@@ -47,13 +53,48 @@ export interface SelectField extends FieldBase {
   readonly default: string;
 }
 
+/**
+ * Which of a source's libraries a connection shows. `except` also shows
+ * libraries the source adds later; `only` does not.
+ */
+export type LibrarySelection =
+  | { readonly mode: 'all' }
+  | { readonly mode: 'only' | 'except'; readonly ids: readonly string[] };
+
+/**
+ * A choice among the libraries the source itself reports. It can only be a
+ * setting: the app fills its options by asking the connection, so the plugin
+ * must declare the `libraries` capability.
+ */
+export interface LibrariesField extends FieldBase {
+  readonly type: 'libraries';
+  readonly default: LibrarySelection;
+}
+
 export type Field = TextField | UrlField | PasswordField | BooleanField | SelectField;
 
 export type FieldType = Field['type'];
 
-export type FieldValue = string | boolean;
+export type FieldValue = string | boolean | LibrarySelection;
 
 export type FieldValues = Readonly<Record<string, FieldValue>>;
 
 /** The secret values of one connection, keyed by password-field key. */
 export type Credentials = Readonly<Record<string, string>>;
+
+export function isLibrarySelection(value: unknown): value is LibrarySelection {
+  if (typeof value !== 'object' || value === null) return false;
+  const { mode, ids } = value as { mode?: unknown; ids?: unknown };
+  if (mode === 'all') return true;
+  return (
+    (mode === 'only' || mode === 'except') &&
+    Array.isArray(ids) &&
+    ids.every((id) => typeof id === 'string')
+  );
+}
+
+/** Whether `id` passes a selection. Anything but a valid selection means all. */
+export function selectsLibrary(selection: FieldValue | undefined, id: string): boolean {
+  if (!isLibrarySelection(selection) || selection.mode === 'all') return true;
+  return selection.mode === 'only' ? selection.ids.includes(id) : !selection.ids.includes(id);
+}

@@ -4,7 +4,9 @@ Emby server. Closely related to Jellyfin — similar APIs without being identica
 
 ## Roles
 
-**Media** — exposes content. **Sync** — carries your user state.
+**Media.** No sync role: like Jellyfin, the server stays the master of what each
+of its users watched. The app will read that and, with playback, write progress
+back through the media role — never through a sync role.
 
 ## Brings
 
@@ -13,12 +15,12 @@ Movies and shows.
 ## Connection
 
 - **Server URL** — required
-- **Username** — required
+- **Username** — required; a credential, so it can be kept per profile
 - **Password**
 
 ## Settings
 
-Every sync toggle defaults to **off**. Connecting this plugin for media does nothing to your viewing state until you switch it on.
+None yet.
 
 ## Status
 

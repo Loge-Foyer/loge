@@ -20,7 +20,7 @@ export const plugin: Plugin = {
         required: true,
         placeholder: 'https://nas.local/webdav',
       },
-      { key: 'username', label: 'Username', type: 'text' },
+      { key: 'username', label: 'Username', type: 'text', credential: true },
       { key: 'password', label: 'Password', type: 'password' },
     ],
     settings: [],

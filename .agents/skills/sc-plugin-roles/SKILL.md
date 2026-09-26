@@ -5,17 +5,22 @@ description: Add or change a role on an existing Streaming Center plugin — giv
 
 # Adding a role to an existing plugin
 
-A plugin already exists for the service. You want it to do something new — a
-media source should also carry user state, or a sync target should also serve
-files.
+A plugin already exists for the service. You want it to do something new — an
+account provider should also serve files, or a file service should also become
+an account.
 
 **Do not create a second package.** Add the role to the existing manifest.
+
+**Media servers do not get a sync role.** Jellyfin, Emby and Plex are the master
+of what their users watched. Reading that is `watchStateRead`, and writing
+progress back is `watchStateWrite` — both media capabilities. A device has at
+most one sync connection, its account, and a media server is never it.
 
 ## Why not a second package
 
 The original specification called the media/sync separation mandatory. What that
-rule protected was the arrangement people actually want — *media from Jellyfin,
-state to iCloud* — not the existence of two npm packages.
+rule protected was the arrangement people actually want — *files from Google
+Drive, the account somewhere else* — not the existence of two npm packages.
 
 That property is preserved by the **roles being independently switchable**, not
 by the packaging. Split the package and you gain nothing; you just make the user
@@ -27,20 +32,20 @@ configure the same server twice.
 
    ```ts
    manifest: {
-     id: pluginId('plex'),
-     displayName: 'Plex',
-     media: { contentKinds: ['movies', 'shows'], capabilities: [...] },
+     id: pluginId('google'),
+     displayName: 'Google Drive',
+     media: { contentKinds: ['files'], capabilities: [...] },
      sync:  { capabilities: [...] },              // ← the new one
      connectionFields: [...],                     // shared by both roles
      settings: [...],
    }
    ```
 
-2. **Declare only what the service can genuinely carry.** A Jellyfin server has
-   somewhere to put "watched up to 42 minutes" and nowhere to put "prefers dark
-   mode". Declaring `preferences: true` there means the engine hands you
-   preference changes, you drop them, and the checkpoint advances past them —
-   the state is gone and nothing errors.
+2. **Declare only what the service can genuinely carry.** An account that can
+   store a watch history but not a home layout must not declare
+   `preferences`. Declaring it anyway means the engine hands you preference
+   changes, you drop them, and the checkpoint advances past them — the state is
+   gone and nothing errors.
 
 3. **Add a toggle per gateable capability, defaulting to `false`.**
 

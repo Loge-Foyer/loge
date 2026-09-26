@@ -13,7 +13,7 @@ api/                 @sc/api — domain types + every contract. Depends on NOTHI
 plugins/
   jellyfin/ emby/ plex/ icloud/ google/ mock/
   yattee/ invidious/ webdav/ custom-server/ local/
-test/                vitest — effective roles, manifest validation, conformance
+test/                vitest — api rules, plugins against fake HTTP, conformance
 docs/
 ```
 
@@ -24,17 +24,22 @@ the app and from a plugin are the same type.
 
 ## One plugin per service
 
-**Not one per role.** Jellyfin serves a library *and* holds viewing state; it is
-`plugins/jellyfin`, one package, two roles. Same for Emby, Plex, iCloud, Google
-and mock.
+**Not one per role.** iCloud serves Drive files *and* can be the device's
+account; it is `plugins/icloud`, one package, two roles. Same for Google and
+mock.
 
 | Plugin | media | sync |
 | --- | :---: | :---: |
-| `jellyfin` `emby` `plex` | ✓ | ✓ |
+| `jellyfin` `emby` `plex` | ✓ | — |
 | `icloud` `google` | ✓ (Drive files) | ✓ |
 | `mock` | ✓ | ✓ |
 | `yattee` `invidious` `webdav` | ✓ | — |
 | `custom-server` `local` | — | ✓ |
+
+**Media servers are media-only.** A media server is the master of what its
+users watched: the app reads it (`watchStateRead`) and later writes progress
+back (`watchStateWrite`) through the *media* role. A device has at most one
+sync connection — the account — and a media server is never it.
 
 Do not create `plugins/jellyfin-sync`. If a service gains a second role, add the
 role to its existing manifest.
@@ -45,6 +50,11 @@ role to its existing manifest.
 | --- | --- | --- |
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
 | any plugin | `@sc/api` | any framework, the app, another plugin |
+
+`lib: ["esnext"]` gives `api` and plugins **no host globals**: no `fetch`,
+`URL`, `console`, `setTimeout`, `btoa`, `AbortSignal`. The compiler rejects
+them. A plugin reaches the host only through the `MediaContext` it is handed:
+`http`, `credentials`, `session`, `network`, `client`, `clock`.
 
 `api` is the centre of the whole project — the app depends on it, every plugin
 depends on it, the sync server depends on it. It must stay a leaf. If you need a
@@ -81,18 +91,40 @@ A role you do not declare is absent, and the app never asks for it.
   names a tab.
 - **`connectionFields`** — endpoint, account, secrets; one list for every role,
   because one connection has one endpoint and one set of credentials. The app
-  renders them. A `password` field is the only secret.
-- **Capabilities** are declared with the code that honours them. No role is
-  implemented yet, so every real plugin declares empty lists; only `mock`
-  declares some.
+  renders them. A `password` field is the only secret. Mark a text field that is
+  part of the account (a username) with `credential: true`: a connection that
+  keeps credentials per profile keeps exactly those, plus every password.
+- **A `libraries` setting** lets the user pick from the libraries the source
+  reports. It needs the `libraries` capability, because the app fills it by
+  asking the connection.
+- **Capabilities** are declared with the code that honours them — the
+  conformance test checks that every declared capability's members
+  (`MEDIA_CAPABILITY_MEMBERS`) exist.
 - `validateManifest()` in `api` enforces the rules below; `npm test` runs it over
   every plugin.
 
 ### Media role
 
-`connect()` returns a `ConnectedMediaProvider`. Members are optional and mirror
-the capability flags: `getHome`, `search`, `getItem`, `getChildren`,
-`getLibraries`, `getPlaybackDescriptor`, `dispose`.
+`plugin.media.connect(target, context)` returns a `ConnectedMediaProvider`. It
+does no network work: signing in waits for the first call. The target holds
+the connection's values already resolved for one profile.
+
+| Capability | Members |
+| --- | --- |
+| `browse` | `listItems`, `getItem`, `getChildren` |
+| `libraries` | `getLibraries` |
+| `watchStateRead` | `getResume` (items carry `watch` too) |
+| `remoteImages` | `resolveImage` (synchronous), `resolveHeaders` |
+| `offlineMetadata` | none — permission for the app to keep items on the device |
+
+`check()` and `dispose()` are always present. Rules every provider follows:
+
+- **Pages are ordered exactly by `compareItems(query.sort)`.** The app merges
+  sources with it.
+- **Sign-in is single-flight.** Several calls start together.
+- **A refused login is never retried.** Servers lock accounts.
+- **Throw only `AppError`**, with a retry hint: `backoff`, `network-change` or
+  `never`.
 
 ### Sync role
 
@@ -111,7 +143,7 @@ The distinction that matters most in this repository.
 The app branches on **effective**. A setting can gate a capability:
 
 ```ts
-type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting;
+type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting | LibrariesField;
 
 interface ToggleSetting {
   readonly key: string;                        // 'syncWatchProgress'
@@ -151,8 +183,8 @@ merge has broken the property it was supposed to preserve.
    refuses it, and `validateManifest` flags secret-looking keys on other field
    types. Artwork needing auth carries a `headersRef`, never an inline header.
 
-4. **Normalize errors.** Throw a typed application error with a known code. A
-   raw HTTP error reaching the UI is a bug.
+4. **Normalize errors.** Throw `AppError` with a known code and a retry hint.
+   A raw HTTP or transport error reaching the UI is a bug.
 
 5. **Never assume you are the only connection.** Two connections to the same
    plugin are normal, and they may enable different roles.
@@ -204,13 +236,20 @@ the test of whether this architecture is real.
 
 ## Current state
 
-`api` holds the manifest vocabulary: branded IDs, content kinds, capability
-flags, field descriptors, `PluginManifest`, `Connection`, `AppUser`,
-`effectiveRoles` and `validateManifest`. The role contracts (`MediaRole`,
-`SyncRole`), `MediaItem` and the error model are **not written yet**.
+`api` holds the manifest vocabulary and the **media contract**:
 
-All eleven plugins export a manifest — roles, content kinds, connection fields —
-and nothing else. No role is implemented anywhere.
+- `MediaItem` and friends
+- `ItemQuery` / `compareItems` / `mergeSorted`
+- `AppError` with retry hints
+- `HttpClient`
+- `MediaRole` / `ConnectedMediaProvider` / `MediaContext`
+- per-connection per-profile values (`PerProfile`, `resolveValues`,
+  `isSetUpFor`)
+
+`SyncRole` is not written yet.
+
+**Jellyfin** implements the media role. **Mock** implements it with a fixed
+catalogue. Every other plugin is a manifest that declares no capability.
 
 ## Verify
 

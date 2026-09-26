@@ -5,7 +5,7 @@ const sound: PluginManifest = {
   id: pluginId('fixture'),
   displayName: 'Fixture',
   description: 'A plugin that exists only in tests.',
-  media: { contentKinds: ['videos'], capabilities: ['home'] },
+  media: { contentKinds: ['videos'], capabilities: ['browse'] },
   sync: { capabilities: ['watchProgress'] },
   connectionFields: [
     { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
@@ -93,10 +93,48 @@ describe('validateManifest', () => {
           label: 'Everything',
           type: 'boolean',
           default: false,
-          gates: ['sync.watchProgress', 'media.home'],
+          gates: ['sync.watchProgress', 'media.browse'],
         },
       ],
     });
     expect(problems).toContain('setting "syncEverything" gates more than one role');
+  });
+});
+
+describe('validateManifest — libraries and credentials', () => {
+  const libraries = { key: 'libraries', label: 'Libraries', type: 'libraries', default: { mode: 'all' } } as const;
+  const withLibrariesCapability = { contentKinds: ['movies'], capabilities: ['browse', 'libraries'] } as const;
+
+  it('accepts a libraries setting when the plugin can list its libraries', () => {
+    expect(problemsWith({ media: withLibrariesCapability, settings: [...sound.settings, libraries] })).toEqual([]);
+  });
+
+  it('rejects a libraries setting without the libraries capability', () => {
+    expect(problemsWith({ settings: [...sound.settings, libraries] })).toContain(
+      'a libraries setting needs the media capability "libraries"',
+    );
+  });
+
+  it('rejects two libraries settings', () => {
+    const problems = problemsWith({
+      media: withLibrariesCapability,
+      settings: [...sound.settings, libraries, { ...libraries, key: 'moreLibraries' }],
+    });
+    expect(problems).toContain('declares more than one libraries setting');
+  });
+
+  it('rejects a libraries default that is not a selection', () => {
+    const problems = problemsWith({
+      media: withLibrariesCapability,
+      settings: [...sound.settings, { ...libraries, default: { mode: 'only', ids: [42] } as never }],
+    });
+    expect(problems).toContain('libraries setting "libraries" has an invalid default');
+  });
+
+  it('rejects a setting marked as a credential', () => {
+    const problems = problemsWith({
+      settings: [...sound.settings, { key: 'accountName', label: 'Account', type: 'text', credential: true }],
+    });
+    expect(problems).toContain('setting "accountName" cannot be a credential; credentials are connection fields');
   });
 });

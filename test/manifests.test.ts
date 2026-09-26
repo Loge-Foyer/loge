@@ -1,5 +1,5 @@
 // The one place allowed to import every plugin: a conformance check over all of them.
-import { validateManifest, type Plugin } from '@sc/api';
+import { MEDIA_CAPABILITY_MEMBERS, validateManifest, type Plugin } from '@sc/api';
 import { plugin as customServer } from '@sc/plugin-custom-server';
 import { plugin as emby } from '@sc/plugin-emby';
 import { plugin as google } from '@sc/plugin-google';
@@ -12,6 +12,8 @@ import { plugin as plex } from '@sc/plugin-plex';
 import { plugin as webdav } from '@sc/plugin-webdav';
 import { plugin as yattee } from '@sc/plugin-yattee';
 import { describe, expect, it } from 'vitest';
+
+import { fakeContext, fakeHttp, target } from './support/fake-http';
 
 const plugins: readonly Plugin[] = [
   customServer,
@@ -32,10 +34,26 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     expect(validateManifest(plugin.manifest)).toEqual([]);
   });
 
-  // No role has an implementation yet, so declaring a capability would be a
-  // promise nothing keeps. The mock is the test double and is exempt.
-  it.skipIf(plugin === mock)('declares no capability ahead of its implementation', () => {
-    expect(plugin.manifest.media?.capabilities ?? []).toEqual([]);
+  // A declared capability is a promise the app acts on. Every one of them
+  // must be kept by a member of the connected provider.
+  it('declares only media capabilities it implements', async () => {
+    const declared = plugin.manifest.media?.capabilities ?? [];
+    if (!plugin.media) {
+      expect(declared).toEqual([]);
+      return;
+    }
+    expect(plugin.manifest.media).toBeDefined();
+    const provider = await plugin.media.connect(target({}), fakeContext({ http: fakeHttp({}).client }).context);
+    for (const capability of declared) {
+      for (const member of MEDIA_CAPABILITY_MEMBERS[capability] ?? []) {
+        expect(typeof provider[member], `${capability} needs ${member}`).toBe('function');
+      }
+    }
+    await provider.dispose();
+  });
+
+  // No sync role is implemented yet. The mock is the test double and is exempt.
+  it.skipIf(plugin === mock)('declares no sync capability ahead of its implementation', () => {
     expect(plugin.manifest.sync?.capabilities ?? []).toEqual([]);
   });
 });
@@ -43,4 +61,8 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
 it('gives every plugin a distinct id', () => {
   const ids = plugins.map((plugin) => plugin.manifest.id);
   expect(new Set(ids).size).toBe(ids.length);
+});
+
+it('keeps media servers media-only: they are the master of their watch state', () => {
+  for (const server of [jellyfin, emby, plex]) expect(server.manifest.sync).toBeUndefined();
 });

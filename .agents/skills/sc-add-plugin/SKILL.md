@@ -18,9 +18,12 @@ abstraction in `api` is wrong — fix that instead of working around it.
 
 A plugin is defined by **the service it talks to**, not by what it does with it.
 
-Jellyfin serves a library *and* remembers what you watched. That is one package
-declaring two roles — not `jellyfin` plus `jellyfin-sync`. Same for Emby, Plex,
-iCloud and Google.
+iCloud serves Drive files *and* can be the device's account. That is one package
+declaring two roles — not `icloud` plus `icloud-sync`. Same for Google.
+
+A **media server** (Jellyfin, Emby, Plex) is media-only: it is the master of what
+its users watched, and the app reads and writes that through the *media* role.
+Never give one a sync role.
 
 If the service you are adding already has a folder, you are adding a **role**,
 not a plugin. Use the `sc-plugin-roles` skill instead.
@@ -38,21 +41,36 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    ```ts
    import { pluginId, type Plugin } from '@sc/api';
 
+   import { createProvider } from './provider';
+
    export const plugin: Plugin = {
      manifest: {
        id: pluginId('<id>'),
        displayName: '…',
        description: 'One sentence for the plugin list.',
-       media: { contentKinds: ['movies', 'shows'], capabilities: [] },
-       sync: { capabilities: [] },
+       media: { contentKinds: ['movies', 'shows'], capabilities: ['browse'] },
        connectionFields: [
          { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
+         { key: 'username', label: 'Username', type: 'text', required: true, credential: true },
          { key: 'password', label: 'Password', type: 'password' },
        ],
        settings: [],
      },
+     // Only once the role is implemented; until then, leave it out and declare no capability.
+     media: { connect: async (target, context) => createProvider(target, context) },
    };
    ```
+
+   `createProvider(target, context)` returns a `ConnectedMediaProvider`. It
+   reaches the host only through `context`:
+
+   - `http` for requests
+   - `session` for a token
+   - `credentials` for passwords
+   - `network`, `client` and `clock`
+
+   `api/` and `plugins/` have no host globals: the compiler refuses `fetch`,
+   `URL`, `console` and timers.
 
    A role you do not declare is absent, and the app never asks for it.
    `contentKinds` is what the source brings — `movies`, `shows`, `anime`,
@@ -64,8 +82,15 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 3. **Declare capabilities honestly.** They are not documentation — application
    code branches on them. Listing `search` while `search()` throws turns every
    query into a `sourceError`; leaving it out means the method is never called.
-   Declare a capability in the same change that implements it — until then the
-   list stays empty.
+   Declare a capability in the same change that implements it. The conformance
+   test fails a declared capability whose members
+   (`MEDIA_CAPABILITY_MEMBERS`) are missing.
+
+   Also, for media:
+
+   - Order `listItems` pages exactly by `compareItems(query.sort)`.
+   - Sign in once for concurrent callers.
+   - Never retry a refused login.
 
 4. **Give every sync capability a toggle, defaulting to `false`.** Connecting a
    server for media must never start pushing viewing state to it. This
@@ -82,11 +107,13 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    `password` field at all. Artwork needing auth carries a `headersRef`, never
    an inline header.
 
-7. **Normalize errors** to a typed application error with a known code. A raw
-   HTTP error reaching the UI is a bug.
+7. **Normalize errors** to `AppError` with a known code and a retry hint
+   (`backoff`, `network-change`, `never`). A raw HTTP or transport error reaching
+   the UI is a bug.
 
-8. **Add it to `test/manifests.test.ts`**, the conformance check that runs
-   `validateManifest` over every plugin.
+8. **Add it to `test/manifests.test.ts`**, the conformance check, and test the
+   role against `fakeHttp` / `fakeContext` from `test/support/` with recorded
+   payloads in `test/fixtures/`.
 
 9. **Register it** in the app's composition root —
    `streaming_center_app/src/composition/plugins.ts`, one line.
@@ -119,7 +146,7 @@ npm test
 
 ## Current state
 
-`api` holds the manifest vocabulary — IDs, content kinds, fields, capabilities,
-connections, effective roles and `validateManifest`. The role contracts
-(`MediaRole`, `SyncRole`, `MediaItem`) are not written yet, so every real plugin
-is a manifest with empty capability lists.
+`api` holds the manifest vocabulary and the media contract (`MediaRole`,
+`MediaItem`, `AppError`, `HttpClient`). `SyncRole` is not written yet.
+`plugins/jellyfin` is the reference implementation of a media role; read it
+before writing another.

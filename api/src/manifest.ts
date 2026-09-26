@@ -1,7 +1,8 @@
 import type { CapabilityKey, MediaCapability, SyncCapability } from './capabilities';
 import type { ContentKind } from './content';
-import type { BooleanField, Field, SelectField, TextField, UrlField } from './fields';
+import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
+import type { MediaRole } from './media-role';
 
 export type PluginRole = 'media' | 'sync';
 
@@ -28,7 +29,7 @@ export interface ToggleSetting extends BooleanField {
  * Settings live in a plain database column, so a setting can never be a
  * password. Secrets are connection fields.
  */
-export type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting;
+export type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting | LibrariesField;
 
 export interface PluginManifest {
   readonly id: PluginId;
@@ -45,9 +46,14 @@ export interface PluginManifest {
   readonly settings: readonly PluginSettingDescriptor[];
 }
 
-/** What a plugin package exports. Role implementations join it as they are built. */
+/**
+ * What a plugin package exports. A role's implementation joins the manifest
+ * once it is written; a declared capability promises the members it maps to
+ * (`MEDIA_CAPABILITY_MEMBERS`).
+ */
 export interface Plugin {
   readonly manifest: PluginManifest;
+  readonly media?: MediaRole;
 }
 
 export function declaredRoles(manifest: PluginManifest): readonly PluginRole[] {

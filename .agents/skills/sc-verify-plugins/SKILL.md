@@ -46,9 +46,13 @@ grep -rnE "(from|import\(|require\()\s*['\"]@sc/plugin-" plugins/*/src/
 
 # no framework in any plugin
 grep -rnE "from 'react|from 'expo|react-native" plugins/*/src/ api/src/
+
+# no host globals: everything goes through the injected context
+grep -rnE "\bfetch\(|new URL\(|\bconsole\.|\bsetTimeout\(|\bbtoa\(|\batob\(" api/src plugins/*/src
 ```
 
-All three should return nothing. Any hit is a boundary violation, and the whole
+All four should return nothing. The compiler already refuses host globals
+(`lib: ["esnext"]`); the last grep catches them in files it has not seen yet. Any hit is a boundary violation, and the whole
 split exists to prevent exactly those.
 
 ## Manifest sanity
@@ -57,8 +61,10 @@ For each plugin, confirm by reading its manifest:
 
 - every declared sync capability has a **toggle defaulting to `false`**
   (`validateManifest` enforces this, and the conformance test runs it)
-- no capability is declared that the implementation cannot actually honour —
-  today no role is implemented, so only `mock` may declare any
+- no capability is declared that the implementation cannot actually honour.
+  The conformance test checks that the members exist; honouring them is what
+  each plugin's own tests are for.
+- media servers (`jellyfin`, `emby`, `plex`) have no sync role
 - the roles in `README.md` match the roles in the manifest
 - the roster in `../.claude/streaming-center-architecture.md` section 8 matches
   reality
@@ -70,6 +76,11 @@ them. Silent data loss, no error.
 
 ## Current state
 
-`api` holds the manifest vocabulary; eleven plugins export manifests only. No
-role is implemented, so passing checks prove the vocabulary and the manifests
-are sound — nothing more.
+`api` holds the manifest vocabulary and the media contract. Jellyfin and mock
+implement the media role. Passing checks prove:
+
+- the vocabulary and every manifest
+- Jellyfin's behaviour against recorded payloads
+- that every declared media capability is implemented
+
+Run the app's verification as well before calling a contract change done.

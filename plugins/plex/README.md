@@ -4,7 +4,9 @@ Plex Media Server. Its own account and authentication model, which stays entirel
 
 ## Roles
 
-**Media** — exposes content. **Sync** — carries your user state.
+**Media.** No sync role: the server stays the master of what each
+of its users watched. The app will read that and, with playback, write progress
+back through the media role — never through a sync role.
 
 ## Brings
 
@@ -13,11 +15,11 @@ Movies and shows.
 ## Connection
 
 - **Server URL** — required
-- **Plex token** — required, stored as a secret
+- **Plex token** — required, stored as a secret; a credential, so it can be kept per profile
 
 ## Settings
 
-Every sync toggle defaults to **off**. Connecting this plugin for media does nothing to your viewing state until you switch it on.
+None yet.
 
 ## Status
 

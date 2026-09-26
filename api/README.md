@@ -16,9 +16,16 @@ stay a leaf.
 
 ## Status
 
-The manifest half is written: branded IDs, content kinds, capability flags,
-field descriptors, the plugin manifest, connections, profiles, the
-effective-roles rule and manifest validation. See `../docs/api/`.
+Written:
 
-Still to come: the role contracts (`MediaRole`, `SyncRole`), `MediaItem`,
-playback descriptors and the error model.
+- the manifest vocabulary, connections with per-profile values, and the
+  effective-roles rule
+- manifest validation
+- the media domain (`MediaItem`, `GlobalMediaKey`, images, watch status)
+- `ItemQuery` and the one ordering rule
+- `AppError` with retry hints and the `HttpClient` port
+- the media role contract, with the context the host supplies
+
+See `../docs/api/`.
+
+Still to come: the sync contract (`SyncRole`) and playback descriptors.

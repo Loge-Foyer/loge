@@ -28,11 +28,16 @@ whole split exists to provide.
 ## One plugin per service
 
 A plugin is defined by the **service** it talks to, not by what it does with it.
-Jellyfin serves a library and holds viewing state — that is one package with two
-roles.
+iCloud serves Drive files and can be the device's account — that is one package
+with two roles.
 
 Do not split a service into `jellyfin` and `jellyfin-sync`. If a service gains a
 role, add it to the existing manifest.
+
+Media servers (Jellyfin, Emby, Plex) are **media-only**. The server is the
+master of what its users watched. The app reads it and writes progress back
+through the media role, and a device's single sync connection — its account — is
+never a media server.
 
 ## The mistake that costs the most
 
@@ -63,21 +68,24 @@ its quirks. Map inside the package, always.
 ## Order of work
 
 `api` first — nothing else can be built correctly until the vocabulary exists.
-The manifest half is written; the role contracts come next. Then `mock`, because it is how the app gets built without a
-real server — and it carries both roles so syncing can be exercised too. It
-should deliberately decline some capabilities, so the app's capability handling
-stays genuinely tested.
-
-Then Jellyfin, which is the real target and the true test of the abstraction —
-and the first plugin to exercise both roles against a real service.
+The manifest and the media contract are written; the sync contract comes with
+the account phase. `mock` implements the media role so the app works offline,
+and deliberately declines some capabilities so the app's capability handling
+stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
-`api` holds the manifest vocabulary (IDs, content kinds, capabilities, fields,
-manifest, connection, effective roles, validation); the role contracts are not
-written yet. Every plugin exports a manifest and nothing else — no role is
-implemented, so no real plugin declares a capability. `npm test` runs the
-effective-roles, validation and conformance tests.
+- **`api`:** the manifest vocabulary, per-profile values, the media contract,
+  errors and the HTTP port.
+- **Jellyfin:** implements the media role, tested with a fake HTTP client and
+  recorded 12.x payloads.
+- **Mock:** implements the media role with a fixed catalogue.
+- **Every other plugin:** a manifest.
+- **`npm test`:** runs everything.
+  - the api rules
+  - Jellyfin's behaviour: sign-in, local-only, paging, mapping
+  - the mock
+  - the conformance check that each declared capability is implemented
 
 ## Git
 

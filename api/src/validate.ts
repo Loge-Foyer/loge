@@ -1,4 +1,5 @@
 import type { CapabilityKey } from './capabilities';
+import { isLibrarySelection } from './fields';
 import { isToggle, type PluginManifest } from './manifest';
 
 const PLUGIN_ID = /^[a-z][a-z0-9-]*$/;
@@ -45,6 +46,25 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     if (values.length === 0) problems.push(`select "${field.key}" has no options`);
     for (const value of duplicates(values)) problems.push(`select "${field.key}" lists "${value}" twice`);
     if (!values.includes(field.default)) problems.push(`select "${field.key}" defaults to a missing option`);
+  }
+
+  // The app fills a libraries setting by asking the connection for its libraries.
+  const librarySettings = settings.filter((setting) => setting.type === 'libraries');
+  if (librarySettings.length > 0 && !media?.capabilities.includes('libraries')) {
+    problems.push('a libraries setting needs the media capability "libraries"');
+  }
+  if (librarySettings.length > 1) problems.push('declares more than one libraries setting');
+  for (const setting of librarySettings) {
+    if (!isLibrarySelection(setting.default)) {
+      problems.push(`libraries setting "${setting.key}" has an invalid default`);
+    }
+  }
+
+  // A credential is part of an account the connection signs in with, so it is a connection field.
+  for (const setting of settings) {
+    if (setting.type === 'text' && setting.credential) {
+      problems.push(`setting "${setting.key}" cannot be a credential; credentials are connection fields`);
+    }
   }
 
   // Settings are stored in plain text; anything that looks secret belongs in a password field.

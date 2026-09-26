@@ -3,7 +3,7 @@
 ```
 api/        @sc/api — the vocabulary; depends on nothing
 plugins/    one package per service
-test/       vitest: the effective-roles rule, manifest validation, conformance
+test/       vitest: the api rules, each implemented plugin against a fake context, conformance
 docs/
 ```
 

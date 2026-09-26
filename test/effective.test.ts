@@ -5,7 +5,7 @@ const manifest: PluginManifest = {
   id: pluginId('fixture'),
   displayName: 'Fixture',
   description: 'A plugin that exists only in tests.',
-  media: { contentKinds: ['movies', 'shows'], capabilities: ['home', 'search', 'watchStateWrite'] },
+  media: { contentKinds: ['movies', 'shows'], capabilities: ['browse', 'search', 'watchStateWrite'] },
   sync: { capabilities: ['watchProgress', 'favorites'] },
   connectionFields: [],
   settings: [
@@ -28,7 +28,7 @@ describe('effectiveRoles', () => {
   it('keeps ungated capabilities and passes content kinds through while media is on', () => {
     const { media } = effectiveRoles(manifest, { roles: { media: true }, settings: {} });
     expect(media?.contentKinds).toEqual(['movies', 'shows']);
-    expect(media?.capabilities).toEqual(new Set(['home', 'search', 'watchStateWrite']));
+    expect(media?.capabilities).toEqual(new Set(['browse', 'search', 'watchStateWrite']));
   });
 
   it('drops a capability whose toggle is switched off', () => {
@@ -36,7 +36,7 @@ describe('effectiveRoles', () => {
       roles: { media: true },
       settings: { reportProgress: false },
     });
-    expect(media?.capabilities).toEqual(new Set(['home', 'search']));
+    expect(media?.capabilities).toEqual(new Set(['browse', 'search']));
   });
 
   it('falls back to toggle defaults, so a sync role starts carrying nothing', () => {

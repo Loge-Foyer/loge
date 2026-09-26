@@ -13,7 +13,7 @@ Files.
 ## Connection
 
 - **Server URL** — required
-- **Username**
+- **Username** — a credential, so it can be kept per profile
 - **Password**
 
 ## Settings
