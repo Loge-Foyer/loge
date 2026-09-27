@@ -1,7 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { userId } from '@sc/api';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
@@ -12,11 +8,11 @@ import { prepareSqlite } from '@/persistence/sqlite/database';
 import { MIGRATIONS, migrate, type SqlMigration } from '@/persistence/sqlite/migrations';
 import { serializeSqlConnection } from '@/persistence/sqlite/sql';
 
-import { openTestDatabase } from './support/engines';
+import { openTestDatabase, tempDatabasePath } from './support/engines';
 import { fakeClock, silentLog } from './support/fakes';
 import { nodeSqliteConnection } from './support/node-sqlite';
 
-const tempFile = () => join(mkdtempSync(join(tmpdir(), 'sc-migrate-')), 'test.db');
+const tempFile = tempDatabasePath;
 
 async function versionOf(path: string) {
   const db = serializeSqlConnection(nodeSqliteConnection(path));

@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,9 +28,22 @@ export interface TestDatabaseOptions {
   readonly migrations?: readonly SqlMigration[];
 }
 
+const tempDirectories: string[] = [];
+
+/** A SQLite file in a directory of its own, deleted after the test file (`test/support/setup.ts`). */
+export function tempDatabasePath(): string {
+  const directory = mkdtempSync(join(tmpdir(), 'sc-db-'));
+  tempDirectories.push(directory);
+  return join(directory, 'test.db');
+}
+
+export function removeTempDatabases(): void {
+  for (const directory of tempDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+}
+
 /** Where a database lives that a test opens more than once — a restart. */
 export function reopenable(engine: Engine): Pick<TestDatabaseOptions, 'path' | 'indexedDB'> {
-  return engine === 'sqlite' ? { path: join(mkdtempSync(join(tmpdir(), 'sc-db-')), 'test.db') } : { indexedDB: new IDBFactory() };
+  return engine === 'sqlite' ? { path: tempDatabasePath() } : { indexedDB: new IDBFactory() };
 }
 
 /** A fresh database on the real engine, with the committed migrations. */
