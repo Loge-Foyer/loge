@@ -46,9 +46,10 @@ Phase 2 — local persistence. Everything from Phase 1 — real titles from ever
 live source, merged; per-profile rows, grids and detail pages; connections that
 decide per connection what each profile keeps (`perProfile`) — now survives a
 restart: SQLite and the keychain on iOS and Android, IndexedDB and encrypted
-secrets on the web. Every local change appends a change-journal entry. Nothing
-plays, and Videos still shows skeletons. vitest covers the database on both
-engines and the service layer.
+secrets on the web. Every local change appends a change-journal entry. What
+sources answered is kept where they allow it, so the home renders at once and
+offline. Nothing plays, and Videos still shows skeletons. vitest covers the
+database on both engines and the service layer.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

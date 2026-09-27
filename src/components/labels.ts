@@ -107,13 +107,36 @@ const ERROR_TEXT: Readonly<Partial<Record<AppErrorCode, string>>> = {
   INVALID_STATE: 'cannot do this yet.',
 };
 
-/** One line for a source that could not answer: "Home server is only used on your home network." */
-export function describeSourceError(error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry' | 'needsPassword'>): string {
+/** "just now", "5 min ago", "3 h ago", "yesterday", "12 days ago" — by hand: Hermes may lack Intl.RelativeTimeFormat. */
+export function timeAgo(then: number, now: number): string {
+  const minutes = Math.floor(Math.max(0, now - then) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
+function whatWentWrong(error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry' | 'needsPassword'>): string {
   if (error.needsPassword) return `${error.label} needs its password again. Enter it in Settings.`;
   if (error.reason === 'local-network-only') return `${error.label} is only used on your home network.`;
   // Waiting for another network, which is why it is not tried again.
   if (error.retry === 'network-change' && error.code !== 'OFFLINE') return `${error.label} can’t be reached on this network.`;
   return `${error.label} ${ERROR_TEXT[error.code] ?? 'ran into a problem.'}`;
+}
+
+/**
+ * One line for a source that could not answer — "Home server is only used on
+ * your home network." — and, when what was saved from it stands in, how old
+ * that is.
+ */
+export function describeSourceError(
+  error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry' | 'needsPassword' | 'savedAt'>,
+  now = Date.now(),
+): string {
+  const line = whatWentWrong(error);
+  return error.savedAt === undefined ? line : `${line} Showing what was saved ${timeAgo(error.savedAt, now)}.`;
 }
 
 /** The same, for an error that happened while trying a draft, which has no label yet. */

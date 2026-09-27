@@ -11,11 +11,13 @@ import { Chip, ChipRow } from '@/components/chip';
 import { episodeCode, formatCommunityRating, formatRuntime, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
 import { itemHref } from '@/components/media/item-link';
+import { SourceNotices } from '@/components/media/source-notices';
 import { Scrim } from '@/components/scrim';
 import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
-import { useChildren, useItem } from '@/hooks/use-media';
+import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
+import type { SourceError } from '@/services/media';
 
 /** A film, a series with its seasons and episodes, or one episode — whatever the key points at. */
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
@@ -41,15 +43,35 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
       </Screen>
     );
   }
-  return <Detail detail={detail.data} showWatch={showWatch} {...(season ? { season } : {})} />;
+  return (
+    <Detail
+      detail={detail.data.detail}
+      showWatch={showWatch}
+      {...(season ? { season } : {})}
+      {...(detail.data.sourceError ? { sourceError: detail.data.sourceError } : {})}
+    />
+  );
 }
 
-function Detail({ detail, showWatch, season }: { detail: MediaDetail; showWatch: boolean; season?: string }) {
+function Detail({
+  detail,
+  showWatch,
+  season,
+  sourceError,
+}: {
+  detail: MediaDetail;
+  showWatch: boolean;
+  season?: string;
+  /** The source could not answer; this page shows what was saved from it. */
+  sourceError?: SourceError;
+}) {
   const { item, people, studios, tagline } = detail;
+  const refresh = useRefreshMedia();
   return (
     <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
       <Hero item={item} />
       <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={1100} self="center">
+        {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
         {showWatch ? <WatchState item={item} /> : null}
         {tagline ? (
@@ -187,7 +209,7 @@ function ShowLink({ episode }: { episode: Episode }) {
 /** The seasons as tabs, starting with the first one that still has something unwatched. */
 function Seasons({ show, initial, showWatch }: { show: Show; initial?: string; showWatch: boolean }) {
   const seasons = useChildren(show);
-  const list = seasons.data ?? [];
+  const list = seasons.data?.items ?? [];
   const [chosen, setChosen] = useState(initial);
   const unfinished = list.find((season) => season.watch !== undefined && !season.watch.played);
   const selected = list.find((season) => season.key.externalId === chosen) ?? unfinished ?? list[0];
@@ -204,7 +226,7 @@ function Seasons({ show, initial, showWatch }: { show: Show; initial?: string; s
       />
       {episodes.isPending ? <Spinner color="$accent9" self="flex-start" /> : null}
       <YStack gap="$4">
-        {(episodes.data ?? []).map((episode) =>
+        {(episodes.data?.items ?? []).map((episode) =>
           episode.type === 'episode' ? <EpisodeRow key={episode.key.externalId} episode={episode} showWatch={showWatch} /> : null,
         )}
       </YStack>

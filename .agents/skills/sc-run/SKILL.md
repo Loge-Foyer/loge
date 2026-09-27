@@ -156,7 +156,10 @@ over the DevTools protocol:
   ratings, watched checks and progress bars), a title link to each row's
   full-screen grid, and detail pages. Connected to Jellyfin, the titles and
   artwork are the server's; the mock draws coloured placeholders instead of
-  artwork. A source that cannot answer shows one quiet line with Retry.
+  artwork. A source that cannot answer shows one quiet line with Retry; where
+  its titles were saved, they stay, and the line says how old they are.
+  `Network.setBlockedURLs` on the server's host shows that in a browser;
+  `adb shell svc wifi disable` on Android (a local-only server is then skipped).
 - **Customize** (the sliders button, top right) — per-row order, visibility,
   sort and card style, per profile.
 - **Videos** — one tab per source, skeleton shelves: nothing lists videos yet.

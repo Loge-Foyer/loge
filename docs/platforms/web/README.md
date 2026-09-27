@@ -46,6 +46,11 @@ persistent storage (`navigator.storage.persist()`), which the browser may grant
 or refuse. Safari deletes a site's storage after seven days without a visit,
 unless the site is added to the Home Screen.
 
+**Offline**, the page itself has to load first: there is no service worker, so
+a browser with no network at all cannot open the app. With the page loaded — or
+served from `localhost` — a server that cannot be reached is replaced by what
+was saved from it, as on a phone.
+
 **Several tabs** share one database. A tab does not see another's changes
 until it reloads. When a tab opens a newer version of the app, the older tabs
 close their connection so its upgrade can run, then ask to be reloaded.

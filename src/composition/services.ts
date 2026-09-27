@@ -60,7 +60,15 @@ export function createServices(): AppServices {
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
-  const media = createMediaService({ sources, pool, probeSecrets: connections.probeSecrets, network, log });
+  const media = createMediaService({
+    sources,
+    pool,
+    probeSecrets: connections.probeSecrets,
+    network,
+    cache: db.mediaCache,
+    clock,
+    log,
+  });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
 
@@ -70,6 +78,7 @@ export function createServices(): AppServices {
       await janitor.drain();
       // A storage failure lands on the boot screen's "could not start", never on an endless splash.
       await session.start();
+      void media.prune();
     },
   };
 }

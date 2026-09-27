@@ -1,9 +1,9 @@
 import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@sc/api';
-import { keepPreviousData, useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import { PixelRatio } from 'react-native';
 
-import type { MergeState, RowResult, RowSpec } from '@/services/media';
+import type { GridPage, MergeState, RowResult, RowSpec } from '@/services/media';
 import { isRemoteKey, remoteKey, userKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
@@ -15,7 +15,6 @@ const MINUTE = 60_000;
 
 // What a source answered can go stale; local state cannot, and keeps the default.
 const remote = {
-  networkMode: 'always', // a home server answers without the internet, so never wait for "online"
   refetchOnWindowFocus: true,
 } as const;
 
@@ -23,30 +22,29 @@ const remote = {
 const whileBackingOff = (result: RowResult | undefined) =>
   result?.sourceErrors.some((error) => error.retry === 'backoff') ? 30_000 : false;
 
-export function useHomeRow(spec: RowSpec, enabled = true) {
-  const userId = useActiveUserId();
-  const { media } = useServices();
-  return useQuery({
-    queryKey: remoteKey(userId, 'row', spec.kind, spec.sort.by, spec.sort.order),
-    queryFn: ({ signal }) => media.row(userId, spec, ROW_LIMIT, signal),
-    staleTime: 5 * MINUTE,
-    placeholderData: keepPreviousData,
-    refetchInterval: (query) => whileBackingOff(query.state.data),
-    enabled,
-    ...remote,
-  });
-}
+const rowKey = (spec: RowSpec) => [spec.kind, spec.sort.by, spec.sort.order] as const;
 
-/** Several rows at once, so the home can gather what every row could not reach into one notice. */
+/**
+ * Several rows at once, so the home can gather what every row could not reach
+ * into one notice. Each row shows what was saved from last time while its
+ * sources answer — a placeholder, so it never passes for a fresh answer.
+ */
 export function useHomeRowQueries(specs: readonly RowSpec[]) {
   const userId = useActiveUserId();
   const { media } = useServices();
-  return useQueries({
+  const saved = useQueries({
     queries: specs.map((spec) => ({
-      queryKey: remoteKey(userId, 'row', spec.kind, spec.sort.by, spec.sort.order),
+      queryKey: remoteKey(userId, 'saved', 'row', ...rowKey(spec)),
+      queryFn: () => media.saved.row(userId, spec, ROW_LIMIT),
+    })),
+  });
+  return useQueries({
+    queries: specs.map((spec, index) => ({
+      queryKey: remoteKey(userId, 'row', ...rowKey(spec)),
       queryFn: ({ signal }: { signal: AbortSignal }) => media.row(userId, spec, ROW_LIMIT, signal),
       staleTime: 5 * MINUTE,
-      placeholderData: keepPreviousData,
+      // Saved rows first; else, while the sort changes, the previous rows.
+      placeholderData: (previous: RowResult | undefined) => saved[index]?.data ?? previous,
       refetchInterval: (query: { state: { data: RowResult | undefined } }) => whileBackingOff(query.state.data),
       ...remote,
     })),
@@ -56,10 +54,16 @@ export function useHomeRowQueries(specs: readonly RowSpec[]) {
 export function useContinueWatching(enabled = true) {
   const userId = useActiveUserId();
   const { media } = useServices();
-  return useQuery({
+  const saved = useQuery({
+    queryKey: remoteKey(userId, 'saved', 'continue'),
+    queryFn: () => media.saved.continueWatching(userId),
+    enabled,
+  });
+  return useQuery<RowResult, Error, RowResult, readonly unknown[]>({
     queryKey: remoteKey(userId, 'continue'),
     queryFn: ({ signal }) => media.continueWatching(userId, undefined, signal),
     staleTime: 30_000,
+    placeholderData: (previous: RowResult | undefined) => saved.data ?? previous,
     refetchInterval: (query) => whileBackingOff(query.state.data),
     enabled,
     ...remote,
@@ -69,6 +73,18 @@ export function useContinueWatching(enabled = true) {
 export function useGrid(spec: RowSpec | undefined) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const saved = useQuery({
+    queryKey: remoteKey(userId, 'saved', 'grid', spec?.kind, spec?.sort.by, spec?.sort.order),
+    queryFn: () => (spec ? media.saved.gridFirstPage(userId, spec, GRID_PAGE) : null),
+    enabled: spec !== undefined,
+  });
+  // A saved first page has no `next`, and a placeholder never counts for
+  // `hasNextPage` — so the grid cannot page on from last week's positions.
+  const placeholder = useMemo(
+    (): InfiniteData<GridPage, MergeState | null> | undefined =>
+      saved.data ? { pages: [saved.data], pageParams: [null] } : undefined,
+    [saved.data],
+  );
   return useInfiniteQuery({
     queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order),
     queryFn: ({ pageParam, signal }) => {
@@ -78,6 +94,7 @@ export function useGrid(spec: RowSpec | undefined) {
     initialPageParam: null as MergeState | null,
     getNextPageParam: (last) => last.next ?? null,
     staleTime: 5 * MINUTE,
+    placeholderData: (_previous: InfiniteData<GridPage, MergeState | null> | undefined) => placeholder,
     enabled: spec !== undefined,
     ...remote,
   });

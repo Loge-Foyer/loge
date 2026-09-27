@@ -114,6 +114,13 @@ same connection may do. The screens only ever see that result.
   `compareItems` order; rows merge sorted lists, and the grid merges buffered
   pages that stop as soon as one source runs dry, because past that point the
   order can no longer be proved.
+- **What a source answered is kept,** per profile, where the source allows it
+  (`offlineMetadata`, and its switch). A source that fails is represented by
+  what was saved from it, marked with when (`SourceError.savedAt`); on the grid
+  only on the first page, as a finished source the merge never pages. At
+  launch the hooks show saved rows as `placeholderData` from a second, local
+  query — never `setQueryData`, which would make a snapshot look fresh and let
+  the grid page from old positions.
 
 ## Query keys
 

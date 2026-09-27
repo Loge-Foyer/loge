@@ -153,6 +153,11 @@ These are specific to Streaming Center and matter more than anything above.
   `MissingSecretError` instead of signing in with nothing.
 - **The device key is never in the database,** which backups copy to other
   phones. It lives in the device-bound secure store.
+- **The media cache is a cache.** Never journaled; every read and write best
+  effort; kept only where `offlineMetadata` is effective for that profile, and
+  served only under the fingerprint it was saved with. A connection change
+  purges it in the same transaction. Screens show it as `placeholderData`, never
+  through `setQueryData`.
 - **Tests run on the real engines** — `node:sqlite` and fake-indexeddb, one
   contract suite for both. Never mock a repository.
 
@@ -289,6 +294,9 @@ Phase 2 — local persistence. Everything survives a restart:
   IndexedDB and WebCrypto-encrypted secrets on the web, which requires a secure
   page. Every local change appends a change-journal entry; nothing drains it
   until the account phase.
+- What sources answered is kept per profile where the source allows it: the
+  home, grids and visited detail pages render from it at launch, and in its
+  place when a source cannot answer, saying how old it is.
 - There is no development seed: set things up once, and they persist.
   `docs/getting-started` has how to start from scratch.
 - Videos still renders skeletons: no plugin lists videos or files yet.

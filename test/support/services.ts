@@ -56,6 +56,8 @@ export interface FakeSourceOptions {
   /** Films per call of `connect`, given the connection id it runs for. */
   readonly movies?: (connectionId: ConnectionId) => readonly MediaItem[];
   readonly resume?: (connectionId: ConnectionId) => readonly MediaItem[];
+  /** A show's seasons, or a season's episodes. */
+  readonly children?: (parent: MediaItem) => readonly MediaItem[];
   /** Thrown by every call while set. */
   readonly failWith?: () => AppError | undefined;
   readonly withImages?: boolean;
@@ -115,7 +117,10 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
             if (!item) throw new AppError('NOT_FOUND', 'No such item.');
             return { item, people: [], studios: [], externalIds: {} };
           },
-          getChildren: async () => ({ items: [] }),
+          getChildren: async (parent) => {
+            await fail();
+            return { items: options.children?.(parent) ?? [] };
+          },
           getResume: async (limit) => {
             await fail();
             return (options.resume?.(target.connectionId) ?? []).slice(0, limit);
@@ -174,7 +179,15 @@ export function buildServices(options: {
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
-  const media = createMediaService({ sources, pool, probeSecrets: connections.probeSecrets, network, log: silentLog });
+  const media = createMediaService({
+    sources,
+    pool,
+    probeSecrets: connections.probeSecrets,
+    network,
+    cache: db.mediaCache,
+    clock,
+    log: silentLog,
+  });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
   return {

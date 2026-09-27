@@ -27,6 +27,15 @@ interface Entry {
   parked?: AppError;
 }
 
+/**
+ * What a source runs with, as one string: a provider is replaced when it
+ * changes, and nothing saved under another one is served. Secrets never enter
+ * it — a changed secret gets a new credentials ref, and that does.
+ */
+export function fingerprintOf(source: Source): string {
+  return stableJson([source.connection.perProfile, source.values.fields, source.values.settings, source.values.credentialsRef ?? null]);
+}
+
 /** A draft to try out: its values, and the secrets it signs in with. */
 export interface ProbeConnection {
   readonly pluginId: PluginId;
@@ -66,9 +75,6 @@ export function createProviderPool(deps: {
 }): ProviderPool {
   const entries = new Map<string, Entry>();
   const keyOf = (source: Source) => `${source.connection.id}|${source.scope}`;
-  // Secrets never enter it: a changed secret gets a new credentials ref, and that does.
-  const fingerprintOf = (source: Source) =>
-    stableJson([source.connection.perProfile, source.values.fields, source.values.settings, source.values.credentialsRef ?? null]);
 
   const context = async (installationScope: string, read: () => Promise<Credentials>, session: MediaContext['session']): Promise<MediaContext> => {
     const client = await deps.identity.identity();

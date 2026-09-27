@@ -89,6 +89,11 @@ SQLite and the keychain; in a browser, its own database, with the secrets
 encrypted. Every change is also recorded, for the sync that comes with the
 account.
 
+What the servers answered is kept too, where they allow it. So the home shows
+up at once when the app opens, and when a server cannot be reached — away from
+home, or with the server off — you still see your library and how old that
+view is.
+
 What is not there yet: nothing plays, and there is no account to carry
 profiles between devices.
 

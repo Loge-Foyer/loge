@@ -76,7 +76,8 @@ effective = declared ∩ switched on   (a missing switch is off)
 
 Branching on declared alone calls features the user switched off — for a sync
 role, pushing viewing state to a server they never asked to sync with; for
-`offlineMetadata`, keeping artwork on a device whose owner said not to. Every
+`offlineMetadata`, keeping titles and artwork on a device whose owner said not
+to. Every
 sync toggle defaults to off for exactly this reason.
 
 ## 5. Installed per device, configured per connection

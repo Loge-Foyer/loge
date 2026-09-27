@@ -50,6 +50,14 @@ would have filled; a profile that has not set up a connection sees "Finish
 setting up" for it. Pull to refresh on a phone; a Refresh button beside
 Customize in a browser, which cannot pull.
 
+**What was saved comes first.** At launch a row shows what its sources answered
+last time — a placeholder, never taken for a fresh answer — until they answer
+again. When one cannot, what was saved from it stays, and its line says how old
+it is: "Home is only used on your home network. Showing what was saved 5 min
+ago." The grid shows a saved first page the same way, and pages on only once
+the source is back. A detail page opened before comes back with the same line.
+All of this only where the source may be kept on the device (`docs/data`).
+
 **Cards** (`components/media/`):
 
 - *Poster* (2:3) — the source's ratings stacked top left (★ community score,

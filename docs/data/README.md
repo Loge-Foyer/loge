@@ -25,9 +25,9 @@ entry together, which needs real transactions.
   connection with its shared values and its `perProfile` mode.
 - **A profile** — its own values for each connection that keeps values per
   profile (fields, settings, a credentials ref, or `off` when the profile does
-  not use that connection) and its preferences, today the home layout.
-  Everything a profile owns cascades from `users`, so deleting the profile is
-  one statement.
+  not use that connection), its preferences (today the home layout), and what
+  sources answered it. Everything a profile owns cascades from `users`, so
+  deleting the profile is one statement.
 - **The credential store** — passwords, PINs and session tokens, by ref. A row
   holds a `credentialsRef` and the names of the password fields that are saved
   (`secretKeys`), never a value.
@@ -88,6 +88,7 @@ Some writes are not journaled:
 
 - Device settings. The default profile and the installed plugins belong to
   this device.
+- What sources answered. It is a cache, not user state.
 - Rows a cascade deleted. The parent's entry implies them.
 - Writes that change nothing.
 
@@ -159,13 +160,45 @@ with it:
 The device key is kept out of the database for the same reason: a copy on a
 second phone would sign both in as one device.
 
-## Titles and artwork
+## What sources answered
 
-Metadata from sources lives in the query cache, in memory, for now. A plugin
-that declares `offlineMetadata` — stable ids and artwork versioned by tag — lets
-the app keep its images on disk (`cachePolicy: 'memory-disk'`) while the
-connection's "Keep metadata on this device" setting is on. Keeping the
-metadata itself, under the same switch, comes next.
+The home, each row's grid and the detail pages already opened are kept on the
+device, per profile and per source:
+
+- **What is kept:** each source's answer for a row (its first page, in the
+  source's own order), the grid's first page, Continue Watching, a show's
+  seasons and episodes, and a detail page once it has been opened. Watch
+  status is kept as the source reported it, inside each item. A separate
+  watch-status cache, with the outbox that sends changes back, arrives with
+  playback.
+- **Only where allowed.** Nothing is kept unless the source declares
+  `offlineMetadata` — stable ids, artwork versioned by tag — and the
+  connection's "Keep metadata on this device" switch is on for that profile.
+  Switching it off deletes what was kept.
+- **Only for the values it was saved under.** Each entry carries the
+  fingerprint of what the source ran with — its fields, settings and
+  credentials ref. After a changed address, library selection or password,
+  nothing saved before is shown. Changing a connection also purges its saved
+  answers outright, in the same transaction.
+- **A cache, not user state:** never journaled, and every read and write is
+  best effort. A failure to save never fails a screen.
+
+How screens use it:
+
+- **While a source answers**, a row shows what was saved as a placeholder. It
+  never passes for a fresh answer, and a grid never pages on from a saved page.
+- **When a source cannot answer**, what was saved stands in, and the notice
+  says how old it is: "Home is not reachable right now. Showing what was saved
+  5 min ago." A source that says an item is gone (`NOT_FOUND`) drops it from
+  what is kept.
+- **Pruning.** Rows, grids and Continue Watching are replaced on every
+  refresh. Details and episode lists nobody has opened for 30 days are deleted
+  at launch.
+
+Artwork has its own cache: expo-image keeps images on disk (`cachePolicy:
+'memory-disk'`) under the same switch, and a browser its HTTP cache. Saved
+items resolve their artwork before the source has answered, so a saved row has
+its posters.
 
 ## Tests
 

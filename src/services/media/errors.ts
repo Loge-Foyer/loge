@@ -21,6 +21,8 @@ export interface SourceError {
   readonly message: string;
   /** Not even asked: the password saved for it is no longer on this device. */
   readonly needsPassword?: true;
+  /** What was saved from this source stands in for it; this is when it was saved. */
+  readonly savedAt?: number;
 }
 
 /**
@@ -47,7 +49,7 @@ export function toAppError(error: unknown, log: Logger): AppError {
   return new AppError('PROVIDER_UNAVAILABLE', 'This source ran into a problem.', { retry: 'backoff', cause: error });
 }
 
-export function sourceError(source: Source, error: AppError): SourceError {
+export function sourceError(source: Source, error: AppError, savedAt?: number): SourceError {
   return {
     connectionId: source.connection.id,
     label: source.connection.label,
@@ -56,5 +58,6 @@ export function sourceError(source: Source, error: AppError): SourceError {
     ...(error.reason ? { reason: error.reason } : {}),
     message: error.message,
     ...(error instanceof MissingSecretError ? { needsPassword: true as const } : {}),
+    ...(savedAt === undefined ? {} : { savedAt }),
   };
 }
