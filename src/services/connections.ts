@@ -21,11 +21,12 @@ import {
 import { hasErrors, validateDraft, type DraftErrors } from './field-values';
 import { stableJson } from './hash';
 import type { PluginCatalog } from './plugin-catalog';
-import type { IdGenerator, LocalDatabase, ProfileValues, Repositories, SecureCredentialStore } from './ports';
+import type { IdGenerator, JournalAnnouncement, LocalDatabase, ProfileValues, Repositories, SecureCredentialStore } from './ports';
 import { removeConnectionIn } from './removal';
 import type { SecretJanitor } from './secrets';
 import { sessionRef, type CredentialScope } from './sessions';
 import { standingOf } from './sources';
+import { profileSignInOf } from './sync/sealed';
 
 export type SecretScope = 'shared' | UserId;
 
@@ -354,6 +355,7 @@ export function createConnectionService(deps: {
       if (row) await tx.connections.putProfileValues(connection.id, userId, row);
       else await tx.connections.deleteProfileValues(connection.id, userId);
     }
+    await tx.journal.announce(movedPasswords(planned, catalog.get(connection.pluginId)));
     // What the source answered under the old values may not hold under the new ones.
     await tx.mediaCache.purge(connection.id);
     await tx.staleSecrets.add([...stale, ...signedOut.map((scope) => sessionRef(connection.id, scope))]);
@@ -435,6 +437,25 @@ export function createConnectionService(deps: {
     commit,
     discard,
   };
+}
+
+/**
+ * The profiles whose saved passwords a save points somewhere else, through
+ * the connection's address alone. Other devices drop a password whose sign-in
+ * moves, so each of these goes out again, after the connection — sealed for
+ * where it signs in now. A row the save changed is journaled already.
+ */
+function movedPasswords(planned: SavePlan, manifest: PluginManifest | undefined): readonly JournalAnnouncement[] {
+  const { connection, existing, storedProfiles, rows } = planned;
+  if (!existing) return [];
+  const moved: JournalAnnouncement[] = [];
+  for (const [userId, row] of rows) {
+    const before = storedProfiles.get(userId);
+    if (!row || !before || !row.credentialsRef || stableJson(row) !== stableJson(before)) continue;
+    if (profileSignInOf(existing, manifest, before) === profileSignInOf(connection, manifest, row)) continue;
+    moved.push({ userId, entity: 'connectionProfileValues', entityId: `${connection.id}/${userId}`, operation: 'upsert', localVersion: 0 });
+  }
+  return moved;
 }
 
 /** Keeps only what the manifest declares, so nothing undeclared is ever stored. */

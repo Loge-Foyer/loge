@@ -15,9 +15,11 @@ import type { AppActivity, OwnerAnswer, OwnerAuthentication } from '@/services/p
 
 export interface FakeAccount {
   readonly plugin: Plugin;
+  /** The vault key every device signed in to it seals with. */
+  readonly vaultKey: Uint8Array;
   /** Everything stored, in the account's order. */
   readonly log: readonly SyncChange[];
-  readonly calls: { pushes: number; signIns: number; pulls: number; signOuts: number };
+  readonly calls: { pushes: number; signIns: number; pulls: number; signOuts: number; vaultKeys: number };
   /** Store only the first `n` of the next push. */
   acceptOnly(n: number): void;
   /** The next call — of any kind — fails with this. */
@@ -33,30 +35,35 @@ export interface FakeAccount {
   refuseOwner(refuse: boolean): void;
   /** Refuse every sign-in, as a changed password would. */
   refuseSignIn(refuse: boolean): void;
+  /** Fail every ask for the vault key with this, until `undefined`. */
+  failVaultKey(error: AppError | undefined): void;
   /** Another device's change, landed before the change with id `before` — or last. */
   inject(change: SyncChange, before?: string): void;
   /** The same account, as a plugin declaring what it carries differently — an app update. */
   pluginCarrying(carries: readonly SyncCapability[]): Plugin;
 }
 
-export function fakeSyncAccount(
-  options: {
-    readonly id?: string;
-    readonly pageSize?: number;
-    readonly carries?: readonly SyncCapability[];
-    /** A media role too, as iCloud or Google have — one that lists nothing. */
-    readonly withMedia?: boolean;
-    /** An account that cannot check its owner: the device is asked instead. */
-    readonly noOwnerCheck?: boolean;
-    /** A switch in its settings, on at first, that stops it carrying this. */
-    readonly toggle?: SyncCapability;
-  } = {},
-): FakeAccount {
+export interface FakeAccountOptions {
+  readonly id?: string;
+  readonly pageSize?: number;
+  readonly carries?: readonly SyncCapability[];
+  /** A media role too, as iCloud or Google have — one that lists nothing. */
+  readonly withMedia?: boolean;
+  /** An account that cannot check its owner: the device is asked instead. */
+  readonly noOwnerCheck?: boolean;
+  /** A switch in its settings, on at first, that stops it carrying this. */
+  readonly toggle?: SyncCapability;
+}
+
+/** What a sealing account carries: everything the fake does, passwords included. */
+export const SEALING: readonly SyncCapability[] = ['profile', 'preferences', 'providerConnections', 'sealedPasswords'];
+
+export function fakeSyncAccount(options: FakeAccountOptions = {}): FakeAccount {
   const pageSize = options.pageSize ?? 50;
   let epoch = 1;
   const log: SyncChange[] = [];
   const stored = new Set<string>();
-  const calls = { pushes: 0, signIns: 0, pulls: 0, signOuts: 0 };
+  const calls = { pushes: 0, signIns: 0, pulls: 0, signOuts: 0, vaultKeys: 0 };
   // One account, one vault: every device signed in to it seals with the same key.
   const vault = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
   let acceptOnly: number | undefined;
@@ -65,6 +72,7 @@ export function fakeSyncAccount(
   let expireNext = false;
   let refuseOwner = false;
   let refuseSignIn = false;
+  let failVaultKey: AppError | undefined;
 
   const check = () => {
     const failure = failNext;
@@ -128,7 +136,9 @@ export function fakeSyncAccount(
       if (refuseOwner) throw new AppError('UNAUTHORIZED', 'That is not the owner.');
     },
     vaultKey: async () => {
+      calls.vaultKeys += 1;
       check();
+      if (failVaultKey) throw failVaultKey;
       return vault;
     },
     createAccount: async () => {
@@ -159,6 +169,7 @@ export function fakeSyncAccount(
 
   return {
     plugin: pluginCarrying(options.carries ?? ['profile', 'preferences', 'providerConnections']),
+    vaultKey: vault,
     pluginCarrying,
     inject: (change, before) => {
       stored.add(change.id);
@@ -194,6 +205,9 @@ export function fakeSyncAccount(
     },
     refuseSignIn: (refuse) => {
       refuseSignIn = refuse;
+    },
+    failVaultKey: (error) => {
+      failVaultKey = error;
     },
   };
 }

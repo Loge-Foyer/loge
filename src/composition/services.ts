@@ -89,7 +89,7 @@ export function createServices(): AppServices {
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
 
-  const parts: SyncParts = { db, credentials, catalog, ids, janitor, log };
+  const parts: SyncParts = { db, credentials, catalog, ids, janitor, crypto, log };
   const lock = createRunLock();
   const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
   const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity: createAppActivity() });

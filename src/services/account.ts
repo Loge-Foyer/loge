@@ -21,6 +21,8 @@ import type { SyncEngine } from './sync/engine';
 import { joinAccount, previewAccount, type AccountPreview } from './sync/join';
 import type { AccountProviders } from './sync/provider';
 import type { SyncScheduler } from './sync/scheduler';
+import { vaultOnce } from './sync/sealed';
+import { sessionRef } from './sessions';
 
 const FINAL_PUSH_MS = 5_000;
 const LOCK = 'streaming-center-sync';
@@ -54,6 +56,8 @@ export interface PreparedSignIn {
   readonly draft: ConnectionDraft;
   readonly carried: ReadonlySet<SyncCapability>;
   readonly preview?: AccountPreview;
+  /** The account's vault key, read while the sign-in was open: the join opens the passwords the account holds with it. Memory only. */
+  readonly vaultKey?: Uint8Array;
 }
 
 /** The owner was not verified, so nothing changed. `cancelled` is someone backing out, not an error to show. */
@@ -111,12 +115,16 @@ export function createAccountService(deps: {
     throw new OwnerNotVerifiedError(verdict);
   };
 
-  // Letting an account go: its state goes, and so does a connection that was only ever the account.
+  // Letting an account go: its state goes, and its session — the vault key with it — and so does a connection that was only ever the account.
   const leave = async (tx: Repositories, connection: Connection) => {
     await tx.syncState.remove(connection.id);
     const servesMedia = connection.roles.media === true && catalog.get(connection.pluginId)?.media !== undefined;
-    if (servesMedia) await tx.connections.update({ ...connection, roles: { ...connection.roles, sync: false } });
-    else await removeConnectionIn(tx, connection.id);
+    if (servesMedia) {
+      await tx.connections.update({ ...connection, roles: { ...connection.roles, sync: false } });
+      await tx.staleSecrets.add([sessionRef(connection.id, 'account')]);
+    } else {
+      await removeConnectionIn(tx, connection.id);
+    }
   };
 
   const carriedBy = (manifest: PluginManifest, draft: ConnectionDraft): ReadonlySet<SyncCapability> =>
@@ -177,6 +185,8 @@ export function createAccountService(deps: {
       try {
         const status = await probe.getStatus();
         const preview = again ? undefined : await previewAccount(probe, carried, deps.parts);
+        // Read before the probe goes: the join needs it, and asking again would sign in again.
+        const vaultKey = preview && carried.has('sealedPasswords') ? await probe.vaultKey?.() : undefined;
         const local = await db.users.list();
         const accountProfiles = (preview?.changes ?? []).flatMap((change) =>
           change.entity === 'profile' && change.operation === 'upsert' ? [change.data.name] : [],
@@ -196,6 +206,7 @@ export function createAccountService(deps: {
           draft: !existing && status.accountName ? { ...draft, label: status.accountName } : draft,
           carried,
           ...(preview ? { preview } : {}),
+          ...(vaultKey ? { vaultKey } : {}),
         };
       } finally {
         await probe.dispose().catch(() => undefined);
@@ -216,6 +227,7 @@ export function createAccountService(deps: {
       if (prepared.switching && current?.available) await engine.finalPush(FINAL_PUSH_MS);
 
       const planned = await connections.plan(prepared.manifest.id, prepared.draft, prepared.existing, { sync: true });
+      const { vaultKey } = prepared;
       let arrived = 0;
       let reported: Applied | undefined;
       try {
@@ -226,19 +238,22 @@ export function createAccountService(deps: {
             prepared.carried,
             preview,
             { kind: 'sign-in', profiles: prepared.ask ? profiles : 'both' },
-            async (tx) => {
-              for (const connection of await tx.connections.list()) {
-                if (connection.roles.sync !== true || connection.id === planned.connection.id) continue;
-                // Leaving an account: what changes here from now on is this device's own.
-                const head = await tx.journal.head();
-                await tx.deviceSettings.update((settings) => ({ ...settings, leftAccountAt: head }));
-                await leave(tx, connection);
-              }
-              await connections.commit(tx, planned);
-              const pluginId = prepared.manifest.id;
-              await tx.deviceSettings.update((settings) =>
-                settings.plugins[pluginId]?.enabled ? settings : { ...settings, plugins: { ...settings.plugins, [pluginId]: { enabled: true } } },
-              );
+            {
+              inTransaction: async (tx) => {
+                for (const connection of await tx.connections.list()) {
+                  if (connection.roles.sync !== true || connection.id === planned.connection.id) continue;
+                  // Leaving an account: what changes here from now on is this device's own.
+                  const head = await tx.journal.head();
+                  await tx.deviceSettings.update((settings) => ({ ...settings, leftAccountAt: head }));
+                  await leave(tx, connection);
+                }
+                await connections.commit(tx, planned);
+                const pluginId = prepared.manifest.id;
+                await tx.deviceSettings.update((settings) =>
+                  settings.plugins[pluginId]?.enabled ? settings : { ...settings, plugins: { ...settings.plugins, [pluginId]: { enabled: true } } },
+                );
+              },
+              ...(vaultKey ? { vault: vaultOnce(deps.parts.crypto, () => Promise.resolve(vaultKey)) } : {}),
             },
           );
           arrived = applied.arrivedProfiles.size;

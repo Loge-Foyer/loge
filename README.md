@@ -90,8 +90,9 @@ built with [Tamagui](https://tamagui.dev):
 
 **The account.** At first launch, sign in and the household's profiles arrive
 in "Who's watching?" — or use the device on its own. Signed in, profiles and
-their PINs, each profile's settings, and connections (without their passwords)
-are kept in step on every device on the same account. A forgotten PIN is reset
+their PINs, each profile's settings, and connections are kept in step on every
+device on the same account — with their passwords, sealed on the device, where
+the account can carry them. A forgotten PIN is reset
 by confirming it's you: through the account, or with Face ID, a fingerprint or
 the passcode.
 

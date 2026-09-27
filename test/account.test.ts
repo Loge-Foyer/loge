@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { OwnerNotVerifiedError } from '@/services/account';
 import { draftOf, initialDraft } from '@/services/connection-draft';
+import { sessionRef } from '@/services/sessions';
 
 import { accountDraft, mediaDraft, signIn, sync, twoDevices } from './support/devices';
 import { ENGINES, type Engine } from './support/engines';
@@ -182,7 +183,7 @@ describe.each(ENGINES)('the account on %s', (engine: Engine) => {
       expect((await a.db.deviceSettings.get()).leftAccountAt).toBeGreaterThan(0);
     });
 
-    it('keeps a connection that also serves media, with its sync role off', async () => {
+    it('keeps a connection that also serves media, with its sync role off and its account session gone', async () => {
       const account = fakeSyncAccount({ id: 'both-roles', withMedia: true });
       const device = buildServices({ plugins: [account.plugin], engine, device: 'dual' });
       await device.services.profiles.create('Lee');
@@ -193,8 +194,12 @@ describe.each(ENGINES)('the account on %s', (engine: Engine) => {
       const prepared = await device.services.account.prepareSignIn({ connectionId: existing.id, draft: draftOf(account.plugin.manifest, edit) });
       await device.services.account.completeSignIn(prepared, 'both');
       expect((await device.db.connections.get(existing.id))?.roles).toEqual({ media: true, sync: true });
+      // The account's session holds its vault key: it must not outlive the account.
+      const session = sessionRef(existing.id, 'account');
+      await device.deviceBound.write(session, { value: 'token and vault key', identity: 'x' });
       await device.services.account.signOut();
       expect((await device.db.connections.get(existing.id))?.roles).toEqual({ media: true, sync: false });
+      expect(await device.deviceBound.read(session)).toBeUndefined();
     });
 
     it('is refused a connection removal while it is the account', async () => {

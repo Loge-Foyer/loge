@@ -111,8 +111,10 @@ The device's account is the one connection with its sync role on, and only the
 account service switches that: signing in in Settings → Account (or at first
 launch), never a connection form, and never by default. Signing in is the
 opt-in, so the account carries everything its plugin declares — profiles and
-their PINs, preferences, connections without their passwords — less any toggle
-the plugin offers and the user switched off.
+their PINs, preferences, connections, and their passwords sealed where it
+declares `sealedPasswords` — less any toggle the plugin offers and the user
+switched off. A sealing account supplies the vault key (`vaultKey()`); the app
+seals and opens, and the plugin never sees another connection's password.
 
 - **One provider, apart from the media one.** `services/sync/provider.ts`
   connects the account's sync role with its own session

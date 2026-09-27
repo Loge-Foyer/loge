@@ -5,8 +5,8 @@ import { initialDraft, setSecret, setValue } from '@/services/connection-draft';
 import type { ConnectionDraft } from '@/services/connections';
 
 import { reopenable, type Engine } from './engines';
-import { buildServices, fakeMediaPlugin, movie } from './services';
-import { fakeSyncAccount, type FakeAccount } from './sync';
+import { buildServices, fakeMediaPlugin, movie, type FakeSourceOptions } from './services';
+import { fakeSyncAccount, type FakeAccount, type FakeAccountOptions } from './sync';
 
 export type Device = ReturnType<typeof buildServices> & { readonly where: ReturnType<typeof reopenable> };
 
@@ -16,9 +16,13 @@ export const ENGINE_PAIRS: readonly (readonly [Engine, Engine])[] = [
   ['sqlite', 'indexeddb'],
 ];
 
-export function twoDevices(engines: readonly [Engine, Engine], extra: readonly Plugin[] = []) {
-  const account = fakeSyncAccount();
-  const media = fakeMediaPlugin('fake', { movies: (id) => [movie(id, 'm1', 2020)], signsIn: true });
+export function twoDevices(
+  engines: readonly [Engine, Engine],
+  options: { readonly extra?: readonly Plugin[]; readonly account?: FakeAccountOptions; readonly media?: FakeSourceOptions } = {},
+) {
+  const account = fakeSyncAccount(options.account);
+  const media = fakeMediaPlugin('fake', { movies: (id) => [movie(id, 'm1', 2020)], signsIn: true, ...options.media });
+  const extra = options.extra ?? [];
   const plugins = [account.plugin, media.plugin, ...extra];
   const device = (name: string, engine: Engine): Device => {
     const where = reopenable(engine);

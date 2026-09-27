@@ -124,17 +124,20 @@ has not returned yet. Like device settings, it is never journaled.
 The account carries profiles, their PINs, their preferences, connections and
 each profile's values on them. Other devices get them the next time they sync.
 
-- **What never travels.** Passwords, session tokens, credentials refs, the
-  account's own connection, a connection's sync role, device settings (the
-  default profile, installed plugins), and connections of plugins this build
-  does not register. A connection lists the *names* of its saved passwords, so
-  a device without them asks — "needs its password on this device" — instead of
-  signing in with nothing. A password saved there stays listed when this device
-  edits the connection without having it.
+- **What never travels.** Session tokens, credentials refs, the account's own
+  connection, a connection's sync role, device settings (the default profile,
+  installed plugins), connections of plugins this build does not register —
+  and passwords, except sealed, on an account that carries them. A connection
+  lists the *names* of its saved passwords, so a device without them asks —
+  "needs its password on this device" — instead of signing in with nothing. A
+  password saved there stays listed when this device edits the connection
+  without having it.
 - **The PIN travels readable**, as a lock against the wrong family member
   rather than an account secret. It arrives in the credential store, under a
   fresh ref, never in the database. A PIN this device cannot read — after a
   restore — is not sent at all, rather than sent as "no PIN".
+- **Passwords travel sealed**, on an account that carries `sealedPasswords`
+  (below).
 - **A connection new to this device** installs its plugin.
 - **The first profile chosen** on a device without a default becomes it, as
   the first profile created does — so a device that joined an account does not
@@ -152,6 +155,57 @@ normal push uploads them. Which side wins where both hold something:
 Something deleted here since the device last left an account is not brought
 back, and its delete is announced. Signing out keeps everything on the device
 and records the journal's head (`leftAccountAt`).
+
+### Passwords
+
+**The sign-in rule.** A password is only ever used with the sign-in it was
+saved for: its plugin, and its scope's address and account — the `url` fields
+and the credential fields, resolved over the connection for a profile's own.
+A pulled change that points a connection anywhere else leaves its passwords
+behind, every profile's that moved with it included, and the device asks. It
+holds on every account, sealing or not: whoever controls the account can
+rewrite an address, and a password must never follow it. Other fields — such
+as "local only" — are no part of a sign-in, or every toggle would make other
+devices ask again.
+
+**Sealed.** On an account that carries `sealedPasswords` the engine seals each
+saved password of a connection, and of each profile's values on it, with the
+account's vault key: AES-256-GCM over the password and its sign-in, bound to
+the change it travels in and its field (`sc/sealed/v1|{syncKey}|{field}`). The
+account stores `v1.{key id}.{…}`, which it cannot open. A password this device
+cannot read, or one too long to travel, is left out and its name still goes;
+a change too long with its seals goes without them.
+
+**Arriving**, a seal is opened before the transaction — the credential store is
+no part of one — and written under a fresh ref:
+
+- Each is judged against the connection as the log stands at that change: the
+  page's own upserts and deletes, folded over this device's rows. The
+  transaction takes a ref only if its sign-in is still the row's.
+- The first change to a scope on a page that holds what this device holds
+  already gets no ref, so an echo writes nothing and purges nothing. Every
+  other change gets one, so a page that goes A → B → A ends on A — PINs alike.
+- A seal that does not open — another account's key, a newer version, another
+  connection's — is left out, and the names still count.
+
+**Two exceptions to rule 1**, both narrow:
+
+- A connection that now signs in somewhere else takes the passwords off every
+  profile whose sign-in moved with it, even one this device changed.
+- A password a row lists but this device lacks is filled in from a seal made
+  for that row's own sign-in, even from a change the device does not take —
+  its own change still wins everything else. That is how every device ends up
+  with every password, in whatever order the runs came.
+
+A save here that moves a connection announces its profiles' rows again, after
+it, so they go out sealed for where they sign in now.
+
+**The vault key** comes from the account's plugin, once per run, and only when
+something is to be sealed or opened. If it cannot be had, the run stops before
+the page that needed it: applied without, the seals would be passed for good.
+Signing in reads it while the sign-in is open, for the join. The plugin keeps
+it in the account's session — the device-bound store, never the database,
+never restored onto another phone — and signing out removes that.
 
 ## Migrations
 

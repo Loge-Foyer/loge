@@ -73,11 +73,21 @@ export interface FakeSourceOptions {
   readonly withImages?: boolean;
   /** Reads its credentials before every call, the way a real source signs in. */
   readonly signsIn?: boolean;
+  /** A field that says nothing of where or as whom it signs in — as Jellyfin's "local only". */
+  readonly withNote?: boolean;
 }
 
 /** A media plugin backed by lists, with the counters a test needs to see what was asked. */
 export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
-  const stats = { connects: 0, calls: 0, disposed: 0, credentials: [] as Record<string, string>[], signedInWith: [] as Record<string, string>[] };
+  const stats = {
+    connects: 0,
+    calls: 0,
+    disposed: 0,
+    credentials: [] as Record<string, string>[],
+    signedInWith: [] as Record<string, string>[],
+    /** Where each sign-in went. */
+    signedInAt: [] as string[],
+  };
   const manifest: PluginManifest = {
     id: pluginId(id),
     displayName: id,
@@ -90,6 +100,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
       { key: 'serverUrl', label: 'Server', type: 'url', required: true },
       { key: 'username', label: 'Username', type: 'text', required: true, credential: true },
       { key: 'password', label: 'Password', type: 'password' },
+      ...(options.withNote ? [{ key: 'note', label: 'Note', type: 'text' as const }] : []),
     ],
     settings: options.withImages
       ? [{ key: 'cacheMetadata', label: 'Cache', type: 'boolean', default: true, gates: ['media.offlineMetadata'] }]
@@ -102,7 +113,10 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
         stats.connects += 1;
         const fail = async () => {
           stats.calls += 1;
-          if (options.signsIn) stats.signedInWith.push({ ...(await context.credentials.read()) });
+          if (options.signsIn) {
+            stats.signedInWith.push({ ...(await context.credentials.read()) });
+            stats.signedInAt.push(String(target.fields.serverUrl));
+          }
           const error = options.failWith?.();
           if (error) throw error;
         };
@@ -210,7 +224,7 @@ export function buildServices(options: {
   });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
-  const parts: SyncParts = { db, credentials, catalog, ids, janitor, log: silentLog };
+  const parts: SyncParts = { db, credentials, catalog, ids, janitor, crypto, log: silentLog };
   const lock = createInProcessLock();
   const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
   const activity = fakeActivity();

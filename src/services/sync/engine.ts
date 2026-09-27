@@ -1,4 +1,4 @@
-import { AppError, isAppError, type AppErrorCode, type RetryHint } from '@sc/api';
+import { AppError, isAppError, type AppErrorCode, type CancelSignal, type ConnectedUserStateSyncProvider, type RetryHint } from '@sc/api';
 
 import { MissingSecretError } from '../plugin-context';
 import type { Clock, RunLock } from '../ports';
@@ -7,6 +7,7 @@ import { currentAccount, type CurrentAccount } from './current';
 import { joinAccount, previewAccount, type JoinReason } from './join';
 import type { AccountProviders } from './provider';
 import { pushPending } from './push';
+import { vaultOnce, type VaultSource } from './sealed';
 
 export type SyncPhase =
   | 'idle' // there is no account
@@ -78,10 +79,10 @@ export function createSyncEngine(deps: {
     return parts.db.journal.count(state?.checkpoint ?? 0);
   };
 
-  const join = async (account: CurrentAccount, reason: JoinReason) => {
-    const provider = await providers.provider(account.connection);
-    const preview = await previewAccount(provider, account.carried, parts);
-    applied(await joinAccount(parts, account.connection, account.carried, preview, reason));
+  // One per run, asked for only when something is to be sealed or opened; if the account cannot give it, the run stops.
+  const vaultOf = (account: CurrentAccount, provider: ConnectedUserStateSyncProvider, signal?: CancelSignal): VaultSource | undefined => {
+    const key = account.carried.has('sealedPasswords') ? provider.vaultKey?.bind(provider) : undefined;
+    return key && vaultOnce(parts.crypto, () => key(signal));
   };
 
   const runOnce = async () => {
@@ -97,11 +98,14 @@ export function createSyncEngine(deps: {
     set({ ...status, phase: 'syncing' });
     try {
       const provider = await providers.provider(account.connection);
+      const vault = vaultOf(account, provider);
+      const sealing = vault ? { vault } : {};
       let joins = 0;
       const rejoin = async (reason: JoinReason) => {
         joins += 1;
         if (joins > MAX_JOINS_PER_RUN) throw new AppError('PROVIDER_UNAVAILABLE', 'The account keeps losing its place.', { retry: 'backoff' });
-        await join(account, reason);
+        const preview = await previewAccount(provider, account.carried, parts);
+        applied(await joinAccount(parts, account.connection, account.carried, preview, reason, sealing));
       };
 
       const stored = await parts.db.syncState.get(account.connection.id);
@@ -126,17 +130,17 @@ export function createSyncEngine(deps: {
         if (page.kind === 'expired') {
           // Nothing was lost, only the place in the log: read it all again, and send nothing extra.
           const preview = await previewAccount(provider, account.carried, parts);
-          const result = await applyPage(parts, account.connection, account.carried, state.cursor, preview.changes, preview.cursor);
+          const result = await applyPage(parts, account.connection, account.carried, state.cursor, preview.changes, preview.cursor, vault);
           if (result !== 'moved') applied(result);
           continue;
         }
-        const result = await applyPage(parts, account.connection, account.carried, state.cursor, page.changes, page.cursor);
+        const result = await applyPage(parts, account.connection, account.carried, state.cursor, page.changes, page.cursor, vault);
         if (result === 'moved') continue;
         applied(result);
         if (!page.more) break;
       }
 
-      const outcome = await pushPending(parts, provider, account.connection, account.carried);
+      const outcome = await pushPending(parts, provider, account.connection, account.carried, sealing);
       const lastSyncedAt = clock.now();
       await parts.db.unjournaled(async (tx) => {
         const state = await tx.syncState.get(account.connection.id);
@@ -212,7 +216,9 @@ export function createSyncEngine(deps: {
       try {
         return await lock.run(LOCK, async () => {
           const provider = await providers.provider(account.connection);
-          return (await pushPending(parts, provider, account.connection, account.carried, controller.signal)) === 'done';
+          const vault = vaultOf(account, provider, controller.signal);
+          const options = { signal: controller.signal, ...(vault ? { vault } : {}) };
+          return (await pushPending(parts, provider, account.connection, account.carried, options)) === 'done';
         });
       } catch {
         return false;

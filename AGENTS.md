@@ -200,6 +200,15 @@ each rule. These break silently:
 - **Signing in again changes only passwords.** A new address or username
   would be another account reached without the switch; the service keeps every
   other detail, and the connection form shows the account's details read-only.
+- **A password never follows a connection somewhere else.** Sealed or kept, it
+  is used only with the sign-in it was saved for (`signInOf` in
+  `sync/sealed.ts`: the plugin, `url` fields and credential fields). Keeping a
+  ref because the name is still listed would let whoever controls the account
+  send it anywhere.
+- **Seals are opened before the transaction, and adopted inside it** — the
+  PINs' plan, transaction and cleanup. Plans are keyed by the change object,
+  never its id. A run asks for the vault key once, and stops before the page
+  when it cannot have it: applying without it would pass the seals for good.
 - **Only `src/platform/` imports `expo-local-authentication`.** Screens ask
   `OwnerCheck` (`useOwnerMethod`, `pins.forgot`); lint enforces it, and the web
   build gets a stub that answers "unavailable".

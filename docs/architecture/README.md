@@ -179,6 +179,13 @@ A device has at most one account: the one connection whose sync role is on.
   both sides hold, and announces this device's rows in the journal for the
   normal push to upload. Carrying less is remembered, so carrying it again
   later joins again: what changed meanwhile was never sent.
+- **Passwords** (`sync/sealed.ts`) are used only with the sign-in they were
+  saved for. On an account that carries `sealedPasswords`, a run asks the
+  account for its vault key once — only when something is to be sealed or
+  opened — and hands it to join, apply and push: pushing seals a connection's
+  passwords, applying opens them before the transaction and takes each only
+  for its sign-in. Two narrow exceptions to rule 1 keep every device's copy
+  whole; `docs/data` has them.
 - **When it runs** (`sync/scheduler.ts`): at launch, on coming to the
   foreground, two seconds after a journaled commit, when the network changes,
   every minute in the foreground, and on "Sync now" — never inside a write.
@@ -191,7 +198,8 @@ A device has at most one account: the one connection whose sync role is on.
   has the session gate look again; the UI refreshes what it shows.
 
 **Signing in** is two steps. `prepareSignIn` checks the owner, tries the
-account once and reads it whole, saving nothing. `completeSignIn` writes the
+account once and reads it whole — and its vault key, for the join — saving
+nothing. `completeSignIn` writes the
 account's connection, applies what the account holds and announces this
 device's rows, all in one transaction. Between the two, the UI asks "Use the
 account's profiles" or "Keep both" when both sides hold profiles. Signing in
@@ -227,7 +235,7 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
 | --- | --- |
 | Profiles, connections, per-profile values, preferences, device settings, the change journal | repositories — SQLite on native, IndexedDB on web |
 | Passwords, PINs | the credential store — the keychain on native, encrypted IndexedDB on web |
-| Session tokens, the device key | the device-bound credential store — the keychain, never restored onto another phone |
+| Session tokens, the device key, the account's vault key | the device-bound credential store — the keychain, never restored onto another phone |
 | Reads for screens, titles from sources | TanStack Query, every key prefixed by `device` or by the active profile |
 | The session gate | the session service, read with `useSyncExternalStore` |
 | Where the account's log stands — cursor, checkpoint, what waits to come back | `sync_state`, in the repositories, never journaled |

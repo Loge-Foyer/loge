@@ -13,8 +13,9 @@ import {
 
 import type { JournalAnnouncement, JournalEntry, Repositories, UserPreferences } from '../ports';
 import { removeProfileIn } from '../removal';
-import { appliedOf, newEffects, planPins, understood, writeChange, type Applied, type SyncParts } from './apply';
+import { appliedOf, discardPlanned, fillIn, newEffects, planSecrets, understood, unusedOf, writeChange, type Applied, type SyncParts } from './apply';
 import { fold } from './fold';
+import type { VaultSource } from './sealed';
 import { keyOfEntry, targetsAccount } from './wire';
 
 /** The account as the whole of its log says it is, read before anything is decided. */
@@ -66,13 +67,19 @@ export type JoinReason = { readonly kind: 'sign-in'; readonly profiles: 'account
 
 const PROFILE_OWNED: ReadonlySet<SyncEntity> = new Set(['profile', 'pin', 'preferences']);
 
+export interface JoinOptions {
+  /** Runs first inside the join's transaction: a sign-in writes the account's connection there. */
+  readonly inTransaction?: (tx: Repositories) => Promise<void>;
+  /** Present when the account carries sealed passwords: what it holds arrives with them. */
+  readonly vault?: VaultSource;
+}
+
 /**
  * Joins an account: settles what both sides hold, announces this device's
  * rows in the journal — which the normal push then uploads, protected while
  * in flight and acknowledged by their echoes — and records where in the
  * account's log this device now stands. One unjournaled transaction, so a
- * failed join leaves nothing half done. `inTransaction` runs first inside it:
- * a sign-in writes the account's connection there.
+ * failed join leaves nothing half done.
  *
  * Who wins where both sides hold something:
  * - "Use the account's profiles": the account, for profiles, PINs and
@@ -81,6 +88,8 @@ const PROFILE_OWNED: ReadonlySet<SyncEntity> = new Set(['profile', 'pin', 'prefe
  *   last left an account. Something deleted here since then is not brought
  *   back, and its delete is announced.
  * - `reset` and `grow`: this device — the account lost data, or never had it.
+ *
+ * Where this device keeps its own, a password it lacks is still filled in.
  */
 export async function joinAccount(
   parts: SyncParts,
@@ -88,9 +97,9 @@ export async function joinAccount(
   carried: ReadonlySet<SyncCapability>,
   preview: AccountPreview,
   reason: JoinReason,
-  inTransaction?: (tx: Repositories) => Promise<void>,
+  options: JoinOptions = {},
 ): Promise<Applied> {
-  const fresh = await planPins(parts, preview.changes);
+  const planned = await planSecrets(parts, preview.changes, account.id, options.vault);
   const effects = newEffects();
   const signIn = reason.kind === 'sign-in';
   const accountsProfiles = reason.kind === 'sign-in' && reason.profiles === 'account';
@@ -98,7 +107,7 @@ export async function joinAccount(
 
   try {
     await parts.db.unjournaled(async (tx) => {
-      await inTransaction?.(tx);
+      await options.inTransaction?.(tx);
       const settings = await tx.deviceSettings.get();
       const state = await tx.syncState.get(account.id);
       const since = signIn ? (settings.leftAccountAt ?? 0) : (state?.checkpoint ?? 0);
@@ -129,7 +138,8 @@ export async function joinAccount(
                 ? !lastHere.has(key)
                 : lastHere.get(key)?.operation !== 'delete'
               : !here && lastHere.get(key)?.operation !== 'delete';
-        if (take && (await writeChange(tx, parts, account.id, change, fresh, effects))) fromAccount.add(key);
+        if (!take) await fillIn(tx, parts, change, planned, effects);
+        else if (await writeChange(tx, parts, account.id, change, planned, effects)) fromAccount.add(key);
       }
 
       // The account's profiles win entirely: what it does not hold for them goes too.
@@ -166,8 +176,7 @@ export async function joinAccount(
         await tx.journal.announce(deletes);
       }
 
-      const unused = [...fresh.values()].filter((ref) => !effects.adopted.has(ref));
-      await tx.staleSecrets.add([...effects.stale, ...unused]);
+      await tx.staleSecrets.add([...effects.stale, ...unusedOf(planned, effects)]);
       await tx.syncState.put({
         connectionId: account.id,
         cursor: preview.cursor,
@@ -179,7 +188,7 @@ export async function joinAccount(
       });
     });
   } catch (error) {
-    for (const ref of fresh.values()) await parts.credentials.delete(ref).catch(() => undefined);
+    await discardPlanned(parts, planned);
     throw error;
   }
   await parts.janitor.drain();

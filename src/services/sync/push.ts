@@ -2,7 +2,8 @@ import type { CancelSignal, ConnectedUserStateSyncProvider, Connection, SyncCapa
 
 import type { JournalEntry } from '../ports';
 import type { SyncParts } from './apply';
-import { changeFor, keyOfEntry } from './wire';
+import type { VaultSource } from './sealed';
+import { changeFor, keyOfEntry, type Outgoing } from './wire';
 
 const BATCH = 100;
 
@@ -11,21 +12,25 @@ const BATCH = 100;
  * checkpoint moves across the accepted prefix only, and every accepted change
  * waits to be seen coming back. An entry with nothing to send counts as sent
  * once everything before it is. `partial` when the account stored only part
- * of a batch: the rest goes again, verbatim, next time.
+ * of a batch: the rest goes again, verbatim, next time. With a vault,
+ * connections go with their passwords, sealed.
  */
 export async function pushPending(
   parts: SyncParts,
   provider: ConnectedUserStateSyncProvider,
   account: Connection,
   carried: ReadonlySet<SyncCapability>,
-  signal?: CancelSignal,
+  options: { readonly signal?: CancelSignal; readonly vault?: VaultSource } = {},
 ): Promise<'done' | 'partial'> {
-  const out = {
+  const { signal, vault } = options;
+  const out: Outgoing = {
     db: parts.db,
     credentials: parts.credentials,
-    registered: (pluginId: Connection['pluginId']) => parts.catalog.get(pluginId) !== undefined,
+    manifestOf: (pluginId) => parts.catalog.get(pluginId),
     account: account.id,
     carried,
+    crypto: parts.crypto,
+    ...(vault ? { vault } : {}),
     log: parts.log,
   };
   for (;;) {
