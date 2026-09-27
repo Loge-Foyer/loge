@@ -36,7 +36,7 @@ export const SYNC_CAPABILITY_LABELS: Readonly<Record<SyncCapability, string>> = 
   favorites: 'Favourites',
   watchlist: 'Watchlists',
   history: 'What each profile watched',
-  providerConnections: 'Connections, without their passwords',
+  providerConnections: 'Connections',
   sealedPasswords: 'Their passwords, sealed so only your devices can read them',
   customLists: 'Lists',
   fullBackup: 'A full backup',
@@ -209,12 +209,19 @@ export function describeOwnerVerdict(verdict: OwnerVerdict): string | undefined 
       return 'That didn’t confirm it’s you.';
     case 'failed':
       return 'Your account couldn’t be reached to confirm it’s you. Try again when you’re online.';
+    case 'throttled':
+      return 'Too many tries. Wait a little, then try again.';
     case 'unavailable':
       return 'This device can’t confirm it’s you.';
     case 'cancelled':
     case 'verified':
       return undefined;
   }
+}
+
+/** The same, for a password typed into the owner check: a refusal is a wrong password. */
+export function describeProofVerdict(verdict: OwnerVerdict): string | undefined {
+  return verdict === 'refused' ? 'That password isn’t right.' : describeOwnerVerdict(verdict);
 }
 
 /** "Continue watching", "Movies", or "Movies · Date added" for a row a profile added. */

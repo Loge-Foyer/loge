@@ -198,20 +198,35 @@ A device has at most one account: the one connection whose sync role is on.
   has the session gate look again; the UI refreshes what it shows.
 
 **Signing in** is two steps. `prepareSignIn` checks the owner, tries the
-account once and reads it whole — and its vault key, for the join — saving
-nothing. `completeSignIn` writes the
-account's connection, applies what the account holds and announces this
+account once — or creates it, with the plugin's `signUp` fields — and reads it
+whole, and its vault key for the join, saving nothing. `completeSignIn` writes
+the account's connection, applies what the account holds and announces this
 device's rows, all in one transaction. Between the two, the UI asks "Use the
 account's profiles" or "Keep both" when both sides hold profiles. Signing in
 again to this device's account takes its passwords and nothing else: a new
 address would be another account, reached without switching.
 
+**It signs in once.** The try runs under the installation id the account will
+use (`account|{pluginId}`), so the server sees one device, and the session it
+made is handed to the account inside the run lock, right after the join: no run
+signs in again, and a session a revoke left behind is replaced. Signing out and
+switching tell the old account once, for at most five seconds, and let it go
+whatever it answers.
+
 **The owner check** (`services/owner-check.ts`) re-verifies whoever owns the
 device's profiles: the account's own check when it has one, else Face ID or
 the passcode. Forgot PIN goes through it, and so do signing in on a device
 that has profiles, signing out and switching. Signing in again to the same
-account does not: its password is the proof, and an account that refused the
-old one could not vouch for the owner either.
+account does not: its password is the proof.
+
+- An account whose check takes its password (`ownerProof`) gets it typed
+  again — never the saved one. Nothing typed is refused before anything is
+  asked, so it never counts as a wrong try; a throttled check is `throttled`.
+- An account that no longer lets this device in — revoked, or refusing its
+  saved password — cannot vouch for anyone: the device answers instead, as it
+  does when the account says `signed-out` mid-check.
+- An account that cannot be reached is `failed`, never a quiet fallback to the
+  device.
 
 ## Query keys
 

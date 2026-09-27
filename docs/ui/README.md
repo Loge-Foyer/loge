@@ -92,26 +92,49 @@ goes straight to "Who is this?".
 
 **Settings → Account** (`screens/settings/account.tsx`) shows the account and how
 it stands — "Synced 5 min ago · 2 changes waiting" — with Sync now, what it
-keeps in step, Switch account and Sign out. An account that refused the sign-in
-offers "Sign in again", which takes its passwords and nothing else. Without an
-account the screen says everything is kept on this device, and offers Sign in.
-A row at the top of Settings says the same in one line.
+keeps in step, Switch account and Sign out. An account that refused the sign-in,
+or let this device go, offers "Sign in again", which takes its passwords and
+nothing else. Where the account seals passwords, the list says so, and that it
+cannot read them. Without an account the screen says everything is kept on this
+device, and offers Sign in. A row at the top of Settings says the same in one
+line.
 
 **The sign-in flow** (`screens/sign-in-flow.tsx`) is shared by both, so it uses
 no hook that needs a profile: at first launch there is none. Every step has its
 own Back, and a sign-in that does not go through says why in words, never
 retried. When both sides have profiles it asks once: "Keep both", or "Use the
 account's profiles", which asks again before removing this device's own. A
-switch asks "Move your profiles and settings to X?". Choosing the account's
-profiles can take the profile in use, and everything under `(app)` with it, so
-Settings never navigates after that; the gate does.
+switch asks "Move your profiles and settings to X?" — after "Confirm it's
+you", where the account being left checks its owner with its password.
+Choosing the account's profiles can take the profile in use, and everything
+under `(app)` with it, so Settings never navigates after that; the gate does.
+
+**Creating an account** is the same form. Where the plugin can create one
+(`sync.signUp`), "New here? Create an account" adds its fields — your own
+server's invite code — and the button reads "Create account". Once the account
+exists, the form only signs in to it: going back, or a step that fails after,
+never tries to create it twice. While a key is worked out, the form says it can
+take a few seconds on a phone.
+
+**The owner's password** is asked for in a form of its own
+(`components/owner-proof-form.tsx`), inline, because a native alert cannot hold
+a text field: the fields the account's `ownerProof` names, Continue and Cancel,
+"Checking…" while the key is worked out, and the verdict in words — "That
+password isn't right.", or too many tries. Nothing is retried by itself. Sign
+out opens it in place of the button, after the confirmation; Forgot PIN opens
+it in place of the PIN pad.
 
 **Forgot PIN?** sits under the PIN pad — at launch, when switching, and on PIN
-lock's current-PIN step — wherever the owner can be asked: through the account,
-or with Face ID, a fingerprint or the passcode. Where nobody can be asked — a
-browser without an account — it reads "Forgot it? An account lets you reset a
-PIN." A yes clears the PIN and opens the profile; PIN lock then offers "Set a
-PIN".
+lock's current-PIN step — wherever the owner can be asked: through the account
+(its password, where it asks for one), or with Face ID, a fingerprint or the
+passcode. Where nobody can be asked — a browser without an account — it reads
+"Forgot it? An account lets you reset a PIN.", or, with an account that no
+longer lets this device in, to sign in to it again. A yes clears the PIN and
+opens the profile; PIN lock then offers "Set a PIN".
+
+**Screens scroll with taps passing through** (`components/screen.tsx`,
+`keyboardShouldPersistTaps="handled"`): otherwise the first tap on a button
+after typing only puts the keyboard away, and Continue seems to do nothing.
 
 **The connection form** has one switch, for the media role. The account is not
 a switch: a row says "Your account", or points to Settings → Account. On the

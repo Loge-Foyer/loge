@@ -133,6 +133,21 @@ sync capabilities implements `pull`, `push`, `getStatus` and `dispose` — the
 plugins repository's conformance test enforces it — and `verifyOwner` when the
 account can vouch for its owner, which Forgot PIN uses.
 
+What the manifest declares decides the rest, with no plugin named in the app:
+
+- **`sealedPasswords`** — the engine asks `vaultKey()` once per run and seals
+  and opens connections' passwords itself (`services/sync/sealed.ts`); the
+  plugin never sees another connection's password.
+- **`sync.ownerProof`** — the owner check asks for those password fields again,
+  in `OwnerProofForm`, and hands them to `verifyOwner(proof)`.
+- **`sync.signUp`** — "New here? Create an account" adds those fields, and the
+  try calls `createAccount(fields)` instead of `getStatus()`.
+- **`signOut()`** — called once, for at most five seconds, when the device
+  signs out or switches.
+- **`context.crypto`** — the host's PBKDF2, HKDF and AES-GCM
+  (`src/platform/plugin-crypto.ts`): a plugin derives its keys through it,
+  never in JavaScript of its own.
+
 ## Verifying it actually resolves
 
 `tsc` is not enough. Metro resolution across a repository boundary (symlinks,
@@ -150,8 +165,9 @@ appear exactly once — two copies would mean two brands and two vocabularies.
 
 All ten plugins are linked and registered (`mock` in development builds only).
 Jellyfin and the mock implement the media role — browse, libraries, watch
-status read, and (Jellyfin) remote images and offline metadata. The mock also
-implements the sync role: a pretend account held in memory, keyed by its
-endpoint. The rest export manifests only: the app lists them, installs them and
-configures connections, and says plainly that they cannot list titles, or be an
-account, yet.
+status read, and (Jellyfin) remote images and offline metadata. Two implement
+the sync role: the mock, a pretend account held in memory, keyed by its
+endpoint; and your own server (`custom-server`), with sealed passwords, the
+password as owner proof, and sign-up with an invite. The rest export manifests
+only: the app lists them, installs them and configures connections, and says
+plainly that they cannot list titles, or be an account, yet.

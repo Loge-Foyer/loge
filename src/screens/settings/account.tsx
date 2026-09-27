@@ -7,14 +7,16 @@ import { KeyRound } from '@tamagui/lucide-icons-2/icons/KeyRound';
 import { LogOut } from '@tamagui/lucide-icons-2/icons/LogOut';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Paragraph, SizableText, Spinner, YStack } from 'tamagui';
 
 import { ConfirmButton } from '@/components/confirm-button';
-import { describeSyncStatus, SYNC_CAPABILITY_LABELS } from '@/components/labels';
+import { describeProofVerdict, describeSyncStatus, SYNC_CAPABILITY_LABELS } from '@/components/labels';
+import { OwnerProofForm } from '@/components/owner-proof-form';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
-import { useAccount, useAccountActions, useAccountProviders, useSyncStatus } from '@/hooks/use-account';
+import { useAccount, useAccountActions, useAccountProviders, useOwnerMethod, useSyncStatus } from '@/hooks/use-account';
 import { OwnerNotVerifiedError } from '@/services/account';
 import { SignInFlow, type SignInStart } from '@/screens/sign-in-flow';
 
@@ -24,6 +26,8 @@ export function AccountScreen() {
   const { data: providers = [] } = useAccountProviders();
   const status = useSyncStatus();
   const { signOut, syncNow } = useAccountActions();
+  const { data: method } = useOwnerMethod();
+  const [proving, setProving] = useState(false);
 
   if (current === undefined) return <Screen>{null}</Screen>;
 
@@ -50,12 +54,17 @@ export function AccountScreen() {
   const name = current.connection.label;
   const troubled = status.phase === 'waiting' || status.phase === 'failed' || status.phase === 'needs-sign-in' || status.phase === 'unavailable';
   const busy = status.phase === 'syncing' || syncNow.isPending;
+  // The account's own check asks for its password again: typed here, in place of the button.
+  const asks = method?.via === 'account' ? method.asks : [];
   const signOutError =
     signOut.error instanceof OwnerNotVerifiedError
-      ? signOut.error.verdict === 'cancelled'
-        ? undefined
-        : signOut.error.message
+      ? proving
+        ? describeProofVerdict(signOut.error.verdict)
+        : signOut.error.verdict === 'cancelled'
+          ? undefined
+          : signOut.error.message
       : signOut.error?.message;
+  const sealing = current.carried.has('sealedPasswords');
 
   return (
     <Screen>
@@ -86,7 +95,11 @@ export function AccountScreen() {
 
       <SettingsSection
         title="Kept in step"
-        footer="Passwords stay on each device. Another device asks once for a connection’s password."
+        footer={
+          sealing
+            ? 'Passwords are sealed on this device before they go: the account can’t read them.'
+            : 'Passwords stay on each device. Another device asks once for a connection’s password.'
+        }
       >
         {current.carried.size > 0 ? (
           [...current.carried].map((capability) => (
@@ -116,24 +129,41 @@ export function AccountScreen() {
       </SettingsSection>
 
       <YStack gap="$2" items="flex-start">
-        <ConfirmButton
-          label="Sign out"
-          icon={<LogOut size={16} />}
-          title={`Sign out of ${name}?`}
-          description={`${
-            status.pending > 0
-              ? `${status.pending} ${status.pending === 1 ? 'change hasn’t' : 'changes haven’t'} reached it yet. `
-              : ''
-          }Your profiles stay on this device, and other devices keep what they have.`}
-          confirmLabel="Sign out"
-          disabled={signOut.isPending}
-          onConfirm={() => signOut.mutate()}
-        />
-        {signOutError ? (
-          <SizableText size="$2" color="$red10">
-            {signOutError}
-          </SizableText>
-        ) : null}
+        {proving ? (
+          <OwnerProofForm
+            asks={asks}
+            prompt={`Enter the password of ${name} to sign out.`}
+            busy={signOut.isPending}
+            error={signOutError}
+            // Signed out, this screen stays: the next account must not open on this form.
+            onSubmit={(proof) => signOut.mutate(proof, { onSuccess: () => setProving(false) })}
+            onCancel={() => {
+              setProving(false);
+              signOut.reset();
+            }}
+          />
+        ) : (
+          <>
+            <ConfirmButton
+              label="Sign out"
+              icon={<LogOut size={16} />}
+              title={`Sign out of ${name}?`}
+              description={`${
+                status.pending > 0
+                  ? `${status.pending} ${status.pending === 1 ? 'change hasn’t' : 'changes haven’t'} reached it yet. `
+                  : ''
+              }Your profiles stay on this device, and other devices keep what they have.`}
+              confirmLabel="Sign out"
+              disabled={signOut.isPending}
+              onConfirm={() => (asks.length > 0 ? setProving(true) : signOut.mutate(undefined))}
+            />
+            {signOutError ? (
+              <SizableText size="$2" color="$red10">
+                {signOutError}
+              </SizableText>
+            ) : null}
+          </>
+        )}
       </YStack>
     </Screen>
   );

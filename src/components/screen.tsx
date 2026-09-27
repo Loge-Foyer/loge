@@ -19,7 +19,13 @@ export function Screen({
   refreshControl?: ReactElement<RefreshControlProps>;
 }) {
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }} {...(refreshControl ? { refreshControl } : {})}>
+    // Taps on a button go through while a field has focus: otherwise the first one after typing only puts the keyboard away.
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      style={{ flex: 1 }}
+      {...(refreshControl ? { refreshControl } : {})}
+    >
       <YStack gap={gap} px={flush ? 0 : '$4'} pt="$4" pb="$12" width="100%" maxW={flush ? undefined : 1200} self="center">
         {children}
       </YStack>

@@ -36,9 +36,12 @@ to the generated `android/` folder.
 
 ## Forgot PIN
 
-Without an account that can vouch for its owner, Forgot PIN asks the device:
-a fingerprint, or the screen lock's PIN, pattern or password. It is offered once
-a screen lock is set — `getEnrolledLevelAsync()` reports at least `SECRET`.
+With your own server, Forgot PIN asks for the account's password, and the key
+it gives is worked out natively in about a second. Without an account that can
+vouch for its owner — or with one that has let this device go — it asks the
+device: a fingerprint, or the screen lock's PIN, pattern or password. It is
+offered once a screen lock is set — `getEnrolledLevelAsync()` reports at least
+`SECRET`.
 
 On the emulator: Settings → Security → Screen lock → PIN, then Fingerprint,
 touching the sensor with `adb -e emu finger touch 1` when asked. At the app's

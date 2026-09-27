@@ -42,14 +42,16 @@ WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-Phase 3 — the account. A device has at most one: Welcome offers to sign in or
-to stay on this device, Settings → Account shows it and switches or signs out,
-and the sync engine drains the change journal to it and applies what it brings
-— profiles and their PINs, preferences, connections, and their passwords
-sealed where the account carries them. A password is only ever used with the
-sign-in it was saved for. Forgot PIN re-verifies the owner, through the account
-or the device. The only account so far is the dev-only mock, which declines
-sealing; real ones come in Phases 4 and 5.
+Phase 4 — your own server as the account. A device has at most one: Welcome
+offers to sign in or to stay on this device, Settings → Account shows it and
+switches or signs out, and the sync engine drains the change journal to it and
+applies what it brings — profiles and their PINs, preferences, connections, and
+their passwords sealed where the account carries them. A password is only ever
+used with the sign-in it was saved for. The first real account is your own
+server (`custom-server`, against `../streaming_center_sync`): created from the
+app with an invite, signed in to once, and its password — typed again — is the
+owner check for Forgot PIN, signing out and switching. The dev-only mock is
+still there, and declines sealing; iCloud and Google come in Phase 5.
 Everything from Phase 2 stands: real titles from every live source, merged,
 kept across restarts in SQLite and the keychain, or IndexedDB and encrypted
 secrets on the web. Plugins get the host's cryptography through their context —

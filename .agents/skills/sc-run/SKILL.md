@@ -47,7 +47,24 @@ a flow needs once and it is there on every later launch.
   the account's lockout: do not loop a wrong password.
 - **Offline work**: the `mock` plugin (development builds only) is a pretend
   server that needs no network. Install it and add a connection like any other.
-- **An account**: the mock is a pretend account too. Sign in to it — at first
+- **A real account**: your own server. Start it with a data directory of its
+  own, and make an invite:
+
+  ```bash
+  cd ../streaming_center_sync && npm run build
+  SC_SYNC_DATA=/tmp/sc-data node --disable-warning=ExperimentalWarning dist/main.mjs &
+  SC_SYNC_DATA=/tmp/sc-data node --disable-warning=ExperimentalWarning dist/cli.mjs invite
+  ```
+
+  Then **Sign in → Your own server → New here? Create an account**, at
+  `http://localhost:8730` in a browser or the iOS simulator, and
+  `http://10.0.2.2:8730` on the Android emulator (or `adb reverse tcp:8730
+  tcp:8730` and `localhost`). A second device signs in with the same username
+  and password, and its connections arrive with their passwords. The server's
+  log shows every request by route — a second `POST /v1/auth/login` for one
+  sign-in means the session handover broke — and `dist/cli.mjs devices <user>`
+  and `revoke <id>` are the way to try a lost phone.
+- **A pretend account**: the mock is one too. Sign in to it — at first
   launch, or in Settings → Account — and its endpoint names the account:
   `mock://household` holds Sam (PIN 1234) and Robin, any other endpoint is
   empty. It lives in the JavaScript runtime's memory: a reload forgets it, and
@@ -66,13 +83,17 @@ a flow needs once and it is there on every later launch.
 
 ## The account and Forgot PIN, per platform
 
+- **Your own server** — "Forgot PIN?" opens a password form in place of the
+  PIN pad. Five wrong passwords and the server throttles the device for 30 s:
+  the form then says "Too many tries". Revoked, the device asks itself instead.
 - **Web** — "Forgot PIN?" works with the mock account signed in (it vouches for
   its owner); without an account the unlock screen shows "Forgot it? An account
   lets you reset a PIN." and no link.
-- **Android emulator** — set a screen lock (Settings → Security → Screen lock →
-  PIN), enrol a fingerprint there, touching the sensor with
-  `adb -e emu finger touch 1`. At the app's prompt, `touch 1` answers yes and
-  `touch 2` (an unenrolled finger) no.
+- **Android emulator** — a screen lock and a fingerprint, without the Settings
+  app: `adb shell locksettings set-pin 1111`, then `adb shell am start -a
+  android.settings.FINGERPRINT_ENROLL`, type `1111`, accept, and
+  `adb -e emu finger touch 1` about ten times until "Fingerprint added". At the
+  app's prompt, `touch 1` answers yes and `touch 2` (an unenrolled finger) no.
 - **iOS simulator** — no passcode. In the development build, Face ID can be
   enrolled from the simulator's Features menu; otherwise, without an account,
   there is only the hint.
@@ -128,7 +149,21 @@ adb shell am start -a android.intent.action.VIEW -d "streamingcenterapp://<path>
 adb shell input tap <x> <y>                  # screenshot pixels, not scaled
 adb exec-out screencap -p > /tmp/shot.png
 adb logcat -s ReactNativeJS                  # the app's console output
+adb shell uiautomator dump /sdcard/ui.xml && adb shell cat /sdcard/ui.xml   # every node: text, bounds, focused
 ```
+
+Typing on Android with `adb shell input text` has traps:
+
+- **Only into a field that has focus.** Tap it, then check `focused="true"` in
+  a dump first. Keys that reach no field go to the development build itself:
+  `r` twice reloads the app, `d` opens its menu.
+- **The emulator has a hardware keyboard**, so no soft keyboard shows: never
+  press Back to close one — it navigates back.
+- **Give the app a moment** before tapping the button after it: React takes in
+  the typed text a little later, and a button that is disabled until then
+  ignores the tap. A dump's `enabled` is no guide for Tamagui buttons.
+- The accessibility dumps are heavy: an emulator short on memory answers
+  everything slower while you poll.
 
 On first launch the development build opens its developer-menu introduction
 over the app: tap Continue, then close the menu. Make sure Wi-Fi is the default network

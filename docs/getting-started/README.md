@@ -29,10 +29,26 @@ The workspace root's `jellyfin.env` (gitignored) is a good place to keep the
 test server's details at hand. The app never reads it; the `sc-run` skill types
 them in from there when it drives the app.
 
-## An account to try
+## Your own server
 
-No real account exists yet — your own sync server comes next, then iCloud and
-Google. Development builds have a pretend one: sign in to **Mock**, and its
+Two devices share an account through a sync server you run
+(`../streaming_center_sync`):
+
+```bash
+cd ../streaming_center_sync && npm install && npm run build && npm start
+npm run sc-sync -- invite
+```
+
+In the app: **Sign in → Your own server → New here? Create an account**, with
+`http://localhost:8730` (the Android emulator reaches the computer at
+`http://10.0.2.2:8730`), a username, a password of ten characters or more, and
+the invite. Every other device signs in with the same username and password —
+and its connections arrive with their passwords, sealed on the device that had
+them.
+
+## A pretend account
+
+Development builds have a pretend one too: sign in to **Mock**, and its
 endpoint names the account.
 
 - `mock://household` already has two profiles, Sam (PIN 1234) and Robin, so
@@ -40,7 +56,7 @@ endpoint names the account.
   the "Keep both" question.
 - Any other endpoint is an empty account.
 - It lives in memory. A reload forgets it, and the app joins it again with
-  nothing lost; two devices cannot share it until the sync server exists.
+  nothing lost; two devices cannot share it — your own server is for that.
 
 ## Starting from scratch
 

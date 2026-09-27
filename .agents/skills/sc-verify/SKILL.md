@@ -130,6 +130,9 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
 - `npm test` covers the database, the credential stores and the services —
   the account and two devices syncing through one fake account included — not
   screens. Screens are proven by driving the app on each platform (`sc-run`).
+  The real account plugin against the real server is
+  `../streaming_center_sync`'s `npm test`: run it too after a change to the
+  sync contract or to sealing.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

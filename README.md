@@ -107,9 +107,15 @@ up at once when the app opens, and when a server cannot be reached — away from
 home, or with the server off — you still see your library and how old that
 view is.
 
-What is not there yet: nothing plays, and no real account exists — your own
-sync server comes next, then iCloud and Google. Until then, development builds
-have a pretend one.
+The account can be a server you run yourself — "Your own server", with
+`../streaming_center_sync`. Create it from the app with an invite; every other
+device signs in with its username and password, and gets the household's
+connections with their passwords, sealed on the device that had them. The
+account's password is also what resets a forgotten PIN, and what signing out
+or switching asks for.
+
+What is not there yet: nothing plays, and iCloud and Google come next.
+Development builds also have a pretend account, for trying things offline.
 
 ## Documentation
 

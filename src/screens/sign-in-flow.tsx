@@ -1,20 +1,29 @@
-import { isAppError, type ConnectionId, type FieldValue, type PluginId, type PluginManifest } from '@sc/api';
+import {
+  isAppError,
+  type ConnectionId,
+  type Credentials,
+  type FieldValue,
+  type FieldValues,
+  type PluginId,
+  type PluginManifest,
+} from '@sc/api';
 import { useState } from 'react';
 import { Button, H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { ConfirmButton } from '@/components/confirm-button';
-import { listAll } from '@/components/labels';
+import { describeProofVerdict, listAll } from '@/components/labels';
 import { FieldInput } from '@/components/manifest-form';
+import { OwnerProofForm } from '@/components/owner-proof-form';
 import { PrimaryButton } from '@/components/primary-button';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
-import { useAccount, useAccountProviders } from '@/hooks/use-account';
+import { useAccount, useAccountProviders, useOwnerMethod } from '@/hooks/use-account';
 import { useConnection } from '@/hooks/use-connections';
 import { useRefreshLocalState } from '@/hooks/use-local-state';
-import { OwnerNotVerifiedError, type PreparedSignIn } from '@/services/account';
+import { AccountCreatedError, OwnerNotVerifiedError, type PreparedSignIn } from '@/services/account';
 import { draftOf, initialDraft } from '@/services/connection-draft';
 import { InvalidDraftError, type ConnectionDraft, type SavedSecrets, type SecretChange } from '@/services/connections';
-import { hasErrors, validateDraft, type FieldErrors } from '@/services/field-values';
+import { defaultValues, hasErrors, hasFieldErrors, validateDraft, validateFields, type FieldErrors } from '@/services/field-values';
 
 const NOTHING_SAVED: SavedSecrets = { shared: new Set(), profiles: new Map() };
 
@@ -30,9 +39,23 @@ interface Target {
   readonly connectionId?: ConnectionId;
 }
 
+/** What the details form sends on: a sign-in, or an account to create with these extra fields. */
+interface Submitted {
+  readonly draft: ConnectionDraft;
+  readonly signUp?: FieldValues;
+}
+
 type Step =
   | { readonly kind: 'pick' }
-  | { readonly kind: 'details'; readonly target: Target; readonly draft?: ConnectionDraft; readonly error?: string }
+  | {
+      readonly kind: 'details';
+      readonly target: Target;
+      readonly draft?: ConnectionDraft;
+      readonly error?: string;
+      /** The account exists now: the form signs in to it, never creates it again. */
+      readonly created?: true;
+    }
+  | { readonly kind: 'confirm'; readonly target: Target; readonly submitted: Submitted; readonly error?: string }
   | { readonly kind: 'ask'; readonly target: Target; readonly prepared: PreparedSignIn }
   | { readonly kind: 'switch'; readonly target: Target; readonly prepared: PreparedSignIn }
   | { readonly kind: 'completing' };
@@ -57,8 +80,12 @@ export function SignInFlow({
   const { account, catalog } = useServices();
   const { data: current } = useAccount();
   const { data: providers } = useAccountProviders();
+  const { data: method } = useOwnerMethod();
   const refresh = useRefreshLocalState();
   const [step, setStep] = useState<Step>();
+  const [confirming, setConfirming] = useState(false);
+  // Switching away from an account that checks its owner with its password: typed again before anything is tried.
+  const proofAsks = start.kind !== 'again' && current && method?.via === 'account' ? method.asks : [];
 
   const first = ((): Step | undefined => {
     if (current === undefined || providers === undefined) return undefined;
@@ -101,20 +128,38 @@ export function SignInFlow({
       await onDone(result);
     } catch (error) {
       const message = describeSignInError(error);
-      setStep({ kind: 'details', target, draft: prepared.draft, ...(message ? { error: message } : {}) });
+      setStep({ kind: 'details', target, draft: prepared.draft, ...(message ? { error: message } : {}), ...(prepared.created ? { created: true } : {}) });
     }
   };
 
-  const prepare = async (target: Target, draft: ConnectionDraft) => {
+  const prepare = async (target: Target, { draft, signUp }: Submitted, proof?: Credentials) => {
     const prepared = await account.prepareSignIn(
-      target.connectionId ? { connectionId: target.connectionId, draft } : { pluginId: target.manifest.id, draft },
+      target.connectionId ? { connectionId: target.connectionId, draft } : { pluginId: target.manifest.id, draft, ...(signUp ? { signUp } : {}) },
+      proof,
     );
     if (prepared.ask) setStep({ kind: 'ask', target, prepared });
     else if (prepared.switching) setStep({ kind: 'switch', target, prepared });
     else await complete(target, prepared, 'both');
   };
 
-  const backToDetails = (target: Target, prepared: PreparedSignIn) => setStep({ kind: 'details', target, draft: prepared.draft });
+  const confirmThenPrepare = async (target: Target, submitted: Submitted, proof: Credentials) => {
+    setConfirming(true);
+    try {
+      await prepare(target, submitted, proof);
+    } catch (error) {
+      if (error instanceof OwnerNotVerifiedError) {
+        setStep({ kind: 'confirm', target, submitted, ...withError(describeProofVerdict(error.verdict)) });
+      } else {
+        const created = error instanceof AccountCreatedError;
+        setStep({ kind: 'details', target, draft: submitted.draft, ...withError(describeSignInError(error)), ...(created ? { created: true } : {}) });
+      }
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const backToDetails = (target: Target, prepared: PreparedSignIn) =>
+    setStep({ kind: 'details', target, draft: prepared.draft, ...(prepared.created ? { created: true } : {}) });
 
   switch (shown.kind) {
     case 'pick':
@@ -146,13 +191,18 @@ export function SignInFlow({
       );
     case 'details': {
       const back = first?.kind === 'pick' ? () => setStep({ kind: 'pick' }) : onCancel;
+      const { target } = shown;
       const props = {
-        manifest: shown.target.manifest,
+        manifest: target.manifest,
         passwordsOnly: start.kind === 'again',
         ...(shown.draft ? { restored: shown.draft } : {}),
         ...(shown.error ? { error: shown.error } : {}),
+        ...(shown.created ? { created: true } : {}),
         onBack: back,
-        onSubmit: (draft: ConnectionDraft) => prepare(shown.target, draft),
+        onSubmit: async (submitted: Submitted) => {
+          if (proofAsks.length > 0) setStep({ kind: 'confirm', target, submitted });
+          else await prepare(target, submitted);
+        },
       };
       return shown.target.connectionId ? (
         <ExistingDetails key={shown.target.connectionId} connectionId={shown.target.connectionId} {...props} />
@@ -161,8 +211,28 @@ export function SignInFlow({
           key={shown.target.manifest.id}
           initial={initialDraft(shown.target.manifest, 0)}
           saved={NOTHING_SAVED}
+          canCreate={start.kind !== 'again'}
           {...props}
         />
+      );
+    }
+    case 'confirm': {
+      const { target, submitted } = shown;
+      return (
+        <YStack gap="$5">
+          <StepHeading
+            title="Confirm it’s you"
+            body={`${current?.connection.label ?? 'Your account'} asks for its password before this device moves to another account.`}
+          />
+          <OwnerProofForm
+            asks={proofAsks}
+            prompt={`The password of ${current?.connection.label ?? 'your account'}`}
+            busy={confirming}
+            error={shown.error}
+            onSubmit={(proof) => void confirmThenPrepare(target, submitted, proof)}
+            onCancel={() => setStep({ kind: 'details', target, draft: submitted.draft })}
+          />
+        </YStack>
       );
     }
     case 'ask': {
@@ -233,8 +303,10 @@ interface DetailsProps {
   /** What was typed before a step back. */
   restored?: ConnectionDraft;
   error?: string;
+  /** The account was created already: signing in is all that is left. */
+  created?: boolean;
   onBack: () => void;
-  onSubmit: (draft: ConnectionDraft) => Promise<void>;
+  onSubmit: (submitted: Submitted) => Promise<void>;
 }
 
 function ExistingDetails({ connectionId, ...props }: DetailsProps & { connectionId: ConnectionId }) {
@@ -248,24 +320,36 @@ function ExistingDetails({ connectionId, ...props }: DetailsProps & { connection
       </YStack>
     );
   }
-  return <DetailsForm initial={draftOf(props.manifest, data)} saved={data.saved} {...props} />;
+  return <DetailsForm initial={draftOf(props.manifest, data)} saved={data.saved} canCreate={false} {...props} />;
 }
 
-/** The account's connection fields — nothing per profile, no roles: the account belongs to the device. */
+/**
+ * The account's connection fields — nothing per profile, no roles: the account
+ * belongs to the device. Where the plugin can create an account (`signUp`), it
+ * offers to, with the extra fields that takes.
+ */
 function DetailsForm({
   manifest,
   initial,
   saved,
+  canCreate,
   passwordsOnly,
   restored,
   error,
+  created: createdBefore = false,
   onBack,
   onSubmit,
-}: DetailsProps & { initial: ConnectionDraft; saved: SavedSecrets }) {
+}: DetailsProps & { initial: ConnectionDraft; saved: SavedSecrets; canCreate: boolean }) {
+  const signUpFields = manifest.sync?.signUp?.fields ?? [];
   const [draft, setDraft] = useState(restored ?? initial);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState(error);
   const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState(createdBefore);
+  const [creating, setCreating] = useState(false);
+  const [signUp, setSignUp] = useState<FieldValues>(() => defaultValues(signUpFields));
+  const offersCreate = canCreate && signUpFields.length > 0 && !created;
+  const asCreate = offersCreate && creating;
 
   const setField = (key: string, value: FieldValue) =>
     setDraft((current) => ({ ...current, shared: { ...current.shared, fields: { ...current.shared.fields, [key]: value } } }));
@@ -274,17 +358,23 @@ function DetailsForm({
 
   const submit = async () => {
     const found = validateDraft(manifest, draft, saved);
-    setErrors(found.shared);
+    const signUpErrors = asCreate ? validateFields(signUpFields, signUp) : {};
+    setErrors({ ...found.shared, ...signUpErrors });
     setMessage(found.form);
-    if (hasErrors(found)) return;
+    if (hasErrors(found) || hasFieldErrors(signUpErrors)) return;
     setBusy(true);
     try {
-      await onSubmit(draft);
+      await onSubmit({ draft, ...(asCreate ? { signUp } : {}) });
     } catch (failure) {
       if (failure instanceof InvalidDraftError) {
         setErrors(failure.errors.shared);
         setMessage(failure.errors.form);
       } else {
+        // Created, and not signed in yet: from here on, this form signs in to it.
+        if (failure instanceof AccountCreatedError) {
+          setCreated(true);
+          setCreating(false);
+        }
         setMessage(describeSignInError(failure));
       }
     } finally {
@@ -296,13 +386,17 @@ function DetailsForm({
   return (
     <YStack gap="$5">
       <StepHeading
-        title={manifest.displayName}
+        title={asCreate ? 'Create an account' : manifest.displayName}
         body={
           passwordsOnly
             ? hasPasswords
               ? 'Enter the password again. The rest stays as it is: another address would be another account.'
               : 'Sign in again with the details saved on this device.'
-            : manifest.description
+            : created
+              ? 'Your account is there now. Sign in to it with the same details.'
+              : asCreate
+                ? 'Choose a username and a password. The password protects everything the account holds, and nothing can recover it.'
+                : manifest.description
         }
       />
       {manifest.connectionFields.length > 0 ? (
@@ -334,15 +428,36 @@ function DetailsForm({
               />
             );
           })}
+          {asCreate
+            ? signUpFields.map((field) => (
+                <FieldInput
+                  key={`sign-up-${field.key}`}
+                  field={field}
+                  value={signUp[field.key]}
+                  onChange={(value) => setSignUp((current) => ({ ...current, [field.key]: value }))}
+                  error={errors[field.key]}
+                />
+              ))
+            : null}
         </YStack>
+      ) : null}
+      {offersCreate ? (
+        <Button chromeless color="$accent10" self="flex-start" px={0} disabled={busy} onPress={() => setCreating(!creating)}>
+          {creating ? 'Have an account? Sign in' : 'New here? Create an account'}
+        </Button>
       ) : null}
       {message ? <SizableText color="$red10">{message}</SizableText> : null}
       <XStack gap="$3" items="center">
         <PrimaryButton size="$5" disabled={busy} onPress={() => void submit()}>
-          Sign in
+          {asCreate ? 'Create account' : 'Sign in'}
         </PrimaryButton>
         {busy ? <Spinner size="small" color="$accent9" /> : null}
       </XStack>
+      {busy ? (
+        <SizableText size="$2" color="$color10">
+          {asCreate ? 'Creating your account' : 'Signing in'} — this can take a few seconds on a phone.
+        </SizableText>
+      ) : null}
       <BackButton onPress={onBack} disabled={busy} />
     </YStack>
   );
@@ -369,10 +484,19 @@ function BackButton({ onPress, disabled = false }: { onPress: () => void; disabl
   );
 }
 
-/** Why signing in did not go through, in words. Nothing when someone backed out of the owner check. */
+/**
+ * Why signing in did not go through, in words — the plugin's own for what it
+ * refused, such as a used invite or a taken name. Nothing when someone backed
+ * out of the owner check.
+ */
 function describeSignInError(error: unknown): string | undefined {
   if (error instanceof OwnerNotVerifiedError) return error.verdict === 'cancelled' ? undefined : error.message;
+  if (error instanceof AccountCreatedError) {
+    const why = describeSignInError(error.cause);
+    return `${error.message}${why ? ` ${why}` : ''} Sign in to continue.`;
+  }
   if (isAppError(error)) {
+    if (error.reason === 'too-many-attempts') return error.message;
     if (error.code === 'UNAUTHORIZED') return 'The account did not accept these details.';
     if (error.code === 'OFFLINE') return 'The account could not be reached. Check the network, then try again.';
     if (error.code === 'TIMEOUT') return 'The account took too long to answer.';
@@ -380,3 +504,5 @@ function describeSignInError(error: unknown): string | undefined {
   }
   return error instanceof Error ? error.message : String(error);
 }
+
+const withError = (message: string | undefined) => (message ? { error: message } : {});

@@ -125,6 +125,20 @@ function checkScope(
   return errors;
 }
 
+/** Fields outside a connection — what creating an account takes (`sync.signUp`): the required ones filled in, addresses whole. */
+export function validateFields(fields: readonly Field[], values: FieldValues): FieldErrors {
+  const errors: Record<string, string> = {};
+  for (const field of fields) {
+    const value = values[field.key];
+    if ((field.type === 'text' || field.type === 'url') && field.required && !isFilled(value)) {
+      errors[field.key] = `${field.label} is required.`;
+    } else if (field.type === 'url' && isFilled(value) && !URL_LIKE.test(String(value).trim())) {
+      errors[field.key] = 'Enter a full address, such as https://example.com.';
+    }
+  }
+  return errors;
+}
+
 function isFilled(value: FieldValue | undefined): boolean {
   return typeof value === 'string' ? value.trim() !== '' : value !== undefined;
 }

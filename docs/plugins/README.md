@@ -120,7 +120,14 @@ seals and opens, and the plugin never sees another connection's password.
   connects the account's sync role with its own session
   (`session:{id}:account`), so a connection that is a source and the account
   signs in twice without either ending the other. A sign-in is tried once, on a
-  provider outside the pool, before anything is saved.
+  provider outside the pool, before anything is saved — under the installation
+  id the account will use, and with the session it made handed over, so it is
+  one device at the server and one sign-in.
+- **Your own server** (`custom-server`) is the account for someone who wants
+  neither Apple nor Google. It declares `sealedPasswords`, an `ownerProof` —
+  its password, typed again — and `signUp`, an invite code; the owner check,
+  "Create an account" and signing out all come from those, with no plugin named
+  in the app.
 - **A plugin that can only be an account** — a sync server, say — has no
   connection form: its page offers "Use as your account", and its `new` route
   refuses. One that declares a sync role this build does not implement says it

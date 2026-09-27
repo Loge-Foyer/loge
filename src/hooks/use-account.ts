@@ -1,3 +1,4 @@
+import type { Credentials } from '@sc/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 
@@ -39,7 +40,7 @@ export function useAccountActions() {
   const refresh = useRefreshLocalState();
   return {
     // Signing out lets the account's connection go when it was only the account, and its source with it.
-    signOut: useMutation({ mutationFn: () => account.signOut(), onSuccess: () => refresh({ remote: true }) }),
+    signOut: useMutation({ mutationFn: (proof?: Credentials) => account.signOut(proof), onSuccess: () => refresh({ remote: true }) }),
     syncNow: useMutation({ mutationFn: () => sync.now() }),
   };
 }

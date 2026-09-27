@@ -212,6 +212,17 @@ each rule. These break silently:
 - **Only `src/platform/` imports `expo-local-authentication`.** Screens ask
   `OwnerCheck` (`useOwnerMethod`, `pins.forgot`); lint enforces it, and the web
   build gets a stub that answers "unavailable".
+- **The owner's proof is typed, never saved.** An account's `ownerProof`
+  fields are asked for again in `OwnerProofForm` and passed to
+  `owner.verify(reason, proof)`; the saved password is never the proof. An
+  empty proof is refused before anything is asked. An account that has let
+  this device go cannot vouch: the device answers, never a quiet yes.
+- **Sign in once.** The probe and the account share an installation id, and
+  the probe's session is written into the account's inside the run lock, right
+  after the join. A second derivation — seconds on a phone — or a second device
+  row at the server means that handover broke.
+- **A created account is never created again.** After `createAccount`, a
+  failure is `AccountCreatedError`, and the form turns to signing in.
 
 ---
 
@@ -351,20 +362,25 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-Phase 3 — the account. One account per device, the household's profiles under
-it, and everything from Phase 2 surviving a restart:
+Phase 4 — your own server as the account. One account per device, the
+household's profiles under it, and everything from Phase 2 surviving a
+restart:
 
 - Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
   source), Settings (the account, profiles, PIN lock, plugins).
 - The account: Welcome offers "Sign in to sync your profiles" or "Use on this
   device only"; Settings → Account shows how it stands, Sync now, Switch and
   Sign out. The sync engine drains the journal to it and applies what it
-  brings: profiles and their PINs, preferences, connections without their
-  passwords. Forgot PIN re-verifies the owner — through the account, or Face
-  ID, a fingerprint or the passcode (`expo-local-authentication`, in
-  `src/platform/` only). The only account is the dev-only mock, held in memory;
-  real ones arrive with the sync server (Phase 4) and iCloud and Google
-  (Phase 5).
+  brings: profiles and their PINs, preferences, and connections — with their
+  passwords sealed on the device, where the account carries them, and only
+  ever for the sign-in they were saved with. Forgot PIN re-verifies the owner —
+  through the account (its password, typed again), or Face ID, a fingerprint
+  or the passcode (`expo-local-authentication`, in `src/platform/` only).
+- Your own server (`custom-server`, against `../streaming_center_sync`) is the
+  first real account: "Create an account" with an invite, one sign-in handed
+  to the account, and its password as the owner check for Forgot PIN, signing
+  out and switching. The dev-only mock is still there, in memory; iCloud and
+  Google come in Phase 5.
 - Plugins are installed per device. Connections belong to the device, and each
   decides what every profile keeps for itself: nothing, its own sign-in, or
   everything — with PIN-gated profile tabs, "Finish setting up" for profiles

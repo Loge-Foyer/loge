@@ -1,3 +1,4 @@
+import { AppError } from '@sc/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { signIn, sync, twoDevices } from './support/devices';
@@ -11,7 +12,7 @@ describe.each(ENGINES)('Forgot PIN on %s', (engine: Engine) => {
     const alex = (await a.services.profiles.create('Alex')).id;
     await a.services.pins.create(alex, '1234');
     await signIn(a, account);
-    expect(await a.services.owner.method()).toBe('account');
+    expect(await a.services.owner.method()).toEqual({ via: 'account', asks: [] });
 
     account.refuseOwner(true);
     expect(await a.services.pins.forgot(alex)).toBe('refused');
@@ -27,7 +28,7 @@ describe.each(ENGINES)('Forgot PIN on %s', (engine: Engine) => {
     const device = buildServices({ plugins: [], engine, owner });
     const alex = (await device.services.profiles.create('Alex')).id;
     await device.services.pins.create(alex, '1234');
-    expect(await device.services.owner.method()).toBe('device');
+    expect(await device.services.owner.method()).toEqual({ via: 'device' });
 
     expect(await device.services.pins.forgot(alex)).toBe('cancelled');
     expect((await device.services.profiles.get(alex))?.pinProtected).toBe(true);
@@ -80,9 +81,72 @@ describe.each(ENGINES)('Forgot PIN on %s', (engine: Engine) => {
     const alex = (await device.services.profiles.create('Alex')).id;
     await device.services.pins.create(alex, '1234');
     expect(await device.services.account.current()).toBeDefined();
-    expect(await device.services.owner.method()).toBe('device');
+    expect(await device.services.owner.method()).toEqual({ via: 'device' });
     expect(await device.services.pins.forgot(alex)).toBe('verified');
     expect(owner.asked).toHaveLength(1);
+  });
+});
+
+describe.each(ENGINES)('Forgot PIN with the account password on %s', (engine: Engine) => {
+  const PASSWORD = 'the owner’s password';
+
+  /** A phone signed in to an account whose owner check asks for its password, Alex locked with a PIN. */
+  async function household() {
+    const account = fakeSyncAccount({ ownerPassword: PASSWORD });
+    const owner = fakeOwnerAuthentication({ available: true, answer: 'verified' });
+    const device = buildServices({ plugins: [account.plugin], engine, device: 'phone', owner });
+    const alex = (await device.services.profiles.create('Alex')).id;
+    await device.services.pins.create(alex, '1234');
+    await signIn(device, account);
+    const locked = async () => (await device.services.profiles.get(alex))?.pinProtected;
+    return { account, owner, device, alex, locked, asked: owner.asked.length };
+  }
+
+  it('asks for the password, keeps the PIN for a wrong one, and clears it for the right one', async () => {
+    const { device, alex, locked } = await household();
+    expect(await device.services.owner.method()).toMatchObject({ via: 'account', asks: [{ key: 'password' }] });
+    expect(await device.services.pins.forgot(alex, { password: 'a guess' })).toBe('refused');
+    expect(await locked()).toBe(true);
+    expect(await device.services.pins.forgot(alex, { password: PASSWORD })).toBe('verified');
+    expect(await locked()).toBe(false);
+  });
+
+  it('refuses an empty password without asking the account, so it never counts as a wrong try', async () => {
+    const { account, device, alex, locked } = await household();
+    expect(await device.services.pins.forgot(alex, { password: '' })).toBe('refused');
+    expect(await device.services.pins.forgot(alex)).toBe('refused');
+    expect(account.calls.owners).toBe(0);
+    expect(await locked()).toBe(true);
+  });
+
+  it('says so when the account is throttling, and keeps the PIN', async () => {
+    const { account, device, alex, locked } = await household();
+    account.throttleOwner(true);
+    expect(await device.services.pins.forgot(alex, { password: PASSWORD })).toBe('throttled');
+    expect(await locked()).toBe(true);
+  });
+
+  it('fails, rather than asks the device instead, when the account cannot be reached', async () => {
+    const { account, owner, device, alex, locked, asked } = await household();
+    account.failNext(new AppError('OFFLINE', 'No network.'));
+    expect(await device.services.pins.forgot(alex, { password: PASSWORD })).toBe('failed');
+    expect(owner.asked).toHaveLength(asked);
+    expect(await locked()).toBe(true);
+  });
+
+  it('lets the device answer once the account has let this device go — noticed by a run, or by the check itself', async () => {
+    const { account, owner, device, alex, locked, asked } = await household();
+    account.revoke();
+    // Not noticed yet: the account is asked, answers that it no longer knows this device, and the device answers.
+    expect(await device.services.pins.forgot(alex, { password: PASSWORD })).toBe('verified');
+    expect(owner.asked).toHaveLength(asked + 1);
+    expect(await locked()).toBe(false);
+
+    await device.services.pins.create(alex, '1234');
+    await sync(device);
+    expect(await device.services.owner.method()).toEqual({ via: 'device' });
+    expect(await device.services.pins.forgot(alex)).toBe('verified');
+    expect(owner.asked).toHaveLength(asked + 2);
   });
 });
 

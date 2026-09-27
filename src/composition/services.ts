@@ -15,7 +15,7 @@ import { createHomeLayoutService } from '@/services/home-layout';
 import type { Services } from '@/services';
 import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
-import { createOwnerCheck } from '@/services/owner-check';
+import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
@@ -24,7 +24,6 @@ import { createSessionService } from '@/services/session';
 import { createSessions } from '@/services/sessions';
 import { createSourceService } from '@/services/sources';
 import type { SyncParts } from '@/services/sync/apply';
-import { currentAccount } from '@/services/sync/current';
 import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
@@ -54,14 +53,11 @@ export function createServices(): AppServices {
   const identity = createClientIdentitySource(deviceBound, log);
   const crypto = hostCrypto;
   const accountProviders = createAccountProviders({ http, network, identity, clock, crypto, catalog, credentials, sessions });
+  const parts: SyncParts = { db, credentials, catalog, ids, janitor, crypto, log };
+  const lock = createRunLock();
+  const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
   const owner = createOwnerCheck({
-    account: async () => {
-      const account = await currentAccount(db, catalog);
-      if (!account?.available) return undefined;
-      const provider = await accountProviders.provider(account.connection);
-      const verify = provider.verifyOwner;
-      return verify && ((signal) => verify.call(provider, {}, signal));
-    },
+    account: accountOwnerCheck({ db, catalog, providers: accountProviders, status: engine.status }),
     device: createOwnerAuthentication(),
     log,
   });
@@ -89,11 +85,20 @@ export function createServices(): AppServices {
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
 
-  const parts: SyncParts = { db, credentials, catalog, ids, janitor, crypto, log };
-  const lock = createRunLock();
-  const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
   const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity: createAppActivity() });
-  const account = createAccountService({ db, catalog, connections, owner, providers: accountProviders, engine, scheduler, janitor, lock, parts });
+  const account = createAccountService({
+    db,
+    catalog,
+    connections,
+    owner,
+    providers: accountProviders,
+    engine,
+    scheduler,
+    janitor,
+    lock,
+    parts,
+    sessions,
+  });
   // What the account brought: running providers let changed connections and removed profiles go, and the gate looks again.
   engine.onApplied((applied) => {
     for (const id of applied.connections) pool.forgetConnection(id);

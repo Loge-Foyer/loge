@@ -1,11 +1,15 @@
 import {
   AppError,
   effectiveRoles,
+  isAppError,
   type Connection,
   type ConnectionId,
+  type Credentials,
+  type FieldValues,
   type PluginId,
   type PluginManifest,
   type SyncCapability,
+  type SyncStatus as AccountStatus,
 } from '@sc/api';
 
 import { draftOf } from './connection-draft';
@@ -22,9 +26,10 @@ import { joinAccount, previewAccount, type AccountPreview } from './sync/join';
 import type { AccountProviders } from './sync/provider';
 import type { SyncScheduler } from './sync/scheduler';
 import { vaultOnce } from './sync/sealed';
-import { sessionRef } from './sessions';
+import { sessionIdentity, sessionRef, type Sessions } from './sessions';
 
 const FINAL_PUSH_MS = 5_000;
+const SIGN_OUT_MS = 5_000;
 const LOCK = 'streaming-center-sync';
 
 /** A plugin that can be the device's account, and this device's connections of it that could become it — none kept per profile. */
@@ -33,9 +38,13 @@ export interface AccountProvider {
   readonly connections: readonly Connection[];
 }
 
-/** Where a sign-in goes: a new connection of a plugin, or one this device already has. */
+/**
+ * Where a sign-in goes: a new connection of a plugin — an account that exists
+ * already, or one to create with its `signUp` fields — or one of this
+ * device's connections.
+ */
 export type SignInTarget =
-  | { readonly pluginId: PluginId; readonly draft: ConnectionDraft }
+  | { readonly pluginId: PluginId; readonly draft: ConnectionDraft; readonly signUp?: FieldValues }
   | { readonly connectionId: ConnectionId; readonly draft?: ConnectionDraft };
 
 /** A sign-in tried and the account read — nothing saved yet. */
@@ -58,6 +67,22 @@ export interface PreparedSignIn {
   readonly preview?: AccountPreview;
   /** The account's vault key, read while the sign-in was open: the join opens the passwords the account holds with it. Memory only. */
   readonly vaultKey?: Uint8Array;
+  /** What the sign-in left in its session, which becomes the account's own: nothing signs in twice. Memory only. */
+  readonly session?: string;
+  /** The account was created by this sign-in. It exists now: going back, the form signs in to it, never creates it again. */
+  readonly created?: true;
+}
+
+/**
+ * An account was created, and what came after did not go through. It exists
+ * now, so the form signs in to it from here on — creating it again would be
+ * refused.
+ */
+export class AccountCreatedError extends Error {
+  constructor(cause: unknown) {
+    super('Your account was created, but signing in did not finish.', { cause });
+    this.name = 'AccountCreatedError';
+  }
 }
 
 /** The owner was not verified, so nothing changed. `cancelled` is someone backing out, not an error to show. */
@@ -70,7 +95,9 @@ export class OwnerNotVerifiedError extends Error {
         ? 'That did not confirm it’s you.'
         : verdict === 'failed'
           ? 'Your account could not be reached to confirm it’s you.'
-          : 'Not confirmed.',
+          : verdict === 'throttled'
+            ? 'Too many tries. Wait a little, then try again.'
+            : 'Not confirmed.',
     );
     this.name = 'OwnerNotVerifiedError';
     this.verdict = verdict;
@@ -82,14 +109,16 @@ export interface AccountService {
   providers(): Promise<readonly AccountProvider[]>;
   /**
    * The owner check (when there is something to protect), one try at signing
-   * in, and the whole account read. Signing in to this device's account again
-   * takes only its passwords, and no owner check: the password is the proof.
+   * in — or at creating the account — and the whole account read. `proof` is
+   * the current account's owner proof, when switching away from one that asks.
+   * Signing in to this device's account again takes only its passwords, and
+   * no owner check: the password is the proof.
    */
-  prepareSignIn(target: SignInTarget): Promise<PreparedSignIn>;
+  prepareSignIn(target: SignInTarget, proof?: Credentials): Promise<PreparedSignIn>;
   /** One transaction: the account's connection, the account's changes, this device's announced. */
   completeSignIn(prepared: PreparedSignIn, profiles: 'account' | 'both'): Promise<{ readonly profilesArrived: number }>;
-  /** Everything stays on the device; only the account is let go. */
-  signOut(): Promise<void>;
+  /** Everything stays on the device; only the account is let go — at the server too, where it can be in a moment. */
+  signOut(proof?: Credentials): Promise<void>;
 }
 
 export function createAccountService(deps: {
@@ -103,13 +132,14 @@ export function createAccountService(deps: {
   readonly janitor: SecretJanitor;
   readonly lock: RunLock;
   readonly parts: SyncParts;
+  readonly sessions: Sessions;
 }): AccountService {
-  const { db, catalog, connections, owner, providers, engine, scheduler } = deps;
+  const { db, catalog, connections, owner, providers, engine, scheduler, sessions } = deps;
 
   // Nothing to protect on a device without profiles: the first launch needs no owner.
-  const guard = async (reason: string) => {
+  const guard = async (reason: string, proof?: Credentials) => {
     if ((await db.users.list()).length === 0) return;
-    const verdict = await owner.verify(reason);
+    const verdict = await owner.verify(reason, proof);
     // Where no owner can be asked — a browser without an account — account actions stay open.
     if (verdict === 'verified' || verdict === 'unavailable') return;
     throw new OwnerNotVerifiedError(verdict);
@@ -130,6 +160,30 @@ export function createAccountService(deps: {
   const carriedBy = (manifest: PluginManifest, draft: ConnectionDraft): ReadonlySet<SyncCapability> =>
     effectiveRoles(manifest, { roles: { sync: true }, settings: draft.shared.settings }).sync?.capabilities ?? new Set();
 
+  // The sign-in just made becomes the account's session. Inside the run lock, so no run starts between the two and signs in again.
+  const takeSession = async (connection: Connection, manifest: PluginManifest, value: string) => {
+    await sessions.bind(connection.id, 'account', sessionIdentity(manifest, connection.values)).write(value);
+    // A provider already running for it would go on with the session it had — a revoke's tombstone, say.
+    providers.forget();
+  };
+
+  // Once, and briefly: the server lets this device go if it can; the device lets go of the account whatever it answers.
+  const letGoAtServer = async (account: CurrentAccount) => {
+    if (!account.available) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SIGN_OUT_MS);
+    try {
+      const provider = await providers.provider(account.connection);
+      await provider.signOut?.(controller.signal);
+    } catch (error) {
+      deps.parts.log.warn('sync', 'The account could not be told this device signed out', {
+        code: isAppError(error) ? error.code : 'unknown',
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   return {
     current: () => currentAccount(db, catalog),
 
@@ -146,7 +200,7 @@ export function createAccountService(deps: {
         }));
     },
 
-    prepareSignIn: async (target) => {
+    prepareSignIn: async (target, proof) => {
       const current = await currentAccount(db, catalog);
       let manifest: PluginManifest | undefined;
       let existing: Connection | undefined;
@@ -177,16 +231,26 @@ export function createAccountService(deps: {
       }
 
       const again = existing !== undefined && current?.connection.id === existing.id;
-      if (!again) await guard('Confirm it’s you to sign in to an account');
+      if (!again) await guard('Confirm it’s you to sign in to an account', proof);
       const carried = carriedBy(manifest, draft);
       const credentials = await connections.probeSecrets(manifest.id, existing?.id, 'shared', draft.shared.secrets);
-      // One try, whatever it answers: a refused sign-in is never tried again by itself.
-      const probe = await providers.probe(manifest.id, { fields: draft.shared.fields, settings: draft.shared.settings }, credentials);
+      const signUp = 'pluginId' in target ? target.signUp : undefined;
+      // One try, whatever it answers: a refused sign-in, or a refused account, is never tried again by itself.
+      const { provider: probe, session } = await providers.probe(manifest.id, { fields: draft.shared.fields, settings: draft.shared.settings }, credentials);
+      let created = false;
       try {
-        const status = await probe.getStatus();
+        let status: AccountStatus;
+        if (signUp) {
+          if (!probe.createAccount) throw new AppError('INVALID_STATE', `${manifest.displayName} cannot create an account here.`, { retry: 'never' });
+          status = await probe.createAccount(signUp);
+          created = true;
+        } else {
+          status = await probe.getStatus();
+        }
         const preview = again ? undefined : await previewAccount(probe, carried, deps.parts);
         // Read before the probe goes: the join needs it, and asking again would sign in again.
         const vaultKey = preview && carried.has('sealedPasswords') ? await probe.vaultKey?.() : undefined;
+        const signedIn = await session();
         const local = await db.users.list();
         const accountProfiles = (preview?.changes ?? []).flatMap((change) =>
           change.entity === 'profile' && change.operation === 'upsert' ? [change.data.name] : [],
@@ -207,7 +271,12 @@ export function createAccountService(deps: {
           carried,
           ...(preview ? { preview } : {}),
           ...(vaultKey ? { vaultKey } : {}),
+          ...(signedIn ? { session: signedIn } : {}),
+          ...(created ? { created: true as const } : {}),
         };
+      } catch (error) {
+        if (created) throw new AccountCreatedError(error);
+        throw error;
       } finally {
         await probe.dispose().catch(() => undefined);
       }
@@ -215,8 +284,12 @@ export function createAccountService(deps: {
 
     completeSignIn: async (prepared, profiles) => {
       if (prepared.again && prepared.existing) {
-        // The same account with new details: saved like any connection, then synced again.
-        await connections.update(prepared.existing.id, prepared.draft);
+        const { existing, session } = prepared;
+        // The same account with new details: saved like any connection, then synced again — as the sign-in just made.
+        await deps.lock.run(LOCK, async () => {
+          const connection = await connections.update(existing.id, prepared.draft);
+          if (session) await takeSession(connection, prepared.manifest, session);
+        });
         await scheduler.accountChanged();
         return { profilesArrived: 0 };
       }
@@ -256,6 +329,7 @@ export function createAccountService(deps: {
               ...(vaultKey ? { vault: vaultOnce(deps.parts.crypto, () => Promise.resolve(vaultKey)) } : {}),
             },
           );
+          if (prepared.session) await takeSession(planned.connection, prepared.manifest, prepared.session);
           arrived = applied.arrivedProfiles.size;
           reported = applied;
         });
@@ -263,6 +337,8 @@ export function createAccountService(deps: {
         await connections.discard(planned);
         throw error;
       }
+      // The old account's provider still holds its session, whatever the join queued.
+      if (prepared.switching && current) await letGoAtServer(current);
       await deps.janitor.drain();
       // Profiles that arrived, or went: the gate and whatever holds on to them hear of it.
       if (reported) engine.report(reported);
@@ -270,17 +346,18 @@ export function createAccountService(deps: {
       return { profilesArrived: arrived };
     },
 
-    signOut: async () => {
+    signOut: async (proof) => {
       const current = await currentAccount(db, catalog);
       if (!current) return;
-      await guard('Confirm it’s you to sign out of the account');
-      await deps.lock.run(LOCK, () =>
-        db.unjournaled(async (tx) => {
+      await guard('Confirm it’s you to sign out of the account', proof);
+      await deps.lock.run(LOCK, async () => {
+        await letGoAtServer(current);
+        await db.unjournaled(async (tx) => {
           const head = await tx.journal.head();
           await tx.deviceSettings.update((settings) => ({ ...settings, leftAccountAt: head }));
           await leave(tx, current.connection);
-        }),
-      );
+        });
+      });
       await deps.janitor.drain();
       await scheduler.accountChanged();
     },

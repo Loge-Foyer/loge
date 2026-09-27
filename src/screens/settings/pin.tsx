@@ -23,6 +23,8 @@ export function PinScreen() {
   const { create, change, remove } = usePinActions();
   const [step, setStep] = useState<Step>({ kind: 'menu' });
   const [message, setMessage] = useState<{ text: string; tone: 'hint' | 'error' }>();
+  // The account's password takes the pad's place while it is asked for.
+  const [asking, setAsking] = useState(false);
 
   if (!profile) return <Screen>{null}</Screen>;
 
@@ -57,14 +59,16 @@ export function PinScreen() {
   const pad = (title: string, onComplete: (pin: string) => void, footer?: ReactNode) => (
     <Screen>
       <YStack py="$6" gap="$4" items="center">
-        <PinPad
-          title={title}
-          {...(message ? { message: message.text, tone: message.tone } : {})}
-          onComplete={(pin) => {
-            setMessage(undefined);
-            onComplete(pin);
-          }}
-        />
+        {asking ? null : (
+          <PinPad
+            title={title}
+            {...(message ? { message: message.text, tone: message.tone } : {})}
+            onComplete={(pin) => {
+              setMessage(undefined);
+              onComplete(pin);
+            }}
+          />
+        )}
         {footer}
       </YStack>
     </Screen>
@@ -85,7 +89,15 @@ export function PinScreen() {
           );
         },
         // Cleared, the PIN is simply off: the menu then offers to set one.
-        <ForgotPin userId={userId} onReset={() => setStep({ kind: 'menu' })} onRefused={fail} />,
+        <ForgotPin
+          userId={userId}
+          onReset={() => {
+            setAsking(false);
+            setStep({ kind: 'menu' });
+          }}
+          onRefused={fail}
+          onAsking={setAsking}
+        />,
       );
     case 'new':
       return pad('Choose a new four-digit PIN', (next) =>

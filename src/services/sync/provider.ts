@@ -14,14 +14,27 @@ import type { PluginCatalog } from '../plugin-catalog';
 import type { SecureCredentialStore } from '../ports';
 import { sessionIdentity, type Sessions } from '../sessions';
 
+/** A provider outside the pool, and the session it signed in with — the account's own, once it is saved. */
+export interface Probe {
+  readonly provider: ConnectedUserStateSyncProvider;
+  readonly session: () => Promise<string | undefined>;
+}
+
 /** The account's one connected provider, replaced when the connection's values change. */
 export interface AccountProviders {
   provider(account: Connection): Promise<ConnectedUserStateSyncProvider>;
-  /** A provider outside the pool, to try a sign-in before anything is saved. The caller disposes it. */
-  probe(pluginId: PluginId, values: { readonly fields: FieldValues; readonly settings: FieldValues }, credentials: Credentials): Promise<ConnectedUserStateSyncProvider>;
+  /** To try a sign-in before anything is saved. The caller disposes it. */
+  probe(pluginId: PluginId, values: { readonly fields: FieldValues; readonly settings: FieldValues }, credentials: Credentials): Promise<Probe>;
   /** The account changed or went. */
   forget(): void;
 }
+
+/**
+ * One installation id for a plugin's account on this device, the probe's and
+ * the account's alike: the server keeps one device row per installation, so
+ * signing in and then syncing is one device, not two.
+ */
+const installationOf = (pluginId: PluginId) => `account|${pluginId}`;
 
 export function createAccountProviders(
   deps: PluginContextDeps & {
@@ -46,7 +59,7 @@ export function createAccountProviders(
       { connectionId: account.id, fields: account.values.fields, settings: account.values.settings },
       await pluginContext(
         deps,
-        `${account.id}|account`,
+        installationOf(account.pluginId),
         secretsOf(deps.credentials, account.values),
         deps.sessions.bind(account.id, 'account', sessionIdentity(manifest, account.values)),
       ),
@@ -72,11 +85,13 @@ export function createAccountProviders(
     },
     probe: async (pluginId, values, credentials) => {
       const { role } = roleOf(pluginId);
-      // Its own installation id and no saved session: trying a sign-in never touches a running one.
-      return role.connect(
+      // No saved session: trying a sign-in never touches a running one. What it signs in with is kept, for the account to take.
+      const session = deps.sessions.ephemeral();
+      const provider = await role.connect(
         { connectionId: toConnectionId('probe'), fields: values.fields, settings: values.settings },
-        await pluginContext(deps, `probe|account|${pluginId}`, async () => credentials, deps.sessions.ephemeral()),
+        await pluginContext(deps, installationOf(pluginId), async () => credentials, session),
       );
+      return { provider, session: () => session.read() };
     },
     forget: () => {
       if (entry) dispose(entry.ready);

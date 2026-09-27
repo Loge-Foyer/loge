@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { Credentials, UserId } from '@sc/api';
 import { useMutation } from '@tanstack/react-query';
 
 import { useServices } from './services-context';
@@ -23,7 +23,10 @@ export function usePinActions() {
         pins.remove(userId, current),
       onSuccess: () => refresh(),
     }),
-    /** Forgot PIN: the owner is asked, and only a yes clears it. */
-    forgot: useMutation({ mutationFn: (userId: UserId) => pins.forgot(userId), onSuccess: () => refresh() }),
+    /** Forgot PIN: the owner is asked — with `proof`, when the account asks for one — and only a yes clears it. */
+    forgot: useMutation({
+      mutationFn: ({ userId, proof }: { userId: UserId; proof?: Credentials }) => pins.forgot(userId, proof),
+      onSuccess: () => refresh(),
+    }),
   };
 }

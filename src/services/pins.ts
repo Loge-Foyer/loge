@@ -1,4 +1,4 @@
-import { credentialsRef, type UserId } from '@sc/api';
+import { credentialsRef, type Credentials, type UserId } from '@sc/api';
 
 import type { OwnerCheck, OwnerVerdict } from './owner-check';
 import type { Clock, IdGenerator, LocalDatabase, SecureCredentialStore } from './ports';
@@ -23,8 +23,8 @@ export interface PinService {
   create(userId: UserId, pin: string): Promise<void>;
   change(userId: UserId, current: string, next: string): Promise<PinCheck>;
   remove(userId: UserId, current: string): Promise<PinCheck>;
-  /** Forgot PIN: the owner is re-verified, and only then does the PIN go. */
-  forgot(userId: UserId): Promise<OwnerVerdict>;
+  /** Forgot PIN: the owner is re-verified — with `proof`, when the account asks for one — and only then does the PIN go. */
+  forgot(userId: UserId, proof?: Credentials): Promise<OwnerVerdict>;
 }
 
 interface Throttle {
@@ -132,9 +132,9 @@ export function createPinService(deps: {
       await clear(userId);
       return check;
     },
-    forgot: async (userId) => {
+    forgot: async (userId, proof) => {
       await requireUser(userId);
-      const verdict = await owner.verify('Confirm it’s you to reset this profile’s PIN');
+      const verdict = await owner.verify('Confirm it’s you to reset this profile’s PIN', proof);
       if (verdict !== 'verified') return verdict;
       await clear(userId);
       throttles.delete(userId);
