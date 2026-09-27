@@ -25,7 +25,7 @@ import type { SyncScheduler } from './sync/scheduler';
 const FINAL_PUSH_MS = 5_000;
 const LOCK = 'streaming-center-sync';
 
-/** A plugin that can be the device's account, and this device's connections of it that could become it. */
+/** A plugin that can be the device's account, and this device's connections of it that could become it — none kept per profile. */
 export interface AccountProvider {
   readonly manifest: PluginManifest;
   readonly connections: readonly Connection[];
@@ -41,7 +41,10 @@ export interface PreparedSignIn {
   readonly accountName?: string;
   /** Both sides hold profiles the other lacks: ask "Use the account's profiles" or "Keep both". */
   readonly ask: boolean;
-  readonly accountProfiles: number;
+  /** The account's profiles, by name. */
+  readonly accountProfiles: readonly string[];
+  /** This device's profiles the account lacks, by name — what "Use the account's profiles" removes. */
+  readonly onlyHere: readonly string[];
   /** It replaces the account this device has. */
   readonly switching: boolean;
   /** It only signs in to this device's account again, with new details. */
@@ -129,7 +132,9 @@ export function createAccountService(deps: {
         .filter((manifest) => catalog.syncRole(manifest.id) !== undefined)
         .map((manifest) => ({
           manifest,
-          connections: all.filter((connection) => connection.pluginId === manifest.id && connection.roles.sync !== true),
+          connections: all.filter(
+            (connection) => connection.pluginId === manifest.id && connection.roles.sync !== true && connection.perProfile === 'none',
+          ),
         }));
     },
 
@@ -173,16 +178,22 @@ export function createAccountService(deps: {
         const status = await probe.getStatus();
         const preview = again ? undefined : await previewAccount(probe, carried, deps.parts);
         const local = await db.users.list();
-        const ask = preview !== undefined && preview.profiles.size > 0 && local.some((user) => !preview.profiles.has(user.id));
+        const accountProfiles = (preview?.changes ?? []).flatMap((change) =>
+          change.entity === 'profile' && change.operation === 'upsert' ? [change.data.name] : [],
+        );
+        // Nothing to choose between unless the account has profiles of its own.
+        const onlyHere = preview && preview.profiles.size > 0 ? local.filter((user) => !preview.profiles.has(user.id)).map((user) => user.name) : [];
         return {
           ...(status.accountName ? { accountName: status.accountName } : {}),
-          ask,
-          accountProfiles: preview?.profiles.size ?? 0,
+          ask: onlyHere.length > 0,
+          accountProfiles,
+          onlyHere,
           switching: current !== undefined && !again,
           again,
           manifest,
           ...(existing ? { existing } : {}),
-          draft,
+          // A connection made for the account is named the way the account names itself.
+          draft: !existing && status.accountName ? { ...draft, label: status.accountName } : draft,
           carried,
           ...(preview ? { preview } : {}),
         };

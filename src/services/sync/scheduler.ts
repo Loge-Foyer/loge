@@ -83,6 +83,7 @@ export function createSyncScheduler(deps: {
       started = true;
       unsubscribe = [
         deps.journal.subscribe(() => {
+          void engine.changed();
           clearTimeout(afterChange);
           afterChange = setTimeout(() => void request('change'), AFTER_CHANGE_MS);
         }),

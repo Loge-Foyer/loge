@@ -80,6 +80,46 @@ render behind a native sheet: per row, up and down, shown or hidden, sort and
 direction, poster or scene cards. Rows a profile adds can be removed; the
 default ones can only be hidden. Reset puts the default back.
 
+## The account
+
+**Welcome** (`screens/welcome.tsx`) is the first launch: "Sign in to sync your
+profiles" or "Use on this device only". Signing in picks an account — straight
+to its form when there is only one kind — asks for its connection fields and
+nothing else, and tries once. When the account brings profiles, a spinner holds
+while the gate moves to "Who's watching?"; an empty account leads to "Who is
+this?", as using the device alone does. A build with no account to sign in to
+goes straight to "Who is this?".
+
+**Settings → Account** (`screens/settings/account.tsx`) shows the account and how
+it stands — "Synced 5 min ago · 2 changes waiting" — with Sync now, what it
+keeps in step, Switch account and Sign out. An account that refused the sign-in
+offers "Sign in again", which takes its passwords and nothing else. Without an
+account the screen says everything is kept on this device, and offers Sign in.
+A row at the top of Settings says the same in one line.
+
+**The sign-in flow** (`screens/sign-in-flow.tsx`) is shared by both, so it uses
+no hook that needs a profile: at first launch there is none. Every step has its
+own Back, and a sign-in that does not go through says why in words, never
+retried. When both sides have profiles it asks once: "Keep both", or "Use the
+account's profiles", which asks again before removing this device's own. A
+switch asks "Move your profiles and settings to X?". Choosing the account's
+profiles can take the profile in use, and everything under `(app)` with it, so
+Settings never navigates after that; the gate does.
+
+**Forgot PIN?** sits under the PIN pad — at launch, when switching, and on PIN
+lock's current-PIN step — wherever the owner can be asked: through the account,
+or with Face ID, a fingerprint or the passcode. Where nobody can be asked — a
+browser without an account — it reads "Forgot it? An account lets you reset a
+PIN." A yes clears the PIN and opens the profile; PIN lock then offers "Set a
+PIN".
+
+**The connection form** has one switch, for the media role. The account is not
+a switch: a row says "Your account", or points to Settings → Account. On the
+account's own connection the details are read-only — another address would be
+another account — and neither Remove nor per-profile values are offered. A
+plugin that can only be an account offers "Use as your account" on its page;
+its `new` route refuses, since no form switches a sync role on.
+
 ## Artwork
 
 `components/artwork.tsx` is the only thing that turns an image reference into

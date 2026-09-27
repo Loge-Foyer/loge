@@ -55,6 +55,20 @@ was saved from it, as on a phone.
 until it reloads. When a tab opens a newer version of the app, the older tabs
 close their connection so its upgrade can run, then ask to be reloaded.
 
+## The account in a browser
+
+- **One tab syncs at a time.** A run holds the `streaming-center-sync` Web
+  Lock, and a page of changes is applied only while the cursor it was pulled
+  from is still the stored one, so two tabs never apply the same page twice.
+  Another tab still sees the changes only once it reloads.
+- **Forgot PIN needs an account.** A browser cannot ask for the device's
+  owner, so without an account that can vouch for its owner a PIN stays until
+  it is typed.
+- **The development account forgets on reload.** The mock keeps its pretend
+  account in the page's memory; after a reload the next run finds it empty and
+  joins it again, sending this browser's profiles back up. Nothing local is
+  lost.
+
 ## Reaching a media server from a browser
 
 - **CORS.** The browser sends the source's requests itself, so the server must

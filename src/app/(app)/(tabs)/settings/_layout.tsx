@@ -8,6 +8,7 @@ export default function SettingsStack() {
   return (
     <Stack screenOptions={tabStackOptions}>
       <Stack.Screen name="index" options={tabRootOptions('Settings')} />
+      <Stack.Screen name="account/index" options={{ title: 'Account' }} />
       <Stack.Screen name="pin" options={{ title: 'PIN lock' }} />
       <Stack.Screen name="profiles/index" options={{ title: 'Profiles' }} />
       <Stack.Screen name="plugins/index" options={{ title: 'Plugins' }} />

@@ -86,6 +86,7 @@ function TextInputField({ field, value, onChange, disabled, saved, onRemoveSaved
         value={typeof value === 'string' ? value : ''}
         onChangeText={onChange}
         disabled={disabled}
+        opacity={disabled ? 0.6 : 1}
         borderColor={error ? '$red8' : '$borderColor'}
         autoCapitalize="none"
         autoCorrect={false}

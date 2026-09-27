@@ -69,6 +69,17 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first, second) => {
   });
 
   describe('pushing', () => {
+    it('counts a change as waiting as soon as it is made, and as sent once it went', async () => {
+      const { a, alex } = await joined();
+      await sync(a);
+      expect(a.engine.status()).toMatchObject({ phase: 'synced', pending: 0 });
+      await a.services.profiles.rename(alex, 'Renamed');
+      await a.engine.changed();
+      expect(a.engine.status()).toMatchObject({ phase: 'synced', pending: 1 });
+      await sync(a);
+      expect(a.engine.status()).toMatchObject({ phase: 'synced', pending: 0 });
+    });
+
     it('sends again only what the account did not store', async () => {
       const { a, account, alex } = await joined();
       await a.services.profiles.rename(alex, 'One');

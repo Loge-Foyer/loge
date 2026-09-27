@@ -42,14 +42,17 @@ WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-Phase 2 — local persistence. Everything from Phase 1 — real titles from every
-live source, merged; per-profile rows, grids and detail pages; connections that
-decide per connection what each profile keeps (`perProfile`) — now survives a
-restart: SQLite and the keychain on iOS and Android, IndexedDB and encrypted
-secrets on the web. Every local change appends a change-journal entry. What
-sources answered is kept where they allow it, so the home renders at once and
-offline. Nothing plays, and Videos still shows skeletons. vitest covers the
-database on both engines and the service layer.
+Phase 3 — the account. A device has at most one: Welcome offers to sign in or
+to stay on this device, Settings → Account shows it and switches or signs out,
+and the sync engine drains the change journal to it and applies what it brings
+— profiles and their PINs, preferences, connections without their passwords.
+Forgot PIN re-verifies the owner, through the account or the device. The only
+account so far is the dev-only mock; real ones come in Phases 4 and 5.
+Everything from Phase 2 stands: real titles from every live source, merged,
+kept across restarts in SQLite and the keychain, or IndexedDB and encrypted
+secrets on the web. Nothing plays, and Videos still shows skeletons. vitest
+covers the database on both engines, the services, and two devices syncing on
+every pair of engines.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

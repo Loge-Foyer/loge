@@ -6,13 +6,15 @@ cd ../streaming_center_app && npm install
 npm start                                       # then i / a / w, or npm run ios|android|web
 ```
 
-Expo Go is enough on a device or simulator; no development build is needed yet.
+Expo Go is enough on a device or simulator; only Face ID on iOS needs a
+development build (`docs/platforms/ios`).
 
 ## Set up once
 
-The first launch asks "Who is this?" and names the first profile. From then on
-the app opens where you left it: profiles, PINs, installed plugins, connections
-and their passwords, and each profile's home are kept on the device.
+The first launch offers to sign in to an account, or to use the device on its
+own and name its first profile. From then on the app opens where you left it:
+profiles, PINs, installed plugins, connections and their passwords, and each
+profile's home are kept on the device.
 
 To add a server, go to Settings → Plugins, install it, and add a connection.
 The form comes from the plugin itself. For development against your own
@@ -22,6 +24,19 @@ the account's lockout on the server.
 The workspace root's `jellyfin.env` (gitignored) is a good place to keep the
 test server's details at hand. The app never reads it; the `sc-run` skill types
 them in from there when it drives the app.
+
+## An account to try
+
+No real account exists yet — your own sync server comes next, then iCloud and
+Google. Development builds have a pretend one: sign in to **Mock**, and its
+endpoint names the account.
+
+- `mock://household` already has two profiles, Sam (PIN 1234) and Robin, so
+  signing in shows them arriving — and, on a device with profiles of its own,
+  the "Keep both" question.
+- Any other endpoint is an empty account.
+- It lives in memory. A reload forgets it, and the app joins it again with
+  nothing lost; two devices cannot share it until the sync server exists.
 
 ## Starting from scratch
 

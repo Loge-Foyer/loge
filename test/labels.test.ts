@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeSourceError, timeAgo } from '@/components/labels';
+import { describeSourceError, describeSyncStatus, timeAgo } from '@/components/labels';
 
 describe('describing a source that could not answer', () => {
   it('says a home server is skipped on mobile data', () => {
@@ -15,9 +15,9 @@ describe('describing a source that could not answer', () => {
     );
   });
 
-  it('asks for the password again when the saved one is gone from the device', () => {
+  it('asks for the password when this device has none — after a restore, or on a connection the account brought', () => {
     expect(describeSourceError({ label: 'Home', code: 'UNAUTHORIZED', retry: 'never', needsPassword: true })).toBe(
-      'Home needs its password again. Enter it in Settings.',
+      'Home needs its password on this device. Enter it in Settings.',
     );
   });
 
@@ -30,6 +30,35 @@ describe('describing a source that could not answer', () => {
     const now = Date.UTC(2026, 8, 27, 12);
     expect(describeSourceError({ label: 'Home', code: 'OFFLINE', retry: 'network-change', savedAt: now - 5 * 60_000 }, now)).toBe(
       'Home is not reachable right now. Showing what was saved 5 min ago.',
+    );
+  });
+});
+
+describe('describing how the account stands', () => {
+  const now = 1_000_000_000;
+
+  it('says when it last synced, and how many changes wait to be sent', () => {
+    expect(describeSyncStatus({ phase: 'synced', lastSyncedAt: now - 5 * 60_000, pending: 0 }, now)).toBe('Synced 5 min ago');
+    expect(describeSyncStatus({ phase: 'synced', lastSyncedAt: now, pending: 2 }, now)).toBe('Synced just now · 2 changes waiting');
+  });
+
+  it('tells a refused sign-in from a password this device does not have', () => {
+    const refused = { code: 'UNAUTHORIZED', message: 'No.', retry: 'never' } as const;
+    expect(describeSyncStatus({ phase: 'needs-sign-in', pending: 1, problem: refused }, now)).toBe('Needs you to sign in again · 1 change waiting');
+    expect(describeSyncStatus({ phase: 'needs-sign-in', pending: 0, problem: { ...refused, needsPassword: true } }, now)).toBe(
+      'Needs its password on this device',
+    );
+  });
+
+  it('tells being offline from a network the account cannot be reached on, and from a retry', () => {
+    expect(describeSyncStatus({ phase: 'waiting', pending: 0, problem: { code: 'OFFLINE', message: '', retry: 'network-change' } }, now)).toBe(
+      'Offline — syncs when a network is back',
+    );
+    expect(describeSyncStatus({ phase: 'waiting', pending: 0, problem: { code: 'TIMEOUT', message: '', retry: 'network-change' } }, now)).toBe(
+      'Can’t be reached on this network',
+    );
+    expect(describeSyncStatus({ phase: 'waiting', pending: 0, problem: { code: 'PROVIDER_UNAVAILABLE', message: '', retry: 'backoff' } }, now)).toBe(
+      'Couldn’t sync — trying again soon',
     );
   });
 });

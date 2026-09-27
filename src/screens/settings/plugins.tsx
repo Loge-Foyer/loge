@@ -11,18 +11,18 @@ import { useServices } from '@/hooks/services-context';
 import { usePluginStates } from '@/hooks/use-plugins';
 import { TAB_CONTENT, type ContentTab } from '@/services/tab-content';
 
-type Filter = 'all' | ContentTab | 'sync';
+type Filter = 'all' | ContentTab | 'accounts';
 
 const FILTERS: readonly { id: Filter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'media', label: 'For Media' },
   { id: 'videos', label: 'For Videos' },
-  { id: 'sync', label: 'Sync' },
+  { id: 'accounts', label: 'Accounts' },
 ];
 
 function matches(manifest: PluginManifest, filter: Filter) {
   if (filter === 'all') return true;
-  if (filter === 'sync') return manifest.sync !== undefined;
+  if (filter === 'accounts') return manifest.sync !== undefined;
   return manifest.media?.contentKinds.some((kind) => TAB_CONTENT[filter].includes(kind)) ?? false;
 }
 

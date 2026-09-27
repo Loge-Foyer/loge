@@ -188,6 +188,16 @@ each rule. These break silently:
 - **A refused sign-in is never retried by itself** — not on a network change,
   not on a poll, not on "Sync now". The engine parks until the user signs in
   again.
+- **The sign-in flow uses no profile's hook.** Welcome shares it, outside
+  `(app)`, before any profile exists. And it never navigates after "Use the
+  account's profiles": that may have taken the profile in use, and `(app)` with
+  it — the gate moves instead.
+- **Signing in again changes only passwords.** A new address or username
+  would be another account reached without the switch; the service keeps every
+  other detail, and the connection form shows the account's details read-only.
+- **Only `src/platform/` imports `expo-local-authentication`.** Screens ask
+  `OwnerCheck` (`useOwnerMethod`, `pins.forgot`); lint enforces it, and the web
+  build gets a stub that answers "unavailable".
 
 ---
 
@@ -306,10 +316,20 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-Phase 2 — local persistence. Everything survives a restart:
+Phase 3 — the account. One account per device, the household's profiles under
+it, and everything from Phase 2 surviving a restart:
 
 - Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
-  source), Settings (profiles, PIN lock, plugins).
+  source), Settings (the account, profiles, PIN lock, plugins).
+- The account: Welcome offers "Sign in to sync your profiles" or "Use on this
+  device only"; Settings → Account shows how it stands, Sync now, Switch and
+  Sign out. The sync engine drains the journal to it and applies what it
+  brings: profiles and their PINs, preferences, connections without their
+  passwords. Forgot PIN re-verifies the owner — through the account, or Face
+  ID, a fingerprint or the passcode (`expo-local-authentication`, in
+  `src/platform/` only). The only account is the dev-only mock, held in memory;
+  real ones arrive with the sync server (Phase 4) and iCloud and Google
+  (Phase 5).
 - Plugins are installed per device. Connections belong to the device, and each
   decides what every profile keeps for itself: nothing, its own sign-in, or
   everything — with PIN-gated profile tabs, "Finish setting up" for profiles
@@ -320,8 +340,8 @@ Phase 2 — local persistence. Everything survives a restart:
   the mock implement the media role; nothing plays yet.
 - Storage: SQLite (`expo-sqlite`) and the keychain on iOS and Android;
   IndexedDB and WebCrypto-encrypted secrets on the web, which requires a secure
-  page. Every local change appends a change-journal entry; nothing drains it
-  until the account phase.
+  page. Every local change appends a change-journal entry, which the account
+  drains when there is one.
 - What sources answered is kept per profile where the source allows it: the
   home, grids and visited detail pages render from it at launch, and in its
   place when a source cannot answer, saying how old it is.
@@ -332,7 +352,8 @@ Phase 2 — local persistence. Everything survives a restart:
   a router remount must never rebuild it, and in development it survives Fast
   Refresh.
 - vitest covers the database on both engines, the credential stores and the
-  service layer (`npm test`).
+  service layer, and two devices syncing through one fake account on every
+  pair of engines (`npm test`).
 
 Do not assume anything else described here exists. Build it, then update the
 docs in the same commit.

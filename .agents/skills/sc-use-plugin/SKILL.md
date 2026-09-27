@@ -1,6 +1,6 @@
 ---
 name: sc-use-plugin
-description: Wire a Streaming Center plugin from the plugins repository into the app — the file dependency, the Metro watch folder, the registration line at the composition root, per-profile connection values, effective roles on resolved values, and how a media role is called. Use when connecting, registering or debugging a plugin inside the app.
+description: Wire a Streaming Center plugin from the plugins repository into the app — the file dependency, the Metro watch folder, the registration line at the composition root, per-profile connection values, effective roles on resolved values, and how the media and sync roles are called. Use when connecting, registering or debugging a plugin inside the app.
 ---
 
 # Using a plugin in the app
@@ -74,11 +74,11 @@ this for every screen:
 effective = declared ∩ switched on   (a missing switch is off)
 ```
 
-Branching on declared alone calls features the user switched off — for a sync
-role, pushing viewing state to a server they never asked to sync with; for
+Branching on declared alone calls features the user switched off — for
 `offlineMetadata`, keeping titles and artwork on a device whose owner said not
-to. Every
-sync toggle defaults to off for exactly this reason.
+to. The sync role is on for one connection only, the device's account, and only
+the account service switches it; signing in is the opt-in, so the account
+carries what its plugin declares, less any toggle the user switched off.
 
 ## 5. Installed per device, configured per connection
 
@@ -107,7 +107,8 @@ look for `@sc/plugin-jellyfin-sync`; it does not exist and should not.
 
 `plugin.media.connect(target, context)` is called by `services/media/pool.ts`
 and nothing else. The target is the resolved values for one credential scope;
-the context carries every host service a plugin may use — HTTP, the scope's
+the context (`services/plugin-context.ts`) carries every host service a plugin
+may use — HTTP, the scope's
 credentials, its session token, the network kind, a client identity and a
 clock — because plugins have no host globals. A declared capability means the
 provider implements its member (`browse` → `listItems`, `getItem`,
@@ -119,6 +120,18 @@ Screens never call a provider. They read `useHomeRowQueries`, `useGrid`,
 `useItem` and friends (`src/hooks/use-media.ts`), which go through the media
 service: merged across sources, failures returned as `sourceErrors`, parking
 and retry handled there.
+
+## 8. How a sync role is called
+
+`plugin.sync.connect(target, context)` is called by `services/sync/provider.ts`
+and nothing else: for the connection that is the device's account, and once,
+outside any pool, to try a sign-in before anything is saved. Its session is kept
+apart from the media role's (`session:{id}:account`). The engine
+(`services/sync/engine.ts`) pulls, applies and pushes; screens read
+`useSyncStatus` and `useAccount` and never call a provider. A plugin declaring
+sync capabilities implements `pull`, `push`, `getStatus` and `dispose` — the
+plugins repository's conformance test enforces it — and `verifyOwner` when the
+account can vouch for its owner, which Forgot PIN uses.
 
 ## Verifying it actually resolves
 
@@ -135,8 +148,10 @@ appear exactly once — two copies would mean two brands and two vocabularies.
 
 ## Current state
 
-All eleven plugins are linked and registered (`mock` in development builds
-only). Jellyfin and the mock implement the media role — browse, libraries,
-watch status read, and (Jellyfin) remote images and offline metadata. The rest
-export manifests only: the app lists them, installs them and configures
-connections, and says plainly that they cannot list titles yet.
+All ten plugins are linked and registered (`mock` in development builds only).
+Jellyfin and the mock implement the media role — browse, libraries, watch
+status read, and (Jellyfin) remote images and offline metadata. The mock also
+implements the sync role: a pretend account held in memory, keyed by its
+endpoint. The rest export manifests only: the app lists them, installs them and
+configures connections, and says plainly that they cannot list titles, or be an
+account, yet.

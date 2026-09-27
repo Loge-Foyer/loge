@@ -29,7 +29,7 @@ describe.each(ENGINES)('the account on %s', (engine: Engine) => {
     it('asks, and "Use the account’s profiles" leaves only those — keeping this device’s connections', async () => {
       const { a, account, home } = await bothHaveProfiles();
       const prepared = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
-      expect(prepared).toMatchObject({ ask: true, accountProfiles: 2, switching: false });
+      expect(prepared).toMatchObject({ ask: true, accountProfiles: ['Sam', 'Robin'], onlyHere: ['Lee'], switching: false });
       await a.services.account.completeSignIn(prepared, 'account');
 
       expect((await a.services.profiles.list()).map((profile) => profile.name).sort()).toEqual(['Robin', 'Sam']);
@@ -124,6 +124,12 @@ describe.each(ENGINES)('the account on %s', (engine: Engine) => {
   });
 
   describe('one account per device', () => {
+    it('names a connection made for the account after the account', async () => {
+      const { a, account } = pair();
+      await signIn(a, account);
+      expect((await a.services.account.current())?.connection.label).toBe('The fake account');
+    });
+
     it('lets no connection form switch a sync role on', async () => {
       const both = fakeSyncAccount({ id: 'both-roles', withMedia: true });
       const device = buildServices({ plugins: [both.plugin], engine, device: 'solo' });

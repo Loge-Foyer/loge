@@ -1,7 +1,19 @@
-import type { AppErrorCode, ContentKind, Episode, ItemSort, ItemSortKey, MediaItem, PerProfile, PluginRole } from '@sc/api';
+import type {
+  AppErrorCode,
+  ContentKind,
+  Episode,
+  ItemSort,
+  ItemSortKey,
+  MediaItem,
+  PerProfile,
+  PluginRole,
+  SyncCapability,
+} from '@sc/api';
 
 import type { HomeRow } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
+import type { OwnerVerdict } from '@/services/owner-check';
+import type { SyncStatus } from '@/services/sync/engine';
 
 export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
   movies: 'Movies',
@@ -13,7 +25,20 @@ export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
 
 export const ROLE_LABELS: Readonly<Record<PluginRole, string>> = {
   media: 'Media',
-  sync: 'Sync',
+  sync: 'Account',
+};
+
+/** What an account keeps in step, in words. */
+export const SYNC_CAPABILITY_LABELS: Readonly<Record<SyncCapability, string>> = {
+  profile: 'Profiles and their PINs',
+  preferences: 'Each profile’s settings, like its home',
+  watchProgress: 'Where each profile stopped watching',
+  favorites: 'Favourites',
+  watchlist: 'Watchlists',
+  history: 'What each profile watched',
+  providerConnections: 'Connections, without their passwords',
+  customLists: 'Lists',
+  fullBackup: 'A full backup',
 };
 
 export const PER_PROFILE_LABELS: Readonly<Record<PerProfile, string>> = {
@@ -119,7 +144,7 @@ export function timeAgo(then: number, now: number): string {
 }
 
 function whatWentWrong(error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry' | 'needsPassword'>): string {
-  if (error.needsPassword) return `${error.label} needs its password again. Enter it in Settings.`;
+  if (error.needsPassword) return `${error.label} needs its password on this device. Enter it in Settings.`;
   if (error.reason === 'local-network-only') return `${error.label} is only used on your home network.`;
   // Waiting for another network, which is why it is not tried again.
   if (error.retry === 'network-change' && error.code !== 'OFFLINE') return `${error.label} can’t be reached on this network.`;
@@ -146,6 +171,49 @@ export function describeProbeError(error: { code: AppErrorCode; reason?: string;
   if (error.code === 'OFFLINE') return 'The server could not be reached. Check the address and the network.';
   if (error.code === 'TIMEOUT') return 'The server took too long to answer.';
   return error.message;
+}
+
+/** "Synced 5 min ago · 2 changes waiting". */
+export function describeSyncStatus(status: SyncStatus, now = Date.now()): string {
+  const waiting = status.pending > 0 ? `${status.pending} ${status.pending === 1 ? 'change' : 'changes'} waiting` : undefined;
+  const line = syncPhaseLine(status, now);
+  return waiting ? `${line} · ${waiting}` : line;
+}
+
+function syncPhaseLine({ phase, lastSyncedAt, problem }: SyncStatus, now: number): string {
+  switch (phase) {
+    case 'idle':
+      return 'Not synced yet';
+    case 'syncing':
+      return 'Syncing…';
+    case 'synced':
+      return lastSyncedAt === undefined ? 'Synced' : `Synced ${timeAgo(lastSyncedAt, now)}`;
+    case 'waiting':
+      if (problem?.code === 'OFFLINE') return 'Offline — syncs when a network is back';
+      if (problem?.retry === 'network-change') return 'Can’t be reached on this network';
+      return 'Couldn’t sync — trying again soon';
+    case 'needs-sign-in':
+      return problem?.needsPassword ? 'Needs its password on this device' : 'Needs you to sign in again';
+    case 'unavailable':
+      return 'Can’t be used in this version of the app';
+    case 'failed':
+      return problem?.message ?? 'Ran into a problem';
+  }
+}
+
+/** Why the owner check did not go through; nothing when someone backed out. */
+export function describeOwnerVerdict(verdict: OwnerVerdict): string | undefined {
+  switch (verdict) {
+    case 'refused':
+      return 'That didn’t confirm it’s you.';
+    case 'failed':
+      return 'Your account couldn’t be reached to confirm it’s you. Try again when you’re online.';
+    case 'unavailable':
+      return 'This device can’t confirm it’s you.';
+    case 'cancelled':
+    case 'verified':
+      return undefined;
+  }
 }
 
 /** "Continue watching", "Movies", or "Movies · Date added" for a row a profile added. */

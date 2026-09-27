@@ -47,8 +47,9 @@ else is real, including the database engine:
   pair of engines: SQLite and SQLite, IndexedDB and IndexedDB, and one of each.
   The fake account can store only part of a push, lose an answer, fail, forget
   everything, roll back, expire a cursor or refuse its owner, and the suites
-  prove the devices converge through all of it. The scheduler runs on fake
-  timers against a scripted engine.
+  prove the devices converge through all of it. Signing in, switching, signing
+  out, the owner check and Forgot PIN run on both engines too. The scheduler
+  runs on fake timers against a scripted engine.
 
 `test/support/services.ts` builds the service graph as the app wires it.
 `test/support/engines.ts` opens a fresh database per test. Two things there

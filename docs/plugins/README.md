@@ -23,7 +23,7 @@ an import and an entry in its list. The catalogue checks every manifest when the
 app starts: a broken manifest stops a development build and is left out of a
 production one. A plugin that implements a role exports it beside its manifest
 (`plugin.media`); the catalogue hands it to the media service, and nothing else
-ever holds it.
+ever holds it. A sync role (`plugin.sync`) goes only to the account service.
 
 ## Installed per device, configured per connection
 
@@ -72,8 +72,8 @@ reports stay chosen, in case they come back.
 ## What a plugin is given
 
 Plugins have no host globals — `@sc/api` compiles against `lib: ["esnext"]`
-alone — so everything reaches them through the `MediaContext` built in
-`services/media/pool.ts`:
+alone — so everything reaches them through the `PluginContext` built in
+`services/plugin-context.ts`, for a media source and the account alike:
 
 | Port | What the app supplies |
 | --- | --- |
@@ -105,6 +105,27 @@ That mapping lives in one place, `src/services/tab-content.ts`. Nothing in the
 app ever asks *which* plugin a source is: it branches on the effective
 capabilities of a resolved source.
 
+## The account
+
+The device's account is the one connection with its sync role on, and only the
+account service switches that: signing in in Settings → Account (or at first
+launch), never a connection form, and never by default. Signing in is the
+opt-in, so the account carries everything its plugin declares — profiles and
+their PINs, preferences, connections without their passwords — less any toggle
+the plugin offers and the user switched off.
+
+- **One provider, apart from the media one.** `services/sync/provider.ts`
+  connects the account's sync role with its own session
+  (`session:{id}:account`), so a connection that is a source and the account
+  signs in twice without either ending the other. A sign-in is tried once, on a
+  provider outside the pool, before anything is saved.
+- **A plugin that can only be an account** — a sync server, say — has no
+  connection form: its page offers "Use as your account", and its `new` route
+  refuses. One that declares a sync role this build does not implement says it
+  cannot be an account yet.
+- **A build without the account's plugin** shows the account as unavailable,
+  and can still sign out of it.
+
 ## Plugins run on Hermes
 
 On iOS and Android, plugin code runs on Hermes, which lacks a few built-ins
@@ -116,5 +137,6 @@ tests scan its sources for them.
 ## The rules, enforced
 
 Lint fails if anything outside `src/composition/` imports a plugin, a
-repository implementation or a platform module. See the `sc-verify` skill for
-how to prove the rules still bite.
+repository implementation or a platform module, and if anything outside
+`src/platform/` imports `expo-local-authentication`. See the `sc-verify` skill
+for how to prove the rules still bite.

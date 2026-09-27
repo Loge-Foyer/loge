@@ -2,7 +2,7 @@
 
 Building and running on simulator and device, native modules, config plugins, and when a development build replaces Expo Go.
 
-Expo Go is enough today: every native module in use ships with it. A development build becomes necessary with the first custom native module — the playback engine.
+Expo Go is enough today: every native module in use ships with it. A development build becomes necessary with the first custom native module — the playback engine — and Face ID needs one already (below).
 
 ## Servers on the local network
 
@@ -25,6 +25,21 @@ build arrives — never as edits to a generated `ios/` folder.
 - Keychain entries can outlive the app. Uninstalling it does not delete them,
   so starting fresh on a simulator is `xcrun simctl uninstall booted
   host.exp.Exponent` plus `xcrun simctl keychain booted reset`.
+
+## Forgot PIN and Face ID
+
+Forgot PIN asks the account when it can vouch for its owner, and otherwise the
+device, through `expo-local-authentication`: Face ID or Touch ID, falling back
+to the passcode. Only `src/platform/owner-authentication.ts` imports it; the web
+gets `owner-authentication.web.ts`, which answers "unavailable".
+
+- **Face ID needs a development or store build.** Expo Go cannot carry the
+  app's Face ID usage text (`faceIDPermission`, set through the module's config
+  plugin in `app.json`), so there it is not offered.
+- **A simulator has no passcode**, and Face ID enrolment is a development-build
+  matter too. In Expo Go on a simulator the device cannot be asked, so without
+  an account the unlock screen shows "Forgot it? An account lets you reset a
+  PIN." instead of the link.
 
 ## The simulator
 

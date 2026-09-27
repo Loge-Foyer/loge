@@ -11,7 +11,7 @@ src/
   app/          routes only (expo-router); each file renders a screen
   screens/      screen bodies — kept apart so TV layouts can be new screens
   components/   the design system, on Tamagui; takes domain types only
-  hooks/        React bindings: query hooks, the session gate
+  hooks/        React bindings: query hooks, the session gate, the account's status
   services/     business logic, no React; ports.ts declares what they need
   persistence/  the local database: SQLite (native) and IndexedDB (web)
   platform/     device boundary: credentials, HTTP, network, identity, clock, logging,
@@ -72,6 +72,13 @@ were `(app)` guarded until `ready`, the router would replace the link with the
 boot screen before the app could honour it. If the gate settles anywhere else —
 a PIN to enter, a profile to pick — the guards take over as usual and the link
 is dropped.
+
+Welcome, the first-launch screen, sits outside `(app)`: signing in to an
+account there happens before any profile exists. When an account's profiles
+arrive — at sign-in or in a later run — the engine tells the composition, which
+has the gate look again (`session.refresh()`): from the first launch to "Who's
+watching?", and from a profile that another device removed to the picker. A
+PIN set elsewhere never locks the profile in use.
 
 ## Where a source comes from
 
@@ -185,6 +192,9 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
   the internet, so React Query must never hold them back as "offline".
 - Refresh — pull to refresh, or the web toolbar — unparks sources and
   invalidates the profile's remote keys; a changed network does the same.
+- What the account brings refreshes local keys — remote ones too when a
+  connection changed — and drops a removed profile's keys. `useSyncEffects`
+  does it from the root layout, because Welcome is outside `(app)`.
 
 ## State ownership
 
@@ -195,3 +205,5 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
 | Session tokens, the device key | the device-bound credential store — the keychain, never restored onto another phone |
 | Reads for screens, titles from sources | TanStack Query, every key prefixed by `device` or by the active profile |
 | The session gate | the session service, read with `useSyncExternalStore` |
+| Where the account's log stands — cursor, checkpoint, what waits to come back | `sync_state`, in the repositories, never journaled |
+| How the account stands — syncing, synced, waiting, changes not sent | the sync engine, read with `useSyncExternalStore` |

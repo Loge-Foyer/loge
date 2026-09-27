@@ -1,5 +1,4 @@
 import {
-  declaredRoles,
   isAppError,
   perProfileKeys,
   perProfileModes,
@@ -18,7 +17,7 @@ import {
 } from '@sc/api';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Button, Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
@@ -29,7 +28,7 @@ import { PinPad } from '@/components/pin-pad';
 import { PrimaryButton } from '@/components/primary-button';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
-import { SettingsSection } from '@/components/settings-list';
+import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { SourceTabs, type SourceTab } from '@/components/source-tabs';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
@@ -73,6 +72,8 @@ export function NewConnectionScreen({ pluginId }: { pluginId: PluginId }) {
   const { data: existing } = usePluginConnections(pluginId);
   const { create } = useConnectionActions();
   if (!manifest || !existing) return <Missing loading={!!manifest} />;
+  // An account is chosen in Settings → Account, never added here: this form cannot switch a sync role on.
+  if (!manifest.media) return <AccountOnly manifest={manifest} />;
   return (
     <ConnectionForm
       title={`New ${manifest.displayName} connection`}
@@ -112,32 +113,40 @@ function Missing({ loading }: { loading: boolean }) {
   );
 }
 
-const ROLE_FIELDS: Readonly<Record<PluginRole, (manifest: PluginManifest) => BooleanField>> = {
-  media: (manifest) => {
-    const kinds = manifest.media?.contentKinds ?? [];
-    const tabs = [
-      ...(kindsForTab('media', kinds).length > 0 ? ['Media'] : []),
-      ...(kindsForTab('videos', kinds).length > 0 ? ['Videos'] : []),
-    ];
-    return {
-      key: 'role.media',
-      label: 'Use as a media source',
-      type: 'boolean',
-      default: false,
-      description: `Brings ${listKinds(kinds)} to ${tabs.join(' and ')}.`,
-    };
-  },
-  sync: (manifest) => ({
-    key: 'role.sync',
-    label: 'Keep my state here',
+function AccountOnly({ manifest }: { manifest: PluginManifest }) {
+  const { catalog } = useServices();
+  const usable = catalog.syncRole(manifest.id) !== undefined;
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: manifest.displayName }} />
+      <Paragraph color="$color11">
+        {usable
+          ? `${manifest.displayName} is an account, not a source. Sign in to it in Settings → Account.`
+          : `${manifest.displayName} is an account, and can’t be used as one in this version of the app yet.`}
+      </Paragraph>
+      {usable ? (
+        <SettingsSection>
+          <SettingsRow title="Sign in" href={{ pathname: '/settings/account/sign-in', params: { plugin: manifest.id } }} />
+        </SettingsSection>
+      ) : null}
+    </Screen>
+  );
+}
+
+function mediaRoleField(manifest: PluginManifest): BooleanField {
+  const kinds = manifest.media?.contentKinds ?? [];
+  const tabs = [
+    ...(kindsForTab('media', kinds).length > 0 ? ['Media'] : []),
+    ...(kindsForTab('videos', kinds).length > 0 ? ['Videos'] : []),
+  ];
+  return {
+    key: 'role.media',
+    label: 'Use as a media source',
     type: 'boolean',
     default: false,
-    description:
-      (manifest.sync?.capabilities.length ?? 0) > 0
-        ? 'Only what you switch on below is sent.'
-        : 'Nothing to sync yet — this plugin cannot carry any state so far.',
-  }),
-};
+    description: `Brings ${listKinds(kinds)} to ${tabs.join(' and ')}.`,
+  };
+}
 
 /** Which role a setting belongs to: the role of what it gates, if anything. */
 function roleOf(setting: PluginSettingDescriptor): PluginRole | null {
@@ -191,7 +200,9 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const [errors, setErrors] = useState<DraftErrors>(NO_ERRORS);
   const [saving, setSaving] = useState(false);
 
-  const modes = perProfileModes(manifest);
+  // Only the account service switches a sync role; here the account is shown, and guarded.
+  const isAccount = stored?.connection.roles.sync === true;
+  const modes = isAccount ? [] : perProfileModes(manifest);
   const keys = perProfileKeys(manifest, draft.perProfile);
   const separate = draft.perProfile !== 'none';
   const tabProfile = profiles.find((profile) => profile.id === tab);
@@ -263,9 +274,10 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
             if (typeof value === 'string') edit((current) => setSecret(current, tab, field.key, value));
           }}
           error={error}
+          disabled={inert}
           saved={isSaved}
           marker={marker(perProfile)}
-          {...(isSaved && !field.required
+          {...(isSaved && !field.required && !inert
             ? { onRemoveSaved: () => edit((current) => setSecret(current, tab, field.key, null)) }
             : {})}
         />
@@ -372,7 +384,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const groups = [
     { role: null, title: 'Settings' },
     { role: 'media', title: 'Media settings' },
-    { role: 'sync', title: 'What to sync' },
+    { role: 'sync', title: 'What your account keeps in step' },
   ] as const;
   const losing = profilesLosingValues(draft, stored);
   const setUpCount = profiles.filter((profile) => isSetUpInDraft(manifest, draft, profile.id, saved)).length;
@@ -411,9 +423,15 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
               {...(errors.form ? { error: errors.form } : {})}
             />
           ) : null}
-          {before.map((field) => renderField(field, 'fields'))}
+          {before.map((field) => renderField(field, 'fields', isAccount))}
           {after.length > 0 ? profileSwitcher : null}
-          {after.length > 0 ? (pinGate ?? offNotice ?? after.map((field) => renderField(field, 'fields'))) : null}
+          {after.length > 0 ? (pinGate ?? offNotice ?? after.map((field) => renderField(field, 'fields', isAccount))) : null}
+          {isAccount ? (
+            <SizableText size="$2" color="$color10">
+              These are your account’s details. A new password goes in Settings → Account, with Sign in again; another
+              address would be another account.
+            </SizableText>
+          ) : null}
           {canProbe && !locked && !tabOff ? (
             <TestConnection test={test} ready={probeReady} displayName={manifest.displayName} />
           ) : null}
@@ -423,21 +441,22 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
       )}
 
       <FormSection title="Use this connection">
-        {declaredRoles(manifest).map((role) => (
+        {manifest.media ? (
           <FieldInput
-            key={role}
-            field={ROLE_FIELDS[role](manifest)}
-            value={draft.roles[role] === true}
-            onChange={(on) => setRole(role, on === true)}
+            field={mediaRoleField(manifest)}
+            value={draft.roles.media === true}
+            onChange={(on) => setRole('media', on === true)}
           />
-        ))}
+        ) : null}
+        {manifest.sync ? <AccountRole isAccount={isAccount} usable={catalog.syncRole(manifest.id) !== undefined} /> : null}
       </FormSection>
 
       {settingsOnlyPerProfile ? profileSwitcher : null}
       {settingsOnlyPerProfile ? (pinGate ?? offNotice) : null}
       {groups.map(({ role, title: groupTitle }) => {
         const settings = manifest.settings.filter((setting) => roleOf(setting) === role);
-        if (settings.length === 0) return null;
+        // What an account carries matters only on the account.
+        if (settings.length === 0 || (role === 'sync' && !isAccount)) return null;
         const inert = role !== null && draft.roles[role] !== true;
         const ownSettings = settings.some((setting) => keys.settings.has(setting.key));
         return (
@@ -474,7 +493,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         <PrimaryButton size="$4" disabled={saving} onPress={() => void submit()}>
           {submitLabel}
         </PrimaryButton>
-        {onRemove ? (
+        {onRemove && !isAccount ? (
           <ConfirmButton
             label="Remove connection"
             icon={<Trash2 size={16} />}
@@ -486,6 +505,31 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         ) : null}
       </YStack>
     </Screen>
+  );
+}
+
+/** The sync role, which no form switches: the account is chosen in Settings → Account. */
+function AccountRole({ isAccount, usable }: { isAccount: boolean; usable: boolean }) {
+  return (
+    <XStack gap="$3" items="center" justify="space-between">
+      <YStack flex={1} gap="$0.5">
+        <SizableText size="$4" color="$color12">
+          {isAccount ? 'Your account' : 'Use as your account'}
+        </SizableText>
+        <SizableText size="$2" color="$color10">
+          {isAccount
+            ? 'It keeps your profiles and settings in step on every device. Switch or sign out in Settings → Account.'
+            : usable
+              ? 'Choose it in Settings → Account, and your profiles and settings are kept in step on every device.'
+              : 'It can’t be an account in this version of the app yet.'}
+        </SizableText>
+      </YStack>
+      {usable || isAccount ? (
+        <Link href="/settings/account" asChild>
+          <Button size="$3">Account</Button>
+        </Link>
+      ) : null}
+    </XStack>
   );
 }
 

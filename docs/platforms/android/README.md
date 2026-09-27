@@ -25,6 +25,18 @@ the development build arrives.
 - `adb shell pm clear host.exp.exponent` starts Expo Go, and every project in
   it, from scratch.
 
+## Forgot PIN
+
+Without an account that can vouch for its owner, Forgot PIN asks the device:
+a fingerprint, or the screen lock's PIN, pattern or password. It is offered once
+a screen lock is set — `getEnrolledLevelAsync()` reports at least `SECRET` — and
+works in Expo Go.
+
+On the emulator: Settings → Security → Screen lock → PIN, then Fingerprint,
+touching the sensor with `adb -e emu finger touch 1` when asked. At the app's
+prompt, the same command answers it; `adb -e emu finger touch 2` (an unenrolled
+finger) is a refusal.
+
 ## The emulator
 
 - An emulator has both mobile data and Wi-Fi. Check which is the default

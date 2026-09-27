@@ -70,8 +70,8 @@ screens rather than a new app.
 
 ## Current state
 
-**Phase 2 — nothing is lost on restart.** Three tabs, built with
-[Tamagui](https://tamagui.dev):
+**Phase 3 — one account, the household's profiles under it.** Three tabs,
+built with [Tamagui](https://tamagui.dev):
 
 - **Media** — films and series from every source, as one library: what you are
   in the middle of, then a row per kind in the order and sort you choose, a
@@ -79,23 +79,31 @@ screens rather than a new app.
   and episode. Jellyfin is the first real source.
 - **Videos** — web video and plain files, one tab per source. No source lists
   them yet.
-- **Settings** — profiles, PIN lock, and every plugin: install it, connect it
-  through a form the plugin itself describes, and decide what each profile
-  keeps for itself.
+- **Settings** — the account, profiles, PIN lock, and every plugin: install
+  it, connect it through a form the plugin itself describes, and decide what
+  each profile keeps for itself.
+
+**The account.** At first launch, sign in and the household's profiles arrive
+in "Who's watching?" — or use the device on its own. Signed in, profiles and
+their PINs, each profile's settings, and connections (without their passwords)
+are kept in step on every device on the same account. A forgotten PIN is reset
+by confirming it's you: through the account, or with Face ID, a fingerprint or
+the passcode.
 
 Everything is kept on the device: profiles, PINs, installed plugins,
 connections and their passwords, and each profile's home. On a phone that is
 SQLite and the keychain; in a browser, its own database, with the secrets
-encrypted. Every change is also recorded, for the sync that comes with the
-account.
+encrypted. Every change is also recorded, and sent to the account when there is
+one.
 
 What the servers answered is kept too, where they allow it. So the home shows
 up at once when the app opens, and when a server cannot be reached — away from
 home, or with the server off — you still see your library and how old that
 view is.
 
-What is not there yet: nothing plays, and there is no account to carry
-profiles between devices.
+What is not there yet: nothing plays, and no real account exists — your own
+sync server comes next, then iCloud and Google. Until then, development builds
+have a pretend one.
 
 ## Documentation
 

@@ -33,12 +33,13 @@ repository fails to resolve. Those only surface in an export.
 ## Each bundle carries only its own storage
 
 `src/composition/storage.ts` (native) and `storage.web.ts` are chosen by
-platform. If either leaked into the other bundle, web would drag in
-expo-sqlite's WebAssembly build — and need COOP/COEP headers — or native would
-ship dead IndexedDB code:
+platform, and so is `src/platform/owner-authentication.web.ts`, the stub that
+keeps `expo-local-authentication` out of the web. If either leaked into the
+other bundle, web would drag in expo-sqlite's WebAssembly build — and need
+COOP/COEP headers — or native would ship dead IndexedDB code:
 
 ```bash
-grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore /tmp/sc-web             # must print nothing
+grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore -e ExpoLocalAuthentication /tmp/sc-web   # must print nothing
 strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c streaming-center-secrets  # must print 0
 ```
 
@@ -65,6 +66,7 @@ nothing (`docs/platforms/ios` has the path).
 | `@/persistence/*` (and relative `…/persistence/…`) | `src/composition/**` |
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |
 | `@/composition/*` | `src/app/_layout.tsx` |
+| `expo-local-authentication` | `src/platform/**` — everything else asks `OwnerCheck` |
 
 Do not trust them, prove them. Drop a throwaway file into `src/screens/` that
 imports one of each — including a relative `../platform/clock` — and run
@@ -116,7 +118,8 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
   expects a first launch needs a fresh start (`docs/getting-started`).
 - The web build refuses to start on plain `http` from a network address; use
   `localhost`.
-- `npm test` covers the database, the credential stores and the services, not
+- `npm test` covers the database, the credential stores and the services —
+  the account and two devices syncing through one fake account included — not
   screens. Screens are proven by driving the app on each platform (`sc-run`).
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before

@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 
 import { ThemeRoot } from '@/components/theme-root';
 import { ServicesProvider } from '@/composition/provider';
+import { useSyncEffects } from '@/hooks/use-account';
 import { useGate } from '@/hooks/use-session';
 
 // Held until the boot decision is made, so the first screen shown is the right one.
@@ -33,6 +34,7 @@ export default function RootLayout() {
 function RootStack() {
   const gate = useGate();
   const settled = gate.kind !== 'starting';
+  useSyncEffects();
 
   useEffect(() => {
     if (settled) void SplashScreen.hideAsync();

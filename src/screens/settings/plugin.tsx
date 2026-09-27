@@ -1,4 +1,5 @@
 import type { PluginId } from '@sc/api';
+import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Stack } from 'expo-router';
 import { Paragraph, SizableText, YStack } from 'tamagui';
@@ -7,6 +8,7 @@ import { AppSwitch } from '@/components/app-switch';
 import { CONTENT_KIND_LABELS, PER_PROFILE_SUMMARY, ROLE_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { useServices } from '@/hooks/services-context';
 import { usePluginConnections } from '@/hooks/use-connections';
 import { usePluginActions, usePluginManifest, usePluginStates } from '@/hooks/use-plugins';
 import { useProfiles } from '@/hooks/use-profiles';
@@ -16,6 +18,7 @@ import { PLUGIN_OFF } from '@/services/device-plugins';
 import { PluginChips } from './plugins';
 
 export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
+  const { catalog } = useServices();
   const manifest = usePluginManifest(pluginId);
   const userId = useActiveUserId();
   const { data: profiles = [] } = useProfiles();
@@ -30,6 +33,10 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
       </Screen>
     );
   }
+
+  // Signing in installed the account's plugin, and it stays installed while it is the account.
+  const hostsAccount = connections.some((summary) => summary.isAccount);
+  const canBeAccount = catalog.syncRole(pluginId) !== undefined;
 
   return (
     <Screen>
@@ -47,28 +54,54 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
       >
         <SettingsRow
           title="Installed"
-          subtitle={state.enabled ? 'Its sources are available' : 'Install to connect a source'}
+          subtitle={
+            hostsAccount
+              ? 'Your account uses it — sign out to uninstall'
+              : !manifest.media
+                ? 'Installed when you sign in to it'
+                : state.enabled
+                  ? 'Its sources are available'
+                  : 'Install to connect a source'
+          }
           trailing={
             <AppSwitch
               label="Installed"
               checked={state.enabled}
+              disabled={hostsAccount}
               onCheckedChange={(enabled) => setEnabled.mutate({ id: pluginId, enabled })}
             />
           }
         />
       </SettingsSection>
 
-      {state.enabled ? (
+      {!manifest.media && !hostsAccount ? (
+        canBeAccount ? (
+          <SettingsSection title="Account" footer="An account keeps your profiles and settings in step on every device.">
+            <SettingsRow
+              title="Use as your account"
+              icon={<Cloud size={18} color="$accent10" />}
+              href={{ pathname: '/settings/account/sign-in', params: { plugin: pluginId } }}
+            />
+          </SettingsSection>
+        ) : (
+          <Paragraph size="$3" color="$color10">
+            {`${manifest.displayName} can’t carry anything yet: it becomes an account in a later version of the app.`}
+          </Paragraph>
+        )
+      ) : null}
+
+      {state.enabled && (manifest.media || connections.length > 0) ? (
         <SettingsSection title="Connections">
-          {connections.map(({ connection, setUp, off }) => {
-            const roles = (['media', 'sync'] as const).filter((role) => connection.roles[role] === true);
+          {connections.map(({ connection, isAccount, setUp, off }) => {
             const what =
-              roles.length > 0
-                ? roles.map((role) => ROLE_LABELS[role]).join(' · ') +
-                  (roles.includes('media') && manifest.media
-                    ? ` — ${manifest.media.contentKinds.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ')}`
-                    : '')
-                : 'Switched off';
+              [
+                connection.roles.media === true && manifest.media
+                  ? `${ROLE_LABELS.media} — ${manifest.media.contentKinds.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ')}`
+                  : undefined,
+                isAccount ? 'Your account' : undefined,
+              ]
+                .filter((part) => part !== undefined)
+                .join(' · ') || 'Switched off';
             const who =
               connection.perProfile === 'none'
                 ? PER_PROFILE_SUMMARY.none
@@ -90,11 +123,13 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
               />
             );
           })}
-          <SettingsRow
-            title="Add connection"
-            icon={<Plus size={18} color="$accent10" />}
-            href={{ pathname: '/settings/plugins/[pluginId]/new', params: { pluginId } }}
-          />
+          {manifest.media ? (
+            <SettingsRow
+              title="Add connection"
+              icon={<Plus size={18} color="$accent10" />}
+              href={{ pathname: '/settings/plugins/[pluginId]/new', params: { pluginId } }}
+            />
+          ) : null}
         </SettingsSection>
       ) : null}
     </Screen>

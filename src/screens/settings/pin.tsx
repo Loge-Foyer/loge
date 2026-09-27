@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Paragraph, YStack } from 'tamagui';
 
 import { PinPad } from '@/components/pin-pad';
@@ -8,7 +8,7 @@ import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { usePinActions } from '@/hooks/use-pin';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
-import { describeFailure } from '@/screens/unlock';
+import { describeFailure, ForgotPin } from '@/screens/unlock';
 
 type Step =
   | { kind: 'menu' }
@@ -54,9 +54,9 @@ export function PinScreen() {
     );
   }
 
-  const pad = (title: string, onComplete: (pin: string) => void) => (
+  const pad = (title: string, onComplete: (pin: string) => void, footer?: ReactNode) => (
     <Screen>
-      <YStack py="$6">
+      <YStack py="$6" gap="$4" items="center">
         <PinPad
           title={title}
           {...(message ? { message: message.text, tone: message.tone } : {})}
@@ -65,22 +65,28 @@ export function PinScreen() {
             onComplete(pin);
           }}
         />
+        {footer}
       </YStack>
     </Screen>
   );
 
   switch (step.kind) {
     case 'current':
-      return pad('Enter the current PIN', (current) => {
-        if (step.then === 'change') {
-          setStep({ kind: 'new', current });
-          return;
-        }
-        remove.mutate(
-          { userId, current },
-          { onSuccess: (check) => (check.ok ? done() : fail(describeFailure(check))) },
-        );
-      });
+      return pad(
+        'Enter the current PIN',
+        (current) => {
+          if (step.then === 'change') {
+            setStep({ kind: 'new', current });
+            return;
+          }
+          remove.mutate(
+            { userId, current },
+            { onSuccess: (check) => (check.ok ? done() : fail(describeFailure(check))) },
+          );
+        },
+        // Cleared, the PIN is simply off: the menu then offers to set one.
+        <ForgotPin userId={userId} onReset={() => setStep({ kind: 'menu' })} onRefused={fail} />,
+      );
     case 'new':
       return pad('Choose a new four-digit PIN', (next) =>
         setStep({ kind: 'confirm', next, ...(step.current ? { current: step.current } : {}) }),

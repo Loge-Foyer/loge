@@ -39,10 +39,10 @@ export function ConfirmButton({
               <AlertDialog.Cancel asChild>
                 <Button>Cancel</Button>
               </AlertDialog.Cancel>
-              <AlertDialog.Action asChild>
-                <Button theme="red" onPress={onConfirm}>
-                  {confirmLabel}
-                </Button>
+              {/* On the Action itself: the native alert calls the Action's onPress and never
+                  sees the Button inside it. In a browser asChild hands it to the Button. */}
+              <AlertDialog.Action asChild onPress={onConfirm}>
+                <Button theme="red">{confirmLabel}</Button>
               </AlertDialog.Action>
             </XStack>
           </YStack>

@@ -16,12 +16,15 @@ const REFUSED: SyncStatus = { phase: 'needs-sign-in', pending: 1, problem: { cod
 function scriptedEngine() {
   let status: SyncStatus = SYNCED;
   const ahead: SyncStatus[] = [];
-  const calls = { runs: 0 };
+  const calls = { runs: 0, changed: 0 };
   const engine: SyncEngine = {
     status: () => status,
     subscribe: () => () => undefined,
     onApplied: () => () => undefined,
     report: () => undefined,
+    changed: async () => {
+      calls.changed += 1;
+    },
     run: async () => {
       calls.runs += 1;
       status = ahead.shift() ?? status;
@@ -80,6 +83,8 @@ describe('the sync scheduler', () => {
     journal.commit();
     journal.commit();
     journal.commit();
+    // The count of changes waiting follows every commit; the run waits for the burst to end.
+    expect(calls.changed).toBe(3);
     await vi.advanceTimersByTimeAsync(1_999);
     expect(calls.runs).toBe(1);
     await vi.advanceTimersByTimeAsync(1);

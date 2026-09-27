@@ -23,5 +23,7 @@ export function usePinActions() {
         pins.remove(userId, current),
       onSuccess: () => refresh(),
     }),
+    /** Forgot PIN: the owner is asked, and only a yes clears it. */
+    forgot: useMutation({ mutationFn: (userId: UserId) => pins.forgot(userId), onSuccess: () => refresh() }),
   };
 }

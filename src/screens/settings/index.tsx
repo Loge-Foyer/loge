@@ -1,3 +1,5 @@
+import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
+import { CloudOff } from '@tamagui/lucide-icons-2/icons/CloudOff';
 import { Info } from '@tamagui/lucide-icons-2/icons/Info';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { Puzzle } from '@tamagui/lucide-icons-2/icons/Puzzle';
@@ -5,20 +7,24 @@ import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
 import { SizableText } from 'tamagui';
 
-import { ROLE_LABELS } from '@/components/labels';
+import { describeSyncStatus, ROLE_LABELS } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
+import { useAccount, useAccountProviders, useSyncStatus } from '@/hooks/use-account';
 import { usePluginStates } from '@/hooks/use-plugins';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 
-/** Every setting lives here: the profile, the device's plugins, and the app itself. */
+/** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
 export function SettingsScreen() {
   const userId = useActiveUserId();
   const { catalog } = useServices();
+  const { data: account } = useAccount();
+  const { data: providers = [] } = useAccountProviders();
+  const status = useSyncStatus();
   const { data: profiles = [] } = useProfiles();
   const { data: states } = usePluginStates();
   const { data: sources = [] } = useSources();
@@ -27,6 +33,21 @@ export function SettingsScreen() {
 
   return (
     <Screen>
+      <SettingsSection title="Account">
+        <SettingsRow
+          title={account ? account.connection.label : 'This device only'}
+          subtitle={
+            account
+              ? describeSyncStatus(status)
+              : providers.length > 0
+                ? 'Sign in to keep your profiles on every device'
+                : 'Your profiles are kept on this device'
+          }
+          icon={account ? <Cloud size={20} color="$color11" /> : <CloudOff size={20} color="$color11" />}
+          href="/settings/account"
+        />
+      </SettingsSection>
+
       <SettingsSection title="Profile">
         <SettingsRow
           title={user?.name ?? 'Profile'}
@@ -54,16 +75,17 @@ export function SettingsScreen() {
       >
         {installed.map((manifest) => {
           const live = sources.filter((source) => source.manifest.id === manifest.id);
-          const active = live.flatMap((source) => [
-            ...(source.effective.media ? [ROLE_LABELS.media] : []),
-            ...(source.effective.sync ? [ROLE_LABELS.sync] : []),
-          ]);
+          const active = [
+            ...(live.some((source) => source.effective.media) ? [ROLE_LABELS.media] : []),
+            // The account is a connection too, even when it brings nothing to watch.
+            ...(account?.connection.pluginId === manifest.id ? [ROLE_LABELS.sync] : []),
+          ];
           return (
             <SettingsRow
               key={manifest.id}
               title={manifest.displayName}
               subtitle={`${live.length} ${live.length === 1 ? 'connection' : 'connections'}${
-                active.length > 0 ? ` · ${[...new Set(active)].join(' · ')}` : ''
+                active.length > 0 ? ` · ${active.join(' · ')}` : ''
               }`}
               href={{ pathname: '/settings/plugins/[pluginId]', params: { pluginId: manifest.id } }}
             />

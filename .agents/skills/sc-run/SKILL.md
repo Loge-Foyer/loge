@@ -15,8 +15,10 @@ npm start          # dev server, then press i / a / w
 ## Which runtime you need
 
 **Expo Go is enough today.** Every native module in use — `react-native-svg`,
-`expo-crypto`, `react-native-screens`, `expo-sqlite`, `expo-secure-store` —
-ships in Expo Go 57.
+`expo-crypto`, `react-native-screens`, `expo-sqlite`, `expo-secure-store`,
+`expo-local-authentication` — ships in Expo Go 57. One exception: Face ID on
+iOS needs a development build, because Expo Go cannot carry the app's Face ID
+usage text.
 
 That changes the moment a playback engine lands. Expo Go only bundles its own
 native modules, so a custom one requires a development build:
@@ -47,6 +49,11 @@ a flow needs once and it is there on every later launch.
   the account's lockout: do not loop a wrong password.
 - **Offline work**: the `mock` plugin (development builds only) is a pretend
   server that needs no network. Install it and add a connection like any other.
+- **An account**: the mock is a pretend account too. Sign in to it — at first
+  launch, or in Settings → Account — and its endpoint names the account:
+  `mock://household` holds Sam (PIN 1234) and Robin, any other endpoint is
+  empty. It lives in the JavaScript runtime's memory: a reload forgets it, and
+  the next run joins it again with nothing local lost.
 - **In a browser, stay on `localhost`.** On plain `http` from a network address
   the app refuses to start: its secrets need WebCrypto, which only a secure page
   has.
@@ -58,6 +65,21 @@ a flow needs once and it is there on every later launch.
 - **Android** — SDK 36, AVD `shinie-a36` (arm64, Play image), JDK 21
 - **Web** — any browser; `web.output` is a single-page app, so a static host
   needs to fall back to `index.html` for deep paths
+
+## The account and Forgot PIN, per platform
+
+- **Web** — "Forgot PIN?" works with the mock account signed in (it vouches for
+  its owner); without an account the unlock screen shows "Forgot it? An account
+  lets you reset a PIN." and no link.
+- **Android emulator** — set a screen lock (Settings → Security → Screen lock →
+  PIN), enrol a fingerprint there, touching the sensor with
+  `adb -e emu finger touch 1`. At the app's prompt, `touch 1` answers yes and
+  `touch 2` (an unenrolled finger) no.
+- **iOS simulator in Expo Go** — no passcode and no Face ID, so without an
+  account there is only the hint.
+
+Sign out and Switch ask for the owner the same way when the device has
+profiles; at first launch nothing is asked.
 
 ## Screenshots without a human
 
@@ -139,6 +161,13 @@ over the DevTools protocol:
 - Inputs are found through their label (`label[for]` → `id`); focus one, then
   send `Input.insertText` — React ignores a value set directly.
 - The PIN pad takes key events (`Input.dispatchKeyEvent`).
+- A header title can read the same as a button ("Sign in" is both on the
+  sign-in page): click the match that sits inside a `button`, `a` or
+  `[tabindex="0"]`. Section titles are upper-cased by style, so `innerText`
+  reads "KEPT IN STEP", not "Kept in step".
+- Navigating by URL is a full page load: the app starts again, a profile with
+  a PIN asks for it, and the mock account forgets. Stay in the app — tabs, rows,
+  the back arrow — to keep a flow's state.
 - `Network.enable` and `Network.requestWillBeSent` count what a source asked;
   a browser adds a CORS preflight (`OPTIONS`) to each authenticated request. A
   reload should make no new `POST /Users/AuthenticateByName`: the session is
@@ -148,7 +177,9 @@ over the DevTools protocol:
 
 ## What you will actually see right now
 
-- **First launch** — "Who is this?": name the first profile.
+- **First launch** — Welcome: "Sign in to sync your profiles" (the mock, in
+  development) or "Use on this device only", then "Who is this?". An account
+  with profiles lands on "Who's watching?" instead.
 - **Three tabs** — Media, Videos, Settings. Native tab bars on iOS and Android;
   a top navigation bar in the browser. Dark only.
 - **Media** — an empty state until a source is connected. Then Continue
@@ -163,6 +194,8 @@ over the DevTools protocol:
 - **Customize** (the sliders button, top right) — per-row order, visibility,
   sort and card style, per profile.
 - **Videos** — one tab per source, skeleton shelves: nothing lists videos yet.
-- **Settings** — the current profile, all profiles, PIN lock, and every plugin:
-  install it on the device and add connections through forms built from each
-  plugin's manifest, choosing what each profile keeps for itself.
+- **Settings** — the account first ("Synced just now · 1 change waiting"), then
+  the current profile, all profiles, PIN lock, and every plugin: install it on
+  the device and add connections through forms built from each plugin's
+  manifest, choosing what each profile keeps for itself. Settings → Account
+  has Sync now, what it keeps in step, Switch account and Sign out.

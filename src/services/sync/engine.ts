@@ -43,6 +43,8 @@ export interface SyncEngine {
   report(applied: Applied): void;
   /** A run now, or right after the one in progress. Never throws: what went wrong is in the status. */
   run(): Promise<void>;
+  /** A journaled commit: the count of changes waiting, now rather than after the next run. */
+  changed(): Promise<void>;
   /** One last push to the account, tried once, before this device leaves it. `true` when everything went. */
   finalPush(timeoutMs: number): Promise<boolean>;
   /** The account changed or went: let its provider go. */
@@ -192,6 +194,15 @@ export function createSyncEngine(deps: {
         });
       });
       return tail;
+    },
+    changed: async () => {
+      const seen = status;
+      if (seen.phase === 'syncing') return;
+      const account = await currentAccount(parts.db, parts.catalog).catch(() => undefined);
+      if (!account) return;
+      const pending = await pendingOf(account).catch(() => seen.pending);
+      // A run that ended meanwhile counted for itself.
+      if (status === seen && pending !== seen.pending) set({ ...seen, pending });
     },
     finalPush: async (timeoutMs) => {
       const account = await currentAccount(parts.db, parts.catalog);
