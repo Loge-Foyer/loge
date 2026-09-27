@@ -100,7 +100,38 @@ CREATE INDEX media_details_connection ON media_details (connection_id);
 CREATE INDEX media_details_saved_at ON media_details (saved_at);
 `;
 
-export const MIGRATIONS: readonly SqlMigration[] = [{ version: 1, up: (tx) => tx.exec(V1) }];
+// The account phase. Entries written before it get no change id: every
+// account starts with a join above them, so they are never sent.
+const V2 = `
+ALTER TABLE change_journal ADD COLUMN change_id TEXT;
+
+CREATE TABLE sync_state (
+  connection_id TEXT PRIMARY KEY NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  cursor TEXT,
+  checkpoint INTEGER NOT NULL,
+  awaiting TEXT NOT NULL,
+  carried TEXT NOT NULL,
+  last_synced_at INTEGER
+) STRICT;
+`;
+
+export const MIGRATIONS: readonly SqlMigration[] = [
+  { version: 1, up: (tx) => tx.exec(V1) },
+  {
+    version: 2,
+    up: async (tx) => {
+      await tx.exec(V2);
+      // "Sync on" means "the account" from now on, and none is chosen yet. Before,
+      // adding a sync-only plugin switched its sync role on by itself.
+      for (const row of await tx.all<{ id: string; roles: string }>('SELECT id, roles FROM connections')) {
+        const roles = JSON.parse(row.roles) as Record<string, boolean>;
+        if (roles.sync === true) {
+          await tx.run('UPDATE connections SET roles = ? WHERE id = ?', [JSON.stringify({ ...roles, sync: false }), row.id]);
+        }
+      }
+    },
+  },
+];
 
 /**
  * Brings the database up to date, one step per transaction, so a step that

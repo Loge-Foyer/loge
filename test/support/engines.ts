@@ -9,9 +9,9 @@ import { createIndexedDbDatabase } from '@/persistence/indexeddb/database';
 import type { SqlMigration } from '@/persistence/sqlite/migrations';
 import { createSqliteDatabase } from '@/persistence/sqlite/database';
 import { serializeSqlConnection } from '@/persistence/sqlite/sql';
-import type { Clock, LocalDatabase, Logger, Repositories } from '@/services/ports';
+import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
-import { silentLog } from './fakes';
+import { counterIds, silentLog } from './fakes';
 import { nodeSqliteConnection } from './node-sqlite';
 
 export type Engine = 'sqlite' | 'indexeddb';
@@ -20,6 +20,8 @@ export const ENGINES: readonly Engine[] = ['sqlite', 'indexeddb'];
 
 export interface TestDatabaseOptions {
   readonly clock: Clock;
+  /** Change ids. Two devices in one test need different ones, as two phones would have. */
+  readonly ids?: IdGenerator;
   readonly log?: Logger;
   /** SQLite: a file, to open the same database twice. In memory otherwise. */
   readonly path?: string;
@@ -47,18 +49,20 @@ export function reopenable(engine: Engine): Pick<TestDatabaseOptions, 'path' | '
 }
 
 /** A fresh database on the real engine, with the committed migrations. */
-export function openTestDatabase(engine: Engine, options: TestDatabaseOptions): LocalDatabase {
+export function openTestDatabase(engine: Engine, options: TestDatabaseOptions): SyncDatabase {
   const log = options.log ?? silentLog;
+  const ids = options.ids ?? counterIds('change-');
   if (engine === 'sqlite') {
     const db = createSqliteDatabase(async () => serializeSqlConnection(nodeSqliteConnection(options.path), { log }), {
       clock: options.clock,
+      ids,
       log,
       ...(options.migrations ? { migrations: options.migrations } : {}),
     });
     return guarded(db);
   }
   const env = { indexedDB: options.indexedDB ?? new IDBFactory(), IDBKeyRange };
-  return guarded(createIndexedDbDatabase(env, 'streaming-center', { clock: options.clock, log }));
+  return guarded(createIndexedDbDatabase(env, 'streaming-center', { clock: options.clock, ids, log }));
 }
 
 /**
@@ -67,7 +71,7 @@ export function openTestDatabase(engine: Engine, options: TestDatabaseOptions): 
  * waits for it, for ever; on IndexedDB it would run outside the transaction.
  * Either way the test should fail at once, and say why.
  */
-export function guarded(db: LocalDatabase): LocalDatabase {
+export function guarded(db: SyncDatabase): SyncDatabase {
   const inside = new AsyncLocalStorage<true>();
   const refuse = () => {
     if (inside.getStore()) throw new Error('A transaction called the database directly. Use the repositories it was given.');
@@ -89,6 +93,8 @@ export function guarded(db: LocalDatabase): LocalDatabase {
     preferences: wrap(db.preferences),
     mediaCache: wrap(db.mediaCache),
     staleSecrets: wrap(db.staleSecrets),
+    syncState: wrap(db.syncState),
+    journal: wrap(db.journal),
   };
   return {
     ...repositories,
@@ -96,7 +102,11 @@ export function guarded(db: LocalDatabase): LocalDatabase {
       refuse();
       return db.transaction((tx) => inside.run(true, () => work(tx)));
     },
-    journal: wrap(db.journal),
+    unjournaled: async (work) => {
+      refuse();
+      return db.unjournaled((tx) => inside.run(true, () => work(tx)));
+    },
+    journal: { ...wrap(db.journal), subscribe: db.journal.subscribe },
   };
 }
 

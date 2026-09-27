@@ -1,4 +1,4 @@
-import type { Repositories } from '@/services/ports';
+import type { Logger, Repositories } from '@/services/ports';
 
 type Run = <T>(work: (repositories: Repositories) => Promise<T>) => Promise<T>;
 
@@ -48,6 +48,39 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       add: (refs) => write((r) => r.staleSecrets.add(refs)),
       list: () => read((r) => r.staleSecrets.list()),
       remove: (refs) => write((r) => r.staleSecrets.remove(refs)),
+    },
+    syncState: {
+      get: (id) => read((r) => r.syncState.get(id)),
+      put: (state) => write((r) => r.syncState.put(state)),
+      remove: (id) => write((r) => r.syncState.remove(id)),
+    },
+    journal: {
+      entries: (after, limit) => read((r) => r.journal.entries(after, limit)),
+      head: () => read((r) => r.journal.head()),
+      count: (after) => read((r) => r.journal.count(after)),
+      announce: (changes) => write((r) => r.journal.announce(changes)),
+    },
+  };
+}
+
+/** Who wants to hear that the journal grew. A listener that throws never fails the write it heard about. */
+export function journalListeners(log: Logger) {
+  const listeners = new Set<() => void>();
+  return {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    notify: () => {
+      for (const listener of [...listeners]) {
+        try {
+          listener();
+        } catch (error) {
+          log.warn('storage', 'A journal listener failed', { error: String(error) });
+        }
+      }
     },
   };
 }

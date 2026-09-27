@@ -1,11 +1,11 @@
 import { AppError } from '@sc/api';
 
-import type { Clock, LocalDatabase, Logger, Repositories } from '@/services/ports';
+import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
 import { storageError } from '../errors';
-import { standaloneRepositories } from '../standalone';
+import { journalListeners, standaloneRepositories } from '../standalone';
 import { migrate, MIGRATIONS, type SqlMigration } from './migrations';
-import { sqliteRepositories, toJournalEntry, type JournalRow } from './repositories';
+import { sqliteRepositories } from './repositories';
 import type { SqlDatabase } from './sql';
 
 /**
@@ -31,8 +31,8 @@ export async function prepareSqlite(db: SqlDatabase, migrations: readonly SqlMig
  */
 export function createSqliteDatabase(
   open: () => Promise<SqlDatabase>,
-  deps: { readonly clock: Clock; readonly log: Logger; readonly migrations?: readonly SqlMigration[] },
-): LocalDatabase {
+  deps: { readonly clock: Clock; readonly ids: IdGenerator; readonly log: Logger; readonly migrations?: readonly SqlMigration[] },
+): SyncDatabase {
   let ready: Promise<SqlDatabase> | undefined;
   const database = () => {
     ready ??= open()
@@ -45,19 +45,30 @@ export function createSqliteDatabase(
     return ready;
   };
 
+  const listeners = journalListeners(deps.log);
   const read = async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> =>
-    work(sqliteRepositories(await database(), deps.clock));
-  const write = async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> =>
-    (await database()).transaction((tx) => work(sqliteRepositories(tx, deps.clock)));
+    work(sqliteRepositories(await database(), { clock: deps.clock, ids: deps.ids, journaled: true }));
+  const writing =
+    (journaled: boolean) =>
+    async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> => {
+      let grew = false;
+      const onJournaled = () => {
+        grew = true;
+      };
+      const result = await (await database()).transaction((tx) =>
+        work(sqliteRepositories(tx, { clock: deps.clock, ids: deps.ids, journaled, onJournaled })),
+      );
+      // Committed, and outside the statement queue: a listener may use the database again.
+      if (grew) listeners.notify();
+      return result;
+    };
+  const write = writing(true);
 
+  const standalone = standaloneRepositories(read, write);
   return {
-    ...standaloneRepositories(read, write),
+    ...standalone,
     transaction: write,
-    journal: {
-      entries: async (after = 0) =>
-        (await (await database()).all<JournalRow>('SELECT * FROM change_journal WHERE seq > ? ORDER BY seq', [after])).map(
-          toJournalEntry,
-        ),
-    },
+    unjournaled: writing(false),
+    journal: { ...standalone.journal, subscribe: listeners.subscribe },
   };
 }

@@ -11,7 +11,6 @@
     "@sc/plugin-icloud": "file:../streaming_center_plugins/plugins/icloud",
     "@sc/plugin-invidious": "file:../streaming_center_plugins/plugins/invidious",
     "@sc/plugin-jellyfin": "file:../streaming_center_plugins/plugins/jellyfin",
-    "@sc/plugin-local": "file:../streaming_center_plugins/plugins/local",
     "@sc/plugin-mock": "file:../streaming_center_plugins/plugins/mock",
     "@sc/plugin-plex": "file:../streaming_center_plugins/plugins/plex",
     "@sc/plugin-webdav": "file:../streaming_center_plugins/plugins/webdav",

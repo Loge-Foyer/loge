@@ -5,7 +5,6 @@ import { plugin as google } from '@sc/plugin-google';
 import { plugin as icloud } from '@sc/plugin-icloud';
 import { plugin as invidious } from '@sc/plugin-invidious';
 import { plugin as jellyfin } from '@sc/plugin-jellyfin';
-import { plugin as local } from '@sc/plugin-local';
 import { plugin as mock } from '@sc/plugin-mock';
 import { plugin as plex } from '@sc/plugin-plex';
 import { plugin as webdav } from '@sc/plugin-webdav';
@@ -25,7 +24,6 @@ export const plugins: readonly Plugin[] = [
   yattee,
   invidious,
   customServer,
-  local,
   // A test double — offline, deliberately partial. Development builds only.
   ...(__DEV__ ? [mock] : []),
 ];

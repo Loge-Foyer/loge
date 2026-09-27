@@ -1,23 +1,27 @@
 import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, UserId } from '@sc/api';
 
 import type {
-  Clock,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
+  JournalAnnouncement,
   JournalEntry,
+  JournalRepository,
   MediaCacheRepository,
   PreferencesRepository,
   ProfileValues,
   Repositories,
   StaleSecretQueue,
   StoredUser,
+  SyncState,
+  SyncStateRepository,
   UserPreferences,
   UserRepository,
 } from '@/services/ports';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
+import type { WriteOptions } from '../writes';
 import { request, walk, type IndexedDbEnvironment } from './idb';
 import type { StoreName } from './migrations';
 
@@ -61,8 +65,6 @@ interface MediaDetailRecord {
   readonly savedAt: number;
 }
 
-type Change = Omit<JournalEntry, 'seq' | 'changedAt'>;
-
 function toUser({ position: _position, version: _version, ...user }: UserRecord): StoredUser {
   return user;
 }
@@ -72,12 +74,16 @@ function toConnection({ position: _position, version: _version, ...connection }:
 }
 
 /** The repositories over one open transaction, which spans every store. */
-export function indexedDbRepositories(tx: IDBTransaction, deps: { readonly clock: Clock; readonly env: IndexedDbEnvironment }): Repositories {
-  const { clock, env } = deps;
+export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & { readonly env: IndexedDbEnvironment }): Repositories {
+  const { clock, ids, env } = deps;
   const store = (name: StoreName) => tx.objectStore(name);
 
-  const record = async (change: Change) => {
-    await request(store('journal').add({ ...change, changedAt: clock.now() }));
+  const append = async (change: JournalAnnouncement) => {
+    await request(store('journal').add({ ...change, changeId: ids.next(), changedAt: clock.now() } satisfies Omit<JournalEntry, 'seq'>));
+    deps.onJournaled?.();
+  };
+  const record = async (change: JournalAnnouncement) => {
+    if (deps.journaled) await append(change);
   };
 
   const get = <T>(name: StoreName, key: IDBValidKey) => request(store(name).get(key) as IDBRequest<T | undefined>);
@@ -102,14 +108,21 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: { readonly clock
     insert: async (user) => {
       await request(store('users').add({ ...user, position: await nextPosition('users'), version: 1 } satisfies UserRecord));
       await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: 1 });
+      if (user.pinCredentialRef) await record({ userId: user.id, entity: 'userPin', entityId: user.id, operation: 'upsert', localVersion: 1 });
     },
     update: async (user) => {
       const row = await get<UserRecord>('users', user.id);
       if (!row) throw missingRow('profile', user.id);
-      if (sameData(toUser(row), user)) return;
+      const before = toUser(row);
+      if (sameData(before, user)) return;
       const version = row.version + 1;
       await request(store('users').put({ ...user, position: row.position, version } satisfies UserRecord));
-      await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: version });
+      if (before.name !== user.name) {
+        await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: version });
+      }
+      if (before.pinCredentialRef !== user.pinCredentialRef) {
+        await record({ userId: user.id, entity: 'userPin', entityId: user.id, operation: 'upsert', localVersion: version });
+      }
     },
     delete: async (id) => {
       const row = await get<UserRecord>('users', id);
@@ -153,6 +166,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: { readonly clock
       for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
+      await request(store('syncState').delete(id));
       await record({ entity: 'connection', entityId: id, operation: 'delete', localVersion: row.version + 1 });
     },
     profileValues: async (id) => {
@@ -317,5 +331,30 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: { readonly clock
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets };
+  const syncState: SyncStateRepository = {
+    get: (id) => get<SyncState>('syncState', id),
+    put: async (state) => {
+      if (!(await get('connections', state.connectionId))) throw missingRow('connection', state.connectionId);
+      await request(store('syncState').put(state));
+    },
+    remove: async (id) => {
+      await request(store('syncState').delete(id));
+    },
+  };
+
+  const after = (seq: number) => env.IDBKeyRange.lowerBound(seq, true);
+  const journal: JournalRepository = {
+    entries: (seq = 0, limit) =>
+      request((limit === undefined ? store('journal').getAll(after(seq)) : store('journal').getAll(after(seq), limit)) as IDBRequest<JournalEntry[]>),
+    head: async () => {
+      const last = await request(store('journal').openKeyCursor(null, 'prev'));
+      return typeof last?.primaryKey === 'number' ? last.primaryKey : 0;
+    },
+    count: (seq) => request(store('journal').count(after(seq))),
+    announce: async (changes) => {
+      for (const change of changes) await append(change);
+    },
+  };
+
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, syncState, journal };
 }

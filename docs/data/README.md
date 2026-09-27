@@ -74,15 +74,23 @@ in the same transaction, and refuse a row whose profile or connection is gone.
 
 Every change to one of these appends a journal entry in the same transaction:
 
-- a profile
+- a profile's name, and its PIN as an entry of its own — so a rename can never
+  carry away a PIN set on another device
 - its preferences, key by key
 - a connection
 - a profile's values on a connection
 
 An entry records the entity, its id, `upsert` or `delete`, when it happened,
-and the row's new version. Entries point at data and never copy it, so nothing
-secret can end up there. The database numbers them (`AUTOINCREMENT`), so they
-keep the order changes committed, whatever the clock says.
+the row's new version, and a random change id. The account stores a change once
+by that id, however often it is sent. It is random rather than built from the
+device, because a backup restored onto the same phone repeats sequence numbers:
+the account would take the new changes for old ones, answer that it had them,
+and lose them. Entries written before the account phase have no id, and are
+never sent.
+
+Entries point at data and never copy it, so nothing secret can end up there.
+The database numbers them (`AUTOINCREMENT`), so they keep the order changes
+committed, whatever the clock says.
 
 Some writes are not journaled:
 
@@ -91,12 +99,25 @@ Some writes are not journaled:
 - What sources answered. It is a cache, not user state.
 - Rows a cascade deleted. The parent's entry implies them.
 - Writes that change nothing.
+- What arrives from the account. The sync engine writes it through
+  `SyncDatabase.unjournaled`, a port only it and the account service receive:
+  journaled, a pulled change would be sent straight back. Joining an account
+  still *announces* this device's rows by hand (`journal.announce`), in the
+  same transaction.
 
 The journal belongs to the device, not to a profile. Deleting a profile is
 itself a change, so its `user_id` in the journal does not cascade. This is the
 one table with a `user_id` that does not.
 
-Nothing reads the journal yet: the account phase's sync engine will drain it.
+The sync engine drains it to the account. It reads the journal inside a
+transaction (`tx.journal`), and hears through `journal.subscribe` about every
+commit that journaled something — never a rollback, a read or an unjournaled
+write.
+
+Where the device stands with its account is `sync_state`: one row, cascading
+from the account's connection. It holds the device's place in the account's
+log, how far the journal has been sent, and which of its changes the account
+has not returned yet. Like device settings, it is never journaled.
 
 ## Migrations
 
@@ -109,7 +130,13 @@ destructive: viewing history is not disposable.
     that pragma inside a transaction, so it is set before `BEGIN`.
   - `foreign_key_check` must pass before such a step commits.
 - **IndexedDB** — `src/persistence/indexeddb/migrations.ts`, one upgrade per
-  database version, run by the browser's `onupgradeneeded`.
+  database version, run by the browser's `onupgradeneeded`. A step gets the
+  version-change transaction, so it can rewrite records.
+
+Version 2 added the change ids and `sync_state`, and switched every
+connection's sync role off. Until then, adding a sync-only plugin switched it
+on by itself; from then on a connection carries state only once it is chosen
+as the device's account.
 
 A database written by a newer version of the app is refused rather than
 guessed at, and the boot screen says so. In a browser, a tab still open on the

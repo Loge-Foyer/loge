@@ -13,14 +13,16 @@ export const STORES = [
   'staleSecrets',
   'mediaLists',
   'mediaDetails',
+  'syncState',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
 
-type Upgrade = (db: IDBDatabase) => void;
+/** One version's step, inside the version-change transaction — which it may use to rewrite records. */
+export type Upgrade = (db: IDBDatabase, tx: IDBTransaction) => void;
 
-// One entry per version, never edited once shipped: version n runs UPGRADES[n - 1].
-const UPGRADES: readonly Upgrade[] = [
+// One entry per version, never edited once shipped: version n runs INDEXEDDB_UPGRADES[n - 1].
+export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
   (db) => {
     db.createObjectStore('users', { keyPath: 'id' }).createIndex('byPosition', 'position');
     db.createObjectStore('deviceSettings', { keyPath: 'key' });
@@ -41,11 +43,30 @@ const UPGRADES: readonly Upgrade[] = [
       saved.createIndex('bySavedAt', 'savedAt');
     }
   },
+  // The account phase. Journal records simply gain a `changeId` from now on;
+  // older ones are never sent, since every account starts with a join above them.
+  (db, tx) => {
+    db.createObjectStore('syncState', { keyPath: 'connectionId' });
+    // "Sync on" means "the account" from now on, and none is chosen yet.
+    const walking = tx.objectStore('connections').openCursor();
+    walking.onsuccess = () => {
+      const cursor = walking.result;
+      if (!cursor) return;
+      const connection = cursor.value as { readonly roles: Readonly<Record<string, boolean>> };
+      if (connection.roles.sync === true) cursor.update({ ...connection, roles: { ...connection.roles, sync: false } });
+      cursor.continue();
+    };
+  },
 ];
 
-export const INDEXEDDB_VERSION = UPGRADES.length;
+export const INDEXEDDB_VERSION = INDEXEDDB_UPGRADES.length;
 
 /** Runs every upgrade after `from`, inside the version-change transaction the browser opened. */
-export function upgradeIndexedDb(db: IDBDatabase, from: number, upgrades: readonly Upgrade[] = UPGRADES): void {
-  for (const upgrade of upgrades.slice(from)) upgrade(db);
+export function upgradeIndexedDb(
+  db: IDBDatabase,
+  from: number,
+  tx: IDBTransaction,
+  upgrades: readonly Upgrade[] = INDEXEDDB_UPGRADES,
+): void {
+  for (const upgrade of upgrades.slice(from)) upgrade(db, tx);
 }

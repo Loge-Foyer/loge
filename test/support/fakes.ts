@@ -4,9 +4,10 @@ import type { Credentials, CredentialsRef, NetworkKind } from '@sc/api';
 
 import type { Clock, Logger, NetworkMonitor, SecureCredentialStore } from '@/services/ports';
 
-export function counterIds() {
+/** Ids from a counter. Two devices in one test take different prefixes, so they never mint the same id. */
+export function counterIds(prefix = 'id-') {
   let next = 0;
-  return { next: () => `id-${(next += 1)}` };
+  return { next: () => `${prefix}${(next += 1)}` };
 }
 
 export function fakeClock(start = 1_000_000): Clock & { advance(ms: number): void } {

@@ -1,17 +1,19 @@
 import type { AppError } from '@sc/api';
 
-import type { LocalDatabase } from '@/services/ports';
+import type { SyncDatabase } from '@/services/ports';
 
 import { standaloneRepositories } from './standalone';
 
 /** A database that cannot be used here, and says why on every call — which boot turns into its failure screen. */
-export function unavailableDatabase(reason: AppError): LocalDatabase {
+export function unavailableDatabase(reason: AppError): SyncDatabase {
   const refuse = async (): Promise<never> => {
     throw reason;
   };
+  const standalone = standaloneRepositories(refuse, refuse);
   return {
-    ...standaloneRepositories(refuse, refuse),
+    ...standalone,
     transaction: refuse,
-    journal: { entries: refuse },
+    unjournaled: refuse,
+    journal: { ...standalone.journal, subscribe: () => () => undefined },
   };
 }

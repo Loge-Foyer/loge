@@ -32,7 +32,7 @@ export function createServices(): AppServices {
   const log = consoleLogger;
   const clock = systemClock;
   const ids = uuidGenerator;
-  const { db, credentials, deviceBound } = createStorage({ clock, log });
+  const { db, credentials, deviceBound } = createStorage({ clock, ids, log });
   const network = createNetworkMonitor();
   const sessions = createSessions(deviceBound);
   const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log });

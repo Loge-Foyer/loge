@@ -10,6 +10,8 @@ import type {
   MediaItem,
   NetworkKind,
   PluginId,
+  SyncCapability,
+  SyncCursor,
   UserId,
 } from '@sc/api';
 
@@ -69,6 +71,11 @@ export interface DevicePluginState {
 export interface DeviceSettings {
   readonly defaultUserId?: UserId;
   readonly plugins: Readonly<Partial<Record<PluginId, DevicePluginState>>>;
+  /**
+   * The journal's head when this device last left an account. What changed
+   * after it is this device's own when it joins one again.
+   */
+  readonly leftAccountAt?: number;
 }
 
 export interface DeviceSettingsRepository {
@@ -129,7 +136,8 @@ export interface StaleSecretQueue {
   remove(refs: readonly CredentialsRef[]): Promise<void>;
 }
 
-export type JournalEntity = 'user' | 'preferences' | 'connection' | 'connectionProfileValues';
+/** A profile's PIN is journaled apart from its name, so a rename never carries a PIN away. */
+export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues';
 
 /**
  * One local change, for the sync engine to carry later: a pointer to the
@@ -138,6 +146,12 @@ export type JournalEntity = 'user' | 'preferences' | 'connection' | 'connectionP
  */
 export interface JournalEntry {
   readonly seq: number;
+  /**
+   * Random, and the same every time the change is sent: the account
+   * deduplicates by it. Entries written before the account phase have none,
+   * and are never sent — every account starts with a join above them.
+   */
+  readonly changeId?: string;
   /** Whose entity this is. An attribute, not ownership: the journal outlives the profile. */
   readonly userId?: UserId;
   readonly entity: JournalEntity;
@@ -147,9 +161,48 @@ export interface JournalEntry {
   readonly localVersion: number;
 }
 
-export interface ChangeJournal {
-  /** Entries after `seq`, oldest first. */
-  entries(after?: number): Promise<readonly JournalEntry[]>;
+/** A change recorded by hand: what joining an account announces of this device's rows. */
+export type JournalAnnouncement = Pick<JournalEntry, 'entity' | 'entityId' | 'operation' | 'localVersion'> & {
+  readonly userId?: UserId;
+};
+
+export interface JournalRepository {
+  /** Entries after `seq`, oldest first, at most `limit` of them. */
+  entries(after?: number, limit?: number): Promise<readonly JournalEntry[]>;
+  /** The last entry's `seq`; 0 for an empty journal. */
+  head(): Promise<number>;
+  count(after: number): Promise<number>;
+  /** Records changes by hand — inside an unjournaled transaction too. */
+  announce(changes: readonly JournalAnnouncement[]): Promise<void>;
+}
+
+export interface ChangeJournal extends JournalRepository {
+  /** Called once a commit that journaled something is done; never after a rollback. */
+  subscribe(listener: () => void): () => void;
+}
+
+/**
+ * Where this device stands with its account. Device-owned and never
+ * journaled; it goes with the account's connection.
+ */
+export interface SyncState {
+  readonly connectionId: ConnectionId;
+  /** Where this device is in the account's log. */
+  readonly cursor?: SyncCursor;
+  /** Every journal entry up to here has been accepted by the account, or had nothing to send. */
+  readonly checkpoint: number;
+  /** This device's accepted changes the account has not returned yet: entity key → change id. */
+  readonly awaiting: Readonly<Record<string, string>>;
+  /** What the account carried when this device last joined it. */
+  readonly carried: readonly SyncCapability[];
+  readonly lastSyncedAt?: number;
+}
+
+export interface SyncStateRepository {
+  get(connectionId: ConnectionId): Promise<SyncState | undefined>;
+  /** Refused for a connection that is gone. */
+  put(state: SyncState): Promise<void>;
+  remove(connectionId: ConnectionId): Promise<void>;
 }
 
 /** Everything the database keeps. Each write appends its journal entry in the same transaction. */
@@ -160,6 +213,8 @@ export interface Repositories {
   readonly preferences: PreferencesRepository;
   readonly mediaCache: MediaCacheRepository;
   readonly staleSecrets: StaleSecretQueue;
+  readonly syncState: SyncStateRepository;
+  readonly journal: JournalRepository;
 }
 
 /**
@@ -175,6 +230,15 @@ export interface LocalDatabase extends Repositories {
    */
   transaction<T>(work: (tx: Repositories) => Promise<T>): Promise<T>;
   readonly journal: ChangeJournal;
+}
+
+/**
+ * The database as the sync engine and the account service see it. What
+ * arrives from the account is not this device's change, so it is written
+ * without journaling it — or it would be sent straight back.
+ */
+export interface SyncDatabase extends LocalDatabase {
+  unjournaled<T>(work: (tx: Repositories) => Promise<T>): Promise<T>;
 }
 
 /** Keychain on native, encrypted IndexedDB on web. */

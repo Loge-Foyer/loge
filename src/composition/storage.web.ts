@@ -11,7 +11,7 @@ import type { DeviceStorage, StorageDeps } from './device-storage';
  * expo-sqlite's web build is alpha and needs WebAssembly and COOP/COEP
  * headers from whatever serves the page.
  */
-export function createStorage({ clock, log }: StorageDeps): DeviceStorage {
+export function createStorage({ clock, ids, log }: StorageDeps): DeviceStorage {
   // WebCrypto, which keeps the secrets, exists only on a secure page. Nothing
   // here asks a *source* to use TLS: from localhost, an http server works.
   if (!globalThis.isSecureContext) {
@@ -34,6 +34,7 @@ export function createStorage({ clock, log }: StorageDeps): DeviceStorage {
   return {
     db: createIndexedDbDatabase({ indexedDB: globalThis.indexedDB, IDBKeyRange: globalThis.IDBKeyRange }, 'streaming-center', {
       clock,
+      ids,
       log,
     }),
     // A browser's storage never moves to another device, so one store serves both roles.

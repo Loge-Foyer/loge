@@ -11,27 +11,33 @@ import {
   type MediaDetail,
   type MediaItem,
   type PerProfile,
+  type SyncCapability,
+  type SyncCursor,
   type UserId,
 } from '@sc/api';
 
 import type {
-  Clock,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
+  JournalAnnouncement,
   JournalEntry,
+  JournalRepository,
   MediaCacheRepository,
   PreferencesRepository,
   ProfileValues,
   Repositories,
   StaleSecretQueue,
   StoredUser,
+  SyncState,
+  SyncStateRepository,
   UserPreferences,
   UserRepository,
 } from '@/services/ports';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
+import type { WriteOptions } from '../writes';
 import type { SqlExecutor, SqlValue } from './sql';
 
 interface UserRow {
@@ -66,6 +72,7 @@ interface ProfileValuesRow extends ValuesRow {
 
 export interface JournalRow {
   readonly seq: number;
+  readonly change_id: string | null;
   readonly user_id: string | null;
   readonly entity: JournalEntry['entity'];
   readonly entity_id: string;
@@ -74,7 +81,14 @@ export interface JournalRow {
   readonly local_version: number;
 }
 
-type Change = Omit<JournalEntry, 'seq' | 'changedAt'>;
+interface SyncStateRow {
+  readonly connection_id: string;
+  readonly cursor: string | null;
+  readonly checkpoint: number;
+  readonly awaiting: string;
+  readonly carried: string;
+  readonly last_synced_at: number | null;
+}
 
 const parse = <T>(text: string): T => JSON.parse(text) as T;
 
@@ -113,6 +127,7 @@ function toProfileValues(row: ProfileValuesRow): ProfileValues {
 export function toJournalEntry(row: JournalRow): JournalEntry {
   return {
     seq: row.seq,
+    ...(row.change_id === null ? {} : { changeId: row.change_id }),
     ...(row.user_id === null ? {} : { userId: userId(row.user_id) }),
     entity: row.entity,
     entityId: row.entity_id,
@@ -131,13 +146,29 @@ function valueColumns(values: ConnectionValues): SqlValue[] {
   ];
 }
 
+function toSyncState(row: SyncStateRow): SyncState {
+  return {
+    connectionId: connectionId(row.connection_id),
+    ...(row.cursor === null ? {} : { cursor: row.cursor as SyncCursor }),
+    checkpoint: row.checkpoint,
+    awaiting: parse<Record<string, string>>(row.awaiting),
+    carried: parse<SyncCapability[]>(row.carried),
+    ...(row.last_synced_at === null ? {} : { lastSyncedAt: row.last_synced_at }),
+  };
+}
+
 /** The repositories over one connection or one open transaction. */
-export function sqliteRepositories(sql: SqlExecutor, clock: Clock): Repositories {
-  const record = async (change: Change) => {
+export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Repositories {
+  const { clock, ids } = options;
+  const append = async (change: JournalAnnouncement) => {
     await sql.run(
-      'INSERT INTO change_journal (user_id, entity, entity_id, operation, changed_at, local_version) VALUES (?, ?, ?, ?, ?, ?)',
-      [change.userId ?? null, change.entity, change.entityId, change.operation, clock.now(), change.localVersion],
+      'INSERT INTO change_journal (change_id, user_id, entity, entity_id, operation, changed_at, local_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [ids.next(), change.userId ?? null, change.entity, change.entityId, change.operation, clock.now(), change.localVersion],
     );
+    options.onJournaled?.();
+  };
+  const record = async (change: JournalAnnouncement) => {
+    if (options.journaled) await append(change);
   };
 
   const userRow = (id: UserId) => sql.get<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
@@ -157,11 +188,13 @@ export function sqliteRepositories(sql: SqlExecutor, clock: Clock): Repositories
         [user.id, user.name, user.pinCredentialRef ?? null],
       );
       await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: 1 });
+      if (user.pinCredentialRef) await record({ userId: user.id, entity: 'userPin', entityId: user.id, operation: 'upsert', localVersion: 1 });
     },
     update: async (user) => {
       const row = await userRow(user.id);
       if (!row) throw missingRow('profile', user.id);
-      if (sameData(toUser(row), user)) return;
+      const before = toUser(row);
+      if (sameData(before, user)) return;
       const version = row.version + 1;
       await sql.run('UPDATE users SET name = ?, pin_credential_ref = ?, version = ? WHERE id = ?', [
         user.name,
@@ -169,7 +202,12 @@ export function sqliteRepositories(sql: SqlExecutor, clock: Clock): Repositories
         version,
         user.id,
       ]);
-      await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: version });
+      if (before.name !== user.name) {
+        await record({ userId: user.id, entity: 'user', entityId: user.id, operation: 'upsert', localVersion: version });
+      }
+      if (before.pinCredentialRef !== user.pinCredentialRef) {
+        await record({ userId: user.id, entity: 'userPin', entityId: user.id, operation: 'upsert', localVersion: version });
+      }
     },
     delete: async (id) => {
       const row = await userRow(id);
@@ -394,7 +432,46 @@ export function sqliteRepositories(sql: SqlExecutor, clock: Clock): Repositories
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets };
+  const syncState: SyncStateRepository = {
+    get: async (id) => {
+      const row = await sql.get<SyncStateRow>('SELECT * FROM sync_state WHERE connection_id = ?', [id]);
+      return row && toSyncState(row);
+    },
+    put: async (state) => {
+      if (!(await connectionRow(state.connectionId))) throw missingRow('connection', state.connectionId);
+      await sql.run(
+        `INSERT INTO sync_state (connection_id, cursor, checkpoint, awaiting, carried, last_synced_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (connection_id) DO UPDATE SET
+           cursor = excluded.cursor, checkpoint = excluded.checkpoint, awaiting = excluded.awaiting,
+           carried = excluded.carried, last_synced_at = excluded.last_synced_at`,
+        [
+          state.connectionId,
+          state.cursor ?? null,
+          state.checkpoint,
+          JSON.stringify(state.awaiting),
+          JSON.stringify(state.carried),
+          state.lastSyncedAt ?? null,
+        ],
+      );
+    },
+    remove: async (id) => {
+      await sql.run('DELETE FROM sync_state WHERE connection_id = ?', [id]);
+    },
+  };
+
+  const journal: JournalRepository = {
+    entries: async (after = 0, limit) =>
+      (await sql.all<JournalRow>('SELECT * FROM change_journal WHERE seq > ? ORDER BY seq LIMIT ?', [after, limit ?? -1])).map(
+        toJournalEntry,
+      ),
+    head: async () => (await sql.get<{ head: number }>('SELECT COALESCE(MAX(seq), 0) AS head FROM change_journal'))?.head ?? 0,
+    count: async (after) => (await sql.get<{ count: number }>('SELECT COUNT(*) AS count FROM change_journal WHERE seq > ?', [after]))?.count ?? 0,
+    announce: async (changes) => {
+      for (const change of changes) await append(change);
+    },
+  };
+
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, syncState, journal };
 }
 
 async function readDeviceSettings(sql: SqlExecutor): Promise<DeviceSettings> {

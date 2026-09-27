@@ -1,7 +1,7 @@
 import { connectionId, credentialsRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { LocalDatabase, ProfileValues } from '@/services/ports';
+import type { LocalDatabase, ProfileValues, SyncState } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -278,6 +278,139 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       const [first] = await db.journal.entries();
       const rest = await db.journal.entries(first?.seq);
       expect(rest.map((entry) => entry.entityId)).toEqual([kids.id]);
+    });
+  });
+
+  describe('what the account phase adds', () => {
+    it('gives every entry a change id of its own, kept when the database is opened again', async () => {
+      const where = reopenable(engine);
+      const first = open(where).db;
+      await household(first);
+      const ids = (await first.journal.entries()).map((entry) => entry.changeId);
+      expect(ids.every((id) => typeof id === 'string' && id !== '')).toBe(true);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect((await open(where).db.journal.entries()).map((entry) => entry.changeId)).toEqual(ids);
+    });
+
+    it('reads the journal inside a transaction, its own writes included', async () => {
+      const { db } = open();
+      await db.users.insert(alex);
+      const seen = await db.transaction(async (tx) => {
+        await tx.users.insert(kids);
+        return { head: await tx.journal.head(), count: await tx.journal.count(0), entries: await tx.journal.entries(0, 1) };
+      });
+      expect(seen.count).toBe(2);
+      expect(seen.head).toBe((await db.journal.entries()).at(-1)?.seq);
+      expect(seen.entries.map((entry) => entry.entityId)).toEqual([alex.id]);
+      expect(await db.journal.head()).toBe(seen.head);
+      expect(await db.journal.count(seen.head)).toBe(0);
+    });
+
+    it('starts empty: head 0, nothing after it', async () => {
+      const { db } = open();
+      expect(await db.journal.head()).toBe(0);
+      expect(await db.journal.entries()).toEqual([]);
+    });
+
+    it('writes without journaling on request, and journals again on the next write', async () => {
+      const { db } = open();
+      await db.unjournaled(async (tx) => {
+        await tx.users.insert(alex);
+        await tx.preferences.update(alex.id, () => ({ homeLayout: layout }));
+      });
+      expect(await db.journal.entries()).toEqual([]);
+      expect((await db.preferences.get(alex.id)).homeLayout).toEqual(layout);
+      await db.users.update({ ...alex, name: 'Alexandra' });
+      expect((await db.journal.entries()).map((entry) => entry.entity)).toEqual(['user']);
+    });
+
+    it('announces changes by hand, even inside an unjournaled transaction', async () => {
+      const { db } = open();
+      await db.unjournaled(async (tx) => {
+        await tx.users.insert(alex);
+        await tx.journal.announce([{ userId: alex.id, entity: 'user', entityId: alex.id, operation: 'upsert', localVersion: 1 }]);
+      });
+      const [entry] = await db.journal.entries();
+      expect(entry).toMatchObject({ entity: 'user', entityId: alex.id, userId: alex.id, operation: 'upsert', localVersion: 1 });
+      expect(entry?.changeId).toBeDefined();
+    });
+
+    it('tells its listeners once a journaled commit is done — never for a rollback, a read or an unjournaled write', async () => {
+      const { db } = open();
+      let heard = 0;
+      const stop = db.journal.subscribe(() => {
+        heard += 1;
+      });
+      await db.users.insert(alex);
+      expect(heard).toBe(1);
+      await db.users.list();
+      await db.unjournaled((tx) => tx.users.insert(kids));
+      await db.users.update({ ...alex });
+      expect(heard).toBe(1);
+      await expect(
+        db.transaction(async (tx) => {
+          await tx.users.update({ ...alex, name: 'Alexandra' });
+          throw new Error('changed my mind');
+        }),
+      ).rejects.toThrow('changed my mind');
+      expect(heard).toBe(1);
+      stop();
+      await db.users.update({ ...alex, name: 'Alexandra' });
+      expect(heard).toBe(1);
+    });
+
+    it('journals a rename and a PIN apart, so neither carries the other away', async () => {
+      const { db } = open();
+      await db.users.insert(alex);
+      await db.users.update({ ...alex, name: 'Alexandra' });
+      await db.users.update({ ...alex, name: 'Alexandra', pinCredentialRef: credentialsRef('pin-1') });
+      await db.users.update({ ...alex, name: 'Alex', pinCredentialRef: credentialsRef('pin-2') });
+      await db.users.update({ ...alex, name: 'Alex' });
+      expect((await db.journal.entries()).map((entry) => [entry.entity, entry.localVersion])).toEqual([
+        ['user', 1],
+        ['user', 2],
+        ['userPin', 3],
+        ['user', 4],
+        ['userPin', 4],
+        ['userPin', 5],
+      ]);
+    });
+
+    it('keeps sync state per connection, refuses it for a connection that is gone, and drops it with the connection', async () => {
+      const { db } = open();
+      const home = connection('c-home');
+      await db.connections.insert(home);
+      const state: SyncState = {
+        connectionId: home.id,
+        checkpoint: 12,
+        awaiting: { 'profile/u-alex': 'change-9' },
+        carried: ['profile', 'preferences'],
+        lastSyncedAt: 5,
+      };
+      await db.syncState.put(state);
+      expect(await db.syncState.get(home.id)).toEqual(state);
+      const moved: SyncState = { ...state, checkpoint: 14, awaiting: {} };
+      await db.syncState.put(moved);
+      expect(await db.syncState.get(home.id)).toEqual(moved);
+      await expect(db.syncState.put({ ...state, connectionId: connectionId('c-gone') })).rejects.toThrow('Unknown connection');
+      await db.connections.delete(home.id);
+      expect(await db.syncState.get(home.id)).toBeUndefined();
+    });
+
+    it('removes sync state on request, leaving the connection', async () => {
+      const { db } = open();
+      const home = connection('c-home');
+      await db.connections.insert(home);
+      await db.syncState.put({ connectionId: home.id, checkpoint: 0, awaiting: {}, carried: [] });
+      await db.syncState.remove(home.id);
+      expect(await db.syncState.get(home.id)).toBeUndefined();
+      expect(await db.connections.get(home.id)).toEqual(home);
+    });
+
+    it('refuses the journal and sync state, called directly from inside a transaction', async () => {
+      const { db } = open();
+      await expect(db.transaction(async () => db.journal.head())).rejects.toThrow('called the database directly');
+      await expect(db.unjournaled(async () => db.syncState.get(connectionId('c-home')))).rejects.toThrow('called the database directly');
     });
   });
 

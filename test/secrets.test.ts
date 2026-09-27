@@ -59,12 +59,18 @@ describe.each(ENGINES)('secrets on %s', (engine: Engine) => {
     expect(first && (await credentials.read(first))).toBeUndefined();
     expect(second && (await credentials.read(second))).toEqual({ pin: '2222' });
     expect(await services.pins.verify(alex.id, '2222')).toEqual({ ok: true });
-    const changes = (await db.journal.entries()).filter((entry) => entry.entity === 'user' && entry.entityId === alex.id);
-    expect(changes.map((entry) => entry.localVersion)).toEqual([1, 2, 3]);
+    // Journaled as the profile's PIN, apart from its name.
+    const changes = (await db.journal.entries()).filter((entry) => entry.entityId === alex.id);
+    expect(changes.map((entry) => [entry.entity, entry.localVersion])).toEqual([
+      ['user', 1],
+      ['userPin', 2],
+      ['userPin', 3],
+    ]);
 
     await services.pins.remove(alex.id, '2222');
     expect(second && (await credentials.read(second))).toBeUndefined();
     expect((await db.users.get(alex.id))?.pinCredentialRef).toBeUndefined();
+    expect((await db.journal.entries()).at(-1)).toMatchObject({ entity: 'userPin', entityId: alex.id, localVersion: 4 });
   });
 
   it('deletes a stale secret right after the commit, and at the next launch what a crash left queued', async () => {

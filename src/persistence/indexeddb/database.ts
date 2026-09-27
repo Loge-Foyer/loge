@@ -1,8 +1,8 @@
-import type { Clock, JournalEntry, LocalDatabase, Logger, Repositories } from '@/services/ports';
+import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
 import { storageError } from '../errors';
-import { standaloneRepositories } from '../standalone';
-import { openIndexedDb, request, runTransaction, type IndexedDbEnvironment } from './idb';
+import { journalListeners, standaloneRepositories } from '../standalone';
+import { openIndexedDb, runTransaction, type IndexedDbEnvironment } from './idb';
 import { INDEXEDDB_VERSION, STORES, upgradeIndexedDb } from './migrations';
 import { indexedDbRepositories } from './repositories';
 
@@ -14,8 +14,8 @@ import { indexedDbRepositories } from './repositories';
 export function createIndexedDbDatabase(
   env: IndexedDbEnvironment,
   name: string,
-  deps: { readonly clock: Clock; readonly log: Logger },
-): LocalDatabase {
+  deps: { readonly clock: Clock; readonly ids: IdGenerator; readonly log: Logger },
+): SyncDatabase {
   let ready: Promise<IDBDatabase> | undefined;
   const database = () => {
     ready ??= openIndexedDb(env.indexedDB, name, INDEXEDDB_VERSION, upgradeIndexedDb, {
@@ -32,19 +32,29 @@ export function createIndexedDbDatabase(
     return ready;
   };
 
-  const run = (mode: IDBTransactionMode) => async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> =>
-    runTransaction(await database(), STORES, mode, (tx) => work(indexedDbRepositories(tx, { clock: deps.clock, env })));
-  const read = run('readonly');
-  const write = run('readwrite');
+  const listeners = journalListeners(deps.log);
+  const run =
+    (mode: IDBTransactionMode, journaled: boolean) =>
+    async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> => {
+      let grew = false;
+      const onJournaled = () => {
+        grew = true;
+      };
+      const result = await runTransaction(await database(), STORES, mode, (tx) =>
+        work(indexedDbRepositories(tx, { clock: deps.clock, ids: deps.ids, journaled, onJournaled, env })),
+      );
+      // Resolved on `complete`, so the entries are committed.
+      if (grew) listeners.notify();
+      return result;
+    };
+  const read = run('readonly', true);
+  const write = run('readwrite', true);
 
+  const standalone = standaloneRepositories(read, write);
   return {
-    ...standaloneRepositories(read, write),
+    ...standalone,
     transaction: write,
-    journal: {
-      entries: async (after = 0) =>
-        runTransaction(await database(), ['journal'], 'readonly', (tx) =>
-          request(tx.objectStore('journal').getAll(env.IDBKeyRange.lowerBound(after, true)) as IDBRequest<JournalEntry[]>),
-        ),
-    },
+    unjournaled: run('readwrite', false),
+    journal: { ...standalone.journal, subscribe: listeners.subscribe },
   };
 }

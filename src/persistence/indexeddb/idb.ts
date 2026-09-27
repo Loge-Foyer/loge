@@ -63,12 +63,16 @@ export function openIndexedDb(
   factory: IDBFactory,
   name: string,
   version: number,
-  upgrade: (db: IDBDatabase, from: number) => void,
+  upgrade: (db: IDBDatabase, from: number, tx: IDBTransaction) => void,
   options: { readonly log: Logger; readonly onClose: () => void },
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const opening = factory.open(name, version);
-    opening.onupgradeneeded = (event) => upgrade(opening.result, event.oldVersion);
+    opening.onupgradeneeded = (event) => {
+      // Always there during an upgrade; the steps rewrite records through it.
+      const tx = opening.transaction;
+      if (tx) upgrade(opening.result, event.oldVersion, tx);
+    };
     opening.onblocked = () => options.log.warn('storage', 'Waiting for another tab to let go of the database.');
     opening.onerror = () => {
       reject(

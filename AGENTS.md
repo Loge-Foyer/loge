@@ -143,7 +143,12 @@ These are specific to Streaming Center and matter more than anything above.
   newer database is refused. A table rebuild is a `foreignKeysOff` step.
 - **Journaling is the repositories' job,** in the same transaction. A write that
   changes nothing writes nothing. Device settings and cascaded rows are not
-  journaled; the journal's `user_id` does not cascade.
+  journaled; the journal's `user_id` does not cascade. A PIN is journaled apart
+  from its profile's name (`userPin`).
+- **What arrives from the account is written unjournaled** —
+  `SyncDatabase.unjournaled`, which only the sync engine and the account service
+  receive. Journaled, a pulled change would be sent straight back. Never use it
+  for a change the user made.
 - **Secrets are deleted through the queue.** A ref the rows stop pointing at is
   added to `staleSecrets` in the same transaction; `SecretJanitor` deletes it
   after the commit and at launch. The keychain cannot list its keys, so a missed
