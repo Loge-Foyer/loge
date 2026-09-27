@@ -17,7 +17,7 @@ Nothing — it has no media role.
 
 ## Settings
 
-Connection fields only. Its single role starts **on** when you add a connection — adding a sync-only plugin is the opt-in — while every capability toggle, once there are capabilities, still starts off.
+Connection fields only. It becomes your account only when you choose it in Settings → Account.
 
 ## Status
 

@@ -3,6 +3,7 @@ import type { ContentKind } from './content';
 import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
 import type { MediaRole } from './media-role';
+import type { SyncRole } from './sync';
 
 export type PluginRole = 'media' | 'sync';
 
@@ -17,9 +18,10 @@ export interface SyncRoleManifest {
 }
 
 /**
- * A boolean setting that can switch capabilities off for one connection. One
- * gating a sync capability must default to `false`: connecting a plugin for
- * media must never start carrying the user's state somewhere.
+ * A boolean setting that can switch capabilities off for one connection. For
+ * the account, signing in is the opt-in, so a sync toggle is optional and may
+ * default on; the sync role itself is off until the connection is chosen as
+ * the account.
  */
 export interface ToggleSetting extends BooleanField {
   readonly gates?: readonly CapabilityKey[];
@@ -49,11 +51,12 @@ export interface PluginManifest {
 /**
  * What a plugin package exports. A role's implementation joins the manifest
  * once it is written; a declared capability promises the members it maps to
- * (`MEDIA_CAPABILITY_MEMBERS`).
+ * (`MEDIA_CAPABILITY_MEMBERS`, `SYNC_PROVIDER_MEMBERS`).
  */
 export interface Plugin {
   readonly manifest: PluginManifest;
   readonly media?: MediaRole;
+  readonly sync?: SyncRole;
 }
 
 export function declaredRoles(manifest: PluginManifest): readonly PluginRole[] {

@@ -16,6 +16,9 @@ Vitest, run over `test/` at the repository root.
   values, and "set up".
 - `compare.test.ts` — the one ordering rule and `mergeSorted`.
 - `errors.test.ts` — retry hints.
+- `sync.test.ts` — the sync wire: `isSyncChange` for every entity and for bad
+  shapes, `syncKey`, what each entity needs an account to carry, and
+  `defaultRoles`, which never switches sync on.
 
 **The plugins:**
 
@@ -34,9 +37,10 @@ Vitest, run over `test/` at the repository root.
 - `mock.test.ts` — the catalogue is deterministic and honours sort, libraries,
   paging and latency.
 - `manifests.test.ts` — the conformance check. Every manifest is sound, every
-  plugin that declares a media capability implements its members, media
-  servers stay media-only, and ids are unique. It is the one file allowed to
-  import every plugin.
+  plugin that declares a media capability implements its members, a plugin
+  that declares sync capabilities has a sync role with every provider member,
+  media servers stay media-only, and ids are unique. It is the one file allowed
+  to import every plugin.
 - `engine.test.ts` — no source in `api/` or `plugins/` uses a built-in that
   Hermes lacks (`Array.prototype.toSorted`, `Object.groupBy`,
   `crypto.randomUUID`). Plugins run on Hermes in the iOS and Android apps; the

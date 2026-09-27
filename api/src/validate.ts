@@ -1,10 +1,11 @@
-import type { CapabilityKey } from './capabilities';
+import type { CapabilityKey, SyncCapability } from './capabilities';
 import { isLibrarySelection } from './fields';
 import { isToggle, type PluginManifest } from './manifest';
 
 const PLUGIN_ID = /^[a-z][a-z0-9-]*$/;
 const KEY = /^[a-z][A-Za-z0-9]*$/;
 const SECRET_LOOKING = /password|passcode|passphrase|token|secret|apikey/i;
+const PER_PROFILE_SYNC: readonly SyncCapability[] = ['preferences', 'watchProgress', 'favorites', 'watchlist', 'history', 'customLists'];
 
 /**
  * Problems with a manifest, empty when it is sound. A manifest is static, so a
@@ -92,14 +93,12 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     if (new Set(gates.map((gate) => gate.slice(0, gate.indexOf('.')))).size > 1) {
       problems.push(`setting "${toggle.key}" gates more than one role`);
     }
-    if (toggle.default && gates.some((gate) => gate.startsWith('sync.'))) {
-      problems.push(`setting "${toggle.key}" gates sync and must default to false`);
-    }
   }
+
+  // An account keeps these per profile, so it cannot carry them without the profiles.
   for (const capability of sync?.capabilities ?? []) {
-    const key = `sync.${capability}` as const;
-    if (!toggles.some((toggle) => toggle.gates?.includes(key))) {
-      problems.push(`sync capability "${capability}" has no toggle`);
+    if (PER_PROFILE_SYNC.includes(capability) && !sync?.capabilities.includes('profile')) {
+      problems.push(`sync capability "${capability}" needs "profile"`);
     }
   }
 

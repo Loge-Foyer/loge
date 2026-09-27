@@ -55,8 +55,9 @@ Declare honestly. Carrying less is always better than pretending.
 declares what it *can* do; the user decides per connection what it *may* do.
 Effective = declared ∩ enabled, and that is what the app must read.
 
-Every sync toggle defaults to **off**. Connecting Jellyfin for media must never
-silently begin pushing watch state to it. That independence is the reason
+A new connection's sync role is **off**, and only choosing it as the device's
+account switches it on. Connecting Google Drive for its files must never
+silently make it the place your profiles go. That independence is the reason
 merging the packages was safe in the first place.
 
 ## The third mistake
@@ -68,21 +69,20 @@ its quirks. Map inside the package, always.
 ## Order of work
 
 `api` first — nothing else can be built correctly until the vocabulary exists.
-The manifest and the media contract are written; the sync contract comes with
-the account phase. `mock` implements the media role so the app works offline,
+The manifest, the media contract and the sync contract are written. `mock` implements the media role so the app works offline,
 and deliberately declines some capabilities so the app's capability handling
 stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
 - **`api`:** the manifest vocabulary, per-profile values, the media contract,
-  errors and the HTTP port.
+  the sync contract, errors and the HTTP port.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
 - **Mock:** implements the media role with a fixed catalogue.
 - **Every other plugin:** a manifest.
 - **`npm test`:** runs everything.
-  - the api rules
+  - the api rules, and the sync wire
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
   - the mock
   - the conformance check that each declared capability is implemented

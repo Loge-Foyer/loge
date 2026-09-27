@@ -16,7 +16,7 @@ No fields yet: signing in is an OAuth flow that arrives with the implementation.
 
 ## Settings
 
-Every sync toggle defaults to **off**. Connecting this plugin for media does nothing to your viewing state until you switch it on.
+Its sync role stays off until you choose it as your account in Settings → Account. Connecting it for media does nothing to your profiles or your viewing state.
 
 Both roles are independent.
 

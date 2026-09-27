@@ -27,11 +27,19 @@ watched lives on the server. The app reads it through the media role
 
 ## Sync
 
-Transports the app's own state to **the device's account** — iCloud, Google, a
-self-hosted sync server, or this device only. A device has at most one. Later:
-push, pull, status, and the owner check that resets a forgotten PIN.
+Carries the app's own state to **the device's account** — iCloud, Google, or a
+self-hosted sync server. A device has at most one, and needs none: without an
+account, everything stays on the device. The role connects
+(`plugin.sync.connect`), pushes this device's changes, pulls everyone else's,
+reports its status and, where it can, re-verifies the owner — which is how a
+forgotten PIN is reset.
+
+An account carries what its plugin declares (`capabilities/`). Signing in is
+the opt-in, so there is nothing to switch on afterwards. Passwords never
+travel.
 
 A plugin declares both roles when its service does both jobs. iCloud can serve
 Drive files and be the account, so it is one package with two roles. The roles
-stay independently switchable: browsing iCloud Drive never makes it your
-account.
+stay independent: a new connection starts with its sync role off, and only
+choosing it as the account switches it on. Browsing iCloud Drive never makes
+it your account.

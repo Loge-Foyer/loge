@@ -1,5 +1,5 @@
 // The one place allowed to import every plugin: a conformance check over all of them.
-import { MEDIA_CAPABILITY_MEMBERS, validateManifest, type Plugin } from '@sc/api';
+import { MEDIA_CAPABILITY_MEMBERS, SYNC_PROVIDER_MEMBERS, validateManifest, type Plugin } from '@sc/api';
 import { plugin as customServer } from '@sc/plugin-custom-server';
 import { plugin as emby } from '@sc/plugin-emby';
 import { plugin as google } from '@sc/plugin-google';
@@ -52,9 +52,20 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     await provider.dispose();
   });
 
-  // No sync role is implemented yet. The mock is the test double and is exempt.
-  it.skipIf(plugin === mock)('declares no sync capability ahead of its implementation', () => {
-    expect(plugin.manifest.sync?.capabilities ?? []).toEqual([]);
+  // The app hands an account only what it declares, and drops nothing on its
+  // side — a declared sync capability without an implementation loses data.
+  it('declares only sync capabilities it implements', async () => {
+    const declared = plugin.manifest.sync?.capabilities ?? [];
+    if (!plugin.sync) {
+      expect(declared).toEqual([]);
+      return;
+    }
+    expect(plugin.manifest.sync).toBeDefined();
+    const provider = await plugin.sync.connect(target({}), fakeContext({ http: fakeHttp({}).client }).context);
+    for (const member of SYNC_PROVIDER_MEMBERS) {
+      expect(typeof provider[member], `the sync role needs ${member}`).toBe('function');
+    }
+    await provider.dispose();
   });
 });
 

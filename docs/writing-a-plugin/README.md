@@ -11,7 +11,9 @@ holds your state is one package with two roles, not two packages.
    `api/`). Say what the source brings (`contentKinds`) and what a connection
    needs (`connectionFields`), marking account fields with `credential`.
 3. **Implement the role** you declare — for media, `media.connect(target,
-   context)` returning a `ConnectedMediaProvider`.
+   context)` returning a `ConnectedMediaProvider`; for sync,
+   `sync.connect(target, context)` returning a
+   `ConnectedUserStateSyncProvider`.
 4. **Declare capabilities as you implement them**, never ahead. See
    `capabilities/`.
 5. **Add it to `test/manifests.test.ts`**, write its tests against a fake
@@ -57,3 +59,20 @@ holds your state is one package with two roles, not two packages.
 - **Artwork** is an `ImageRef` you build and later resolve synchronously into an
   address. If an image needs a header, return a `headersRef` and resolve it in
   `resolveHeaders` — never put a token in a URL.
+
+## Inside the sync role
+
+- **Store and return; never decide.** The app resolves conflicts from the order
+  of your log. Keep changes in the order you stored them, and return them in
+  that order — the caller's own included.
+- **Deduplicate by change id.** The same change arrives again after a crash or
+  a lost answer; store it once, and accept it again.
+- **Answer only what you stored.** `accepted` is a prefix of the ids sent, each
+  already durable. Confirming a change you then lose means it is never sent
+  again.
+- **Cursors are yours**, opaque and durable. When you cannot continue from one,
+  say why: `reset` when you lost data, `expired` when you compacted it away.
+- **Check what you are given** with `isSyncChange()`, and end the accepted
+  prefix at the first change you refuse.
+- **Declare what you can hold, and nothing more.** The app hands you every
+  change of a kind you declare, and counts it delivered once you accept it.

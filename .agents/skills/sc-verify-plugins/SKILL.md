@@ -68,8 +68,9 @@ something else, add it to that list and to the app's lint rule together.
 
 For each plugin, confirm by reading its manifest:
 
-- every declared sync capability has a **toggle defaulting to `false`**
-  (`validateManifest` enforces this, and the conformance test runs it)
+- a declared sync capability means a sync role with every provider member (the
+  conformance test), and one kept per profile comes with `profile`
+  (`validateManifest`)
 - no capability is declared that the implementation cannot actually honour.
   The conformance test checks that the members exist; honouring them is what
   each plugin's own tests are for.
@@ -85,11 +86,13 @@ them. Silent data loss, no error.
 
 ## Current state
 
-`api` holds the manifest vocabulary and the media contract. Jellyfin and mock
-implement the media role. Passing checks prove:
+`api` holds the manifest vocabulary, the media contract and the sync contract.
+Jellyfin and mock implement the media role. Passing checks prove:
 
 - the vocabulary and every manifest
 - Jellyfin's behaviour against recorded payloads
-- that every declared media capability is implemented
+- that every declared media capability is implemented, and that no plugin
+  declares a sync capability without a sync role
+- the sync wire: what `isSyncChange` lets through
 
 Run the app's verification as well before calling a contract change done.

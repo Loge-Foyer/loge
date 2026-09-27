@@ -92,10 +92,12 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    - Sign in once for concurrent callers.
    - Never retry a refused login.
 
-4. **Give every sync capability a toggle, defaulting to `false`.** Connecting a
-   server for media must never start pushing viewing state to it. This
-   independence is the only reason merging media and sync into one package was
-   safe.
+4. **Leave the sync role to the account.** A new connection starts with its
+   sync role off; only choosing it as the device's account switches it on.
+   Connecting a server for media must never make it the place profiles go —
+   that independence is the only reason merging media and sync into one
+   package was safe. A sync capability needs no toggle (signing in is the
+   opt-in), so declare exactly what the account can hold.
 
 5. **Map at the boundary.** Remote payloads become domain types *inside* this
    package. No external type may appear in a return value. Adapter-only data
@@ -120,14 +122,34 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 
 ## If it has a sync role
 
+```ts
+import { syncCursor, type SyncRole } from '@sc/api';
+
+export const sync: SyncRole = {
+  connect: async (target, context) => ({
+    connectionId: target.connectionId,
+    getStatus: async () => ({ accountName: '…' }),          // reach the account, sign in once
+    pull: async (cursor) => ({ kind: 'changes', changes: [], cursor: syncCursor('…'), more: false }),
+    push: async (changes) => ({ accepted: [] }),            // a prefix, each durably stored
+    dispose: async () => {},
+  }),
+};
+```
+
 - **`push` must be idempotent.** It may see the same change twice after a crash
-  or a rejected batch. Return the IDs you **accepted**; the engine advances its
-  checkpoint only across the accepted prefix and retries the rest verbatim.
-- **`pull` must be resumable.** Return an opaque cursor, stored per connection.
-- **Never resolve conflicts.** The app's resolver owns that.
+  or a rejected batch. Store it once, keyed by its id, and return the IDs you
+  **accepted**; the engine advances its checkpoint only across the accepted
+  prefix and retries the rest verbatim. End the prefix at the first change
+  `isSyncChange()` refuses.
+- **`pull` must be resumable and complete.** Return an opaque cursor, and the
+  whole log in your order — the caller's own changes included. Answer `reset`
+  when you lost data, `expired` when a cursor was compacted away.
+- **Never resolve conflicts.** The app resolves them from your log's order.
 - **Never overstate what you can carry.** The engine filters the change journal
   by your declared capabilities. Claim support you lack and it hands you changes
   you drop *and advances the checkpoint past them* — silent data loss.
+- **Passwords never travel**, and a `verifyOwner` you offer must really verify
+  the account's owner: "Forgot PIN" trusts it.
 
 ## Boundaries lint will not catch yet
 
@@ -146,7 +168,8 @@ npm test
 
 ## Current state
 
-`api` holds the manifest vocabulary and the media contract (`MediaRole`,
-`MediaItem`, `AppError`, `HttpClient`). `SyncRole` is not written yet.
-`plugins/jellyfin` is the reference implementation of a media role; read it
-before writing another.
+`api` holds the manifest vocabulary, the media contract (`MediaRole`,
+`MediaItem`, `AppError`, `HttpClient`) and the sync contract (`SyncRole`,
+`SyncChange`, `isSyncChange`). `plugins/jellyfin` is the reference
+implementation of a media role; read it before writing another. No plugin
+implements the sync role yet.

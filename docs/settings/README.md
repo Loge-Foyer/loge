@@ -46,9 +46,9 @@ A boolean setting may **gate** capabilities:
 ```
 
 - A toggle gates capabilities of one role only.
-- **Every sync toggle defaults to off**, and every declared sync capability
-  needs one. Connecting a plugin to watch films must never start sending your
-  viewing state anywhere.
+- A sync capability needs no toggle. Signing in to an account is the opt-in,
+  and the account carries what it declares. A plugin may offer one anyway, and
+  it may default on.
 
 ### `libraries`
 
@@ -87,6 +87,7 @@ are missing is *not set up*: the connection is simply not live for it.
 ## Role switches
 
 Besides settings, each connection has a switch per declared role. A new
-connection starts with media on, and sync on only when sync is the plugin's
-single role — adding a sync-only plugin *is* the opt-in, and its capability
-toggles still start off.
+connection starts with media on and sync off. The sync role is switched on
+only by choosing the connection as the device's account — at most one per
+device — never by adding it. Connecting a plugin to watch films never makes it
+the place your profiles go.

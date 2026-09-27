@@ -41,13 +41,13 @@ export interface Connection {
 }
 
 /**
- * Roles switched on for a new connection. Media starts on. Sync starts on only
- * when it is the plugin's single role — adding a sync-only plugin is the
- * opt-in — and even then every capability toggle still starts off.
+ * Roles switched on for a new connection: media on, sync off. The sync role is
+ * switched on only by choosing the connection as the device's account — at
+ * most one per device — never by adding it.
  */
 export function defaultRoles(manifest: PluginManifest): ConnectionRoles {
   return {
     ...(manifest.media ? { media: true } : {}),
-    ...(manifest.sync ? { sync: manifest.media === undefined } : {}),
+    ...(manifest.sync ? { sync: false } : {}),
   };
 }

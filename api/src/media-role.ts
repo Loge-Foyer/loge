@@ -1,51 +1,14 @@
 import type { MediaCapability } from './capabilities';
-import type { Credentials, FieldValues } from './fields';
-import type { CancelSignal, HttpClient } from './http';
+import type { PluginContext, PluginTarget } from './context';
+import type { CancelSignal } from './http';
 import type { ConnectionId } from './ids';
 import type { HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
 import type { ItemPage, ItemQuery } from './query';
 
 /** One connection's values, resolved for the profile it runs for. */
-export interface MediaTarget {
-  readonly connectionId: ConnectionId;
-  readonly fields: FieldValues;
-  readonly settings: FieldValues;
-}
+export type MediaTarget = PluginTarget;
 
-export type NetworkKind = 'wifi' | 'ethernet' | 'cellular' | 'other' | 'none' | 'unknown';
-
-/**
- * Everything a plugin may use from its host. Plugins have no host globals —
- * no fetch, no timers, no storage — so a test can hand them fakes, and the app
- * keeps secrets, logging and the network in one place.
- */
-export interface MediaContext {
-  readonly http: HttpClient;
-  /** The target's password-field values. */
-  readonly credentials: { read(): Promise<Credentials> };
-  /**
-   * A secret the plugin may keep between launches, such as a session token.
-   * The app scopes it to this connection and these credentials, and drops it
-   * when either changes.
-   */
-  readonly session: {
-    read(): Promise<string | undefined>;
-    write(value: string): Promise<void>;
-    clear(): Promise<void>;
-  };
-  readonly network: { current(): NetworkKind };
-  readonly client: {
-    readonly appName: string;
-    readonly appVersion: string;
-    readonly deviceName: string;
-    /** Stable for this device, this connection and this set of credentials. */
-    readonly installationId: string;
-  };
-  readonly clock: {
-    now(): number;
-    sleep(ms: number, signal?: CancelSignal): Promise<void>;
-  };
-}
+export type MediaContext = PluginContext;
 
 export interface SourceInfo {
   readonly serverName?: string;

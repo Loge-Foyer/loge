@@ -38,14 +38,13 @@ One field of every type the app renders:
 - *Simulated latency* — `slow` waits 1.5 s through the injected clock; `flaky`
   fails every third call with a retryable error.
 - *Libraries to show*.
-- *Sync watch progress / favourites / watchlist*, off by default.
 
 It deliberately does **not** declare every capability. A mock that can do
 everything lets broken capability handling go unnoticed. For media it declares
 `browse`, `libraries` and `watchStateRead`, and declines the rest. It has no
 artwork (`remoteImages`), so the app's placeholders get exercised; it declines
-`offlineMetadata` and `search` as well. For sync it declares `watchProgress`,
-`favorites` and `watchlist`.
+`offlineMetadata` and `search` as well. Its sync role declares nothing until it
+is implemented.
 
 ## Status
 

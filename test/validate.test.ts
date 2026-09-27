@@ -6,7 +6,7 @@ const sound: PluginManifest = {
   displayName: 'Fixture',
   description: 'A plugin that exists only in tests.',
   media: { contentKinds: ['videos'], capabilities: ['browse'] },
-  sync: { capabilities: ['watchProgress'] },
+  sync: { capabilities: ['profile', 'watchProgress'] },
   connectionFields: [
     { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
     { key: 'password', label: 'Password', type: 'password' },
@@ -62,17 +62,27 @@ describe('validateManifest', () => {
     expect(problems).toContain('connection field "apiToken" looks secret but is not a password field');
   });
 
-  it('rejects a sync capability without a toggle', () => {
-    expect(problemsWith({ settings: [] })).toContain('sync capability "watchProgress" has no toggle');
+  // Signing in to an account is the opt-in: it carries what it declares.
+  it('accepts a sync capability without a toggle', () => {
+    expect(problemsWith({ settings: [] })).toEqual([]);
   });
 
-  it('rejects a sync toggle that defaults to on', () => {
+  it('accepts a sync toggle that defaults to on', () => {
     const problems = problemsWith({
       settings: [
         { key: 'syncWatchProgress', label: 'Progress', type: 'boolean', default: true, gates: ['sync.watchProgress'] },
       ],
     });
-    expect(problems).toContain('setting "syncWatchProgress" gates sync and must default to false');
+    expect(problems).toEqual([]);
+  });
+
+  it('rejects a per-profile sync capability without profiles', () => {
+    for (const capability of ['preferences', 'watchProgress', 'favorites', 'watchlist', 'history', 'customLists'] as const) {
+      expect(problemsWith({ sync: { capabilities: [capability] }, settings: [] })).toContain(
+        `sync capability "${capability}" needs "profile"`,
+      );
+    }
+    expect(problemsWith({ sync: { capabilities: ['providerConnections'] }, settings: [] })).toEqual([]);
   });
 
   it('rejects a gate on an undeclared capability', () => {

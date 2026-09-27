@@ -18,4 +18,6 @@ export * from './media';
 export * from './query';
 export * from './errors';
 export * from './http';
+export * from './context';
 export * from './media-role';
+export * from './sync';

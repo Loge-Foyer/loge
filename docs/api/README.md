@@ -22,9 +22,11 @@ without learning about the others.
 | `query.ts` | `ItemQuery`, `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `errors.ts` | `AppError`: a code from the spec, a retry hint, and an optional reason. |
 | `http.ts` | `HttpClient`, the port a plugin reaches the network through, and `TransportError`. |
-| `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, `MediaContext`, and `MEDIA_CAPABILITY_MEMBERS`. |
+| `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with, whichever role it plays. |
+| `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. `MediaContext` and `MediaTarget` name the plugin context for media. |
+| `sync.ts` | `SyncRole`, `ConnectedUserStateSyncProvider`, `SyncChange` and the entities it carries, what an account needs to carry each (`SYNC_ENTITY_CAPABILITIES`), `syncKey()`, and `isSyncChange()`. |
 
-Not yet written: the sync role contract and playback descriptors.
+Not yet written: playback descriptors.
 
 ## The manifest
 
@@ -104,3 +106,34 @@ await provider.listItems({ kind: 'movies', sort: { by: 'releaseDate', order: 'de
 - **Artwork is an `ImageRef`** only the plugin can turn into an `ImageSource`,
   synchronously. Headers an image needs are resolved separately and never
   stored.
+
+## The sync contract
+
+A sync role lets a connection be **the device's account** — at most one per
+device. The app hands it this device's changes and asks for everyone else's;
+the account stores and returns them, and never decides between two.
+
+```ts
+const account = await plugin.sync.connect(target, context); // no network work yet
+await account.getStatus();                                  // reach the account and sign in
+const page = await account.pull(cursor);                    // the log after the cursor
+const { accepted } = await account.push(changes);           // a prefix of the ids sent
+```
+
+- **Changes** are `SyncChange`s: an upsert or a delete of a profile, a
+  profile's PIN, a preference, a connection, or a profile's values on one. A
+  PIN is removed by `pin: null`. Passwords never travel: a connection lists the
+  *names* of its saved password fields.
+- **`push` is idempotent by change id.** It answers the ids it durably stored,
+  a prefix of those sent; the app advances only across that prefix and sends
+  the rest again, verbatim.
+- **`pull` returns the whole log in the account's order**, the caller's own
+  changes included, with an opaque cursor to resume from. A device waits to see
+  its own changes come back. `reset` says the account lost data, so the device
+  joins again; `expired` says a cursor was compacted away.
+- **The log's order is the truth.** Conflicts are the app's; a plugin never
+  picks a winner.
+- **`verifyOwner`**, when there is one, re-verifies whoever owns the account.
+  The app offers "Forgot PIN" through it.
+- **`isSyncChange()`** checks anything that arrives; the app runs it on every
+  pulled change.

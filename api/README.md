@@ -25,7 +25,9 @@ Written:
 - `ItemQuery` and the one ordering rule
 - `AppError` with retry hints and the `HttpClient` port
 - the media role contract, with the context the host supplies
+- the sync role contract: the changes an account carries, and the check every
+  pulled change passes (`isSyncChange`)
 
 See `../docs/api/`.
 
-Still to come: the sync contract (`SyncRole`) and playback descriptors.
+Still to come: playback descriptors.

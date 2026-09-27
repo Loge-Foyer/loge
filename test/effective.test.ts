@@ -39,7 +39,7 @@ describe('effectiveRoles', () => {
     expect(media?.capabilities).toEqual(new Set(['browse', 'search']));
   });
 
-  it('falls back to toggle defaults, so a sync role starts carrying nothing', () => {
+  it('falls back to a toggle’s default when nothing is stored', () => {
     const { sync } = effectiveRoles(manifest, { roles: { sync: true }, settings: {} });
     expect(sync?.capabilities).toEqual(new Set());
   });

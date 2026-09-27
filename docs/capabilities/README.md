@@ -38,13 +38,32 @@ is not in effect.
 
 `MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code.
 
+## The sync capabilities
+
+A sync capability says what an account can hold. The app hands an account only
+the kinds it carries, and a kind needs every capability it depends on
+(`SYNC_ENTITY_CAPABILITIES` in `api`):
+
+| What travels | Needs |
+| --- | --- |
+| a profile, and its PIN | `profile` |
+| a profile's preferences | `profile`, `preferences` |
+| a connection | `providerConnections` |
+| a profile's values on a connection | `providerConnections`, `profile` |
+| `watchProgress`, `favorites`, `watchlist`, `history`, `customLists`, `fullBackup` | named, and carried by nothing in the app yet |
+
+A capability kept per profile needs `profile`; `validateManifest` checks it.
+Signing in to an account is the opt-in, so a sync capability needs no toggle. A
+plugin may offer one anyway — to keep history back, say — and it may default
+on.
+
 ## Declare honestly
 
 Capabilities are not documentation.
 
 - **Media:** declaring `browse` means the app calls `listItems`. If that
   throws, every row shows an error for that source.
-- **Sync:** the sync engine will filter the change journal by what you declare.
+- **Sync:** the sync engine filters the change journal by what you declare.
   Claim support you lack and it hands you changes you drop *and advances the
   checkpoint past them* — silent data loss.
 
@@ -52,5 +71,7 @@ So a capability is declared in the same change that implements it. The
 conformance test (`test/manifests.test.ts`) connects every plugin that has a
 media role, with a fake context, and checks that each declared capability's
 members exist. A plugin with no implementation must declare no media
-capability. `mock` declares a deliberately partial set, so the app's
-capability handling is exercised rather than assumed.
+capability, and a plugin declaring sync capabilities must have a sync role
+whose connected provider has `pull`, `push`, `getStatus` and `dispose`
+(`SYNC_PROVIDER_MEMBERS`). `mock` declares a deliberately partial set, so the
+app's capability handling is exercised rather than assumed.

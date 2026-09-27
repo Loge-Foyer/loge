@@ -45,23 +45,27 @@ configure the same server twice.
    store a watch history but not a home layout must not declare
    `preferences`. Declaring it anyway means the engine hands you preference
    changes, you drop them, and the checkpoint advances past them — the state is
-   gone and nothing errors.
+   gone and nothing errors. A capability kept per profile needs `profile`
+   (`validateManifest` checks it).
 
-3. **Add a toggle per gateable capability, defaulting to `false`.**
+3. **The new sync role starts off, everywhere.** Existing connections were
+   stored without it, and a role missing from a connection is off. Only
+   choosing a connection as the device's account switches its sync role on.
+   Someone who connected this plugin last month to watch films must not
+   discover their profiles are being uploaded because you shipped a new role.
+
+   Signing in is the opt-in, so a sync capability needs no toggle. Offer one
+   only for something a user may reasonably keep back:
 
    ```ts
    {
-     key: 'syncWatchProgress',
-     label: 'Sync watch progress to this server',
+     key: 'syncHistory',
+     label: 'Keep viewing history in this account',
      type: 'boolean',
-     default: false,
-     gates: ['sync.watchProgress'],
+     default: true,
+     gates: ['sync.history'],
    }
    ```
-
-   **Every sync toggle starts off.** Someone who connected this plugin last
-   month to watch films must not discover their history is now being uploaded
-   because you shipped a new role.
 
 4. **Do not widen the connection form unnecessarily.** `connectionFields` are
    shared by every role, so the new role already has the existing endpoint and
@@ -95,4 +99,4 @@ npm test
 
 And in the app, confirm it branches on **effective** capabilities — declared
 intersected with enabled — not declared alone. Branching on declared is what
-turns a defaulted-off toggle into an active sync.
+would make a connection sync that is not the account.

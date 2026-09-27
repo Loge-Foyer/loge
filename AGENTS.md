@@ -128,8 +128,17 @@ the connection's values already resolved for one profile.
 
 ### Sync role
 
-`connect()` returns a `ConnectedUserStateSyncProvider`: `pull`, `push`,
-`getStatus`, `dispose`.
+`plugin.sync.connect(target, context)` returns a
+`ConnectedUserStateSyncProvider`: `pull`, `push`, `getStatus`, `dispose`, and
+an optional `verifyOwner` that re-verifies whoever owns the account ("Forgot
+PIN"). A connection whose sync role is on is **the device's account** — at most
+one per device, chosen in the app's Settings → Account.
+
+It carries `SyncChange`s (`api/src/sync.ts`): profiles, their PINs,
+preferences, connections and each profile's values on them. Never passwords —
+a connection lists only the names of its saved password fields. It carries
+exactly what it declares: an entity needs every capability
+`SYNC_ENTITY_CAPABILITIES` lists.
 
 ---
 
@@ -149,7 +158,7 @@ interface ToggleSetting {
   readonly key: string;                        // 'syncWatchProgress'
   readonly label: string;
   readonly type: 'boolean';
-  readonly default: boolean;                   // false for every sync toggle
+  readonly default: boolean;                   // a sync toggle is optional, and may default on
   readonly gates?: readonly CapabilityKey[];   // 'sync.watchProgress' — one role per toggle
 }
 ```
@@ -159,10 +168,14 @@ effect when declared **and** switched on (missing means off); a declared
 capability when every toggle gating it is on (stored value, else default); an
 ungated capability follows its role.
 
-**Every sync toggle defaults to off.** Connecting Jellyfin as a media source
-must never start pushing watch state there. Merging the packages was allowed
-precisely because the roles stay independently switchable — break that and the
-merge has broken the property it was supposed to preserve.
+**The sync role is off on every new connection** (`defaultRoles`). Only
+choosing the connection as the device's account switches it on: connecting
+Google Drive to browse files never makes it the account. Merging the packages
+was allowed precisely because the roles stay independently switchable — break
+that and the merge has broken the property it was supposed to preserve.
+
+Signing in *is* the opt-in, so an account carries everything it declares; a
+sync toggle is optional. A per-profile sync capability needs `profile`.
 
 ---
 
@@ -196,8 +209,10 @@ merge has broken the property it was supposed to preserve.
    advances its checkpoint only across the accepted prefix and retries the rest
    verbatim.
 
-7. **`pull` must be resumable.** Return an opaque cursor, stored per connection
-   so targets progress independently.
+7. **`pull` must be resumable, and complete.** Return an opaque cursor the app
+   stores, and the whole log in your order — the caller's own changes
+   included: a device waits to see its changes come back. Answer `reset` when
+   you lost data and `expired` when a cursor was compacted away.
 
 8. **Do not resolve conflicts.** The app's conflict resolver owns that.
 
@@ -205,6 +220,9 @@ merge has broken the property it was supposed to preserve.
    change journal by what you declare. Claim support you lack and the engine
    hands you changes you drop *and advances the checkpoint past them* — no
    error, gone.
+
+10. **Passwords never travel.** Check every pushed change with
+    `isSyncChange()`, and end the accepted prefix at the first you refuse.
 
 ---
 
@@ -246,7 +264,10 @@ the test of whether this architecture is real.
 - per-connection per-profile values (`PerProfile`, `resolveValues`,
   `isSetUpFor`)
 
-`SyncRole` is not written yet.
+- the sync contract: `SyncRole` / `ConnectedUserStateSyncProvider`,
+  `SyncChange` and its entities, `isSyncChange`
+
+No plugin implements the sync role yet.
 
 **Jellyfin** implements the media role. **Mock** implements it with a fixed
 catalogue. Every other plugin is a manifest that declares no capability.

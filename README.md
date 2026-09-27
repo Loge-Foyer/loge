@@ -90,6 +90,10 @@ The **mock** has a fixed catalogue behind the same contract, so the app works
 fully offline. Every other plugin still describes itself with a manifest and
 declares nothing it cannot do yet.
 
+The contract for an account is written too: what travels — profiles, their
+PINs, preferences and connections, never passwords — and how a change reaches
+every device exactly once, in one order.
+
 Each plugin says what it needs to connect — a server address, a username, a
 password — and the app builds its settings screen from exactly that, including
 which fields each profile may keep for itself.

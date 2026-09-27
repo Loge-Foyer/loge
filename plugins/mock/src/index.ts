@@ -5,7 +5,8 @@
  * It declares a deliberately partial set of capabilities: a mock that can do
  * everything lets broken capability handling go unnoticed. It has no artwork,
  * so the app's placeholders get used, and it cannot be kept offline. Its fields
- * cover every field type the app renders. The sync role is still a manifest.
+ * cover every field type the app renders. The sync role declares nothing until
+ * it is implemented.
  */
 import { pluginId, type Plugin } from '@sc/api';
 
@@ -20,7 +21,7 @@ export const plugin: Plugin = {
       contentKinds: ['movies', 'shows', 'anime', 'videos', 'files'],
       capabilities: ['browse', 'libraries', 'watchStateRead'],
     },
-    sync: { capabilities: ['watchProgress', 'favorites', 'watchlist'] },
+    sync: { capabilities: [] },
     connectionFields: [
       { key: 'libraryName', label: 'Library name', type: 'text', default: 'Mock library' },
       {
@@ -61,27 +62,6 @@ export const plugin: Plugin = {
         ],
       },
       { key: 'libraries', label: 'Libraries to show', type: 'libraries', default: { mode: 'all' } },
-      {
-        key: 'syncWatchProgress',
-        label: 'Sync watch progress',
-        type: 'boolean',
-        default: false,
-        gates: ['sync.watchProgress'],
-      },
-      {
-        key: 'syncFavorites',
-        label: 'Sync favourites',
-        type: 'boolean',
-        default: false,
-        gates: ['sync.favorites'],
-      },
-      {
-        key: 'syncWatchlist',
-        label: 'Sync watchlist',
-        type: 'boolean',
-        default: false,
-        gates: ['sync.watchlist'],
-      },
     ],
   },
   media: {

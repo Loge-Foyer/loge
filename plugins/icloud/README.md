@@ -16,9 +16,9 @@ No fields: it uses the Apple account already on the device.
 
 ## Settings
 
-Every sync toggle defaults to **off**. Connecting this plugin for media does nothing to your viewing state until you switch it on.
+Its sync role stays off until you choose it as your account in Settings → Account. Connecting it for media does nothing to your profiles or your viewing state.
 
-Both roles are independent: you can sync to iCloud without ever browsing Drive, and vice versa.
+Both roles are independent: iCloud can be your account without your ever browsing Drive, and vice versa.
 
 ## Status
 
