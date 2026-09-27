@@ -276,6 +276,27 @@ export interface ClientIdentitySource {
   identity(): Promise<ClientIdentity>;
 }
 
+/** How asking the device's owner went. */
+export type OwnerAnswer = 'verified' | 'cancelled' | 'refused' | 'unavailable';
+
+/** Face ID, a fingerprint or the device's passcode — whoever owns the device. */
+export interface OwnerAuthentication {
+  /** Whether the device can ask at all: a passcode or a biometric is set up. */
+  available(): Promise<boolean>;
+  authenticate(reason: string): Promise<OwnerAnswer>;
+}
+
+/** Whether the app is in front of someone. */
+export interface AppActivity {
+  active(): boolean;
+  subscribe(listener: (active: boolean) => void): () => void;
+}
+
+/** Holds a named lock while work runs — so two tabs of one browser never sync at once. */
+export interface RunLock {
+  run<T>(name: string, work: () => Promise<T>): Promise<T>;
+}
+
 export type LogCategory = 'app.boot' | 'user.session' | 'provider' | 'sync' | 'storage' | 'player';
 
 export type LogFields = Readonly<Record<string, unknown>>;

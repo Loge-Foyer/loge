@@ -8,8 +8,11 @@ import {
   type RetryHint,
 } from '@sc/api';
 
+import { MissingSecretError } from '../plugin-context';
 import type { Logger } from '../ports';
 import type { Source } from '../sources';
+
+export { MissingSecretError };
 
 /** One source that could not answer, next to the results that did arrive. */
 export interface SourceError {
@@ -23,18 +26,6 @@ export interface SourceError {
   readonly needsPassword?: true;
   /** What was saved from this source stands in for it; this is when it was saved. */
   readonly savedAt?: number;
-}
-
-/**
- * A row says a password is saved, and the credential store no longer has it —
- * a backup restored the database but not the keychain. Signing in without it
- * would count as a failed login, and servers lock accounts after a few.
- */
-export class MissingSecretError extends AppError {
-  constructor() {
-    super('UNAUTHORIZED', 'The saved password is no longer on this device.', { retry: 'never' });
-    this.name = 'MissingSecretError';
-  }
 }
 
 /** A request cancelled by its caller — leaving a screen — which is not a failure. */

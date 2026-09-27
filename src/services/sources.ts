@@ -59,7 +59,7 @@ export interface SourceService {
   forUser(userId: UserId): Promise<readonly Source[]>;
   /** Sources whose effective media role brings something to `tab`. */
   forTab(userId: UserId, tab: ContentTab): Promise<readonly TabSource[]>;
-  /** Connections this profile still has to set up. */
+  /** Media connections this profile still has to set up. The account is the device's, never a profile's to finish. */
   pendingFor(userId: UserId): Promise<readonly PendingSource[]>;
 }
 
@@ -108,7 +108,6 @@ export function createSourceService(deps: {
       }
       return tabSources;
     },
-    pendingFor: async (userId) =>
-      (await resolve(userId)).pending.filter(({ connection }) => connection.roles.media === true || connection.roles.sync === true),
+    pendingFor: async (userId) => (await resolve(userId)).pending.filter(({ connection }) => connection.roles.media === true),
   };
 }

@@ -59,6 +59,15 @@ const compositionRoot = {
   message: 'Only src/app/_layout.tsx mounts the composition root. Use useServices().',
 };
 
+// Asking for the device's owner is a platform module's job; everything else
+// goes through the owner check. Flat config replaces a rule's options per
+// matching block, so this path sits in the block that holds the boundary
+// patterns, and src/platform/ gets a block of its own restating them.
+const ownerAuthentication = {
+  name: 'expo-local-authentication',
+  message: 'Only src/platform/ asks for the device owner. Use the owner check from useServices().',
+};
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -70,15 +79,27 @@ module.exports = defineConfig([
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/composition/**'],
+    ignores: ['src/composition/**', 'src/platform/**'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot] }],
+    },
+  },
+  {
+    files: ['src/platform/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [...implementations, compositionRoot] }],
     },
   },
   {
+    files: ['src/composition/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication] }],
+    },
+  },
+  {
     files: ['src/app/_layout.tsx'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: implementations }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: implementations }],
     },
   },
 ]);

@@ -10,8 +10,12 @@ import {
 
 import type { SecureCredentialStore } from './ports';
 
-/** Whose credentials a connection runs with: everyone's shared ones, or one profile's own. */
-export type CredentialScope = 'shared' | UserId;
+/**
+ * Whose credentials a connection runs with: everyone's shared ones, or one
+ * profile's own — and, for the account, the device's. The account's session
+ * is kept apart from the media role's, even on one connection.
+ */
+export type CredentialScope = 'shared' | 'account' | UserId;
 
 export type SessionStore = MediaContext['session'];
 

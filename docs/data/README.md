@@ -119,6 +119,40 @@ from the account's connection. It holds the device's place in the account's
 log, how far the journal has been sent, and which of its changes the account
 has not returned yet. Like device settings, it is never journaled.
 
+## Syncing with the account
+
+The account carries profiles, their PINs, their preferences, connections and
+each profile's values on them. Other devices get them the next time they sync.
+
+- **What never travels.** Passwords, session tokens, credentials refs, the
+  account's own connection, a connection's sync role, device settings (the
+  default profile, installed plugins), and connections of plugins this build
+  does not register. A connection lists the *names* of its saved passwords, so
+  a device without them asks — "needs its password on this device" — instead of
+  signing in with nothing. A password saved there stays listed when this device
+  edits the connection without having it.
+- **The PIN travels readable**, as a lock against the wrong family member
+  rather than an account secret. It arrives in the credential store, under a
+  fresh ref, never in the database. A PIN this device cannot read — after a
+  restore — is not sent at all, rather than sent as "no PIN".
+- **A connection new to this device** installs its plugin.
+- **The first profile chosen** on a device without a default becomes it, as
+  the first profile created does — so a device that joined an account does not
+  ask "Who's watching?" at every launch.
+
+Joining an account announces this device's rows as journal entries, and the
+normal push uploads them. Which side wins where both hold something:
+
+| Joining | Where both sides hold it |
+| --- | --- |
+| "Use the account's profiles" | the account's, for profiles, their PINs and preferences; this device's other profiles go |
+| "Keep both", and connections under either choice | the account's, unless this device changed it since it last left an account |
+| the account lost data (`reset`), or carries more | this device's |
+
+Something deleted here since the device last left an account is not brought
+back, and its delete is announced. Signing out keeps everything on the device
+and records the journal's head (`leftAccountAt`).
+
 ## Migrations
 
 Migrations are numbered and committed, never edited once shipped, and never

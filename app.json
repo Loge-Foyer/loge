@@ -34,7 +34,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to confirm it’s you when a PIN is forgotten."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

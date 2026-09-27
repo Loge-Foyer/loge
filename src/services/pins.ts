@@ -1,5 +1,6 @@
 import { credentialsRef, type UserId } from '@sc/api';
 
+import type { OwnerCheck, OwnerVerdict } from './owner-check';
 import type { Clock, IdGenerator, LocalDatabase, SecureCredentialStore } from './ports';
 import type { SecretJanitor } from './secrets';
 
@@ -22,6 +23,8 @@ export interface PinService {
   create(userId: UserId, pin: string): Promise<void>;
   change(userId: UserId, current: string, next: string): Promise<PinCheck>;
   remove(userId: UserId, current: string): Promise<PinCheck>;
+  /** Forgot PIN: the owner is re-verified, and only then does the PIN go. */
+  forgot(userId: UserId): Promise<OwnerVerdict>;
 }
 
 interface Throttle {
@@ -35,8 +38,9 @@ export function createPinService(deps: {
   janitor: SecretJanitor;
   ids: IdGenerator;
   clock: Clock;
+  owner: OwnerCheck;
 }): PinService {
-  const { db, credentials, janitor, ids, clock } = deps;
+  const { db, credentials, janitor, ids, clock, owner } = deps;
   // In memory on purpose: a persisted lockout would hand anyone holding the
   // device a way to lock the owner out of their own profile.
   const throttles = new Map<UserId, Throttle>();
@@ -97,6 +101,17 @@ export function createPinService(deps: {
     await janitor.drain();
   };
 
+  const clear = async (userId: UserId) => {
+    await db.transaction(async (tx) => {
+      const found = await tx.users.get(userId);
+      if (!found?.pinCredentialRef) return;
+      const { pinCredentialRef, ...user } = found;
+      await tx.users.update(user);
+      await tx.staleSecrets.add([pinCredentialRef]);
+    });
+    await janitor.drain();
+  };
+
   return {
     isWellFormed: (pin) => PIN.test(pin),
     verify,
@@ -114,15 +129,16 @@ export function createPinService(deps: {
     remove: async (userId, current) => {
       const check = await verify(userId, current);
       if (!check.ok) return check;
-      await db.transaction(async (tx) => {
-        const found = await tx.users.get(userId);
-        if (!found?.pinCredentialRef) return;
-        const { pinCredentialRef, ...user } = found;
-        await tx.users.update(user);
-        await tx.staleSecrets.add([pinCredentialRef]);
-      });
-      await janitor.drain();
+      await clear(userId);
       return check;
+    },
+    forgot: async (userId) => {
+      await requireUser(userId);
+      const verdict = await owner.verify('Confirm it’s you to reset this profile’s PIN');
+      if (verdict !== 'verified') return verdict;
+      await clear(userId);
+      throttles.delete(userId);
+      return verdict;
     },
   };
 }

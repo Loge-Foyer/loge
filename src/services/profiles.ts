@@ -1,9 +1,9 @@
-import { userId as toUserId, type AppUser, type CredentialsRef, type UserId } from '@sc/api';
+import { userId as toUserId, type AppUser, type UserId } from '@sc/api';
 
 import type { IdGenerator, LocalDatabase } from './ports';
+import { removeProfileIn } from './removal';
 import type { SecretJanitor } from './secrets';
 import type { SessionService } from './session';
-import { sessionRef } from './sessions';
 import { toAppUser } from './users';
 
 const MAX_NAME_LENGTH = 30;
@@ -60,28 +60,7 @@ export function createProfileService(deps: {
       await db.users.update({ ...user, name: cleanName(name) });
     },
     remove: async (id) => {
-      const removed = await db.transaction(async (tx) => {
-        const all = await tx.users.list();
-        const user = all.find((candidate) => candidate.id === id);
-        if (!user) return false;
-        if (all.length === 1) throw new Error('The last profile cannot be deleted.');
-        const own = await tx.connections.valuesOfProfile(id);
-        const connections = await tx.connections.list();
-        // The cascade takes everything the profile owns. Its secrets are not in
-        // the database, so they are queued: its own sign-ins, its PIN, its sessions.
-        await tx.users.delete(id);
-        await tx.deviceSettings.update((current) => {
-          if (current.defaultUserId !== id) return current;
-          const { defaultUserId: _deleted, ...rest } = current;
-          return rest;
-        });
-        await tx.staleSecrets.add([
-          ...[...own.values()].map((values) => values.credentialsRef).filter((ref): ref is CredentialsRef => ref !== undefined),
-          ...(user.pinCredentialRef ? [user.pinCredentialRef] : []),
-          ...connections.map((connection) => sessionRef(connection.id, id)),
-        ]);
-        return true;
-      });
+      const removed = await db.transaction((tx) => removeProfileIn(tx, id, { allowLast: false }));
       if (!removed) return;
       await janitor.drain();
       onRemoved?.(id);

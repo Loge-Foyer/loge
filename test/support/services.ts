@@ -14,11 +14,14 @@ import {
   type ConnectionId,
 } from '@sc/api';
 
+import { createInProcessLock } from '@/platform/in-process-lock';
+import { createAccountService } from '@/services/account';
 import { createConnectionService } from '@/services/connections';
 import { createDevicePlugins } from '@/services/device-plugins';
 import { createHomeLayoutService } from '@/services/home-layout';
 import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
+import { createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
@@ -26,9 +29,15 @@ import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
 import { createSessions } from '@/services/sessions';
 import { createSourceService } from '@/services/sources';
+import type { SyncParts } from '@/services/sync/apply';
+import { currentAccount } from '@/services/sync/current';
+import { createSyncEngine } from '@/services/sync/engine';
+import { createAccountProviders } from '@/services/sync/provider';
+import { createSyncScheduler } from '@/services/sync/scheduler';
 
 import { openTestDatabase, type Engine, type TestDatabaseOptions } from './engines';
 import { counterIds, fakeClock, fakeNetwork, memoryCredentialStore, silentLog } from './fakes';
+import { fakeActivity, fakeOwnerAuthentication } from './sync';
 
 export { counterIds, fakeClock, fakeNetwork, silentLog } from './fakes';
 
@@ -147,30 +156,39 @@ export function buildServices(options: {
   clock?: ReturnType<typeof fakeClock>;
   credentials?: ReturnType<typeof memoryCredentialStore>;
   deviceBound?: ReturnType<typeof memoryCredentialStore>;
+  /** Names the device: its ids, change ids and device key. Two devices in one test need two names. */
+  device?: string;
+  owner?: ReturnType<typeof fakeOwnerAuthentication>;
 }) {
+  const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
-  const db = openTestDatabase(options.engine ?? 'sqlite', { clock, ...options.where });
+  const db = openTestDatabase(options.engine ?? 'sqlite', { clock, ids: counterIds(`${device}-change-`), ...options.where });
   const credentials = options.credentials ?? memoryCredentialStore();
   const deviceBound = options.deviceBound ?? memoryCredentialStore();
-  const ids = counterIds();
+  const ids = counterIds(`${device}-`);
   const network = options.network ?? fakeNetwork();
   const sessions = createSessions(deviceBound);
   const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log: silentLog });
   const catalog = createPluginCatalog(options.plugins, { strict: true, warn: () => undefined });
   const devicePlugins = createDevicePlugins(db.deviceSettings);
-  const pins = createPinService({ db, credentials, janitor, ids, clock });
-  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
-  const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
-  const pool = createProviderPool({
-    catalog,
-    credentials,
-    sessions,
-    http: unusedHttp,
-    network,
-    identity: { identity: async () => ({ appName: 'Test', appVersion: '1', deviceName: 'Test', deviceKey: 'device-1' }) },
-    clock,
+  const identity = { identity: async () => ({ appName: 'Test', appVersion: '1', deviceName: 'Test', deviceKey: `${device}-key` }) };
+  const accountProviders = createAccountProviders({ http: unusedHttp, network, identity, clock, catalog, credentials, sessions });
+  const ownerAuthentication = options.owner ?? fakeOwnerAuthentication({ available: false });
+  const owner = createOwnerCheck({
+    account: async () => {
+      const account = await currentAccount(db, catalog);
+      if (!account?.available) return undefined;
+      const provider = await accountProviders.provider(account.connection);
+      const verify = provider.verifyOwner;
+      return verify && ((signal) => verify.call(provider, signal));
+    },
+    device: ownerAuthentication,
     log: silentLog,
   });
+  const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
+  const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
+  const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, log: silentLog });
   const connections = createConnectionService({
     db,
     credentials,
@@ -190,6 +208,17 @@ export function buildServices(options: {
   });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
+  const parts: SyncParts = { db, credentials, catalog, ids, janitor, log: silentLog };
+  const lock = createInProcessLock();
+  const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
+  const activity = fakeActivity();
+  const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity });
+  const account = createAccountService({ db, catalog, connections, owner, providers: accountProviders, engine, scheduler, janitor, lock, parts });
+  engine.onApplied((applied) => {
+    for (const id of applied.connections) pool.forgetConnection(id);
+    for (const id of applied.removedProfiles) media.forgetUser(id);
+    void session.refresh();
+  });
   return {
     db,
     credentials,
@@ -197,6 +226,23 @@ export function buildServices(options: {
     janitor,
     network,
     clock,
-    services: { catalog, devicePlugins, session, profiles, pins, connections, sources, homeLayout, media },
+    engine,
+    scheduler,
+    activity,
+    ownerAuthentication,
+    services: {
+      catalog,
+      devicePlugins,
+      session,
+      profiles,
+      pins,
+      connections,
+      sources,
+      homeLayout,
+      media,
+      account,
+      owner,
+      sync: { status: engine.status, subscribe: engine.subscribe, onApplied: engine.onApplied, now: scheduler.now },
+    },
   };
 }

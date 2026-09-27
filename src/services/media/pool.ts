@@ -7,13 +7,12 @@ import {
   type Credentials,
   type FieldValues,
   type HttpClient,
-  type MediaContext,
   type PluginId,
   type UserId,
 } from '@sc/api';
 
-import { stableHash, stableJson } from '../hash';
-import { MissingSecretError } from './errors';
+import { stableJson } from '../hash';
+import { pluginContext, secretsOf } from '../plugin-context';
 import type { PluginCatalog } from '../plugin-catalog';
 import type { ClientIdentitySource, Clock, Logger, NetworkMonitor, SecureCredentialStore } from '../ports';
 import { sessionIdentity, type Sessions } from '../sessions';
@@ -76,22 +75,6 @@ export function createProviderPool(deps: {
   const entries = new Map<string, Entry>();
   const keyOf = (source: Source) => `${source.connection.id}|${source.scope}`;
 
-  const context = async (installationScope: string, read: () => Promise<Credentials>, session: MediaContext['session']): Promise<MediaContext> => {
-    const client = await deps.identity.identity();
-    return {
-      http: deps.http,
-      credentials: { read },
-      session,
-      network: { current: () => deps.network.current() },
-      client: {
-        appName: client.appName,
-        appVersion: client.appVersion,
-        deviceName: client.deviceName,
-        installationId: stableHash(`${client.deviceKey}|${installationScope}`),
-      },
-      clock: { now: () => deps.clock.now(), sleep: (ms, signal) => deps.clock.sleep(ms, signal) },
-    };
-  };
 
   const roleOf = (pluginId: PluginId, name: string) => {
     const role = deps.catalog.mediaRole(pluginId);
@@ -101,18 +84,12 @@ export function createProviderPool(deps: {
 
   const connect = async (source: Source): Promise<ConnectedMediaProvider> => {
     const role = roleOf(source.manifest.id, source.manifest.displayName);
-    const ref = source.values.credentialsRef;
-    const saved = source.values.secretKeys ?? [];
-    const readSecrets = async () => {
-      const secrets = (ref && (await deps.credentials.read(ref))) || {};
-      if (saved.some((key) => secrets[key] === undefined)) throw new MissingSecretError();
-      return secrets;
-    };
     const provider = await role.connect(
       { connectionId: source.connection.id, fields: source.values.fields, settings: source.values.settings },
-      await context(
+      await pluginContext(
+        deps,
         `${source.connection.id}|${source.scope}`,
-        readSecrets,
+        secretsOf(deps.credentials, source.values),
         deps.sessions.bind(source.connection.id, source.scope, sessionIdentity(source.manifest, source.values)),
       ),
     );
@@ -177,7 +154,7 @@ export function createProviderPool(deps: {
       // Its own installation id: a probe signing in never ends a running provider's session.
       return role.connect(
         { connectionId: toConnectionId('probe'), fields: connection.fields, settings: connection.settings },
-        await context(`probe|${connection.pluginId}`, async () => connection.credentials, deps.sessions.ephemeral()),
+        await pluginContext(deps, `probe|${connection.pluginId}`, async () => connection.credentials, deps.sessions.ephemeral()),
       );
     },
     forgetConnection: (id) => forget((key) => key.startsWith(`${id}|`)),

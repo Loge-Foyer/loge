@@ -21,6 +21,12 @@ export interface SessionService {
   chooseAnother(): void;
   /** A profile was deleted; leave it if it was the active one. */
   forget(userId: UserId): void;
+  /**
+   * Profiles changed underneath — the account brought some, or took some
+   * away. Before a profile is chosen, decide again; with one chosen, leave it
+   * only if it is gone. A PIN set meanwhile never locks the profile in use.
+   */
+  refresh(): Promise<void>;
 }
 
 export function createSessionService(deps: {
@@ -34,6 +40,13 @@ export function createSessionService(deps: {
   const move = (next: Gate) => {
     gate = next;
     for (const listener of listeners) listener();
+  };
+  const same = (a: Gate, b: Gate) => a.kind === b.kind && ('userId' in a ? a.userId : undefined) === ('userId' in b ? b.userId : undefined);
+
+  // The first profile chosen on a device without a default becomes it, as the first one created does.
+  const enter = async (userId: UserId) => {
+    move({ kind: 'ready', userId });
+    await deviceSettings.update((current) => (current.defaultUserId === undefined ? { ...current, defaultUserId: userId } : current));
   };
 
   return {
@@ -61,7 +74,7 @@ export function createSessionService(deps: {
       const user = await users.get(userId);
       if (!user) throw new Error(`Unknown profile ${userId}`);
       if (user.pinCredentialRef === undefined) {
-        move({ kind: 'ready', userId });
+        await enter(userId);
         return 'ready';
       }
       if (gate.kind !== 'ready') move({ kind: 'needs-user-unlock', userId });
@@ -69,7 +82,7 @@ export function createSessionService(deps: {
     },
     unlock: async (userId, pin) => {
       const check = await pins.verify(userId, pin);
-      if (check.ok) move({ kind: 'ready', userId });
+      if (check.ok) await enter(userId);
       return check;
     },
     chooseAnother: () => move({ kind: 'needs-user-selection' }),
@@ -77,6 +90,19 @@ export function createSessionService(deps: {
       if ((gate.kind === 'ready' || gate.kind === 'needs-user-unlock') && gate.userId === userId) {
         move({ kind: 'needs-user-selection' });
       }
+    },
+    refresh: async () => {
+      if (gate.kind === 'starting' || gate.kind === 'failed') return;
+      const [stored, settings] = await Promise.all([users.list(), deviceSettings.get()]);
+      const current = gate;
+      let next: Gate = current;
+      if (stored.length === 0) next = { kind: 'needs-first-user' };
+      else if (current.kind === 'needs-first-user' || current.kind === 'needs-user-selection') {
+        next = decideInitialGate({ users: stored.map(toAppUser), defaultUserId: settings.defaultUserId }).gate;
+      } else if ((current.kind === 'ready' || current.kind === 'needs-user-unlock') && !stored.some((user) => user.id === current.userId)) {
+        next = { kind: 'needs-user-selection' };
+      }
+      if (!same(next, current)) move(next);
     },
   };
 }

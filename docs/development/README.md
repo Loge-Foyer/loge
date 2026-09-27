@@ -42,6 +42,13 @@ else is real, including the database engine:
   secrets and what happens to them, session binding, the provider pool, merged
   rows, grid pages and Continue Watching, the home layout. The writes that span
   rows run on both engines.
+- **The account and its sync** — two devices, each a whole service graph on
+  its own database, share one fake account (`test/support/sync.ts`), on every
+  pair of engines: SQLite and SQLite, IndexedDB and IndexedDB, and one of each.
+  The fake account can store only part of a push, lose an answer, fail, forget
+  everything, roll back, expire a cursor or refuse its owner, and the suites
+  prove the devices converge through all of it. The scheduler runs on fake
+  timers against a scripted engine.
 
 `test/support/services.ts` builds the service graph as the app wires it.
 `test/support/engines.ts` opens a fresh database per test. Two things there

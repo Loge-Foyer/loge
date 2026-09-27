@@ -5,6 +5,7 @@ import {
   type Plugin,
   type PluginId,
   type PluginManifest,
+  type SyncRole,
 } from '@sc/api';
 
 export interface PluginCatalog {
@@ -17,6 +18,8 @@ export interface PluginCatalog {
   bringing(kinds: readonly ContentKind[]): readonly PluginManifest[];
   /** The media role's implementation, once the plugin has one. */
   mediaRole(id: PluginId): MediaRole | undefined;
+  /** The sync role's implementation: what can be the device's account. */
+  syncRole(id: PluginId): SyncRole | undefined;
 }
 
 export interface CatalogOptions {
@@ -31,7 +34,8 @@ export function createPluginCatalog(
 ): PluginCatalog {
   const byId = new Map<PluginId, PluginManifest>();
   const roles = new Map<PluginId, MediaRole>();
-  for (const { manifest, media } of plugins) {
+  const syncRoles = new Map<PluginId, SyncRole>();
+  for (const { manifest, media, sync } of plugins) {
     const problems = [
       ...validateManifest(manifest),
       ...(byId.has(manifest.id) ? ['its id is already registered'] : []),
@@ -47,6 +51,7 @@ export function createPluginCatalog(
     }
     byId.set(manifest.id, manifest);
     if (media) roles.set(manifest.id, media);
+    if (sync) syncRoles.set(manifest.id, sync);
   }
 
   const manifests = [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -58,5 +63,6 @@ export function createPluginCatalog(
         manifest.media?.contentKinds.some((kind) => kinds.includes(kind)),
       ),
     mediaRole: (id) => roles.get(id),
+    syncRole: (id) => syncRoles.get(id),
   };
 }

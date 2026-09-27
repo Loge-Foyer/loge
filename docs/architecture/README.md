@@ -14,7 +14,8 @@ src/
   hooks/        React bindings: query hooks, the session gate
   services/     business logic, no React; ports.ts declares what they need
   persistence/  the local database: SQLite (native) and IndexedDB (web)
-  platform/     device boundary: credentials, HTTP, network, identity, clock, logging
+  platform/     device boundary: credentials, HTTP, network, identity, clock, logging,
+                the device owner's check, app activity, the run lock
   composition/  builds the service graph
 ```
 
@@ -40,7 +41,7 @@ services — and `storage.web.ts` the web's: IndexedDB, and secrets encrypted in
 IndexedDB. Metro picks the file by platform, so neither side ships the other's
 code. The databases open on first use; launching first deletes secrets a crash
 left queued, then makes the boot decision, and a storage failure lands on the
-boot screen's "could not start".
+boot screen's "could not start". Then the sync scheduler starts.
 
 ## The local database
 
@@ -121,6 +122,51 @@ same connection may do. The screens only ever see that result.
   launch the hooks show saved rows as `placeholderData` from a second, local
   query — never `setQueryData`, which would make a snapshot look fresh and let
   the grid page from old positions.
+
+## The account and its sync
+
+A device has at most one account: the one connection whose sync role is on.
+`services/account.ts` is the only thing that switches a sync role, and
+`services/sync/` is the engine that keeps the account and the device in step.
+
+- **A run** (`sync/engine.ts`) pulls the account's log from the device's
+  cursor, applies it page by page — each page in one transaction together with
+  the new cursor — then pushes the journal after the checkpoint. The account's
+  log order decides every conflict; no clock does.
+- **Four rules** decide what a pulled change does (`sync/apply.ts`):
+  1. A change this device has not had back from the account protects its
+     entity — pending, or accepted and on its way back. A pulled change to it
+     is skipped: this device's is later in the log.
+  2. A remote delete of a profile or connection is always applied.
+  3. The device's own changes come back and are applied like any other, which
+     is what makes every device converge.
+  4. A pulled change carrying the id of a pending entry is that entry's lost
+     acknowledgement.
+- **Joining** (`sync/join.ts`) — signing in, switching, an account that lost
+  data (`reset`), or one that carries more — reads the whole log, settles what
+  both sides hold, and announces this device's rows in the journal for the
+  normal push to upload.
+- **When it runs** (`sync/scheduler.ts`): at launch, on coming to the
+  foreground, two seconds after a journaled commit, when the network changes,
+  every minute in the foreground, and on "Sync now" — never inside a write.
+  Retry hints decide the rest: `backoff` doubles up to 15 minutes, and nothing
+  but a new network cuts it short; `network-change` waits for one; an account
+  that refused the sign-in waits for the user, always. On the web a run holds a
+  Web Lock, so two tabs never sync at once.
+- **Afterwards** the engine tells its listeners what changed: the composition
+  lets running providers go and has the session gate look again; the UI
+  refreshes what it shows.
+
+**Signing in** is two steps. `prepareSignIn` checks the owner, tries the
+account once and reads it whole, saving nothing. `completeSignIn` writes the
+account's connection, applies what the account holds and announces this
+device's rows, all in one transaction. Between the two, the UI asks "Use the
+account's profiles" or "Keep both" when both sides hold profiles.
+
+**The owner check** (`services/owner-check.ts`) re-verifies whoever owns the
+device's profiles: the account's own check when it has one, else Face ID or
+the passcode. Forgot PIN goes through it, and so do signing in on a device
+that has profiles, signing out and switching.
 
 ## Query keys
 

@@ -168,6 +168,29 @@ These are specific to Streaming Center and matter more than anything above.
 
 ---
 
+## The account
+
+A device has at most one account: the one connection with its sync role on.
+`services/sync/` keeps it in step; `docs/architecture` and `docs/data` explain
+each rule. These break silently:
+
+- **Only `AccountService` switches a sync role.** `connections.save` keeps the
+  stored one whatever the draft says, and a new connection never has it.
+- **What arrives from the account is written unjournaled,** or it would be
+  sent straight back.
+- **An apply or join transaction awaits nothing but `tx`** — not the
+  credential store, not `devicePlugins`, not `profiles.remove` (use the
+  helpers in `services/removal.ts`). PINs are read and written before it;
+  fresh refs it does not adopt are queued inside it, never before they exist.
+- **Nothing in an apply may fail on the data.** Check, then insert or update:
+  on IndexedDB a failed request aborts the whole transaction even when caught,
+  and the page would never move on.
+- **A refused sign-in is never retried by itself** — not on a network change,
+  not on a poll, not on "Sync now". The engine parks until the user signs in
+  again.
+
+---
+
 ## Web is a first-class target
 
 Not an afterthought. Things to know:
