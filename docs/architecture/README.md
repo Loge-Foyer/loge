@@ -15,8 +15,10 @@ src/
   services/     business logic, no React; ports.ts declares what they need
   persistence/  the local database: SQLite (native) and IndexedDB (web)
   platform/     device boundary: credentials, HTTP, network, identity, clock, logging,
-                the device owner's check, app activity, the run lock
+                the device owner's check, app activity, the run lock, cryptography
   composition/  builds the service graph
+modules/
+  key-derivation/  the app's own native code: PBKDF2 on iOS (Swift) and Android (Kotlin)
 ```
 
 Dependencies point inward. Services depend only on the interfaces in
@@ -42,6 +44,29 @@ IndexedDB. Metro picks the file by platform, so neither side ships the other's
 code. The databases open on first use; launching first deletes secrets a crash
 left queued, then makes the boot decision, and a storage failure lands on the
 boot screen's "could not start". Then the sync scheduler starts.
+
+## Cryptography
+
+Plugins have no cryptography of their own — no WebCrypto, no timers, nothing
+host-side — so the app hands them one through their context
+(`PluginContext.crypto`), and keeps one definition of it:
+`platform/plugin-crypto.ts`. It is built from the platform's parts, chosen by
+file like storage:
+
+- **Deriving a key from a password** is PBKDF2-HMAC-SHA256, natively: the
+  local module `modules/key-derivation` on a phone (`crypto.ts`), WebCrypto in a
+  browser (`crypto.web.ts`). Plain JavaScript on Hermes runs a hundred times
+  slower — scrypt took 22 s on the emulator — which is why phones run a
+  development build. Nothing weaker than `isKdfParams` allows is derived,
+  whatever a plugin asks.
+- **Expanding a key** is HKDF-SHA-256 in JavaScript (noble): a few HMACs,
+  cheap anywhere.
+- **Sealing** is AES-256-GCM through expo-crypto (WebCrypto behind it in a
+  browser). A seal's context goes in as base64 that `@sc/api` encoded:
+  expo-crypto reads a string of additional data as base64, and would turn bytes
+  into one through `btoa`.
+
+Only `src/platform/` imports noble or the module; lint enforces it.
 
 ## The local database
 

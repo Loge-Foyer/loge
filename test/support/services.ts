@@ -35,6 +35,7 @@ import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
 
+import { testCrypto } from './crypto';
 import { openTestDatabase, type Engine, type TestDatabaseOptions } from './engines';
 import { counterIds, fakeClock, fakeNetwork, memoryCredentialStore, silentLog } from './fakes';
 import { fakeActivity, fakeOwnerAuthentication } from './sync';
@@ -172,7 +173,8 @@ export function buildServices(options: {
   const catalog = createPluginCatalog(options.plugins, { strict: true, warn: () => undefined });
   const devicePlugins = createDevicePlugins(db.deviceSettings);
   const identity = { identity: async () => ({ appName: 'Test', appVersion: '1', deviceName: 'Test', deviceKey: `${device}-key` }) };
-  const accountProviders = createAccountProviders({ http: unusedHttp, network, identity, clock, catalog, credentials, sessions });
+  const crypto = testCrypto();
+  const accountProviders = createAccountProviders({ http: unusedHttp, network, identity, clock, crypto, catalog, credentials, sessions });
   const ownerAuthentication = options.owner ?? fakeOwnerAuthentication({ available: false });
   const owner = createOwnerCheck({
     account: async () => {
@@ -180,7 +182,7 @@ export function buildServices(options: {
       if (!account?.available) return undefined;
       const provider = await accountProviders.provider(account.connection);
       const verify = provider.verifyOwner;
-      return verify && ((signal) => verify.call(provider, signal));
+      return verify && ((signal) => verify.call(provider, {}, signal));
     },
     device: ownerAuthentication,
     log: silentLog,
@@ -188,7 +190,7 @@ export function buildServices(options: {
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
   const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
   const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
-  const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, log: silentLog });
+  const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, crypto, log: silentLog });
   const connections = createConnectionService({
     db,
     credentials,

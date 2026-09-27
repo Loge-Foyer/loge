@@ -3,11 +3,15 @@
 ```bash
 cd ../streaming_center_plugins && npm install   # first: plugins resolve @sc/api from here
 cd ../streaming_center_app && npm install
-npm start                                       # then i / a / w, or npm run ios|android|web
+npm run android                                 # or npm run ios: builds the development client, the first time
+npm start                                       # later: Metro alone, for the build already installed
+npm run web                                     # the browser needs no build
 ```
 
-Expo Go is enough on a device or simulator; only Face ID on iOS needs a
-development build (`docs/platforms/ios`).
+Phones and simulators run a **development build**, not Expo Go: the app has a
+small native module of its own, for deriving keys from an account password.
+Building it needs the Android SDK or Xcode, and takes a few minutes the first
+time; after that, JavaScript changes load as usual. See `docs/platforms/`.
 
 ## Set up once
 
@@ -45,10 +49,8 @@ The data is only on the device, so starting fresh means clearing it there:
 | Where | How |
 | --- | --- |
 | Web | a new browser profile, or DevTools → Application → Clear site data |
-| iOS simulator | `xcrun simctl uninstall booted host.exp.Exponent`, and `xcrun simctl keychain booted reset` for the secrets, which iOS keeps across an uninstall |
-| Android emulator | `adb shell pm clear host.exp.exponent` |
-
-In Expo Go that clears every project Expo Go has opened.
+| iOS simulator | `xcrun simctl uninstall booted <bundle id>`, and `xcrun simctl keychain booted reset` for the secrets, which iOS keeps across an uninstall |
+| Android emulator | `adb shell pm clear com.fakg.streaming_center_app` |
 
 ## In a browser
 
@@ -70,5 +72,5 @@ server; that is the browser's mixed-content rule. See `docs/platforms/web/`.
   files, and your edits are silently ignored.
 - Fast Refresh keeps the service graph as it was: reload (`r`) after changing a
   service. Building a second graph would open the database a second time.
-- A server on your network is reached over plain `http`. Expo Go allows that;
-  see `docs/platforms/` for what development builds and the web need.
+- A server on your network is reached over plain `http`. The development
+  build allows it (`docs/platforms/`); a page on `https` does not.

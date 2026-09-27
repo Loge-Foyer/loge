@@ -1,4 +1,4 @@
-import { AppError, type ConnectionValues, type Credentials, type HttpClient, type PluginContext } from '@sc/api';
+import { AppError, type ConnectionValues, type Credentials, type HttpClient, type PluginContext, type PluginCrypto } from '@sc/api';
 
 import { stableHash } from './hash';
 import type { ClientIdentitySource, Clock, NetworkMonitor, SecureCredentialStore } from './ports';
@@ -21,6 +21,7 @@ export interface PluginContextDeps {
   readonly network: NetworkMonitor;
   readonly identity: ClientIdentitySource;
   readonly clock: Clock;
+  readonly crypto: PluginCrypto;
 }
 
 /** Everything a plugin may use from the host, for one connection, role and credential scope. */
@@ -43,6 +44,7 @@ export async function pluginContext(
       installationId: stableHash(`${client.deviceKey}|${installationScope}`),
     },
     clock: { now: () => deps.clock.now(), sleep: (ms, signal) => deps.clock.sleep(ms, signal) },
+    crypto: deps.crypto,
   };
 }
 

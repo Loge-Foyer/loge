@@ -50,9 +50,10 @@ Forgot PIN re-verifies the owner, through the account or the device. The only
 account so far is the dev-only mock; real ones come in Phases 4 and 5.
 Everything from Phase 2 stands: real titles from every live source, merged,
 kept across restarts in SQLite and the keychain, or IndexedDB and encrypted
-secrets on the web. Nothing plays, and Videos still shows skeletons. vitest
-covers the database on both engines, the services, and two devices syncing on
-every pair of engines.
+secrets on the web. Plugins get the host's cryptography through their context —
+native PBKDF2 among it — so phones run a development build, not Expo Go.
+Nothing plays, and Videos still shows skeletons. vitest covers the database on
+both engines, the services, and two devices syncing on every pair of engines.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

@@ -2,14 +2,23 @@
 
 Building and running on emulator and device, native modules, and Android-specific configuration.
 
-Expo Go is enough today. The Material tab bar is themed from Tamagui explicitly, because it would otherwise follow the system's light theme under a dark app.
+The app runs in a **development build**, not Expo Go: it has a native module of
+its own, `modules/key-derivation`, which derives keys from an account password
+with PBKDF2 on `javax.crypto`'s HMAC. JavaScript on Hermes is far too slow for
+that (measured: over twenty seconds on the emulator). `npm run android` builds
+the client and installs it; after that, Metro serves the JavaScript as usual.
+Change the Kotlin, or add a native module, and build again.
+
+The Material tab bar is themed from Tamagui explicitly, because it would
+otherwise follow the system's light theme under a dark app.
 
 ## Servers on the local network
 
-Expo Go allows plain `http`. A development or store build blocks cleartext
-traffic from Android 9 on, so it will need a network security configuration
-allowing it to local addresses — set through a config plugin in `app.json` when
-the development build arrives.
+The development build is a debug build, whose generated manifest allows plain
+`http` — a Jellyfin on your network, your own sync server, and Metro itself. A
+release build blocks cleartext from Android 9 on, and will need it allowed
+through a config plugin in `app.json` (`expo-build-properties`) — never an edit
+to the generated `android/` folder.
 
 ## Storage
 
@@ -22,15 +31,14 @@ the development build arrives.
   whose saved password is missing is never signed in without it — servers lock
   accounts after failed logins. Instead it says it needs its password again.
   A profile whose PIN is missing opens for its owner.
-- `adb shell pm clear host.exp.exponent` starts Expo Go, and every project in
-  it, from scratch.
+- `adb shell pm clear com.fakg.streaming_center_app` starts the app from
+  scratch.
 
 ## Forgot PIN
 
 Without an account that can vouch for its owner, Forgot PIN asks the device:
 a fingerprint, or the screen lock's PIN, pattern or password. It is offered once
-a screen lock is set — `getEnrolledLevelAsync()` reports at least `SECRET` — and
-works in Expo Go.
+a screen lock is set — `getEnrolledLevelAsync()` reports at least `SECRET`.
 
 On the emulator: Settings → Security → Screen lock → PIN, then Fingerprint,
 touching the sensor with `adb -e emu finger touch 1` when asked. At the app's
@@ -44,6 +52,9 @@ finger) is a refusal.
   data a local-only source is rightly skipped, with "only used on your home
   network". `adb shell svc wifi disable` and `enable` switch between them, which
   is also the quickest way to see a parked source come back.
+- The development build connects to Metro through its own scheme, after
+  `adb reverse tcp:8081 tcp:8081`:
+  `adb shell am start -a android.intent.action.VIEW -d "exp+streamingcenterapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"`.
 - Deep links work cold or warm, with no prompt:
-  `adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081/--/browse/movies"`.
+  `adb shell am start -a android.intent.action.VIEW -d "streamingcenterapp://browse/movies"`.
 - JavaScript logs go to logcat under `ReactNativeJS`.

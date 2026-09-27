@@ -1,6 +1,7 @@
 import { createAppActivity } from '@/platform/app-activity';
 import { createClientIdentitySource } from '@/platform/client-identity';
 import { systemClock } from '@/platform/clock';
+import { hostCrypto } from '@/platform/crypto';
 import { createPlatformHttpClient } from '@/platform/http';
 import { uuidGenerator } from '@/platform/ids';
 import { consoleLogger } from '@/platform/log';
@@ -51,14 +52,15 @@ export function createServices(): AppServices {
   const devicePlugins = createDevicePlugins(db.deviceSettings);
   const http = createPlatformHttpClient(network, log);
   const identity = createClientIdentitySource(deviceBound, log);
-  const accountProviders = createAccountProviders({ http, network, identity, clock, catalog, credentials, sessions });
+  const crypto = hostCrypto;
+  const accountProviders = createAccountProviders({ http, network, identity, clock, crypto, catalog, credentials, sessions });
   const owner = createOwnerCheck({
     account: async () => {
       const account = await currentAccount(db, catalog);
       if (!account?.available) return undefined;
       const provider = await accountProviders.provider(account.connection);
       const verify = provider.verifyOwner;
-      return verify && ((signal) => verify.call(provider, signal));
+      return verify && ((signal) => verify.call(provider, {}, signal));
     },
     device: createOwnerAuthentication(),
     log,
@@ -66,7 +68,7 @@ export function createServices(): AppServices {
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
   const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
   const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
-  const pool = createProviderPool({ catalog, credentials, sessions, http, network, identity, clock, log });
+  const pool = createProviderPool({ catalog, credentials, sessions, http, network, identity, clock, crypto, log });
   const connections = createConnectionService({
     db,
     credentials,

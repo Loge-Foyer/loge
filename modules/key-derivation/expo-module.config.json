@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KeyDerivationModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.keyderivation.KeyDerivationModule"]
+  }
+}

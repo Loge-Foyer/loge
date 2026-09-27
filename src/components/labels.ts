@@ -37,6 +37,7 @@ export const SYNC_CAPABILITY_LABELS: Readonly<Record<SyncCapability, string>> = 
   watchlist: 'Watchlists',
   history: 'What each profile watched',
   providerConnections: 'Connections, without their passwords',
+  sealedPasswords: 'Their passwords, sealed so only your devices can read them',
   customLists: 'Lists',
   fullBackup: 'A full backup',
 };

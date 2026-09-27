@@ -8,6 +8,7 @@ description: Run the full verification pass for the Streaming Center app — typ
 Run these in order. Each catches something the others cannot.
 
 ```bash
+npm run android       # after a native change (modules/, app.json plugins, a new native dependency): rebuild the development client
 npx expo start        # once, then stop it: it generates .expo/types (typed routes)
 npm run typecheck     # the app, then test/tsconfig.json — strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess
 npm run lint          # expo lint, including the boundary, Hermes and SQLite rules below
@@ -39,9 +40,13 @@ other bundle, web would drag in expo-sqlite's WebAssembly build — and need
 COOP/COEP headers — or native would ship dead IndexedDB code:
 
 ```bash
-grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore -e ExpoLocalAuthentication /tmp/sc-web   # must print nothing
+grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore -e ExpoLocalAuthentication -e KeyDerivation /tmp/sc-web   # must print nothing
 strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c streaming-center-secrets  # must print 0
 ```
+
+The same goes for the host crypto: `src/platform/crypto.ts` derives keys with
+the native module, `crypto.web.ts` with WebCrypto, and the web bundle must not
+ask for a native module it does not have.
 
 With `--source-maps` on the web export, also check the vocabulary is bundled
 once: the `sources` of the web map should list each
@@ -67,6 +72,7 @@ nothing (`docs/platforms/ios` has the path).
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |
 | `@/composition/*` | `src/app/_layout.tsx` |
 | `expo-local-authentication` | `src/platform/**` — everything else asks `OwnerCheck` |
+| `@noble/*`, `modules/key-derivation` | `src/platform/**` — cryptography is the platform's |
 
 Do not trust them, prove them. Drop a throwaway file into `src/screens/` that
 imports one of each — including a relative `../platform/clock` — and run
@@ -75,8 +81,9 @@ imports one of each — including a relative `../platform/clock` — and run
 ## Hermes rules
 
 iOS and Android run Hermes, which lacks `Array.prototype.toSorted`,
-`Object.groupBy` and `crypto.randomUUID`, and may lack `structuredClone`,
-`Promise.withResolvers` and `Intl.RelativeTimeFormat`. Tests run on Node and the
+`Object.groupBy`, `crypto.randomUUID` and `Uint8Array.prototype.toBase64` /
+`fromBase64`, and may lack `structuredClone`, `Promise.withResolvers` and
+`Intl.RelativeTimeFormat`. Tests run on Node and the
 web runs V8, so nothing else notices until a phone throws. Lint rejects all of
 them anywhere in `src/`; add `[1].toSorted()` to the throwaway file above and it
 must fail too. The plugins repository's `test/engine.test.ts` scans its sources
@@ -118,6 +125,8 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
   expects a first launch needs a fresh start (`docs/getting-started`).
 - The web build refuses to start on plain `http` from a network address; use
   `localhost`.
+- Phones run a **development build**. A failure that looks like code that did
+  not change is usually a stale build: rebuild after anything native changed.
 - `npm test` covers the database, the credential stores and the services —
   the account and two devices syncing through one fake account included — not
   screens. Screens are proven by driving the app on each platform (`sc-run`).

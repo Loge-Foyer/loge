@@ -6,29 +6,26 @@ description: Launch the Streaming Center app on the iOS simulator, Android emula
 # Run the Streaming Center app
 
 ```bash
-npm run ios        # iOS simulator
-npm run android    # Android emulator
-npm run web        # browser
-npm start          # dev server, then press i / a / w
+npm run ios        # builds the development client, installs it on the simulator, opens it
+npm run android    # the same on the emulator
+npm run web        # browser — no build
+npm start          # Metro alone, for a development client already installed
 ```
 
 ## Which runtime you need
 
-**Expo Go is enough today.** Every native module in use — `react-native-svg`,
-`expo-crypto`, `react-native-screens`, `expo-sqlite`, `expo-secure-store`,
-`expo-local-authentication` — ships in Expo Go 57. One exception: Face ID on
-iOS needs a development build, because Expo Go cannot carry the app's Face ID
-usage text.
+**A development build, not Expo Go.** The app has a native module of its own —
+`modules/key-derivation`, PBKDF2 on CommonCrypto and `javax.crypto` — and Expo
+Go carries only its bundled modules. JavaScript on Hermes is far too slow to
+derive keys itself: scrypt took 22 s in Expo Go on the emulator, where the
+module takes a second at 600k iterations.
 
-That changes the moment a playback engine lands. Expo Go only bundles its own
-native modules, so a custom one requires a development build:
-
-```bash
-npx expo run:ios      # or run:android
-```
-
-Once that happens, a Metro reload will not pick up native changes — you must
-rebuild, and the failure mode looks like code that did not change.
+`npm run android` / `npm run ios` build the client (the first Android build
+took about seven minutes), install it and start it against Metro. After that,
+JavaScript changes load as usual; a change to `modules/`, a config plugin in
+`app.json` or a new native dependency needs the build again — and a stale build
+looks like code that did not change. Face ID works in the iOS development
+build, which carries the app's usage text.
 
 **Never start Metro with `CI=1` while iterating.** CI mode turns off file
 watching: every edit after startup is silently served stale.
@@ -40,8 +37,9 @@ connections and their passwords, layouts — is kept on the device, so set up wh
 a flow needs once and it is there on every later launch.
 
 - **A first launch** needs a fresh start: a new browser profile (a fresh
-  `--user-data-dir`), `xcrun simctl uninstall booted host.exp.Exponent` plus
-  `xcrun simctl keychain booted reset`, or `adb shell pm clear host.exp.exponent`.
+  `--user-data-dir`), `xcrun simctl uninstall booted <bundle id>` plus
+  `xcrun simctl keychain booted reset`, or
+  `adb shell pm clear com.fakg.streaming_center_app`.
 - **A real Jellyfin server**: Settings → Plugins → Jellyfin → Installed → Add
   connection, filled in from the workspace's gitignored `jellyfin.env`
   (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
@@ -75,8 +73,9 @@ a flow needs once and it is there on every later launch.
   PIN), enrol a fingerprint there, touching the sensor with
   `adb -e emu finger touch 1`. At the app's prompt, `touch 1` answers yes and
   `touch 2` (an unenrolled finger) no.
-- **iOS simulator in Expo Go** — no passcode and no Face ID, so without an
-  account there is only the hint.
+- **iOS simulator** — no passcode. In the development build, Face ID can be
+  enrolled from the simulator's Features menu; otherwise, without an account,
+  there is only the hint.
 
 Sign out and Switch ask for the owner the same way when the device has
 profiles; at first launch nothing is asked.
@@ -90,26 +89,16 @@ xcrun simctl io <UDID> screenshot /tmp/shot.png
 ```
 
 Scripted tapping via `System Events` fails with `-25204` unless the terminal has
-Accessibility permission, and `xcrun simctl openurl` stops at an "Open in Expo
-Go?" prompt every time — on iOS 18 and 26 alike — that only a tap answers. Open
-the project without it:
+Accessibility permission, so on iOS without it you get whatever screen a launch
+lands on. `npm run ios` builds, installs and opens the development build; opened
+again by hand (`xcrun simctl launch <UDID> <bundle id>`), it shows its launcher,
+which lists the running Metro server. Screens behind navigation are driven on
+Android or in a browser. Metro's inspector socket refuses outside debuggers, so
+it is no way in either.
 
-```bash
-xcrun simctl install <UDID> ~/.expo/ios-simulator-app-cache/Expo-Go-<version>.tar.app   # if missing
-xcrun simctl launch --terminate-running-process <UDID> host.exp.Exponent --initialUrl "exp://127.0.0.1:8081"
-```
-
-That start URL is not handed to the app as a deep link (expo-router reads
-`getLinkingURL()`, which it leaves empty), so on iOS without Accessibility you
-get the home screen only. Screens behind navigation are driven on Android or in
-a browser. Metro's inspector socket refuses outside debuggers, so it is no way
-in either.
-
-In Expo Go the app's own scheme does not apply — deep links use the Metro URL
-with `/--/`, e.g. `exp://127.0.0.1:8081/--/browse/movies`.
-`streamingcenterapp://<path>` (from `app.json`) is for development and store
-builds. A link lands on a cold start too: `(app)` stays reachable while the app
-starts. Only a profile with a PIN, or no default profile, drops it.
+Deep links use the app's own scheme, `streamingcenterapp://<path>` (from
+`app.json`). A link lands on a cold start too: `(app)` stays reachable while
+the app starts. Only a profile with a PIN, or no default profile, drops it.
 
 Useful paths: `/media`, `/browse/<rowId>` (`movies`, `shows`, `anime`),
 `/customize-home`, `/settings/plugins/<pluginId>`, `/settings/pin`. Item pages
@@ -118,37 +107,37 @@ them by tapping.
 
 Without Accessibility permission the iOS simulator cannot be tapped, so prove
 persistence there by reading the database: stop the app, then run `sqlite3` on
-`…/ExponentExperienceData/<project>/SQLite/streaming-center.db` in the Expo Go
-data container (`xcrun simctl get_app_container <UDID> host.exp.Exponent data`).
+`Documents/SQLite/streaming-center.db` in the app's data container
+(`xcrun simctl get_app_container <UDID> <bundle id> data`).
 
-Expo Go shows a developer-menu introduction on first launch. Skip it on iOS:
+The development build shows a developer-menu introduction on first launch. Skip
+it on iOS:
 
 ```bash
-xcrun simctl spawn <UDID> defaults write host.exp.Exponent EXDevMenuIsOnboardingFinished -bool YES
+xcrun simctl spawn <UDID> defaults write <bundle id> EXDevMenuIsOnboardingFinished -bool YES
 ```
-
-Its floating developer button then sits over the header's right side; it is not
-part of the app.
 
 Android — taps work, so do screenshots and deep links, with no prompt:
 
 ```bash
 emulator -avd shinie-a36 -no-window -no-audio -no-boot-anim &   # headless
+npx expo start --dev-client                  # Metro, for the installed development build
 adb reverse tcp:8081 tcp:8081
-adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081/--/<path>"
+adb shell am start -a android.intent.action.VIEW -d "exp+streamingcenterapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"
+adb shell am start -a android.intent.action.VIEW -d "streamingcenterapp://<path>"   # a deep link
 adb shell input tap <x> <y>                  # screenshot pixels, not scaled
 adb exec-out screencap -p > /tmp/shot.png
 adb logcat -s ReactNativeJS                  # the app's console output
 ```
 
-On first launch Expo Go opens its developer-menu introduction: tap Continue,
-then close the menu. Make sure Wi-Fi is the default network
+On first launch the development build opens its developer-menu introduction
+over the app: tap Continue, then close the menu. Make sure Wi-Fi is the default network
 (`adb shell dumpsys connectivity | grep "Active default"`) — on mobile data a
 local-only source is rightly skipped. `adb shell svc wifi disable|enable`
 switches, which is the quickest real test of parking and recovery.
 
-If Expo Go is missing on the emulator, `npx expo start --android` installs it,
-or reuse the cached APK: `adb install ~/.expo/android-apk-cache/Expo-Go-<version>.apk`.
+If the development build is missing on the emulator, or anything native
+changed, `npm run android` builds and installs it again.
 
 In a browser, a full page load keeps everything — IndexedDB lives in the
 Chrome profile — so navigating by URL is fine; start with a fresh

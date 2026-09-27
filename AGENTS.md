@@ -61,6 +61,11 @@ Docs: https://docs.expo.dev/eas/index.md
 - Expo Go only includes its bundled native modules. After adding a library with
   native code, the app needs a development build: `npx expo run:ios|android`
   locally, or `eas build --profile development`.
+- **This app is past that point.** Its key derivation is a local module
+  (`modules/key-derivation`, Swift and Kotlin), so phones run a development
+  build: `npm run android` / `npm run ios` build and install it, then Metro
+  serves the JavaScript as before. A native change means building again — a
+  stale build looks like code that did not change. The web needs no build.
 - Prefer recommended Expo modules over third-party libraries, and check your
   available skills before adding dependencies.
   Docs: https://docs.expo.dev/versions/latest/index.md
@@ -225,13 +230,34 @@ Not an afterthought. Things to know:
 ## iOS and Android run Hermes
 
 Hermes lacks built-ins that Node and browsers have — `Array.prototype.toSorted`,
-`Object.groupBy`, `crypto.randomUUID`, and possibly `structuredClone`,
-`Promise.withResolvers` and `Intl.RelativeTimeFormat`. Code using them
-typechecks, passes vitest (Node) and works on the web, then throws on a phone:
-Continue Watching broke exactly like that. Lint rejects them in `src/`; copy and
-sort (`[...list].sort(compare)`) instead. Plugins run on Hermes too — the
-plugins repository's tests scan for the same gaps. The app's TypeScript program
-never sees Node's types; only `test/tsconfig.json` does.
+`Object.groupBy`, `crypto.randomUUID`, `Uint8Array.prototype.toBase64`, and
+possibly `structuredClone`, `Promise.withResolvers` and
+`Intl.RelativeTimeFormat`. Code using them typechecks, passes vitest (Node) and
+works on the web, then throws on a phone: Continue Watching broke exactly like
+that. Lint rejects them in `src/`; copy and sort (`[...list].sort(compare)`)
+instead, and turn bytes into text with `@sc/api`'s helpers. Plugins run on
+Hermes too — the plugins repository's tests scan for the same gaps. The app's
+TypeScript program never sees Node's types; only `test/tsconfig.json` does.
+
+Hermes also has no JIT: cryptography written in JavaScript runs about a hundred
+times slower than on a browser's engine. Measured on the emulator, scrypt at a
+useful strength took 22 s. So key derivation is native — the local module on
+phones, WebCrypto on the web — and only cheap work (HKDF: a few HMACs) is left
+to JavaScript.
+
+## Cryptography
+
+- **Only `src/platform/` does cryptography.** noble and
+  `modules/key-derivation` are imported there alone (lint). Plugins reach it
+  through their context (`PluginContext.crypto`); services through what the
+  composition root hands them.
+- **One definition, per-platform parts:** `platform/plugin-crypto.ts` builds
+  the port from the platform's PBKDF2 (the module, or WebCrypto in
+  `crypto.web.ts`), expo-crypto's AES-GCM and randomness, and noble's HKDF.
+- **expo-crypto reads a string of additional data as base64**, and turns bytes
+  into base64 through `btoa`. The port passes a seal's context as base64 that
+  `@sc/api` encoded — never raw text, never bytes.
+- **Nothing weaker than `isKdfParams` is derived,** whatever a plugin asks.
 
 ---
 
@@ -351,6 +377,10 @@ it, and everything from Phase 2 surviving a restart:
 - The service graph is a runtime singleton (`src/composition/provider.tsx`) —
   a router remount must never rebuild it, and in development it survives Fast
   Refresh.
+- Plugins get the host's cryptography through their context: native PBKDF2
+  (`modules/key-derivation` on phones, WebCrypto on the web), HKDF, and
+  expo-crypto's AES-GCM. Phones therefore run a development build, not Expo
+  Go.
 - vitest covers the database on both engines, the credential stores and the
   service layer, and two devices syncing through one fake account on every
   pair of engines (`npm test`).
@@ -361,6 +391,7 @@ docs in the same commit.
 ## Verify
 
 ```bash
+npm run android         # once per native change: builds the development client (npm run ios likewise)
 npx expo start          # once: generates the typed-route types
 npm run typecheck       # the app, then the tests (test/tsconfig.json)
 npx expo lint           # includes the import-boundary, Hermes and SQLite rules

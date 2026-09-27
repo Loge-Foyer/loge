@@ -1,30 +1,35 @@
 # iOS
 
-Building and running on simulator and device, native modules, config plugins, and when a development build replaces Expo Go.
+Building and running on simulator and device, native modules, config plugins, and the development build.
 
-Expo Go is enough today: every native module in use ships with it. A development build becomes necessary with the first custom native module — the playback engine — and Face ID needs one already (below).
+The app runs in a **development build**, not Expo Go: it has a native module of
+its own, `modules/key-derivation`, which derives keys from an account password
+with CommonCrypto's PBKDF2. JavaScript on Hermes is far too slow for that
+(measured: over twenty seconds). `npm run ios` builds the client and installs it
+on the simulator; after that, Metro serves the JavaScript as usual. Change the
+Swift, or add a native module, and build again.
 
 ## Servers on the local network
 
-Expo Go allows plain `http` to a server on your network. A development or store
-build will not until the app says so: App Transport Security needs
-`NSAllowsLocalNetworking`, and iOS 14 and later ask for local-network permission
-(`NSLocalNetworkUsageDescription`). Both go in `app.json` when the development
-build arrives — never as edits to a generated `ios/` folder.
+App Transport Security refuses plain `http` unless the app says otherwise.
+`app.json` does, through `ios.infoPlist`: `NSAllowsLocalNetworking` lets the
+app reach a server on the local network — a Jellyfin, or your own sync server —
+and `NSLocalNetworkUsageDescription` is the reason iOS shows when it asks for
+local-network permission. Never edit the generated `ios/` folder instead.
 
 ## Storage
 
 - **The database** is SQLite in the app's documents folder, which iCloud and
-  encrypted backups include. Inside Expo Go each project has its own folder:
-  `Documents/ExponentExperienceData/<project>/SQLite/streaming-center.db`,
-  which `sqlite3` can open once the app is closed.
+  encrypted backups include: `Documents/SQLite/streaming-center.db` in the
+  app's data container (`xcrun simctl get_app_container booted <bundle id>
+  data`), which `sqlite3` can open once the app is closed.
 - **Secrets** are in the keychain, under two services. `sc.credentials` holds
   passwords and PINs, and an encrypted backup restores them onto a new phone.
   `sc.device` holds session tokens and the device key, and stays on this
   phone: a restored phone signs in to each server as a device of its own.
 - Keychain entries can outlive the app. Uninstalling it does not delete them,
   so starting fresh on a simulator is `xcrun simctl uninstall booted
-  host.exp.Exponent` plus `xcrun simctl keychain booted reset`.
+  <bundle id>` plus `xcrun simctl keychain booted reset`.
 
 ## Forgot PIN and Face ID
 
@@ -33,19 +38,16 @@ device, through `expo-local-authentication`: Face ID or Touch ID, falling back
 to the passcode. Only `src/platform/owner-authentication.ts` imports it; the web
 gets `owner-authentication.web.ts`, which answers "unavailable".
 
-- **Face ID needs a development or store build.** Expo Go cannot carry the
-  app's Face ID usage text (`faceIDPermission`, set through the module's config
-  plugin in `app.json`), so there it is not offered.
-- **A simulator has no passcode**, and Face ID enrolment is a development-build
-  matter too. In Expo Go on a simulator the device cannot be asked, so without
-  an account the unlock screen shows "Forgot it? An account lets you reset a
-  PIN." instead of the link.
+- **Face ID works in the development build**, which carries the app's usage
+  text (`faceIDPermission`, set through the module's config plugin in
+  `app.json`). Expo Go could not.
+- **A simulator has no passcode.** Enrol Face ID in the simulator's Features
+  menu to be asked at all; without it and without an account, the unlock
+  screen shows "Forgot it? An account lets you reset a PIN." instead of the
+  link.
 
 ## The simulator
 
-- `xcrun simctl openurl` asks "Open in Expo Go?" every time, and the prompt
-  cannot be answered without a tap. Open the project without it:
-  `xcrun simctl launch <UDID> host.exp.Exponent --initialUrl exp://127.0.0.1:8081`.
-  That start URL is not handed on as a deep link, so it always opens the home.
-- Expo Go's developer button floats over the top right of the screen, over the
-  header's actions. It is not part of the app.
+- `npm run ios` builds, installs and opens the development build. Opened again
+  by hand, it shows its launcher: pick the running Metro server.
+- Deep links use the app's own scheme, `streamingcenterapp://<path>`.

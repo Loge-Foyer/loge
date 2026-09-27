@@ -43,6 +43,10 @@ const missingOnHermes = {
       selector: "CallExpression[callee.name='structuredClone']",
       message: 'Hermes may lack structuredClone. Keep values immutable, or copy them explicitly.',
     },
+    {
+      selector: "CallExpression[callee.property.name=/^(toBase64|fromBase64)$/]",
+      message: 'Hermes has no Uint8Array base64 methods. Use encodeBase64Url / decodeBase64Url from @sc/api.',
+    },
     ...sqliteTransactionHelpers,
   ],
   'no-restricted-properties': [
@@ -57,6 +61,13 @@ const missingOnHermes = {
 const compositionRoot = {
   group: ['@/composition/*', '**/composition/*'],
   message: 'Only src/app/_layout.tsx mounts the composition root. Use useServices().',
+};
+
+// Cryptography is the platform's (spec §3): one implementation, which plugins
+// reach through their context and services through the crypto port.
+const cryptography = {
+  group: ['@noble/*', '**/modules/key-derivation/**'],
+  message: 'Only src/platform/ does cryptography. Take the host crypto the composition root hands you.',
 };
 
 // Asking for the device's owner is a platform module's job; everything else
@@ -81,7 +92,7 @@ module.exports = defineConfig([
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/composition/**', 'src/platform/**'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot] }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot, cryptography] }],
     },
   },
   {
@@ -93,13 +104,13 @@ module.exports = defineConfig([
   {
     files: ['src/composition/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication] }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [cryptography] }],
     },
   },
   {
     files: ['src/app/_layout.tsx'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: implementations }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, cryptography] }],
     },
   },
 ]);

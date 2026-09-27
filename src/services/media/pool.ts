@@ -6,15 +6,14 @@ import {
   type ConnectionId,
   type Credentials,
   type FieldValues,
-  type HttpClient,
   type PluginId,
   type UserId,
 } from '@sc/api';
 
 import { stableJson } from '../hash';
-import { pluginContext, secretsOf } from '../plugin-context';
+import { pluginContext, secretsOf, type PluginContextDeps } from '../plugin-context';
 import type { PluginCatalog } from '../plugin-catalog';
-import type { ClientIdentitySource, Clock, Logger, NetworkMonitor, SecureCredentialStore } from '../ports';
+import type { Logger, SecureCredentialStore } from '../ports';
 import { sessionIdentity, type Sessions } from '../sessions';
 import type { Source } from '../sources';
 
@@ -62,16 +61,14 @@ export interface ProviderPool {
  * shares a login shares its provider and its session: a provider each would
  * sign in again and again, each sign-in ending the last one's session.
  */
-export function createProviderPool(deps: {
-  catalog: PluginCatalog;
-  credentials: SecureCredentialStore;
-  sessions: Sessions;
-  http: HttpClient;
-  network: NetworkMonitor;
-  identity: ClientIdentitySource;
-  clock: Clock;
-  log: Logger;
-}): ProviderPool {
+export function createProviderPool(
+  deps: PluginContextDeps & {
+    catalog: PluginCatalog;
+    credentials: SecureCredentialStore;
+    sessions: Sessions;
+    log: Logger;
+  },
+): ProviderPool {
   const entries = new Map<string, Entry>();
   const keyOf = (source: Source) => `${source.connection.id}|${source.scope}`;
 

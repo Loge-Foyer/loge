@@ -26,6 +26,11 @@ npm install
 npm run ios       # or: npm run android, npm run web
 ```
 
+On a phone or simulator this builds a development client first — the app has a
+little native code of its own, for deriving keys — so the first run takes a few
+minutes. After that, changes to the JavaScript load as usual. The web needs no
+build.
+
 To try it against your own Jellyfin server, add it once in Settings → Plugins
 → Jellyfin: its address and an account. The app keeps it, like everything
 else. In a browser, open the app from `localhost` — `docs/getting-started/`

@@ -17,7 +17,7 @@ export interface FakeAccount {
   readonly plugin: Plugin;
   /** Everything stored, in the account's order. */
   readonly log: readonly SyncChange[];
-  readonly calls: { pushes: number; signIns: number; pulls: number };
+  readonly calls: { pushes: number; signIns: number; pulls: number; signOuts: number };
   /** Store only the first `n` of the next push. */
   acceptOnly(n: number): void;
   /** The next call — of any kind — fails with this. */
@@ -56,7 +56,9 @@ export function fakeSyncAccount(
   let epoch = 1;
   const log: SyncChange[] = [];
   const stored = new Set<string>();
-  const calls = { pushes: 0, signIns: 0, pulls: 0 };
+  const calls = { pushes: 0, signIns: 0, pulls: 0, signOuts: 0 };
+  // One account, one vault: every device signed in to it seals with the same key.
+  const vault = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
   let acceptOnly: number | undefined;
   let failNext: AppError | undefined;
   let loseNext = false;
@@ -124,6 +126,18 @@ export function fakeSyncAccount(
       failNext = undefined;
       if (failure) throw failure;
       if (refuseOwner) throw new AppError('UNAUTHORIZED', 'That is not the owner.');
+    },
+    vaultKey: async () => {
+      check();
+      return vault;
+    },
+    createAccount: async () => {
+      calls.signIns += 1;
+      check();
+      return { accountName: 'The fake account' };
+    },
+    signOut: async () => {
+      calls.signOuts += 1;
     },
     dispose: async () => undefined,
   }) satisfies Required<ConnectedUserStateSyncProvider>;

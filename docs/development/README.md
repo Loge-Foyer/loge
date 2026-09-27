@@ -5,6 +5,7 @@ Testing, verification, debugging and release.
 ## Before anything counts as done
 
 ```bash
+npm run android           # after a native change: rebuilds the development client (npm run ios likewise)
 npx expo start            # once — generates the typed-route types
 npm run typecheck         # the app, then the tests: two TypeScript programs
 npm run lint              # includes the import-boundary, Hermes and SQLite rules
@@ -38,6 +39,10 @@ else is real, including the database engine:
 - **The credential stores** — the keychain adapter against a SecureStore
   look-alike that refuses keys the way the real one does, and the web store on
   Node's WebCrypto.
+- **The host's crypto** — the web's PBKDF2 against RFC 7914's vectors, HKDF
+  against RFC 5869's, and AES-GCM opening what Node sealed and the other way
+  round, all on Node's WebCrypto. The native key-derivation module cannot run
+  on Node; it is checked against the same vector on the emulator.
 - **The services** — connections and per-profile values, profiles and PINs,
   secrets and what happens to them, session binding, the provider pool, merged
   rows, grid pages and Continue Watching, the home layout. The writes that span
