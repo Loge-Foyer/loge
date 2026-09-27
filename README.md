@@ -92,7 +92,8 @@ declares nothing it cannot do yet.
 
 The contract for an account is written too: what travels — profiles, their
 PINs, preferences and connections, never passwords — and how a change reaches
-every device exactly once, in one order.
+every device exactly once, in one order. The mock can be an account: a pretend
+one, kept in memory.
 
 Each plugin says what it needs to connect — a server address, a username, a
 password — and the app builds its settings screen from exactly that, including

@@ -267,7 +267,8 @@ the test of whether this architecture is real.
 - the sync contract: `SyncRole` / `ConnectedUserStateSyncProvider`,
   `SyncChange` and its entities, `isSyncChange`
 
-No plugin implements the sync role yet.
+**Mock** implements the sync role too: a pretend account in memory, per
+endpoint.
 
 **Jellyfin** implements the media role. **Mock** implements it with a fixed
 catalogue. Every other plugin is a manifest that declares no capability.

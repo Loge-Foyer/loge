@@ -4,7 +4,7 @@ A pretend server with a deterministic catalogue, so the whole app can be built a
 
 ## Roles
 
-**Media** — implemented. **Sync** — declared, not implemented yet.
+**Media** — implemented. **Sync** — implemented: a pretend account.
 
 ## Brings
 
@@ -27,7 +27,8 @@ The same titles in the same state on every run:
 One field of every type the app renders:
 
 - a library name (text)
-- an endpoint (URL)
+- an endpoint (URL) — ignored for media; as an account, it names the pretend
+  account
 - a username marked as a credential, so the per-profile modes can be tried
   offline
 - an optional password, which exercises the credential store
@@ -43,11 +44,29 @@ It deliberately does **not** declare every capability. A mock that can do
 everything lets broken capability handling go unnoticed. For media it declares
 `browse`, `libraries` and `watchStateRead`, and declines the rest. It has no
 artwork (`remoteImages`), so the app's placeholders get exercised; it declines
-`offlineMetadata` and `search` as well. Its sync role declares nothing until it
-is implemented.
+`offlineMetadata` and `search` as well. As an account it carries profiles,
+preferences and connections, and declines the rest.
+
+## The pretend account
+
+Choose the mock as the device's account, and it keeps a pretend one in memory:
+
+- **One per endpoint.** Every connection in the running app with the same
+  endpoint shares one; `mock://household` starts with two profiles, Sam (PIN
+  1234) and Robin.
+- **Like a real account.** It stores each change once however often it is
+  sent, answers the prefix it stored, and returns the whole log in its order —
+  the sender's own changes too — fifty at a time.
+- **Forgets on reload**, and then answers an old cursor with `reset`, which is
+  how the app's way back from a lost account gets exercised.
+- *Flaky* stores only half of every third push; *slow* waits 1.5 s on every
+  call. Its owner check always passes.
+
+It has no network, so it cannot link two devices: the app's two-device tests
+share one account in memory, and real devices wait for the sync server.
 
 ## Status
 
-The media role is implemented. The sync role is a manifest until the sync phase.
+Both roles are implemented.
 
 See `docs/writing-a-plugin/` at the repository root.

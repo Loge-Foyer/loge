@@ -36,6 +36,10 @@ Vitest, run over `test/` at the repository root.
   - artwork addresses
 - `mock.test.ts` — the catalogue is deterministic and honours sort, libraries,
   paging and latency.
+- `mock-sync.test.ts` — the pretend account: a change stored once however often
+  it is sent, the accepted prefix, the caller's own changes returned, paging,
+  resuming, one account per endpoint, `reset` for a cursor it did not give out,
+  and the household seed.
 - `manifests.test.ts` — the conformance check. Every manifest is sound, every
   plugin that declares a media capability implements its members, a plugin
   that declares sync capabilities has a sync role with every provider member,

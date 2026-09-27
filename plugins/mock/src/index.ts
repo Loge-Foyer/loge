@@ -5,12 +5,13 @@
  * It declares a deliberately partial set of capabilities: a mock that can do
  * everything lets broken capability handling go unnoticed. It has no artwork,
  * so the app's placeholders get used, and it cannot be kept offline. Its fields
- * cover every field type the app renders. The sync role declares nothing until
- * it is implemented.
+ * cover every field type the app renders. As an account it is a pretend one,
+ * held in memory and keyed by the endpoint.
  */
 import { pluginId, type Plugin } from '@sc/api';
 
 import { createProvider } from './provider';
+import { createSyncProvider } from './sync';
 
 export const plugin: Plugin = {
   manifest: {
@@ -21,7 +22,7 @@ export const plugin: Plugin = {
       contentKinds: ['movies', 'shows', 'anime', 'videos', 'files'],
       capabilities: ['browse', 'libraries', 'watchStateRead'],
     },
-    sync: { capabilities: [] },
+    sync: { capabilities: ['profile', 'preferences', 'providerConnections'] },
     connectionFields: [
       { key: 'libraryName', label: 'Library name', type: 'text', default: 'Mock library' },
       {
@@ -29,7 +30,7 @@ export const plugin: Plugin = {
         label: 'Endpoint',
         type: 'url',
         placeholder: 'mock://catalogue',
-        description: 'Ignored. The catalogue never leaves the device.',
+        description: 'Ignored for media. As an account, it names the pretend account; mock://household has profiles already.',
       },
       { key: 'username', label: 'Username', type: 'text', credential: true, description: 'Optional, and ignored.' },
       {
@@ -66,5 +67,8 @@ export const plugin: Plugin = {
   },
   media: {
     connect: async (target, context) => createProvider(target, context),
+  },
+  sync: {
+    connect: async (target, context) => createSyncProvider(target, context),
   },
 };

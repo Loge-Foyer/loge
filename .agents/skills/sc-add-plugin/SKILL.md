@@ -171,5 +171,5 @@ npm test
 `api` holds the manifest vocabulary, the media contract (`MediaRole`,
 `MediaItem`, `AppError`, `HttpClient`) and the sync contract (`SyncRole`,
 `SyncChange`, `isSyncChange`). `plugins/jellyfin` is the reference
-implementation of a media role; read it before writing another. No plugin
-implements the sync role yet.
+implementation of a media role, and `plugins/mock/src/sync.ts` a minimal sync
+role; read them before writing another.

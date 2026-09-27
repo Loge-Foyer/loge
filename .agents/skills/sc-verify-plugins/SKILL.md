@@ -87,7 +87,8 @@ them. Silent data loss, no error.
 ## Current state
 
 `api` holds the manifest vocabulary, the media contract and the sync contract.
-Jellyfin and mock implement the media role. Passing checks prove:
+Jellyfin and mock implement the media role, and mock the sync role as a
+pretend account. Passing checks prove:
 
 - the vocabulary and every manifest
 - Jellyfin's behaviour against recorded payloads
