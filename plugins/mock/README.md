@@ -65,7 +65,8 @@ Choose the mock as the device's account, and it keeps a pretend one in memory:
   call. Its owner check always passes, and asks for no proof.
 
 It has no network, so it cannot link two devices: the app's two-device tests
-share one account in memory, and real devices wait for the sync server.
+share one account in memory, and real devices use your own server
+(`custom-server`).
 
 ## Status
 

@@ -51,6 +51,15 @@ because the fake context's crypto runs on `node:crypto`.
   it is sent, the accepted prefix, the caller's own changes returned, paging,
   resuming, one account per endpoint, `reset` for a cursor it did not give out,
   and the household seed.
+- `custom-server.test.ts` — the account on your own server, against a fake of
+  the server's routes (`support/fake-sync-server.ts`), which knows only that a
+  proof hashes to what it stored: the address reduced to its base, a proof and
+  never the password, the session reused and sign-in shared, weak parameters
+  refused before deriving, a refused sign-in never tried again, a 401 leaving a
+  tombstone that outlives a relaunch, pushes split at 4 MiB with the prefix
+  across them, the vault key the same on two devices, the owner check's four
+  answers, creating an account and its refusals, signing out, and the error
+  table.
 - `manifests.test.ts` — the conformance check. Every manifest is sound, every
   plugin that declares a media capability implements its members, a plugin
   that declares sync capabilities has a sync role with every provider member
@@ -63,6 +72,10 @@ because the fake context's crypto runs on `node:crypto`.
   `crypto.randomUUID`, `Uint8Array.prototype.toBase64`, `fromBase64`). Plugins
   run on Hermes in the iOS and Android apps; the compiler accepts these, so
   without this check a plugin passes everything here and throws on a phone.
+
+**Quick crypto** (`quickCrypto()`) is the same port with a key derivation that
+takes no time and counts itself, for tests that sign in many times; it refuses
+weak parameters as the app's does. One test derives for real.
 
 **The fake context** (`fakeContext()`) gives a plugin an in-memory session,
 credentials, a network the test can switch, a client identity, a clock whose

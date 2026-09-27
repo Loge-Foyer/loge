@@ -97,8 +97,9 @@ them. Silent data loss, no error.
 
 `api` holds the manifest vocabulary, the media contract, the sync contract —
 sealed passwords, owner proofs and sign-up included — and the host's crypto
-port. Jellyfin and mock implement the media role, and mock the sync role as a
-pretend account. Passing checks prove:
+port. Jellyfin and mock implement the media role; mock the sync role as a
+pretend account, and custom-server as the account on your own server. Passing
+checks prove:
 
 - the vocabulary and every manifest
 - Jellyfin's behaviour against recorded payloads
@@ -107,5 +108,7 @@ pretend account. Passing checks prove:
 - the sync wire: what `isSyncChange` lets through, sealed values and size
   limits included
 - bytes as text, and the limits on a key's parameters
+- the custom server's keys and session rules — no password on the wire, weak
+  parameters refused, no sign-in after a 401 — against a fake of its routes
 
 Run the app's verification as well before calling a contract change done.

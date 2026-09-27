@@ -292,7 +292,8 @@ the test of whether this architecture is real.
   AES-GCM), `isKdfParams` with its limits, and bytes as text (`bytes.ts`)
 
 **Mock** implements the sync role too: a pretend account in memory, per
-endpoint.
+endpoint. **Custom server** implements the sync role against the sync server:
+the keys, the session and its rules are in its README.
 
 **Jellyfin** implements the media role. **Mock** implements it with a fixed
 catalogue. Every other plugin is a manifest that declares no capability.

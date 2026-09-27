@@ -81,7 +81,10 @@ stays genuinely tested. Jellyfin is the first real media source.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
 - **Mock:** implements the media role with a fixed catalogue, and the sync role
-  as a pretend account in memory.
+  as a pretend account in memory. It declines sealing on purpose.
+- **Custom server:** implements the sync role against `streaming_center_sync` —
+  sealed passwords, the owner proof, creating an account with an invite — and
+  never signs itself back in after a 401.
 - **Every other plugin:** a manifest.
 - **`npm run typecheck`:** two programs — api and the plugins with no host
   types at all, and the tests with Node's.
@@ -89,6 +92,8 @@ stays genuinely tested. Jellyfin is the first real media source.
   - the api rules, bytes as text, and the sync wire
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
   - the mock, as a source and as an account
+  - the custom server against a fake of the server's routes: keys, sessions,
+    refusals, the log, the owner check, creating an account
   - the conformance check that each declared capability is implemented
 
 ## Git

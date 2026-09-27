@@ -183,5 +183,6 @@ npm test
 `MediaItem`, `AppError`, `HttpClient`), the sync contract (`SyncRole`,
 `SyncChange`, `isSyncChange`, sealed passwords, owner proofs, sign-up) and the
 host's crypto port (`PluginCrypto`, `isKdfParams`). `plugins/jellyfin` is the
-reference implementation of a media role, and `plugins/mock/src/sync.ts` a
-minimal sync role; read them before writing another.
+reference implementation of a media role, `plugins/mock/src/sync.ts` a minimal
+sync role, and `plugins/custom-server` a real account — keys, sealing, the
+owner proof and the session rules; read them before writing another.

@@ -8,6 +8,7 @@ import {
   type MediaContext,
   type MediaTarget,
   type NetworkKind,
+  type PluginCrypto,
 } from '@sc/api';
 
 import { nodeCrypto } from './node-crypto';
@@ -86,6 +87,7 @@ export interface FakeContextOptions {
   readonly network?: NetworkKind;
   readonly session?: string;
   readonly installationId?: string;
+  readonly crypto?: PluginCrypto;
 }
 
 /** A context whose session, network and clock the test can look at and change. */
@@ -120,7 +122,7 @@ export function fakeContext(options: FakeContextOptions) {
         now += ms;
       },
     },
-    crypto: nodeCrypto(),
+    crypto: options.crypto ?? nodeCrypto(),
   };
   return {
     context,
