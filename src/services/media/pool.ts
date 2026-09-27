@@ -13,6 +13,7 @@ import {
 } from '@sc/api';
 
 import { stableHash, stableJson } from '../hash';
+import { MissingSecretError } from './errors';
 import type { PluginCatalog } from '../plugin-catalog';
 import type { ClientIdentitySource, Clock, Logger, NetworkMonitor, SecureCredentialStore } from '../ports';
 import { sessionIdentity, type Sessions } from '../sessions';
@@ -95,11 +96,17 @@ export function createProviderPool(deps: {
   const connect = async (source: Source): Promise<ConnectedMediaProvider> => {
     const role = roleOf(source.manifest.id, source.manifest.displayName);
     const ref = source.values.credentialsRef;
+    const saved = source.values.secretKeys ?? [];
+    const readSecrets = async () => {
+      const secrets = (ref && (await deps.credentials.read(ref))) || {};
+      if (saved.some((key) => secrets[key] === undefined)) throw new MissingSecretError();
+      return secrets;
+    };
     const provider = await role.connect(
       { connectionId: source.connection.id, fields: source.values.fields, settings: source.values.settings },
       await context(
         `${source.connection.id}|${source.scope}`,
-        async () => (ref && (await deps.credentials.read(ref))) || {},
+        readSecrets,
         deps.sessions.bind(source.connection.id, source.scope, sessionIdentity(source.manifest, source.values)),
       ),
     );

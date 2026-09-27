@@ -32,7 +32,7 @@ yarn-error.*
 
 # local env files
 .env*.local
-# A server's details for development (scripts/start-jellyfin.mjs) are never committed.
+# A server's details for development are never committed.
 *.env
 
 # typescript

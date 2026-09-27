@@ -15,6 +15,12 @@ describe('describing a source that could not answer', () => {
     );
   });
 
+  it('asks for the password again when the saved one is gone from the device', () => {
+    expect(describeSourceError({ label: 'Home', code: 'UNAUTHORIZED', retry: 'never', needsPassword: true })).toBe(
+      'Home needs its password again. Enter it in Settings.',
+    );
+  });
+
   it('falls back to what the code means', () => {
     expect(describeSourceError({ label: 'Home', code: 'TIMEOUT', retry: 'backoff' })).toBe('Home took too long to answer.');
     expect(describeSourceError({ label: 'Home', code: 'OFFLINE', retry: 'network-change' })).toBe('Home is not reachable right now.');

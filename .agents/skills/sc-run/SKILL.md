@@ -15,7 +15,8 @@ npm start          # dev server, then press i / a / w
 ## Which runtime you need
 
 **Expo Go is enough today.** Every native module in use — `react-native-svg`,
-`expo-crypto`, `react-native-screens` — ships in Expo Go 57.
+`expo-crypto`, `react-native-screens`, `expo-sqlite`, `expo-secure-store` —
+ships in Expo Go 57.
 
 That changes the moment a playback engine lands. Expo Go only bundles its own
 native modules, so a custom one requires a development build:
@@ -30,30 +31,25 @@ rebuild, and the failure mode looks like code that did not change.
 **Never start Metro with `CI=1` while iterating.** CI mode turns off file
 watching: every edit after startup is silently served stale.
 
-## Seeded data
+## Data persists — set it up once
 
-Storage is in memory, so every reload is a first launch (Welcome → name a
-profile). To start past it:
+There is no development seed. Everything — profiles, PINs, installed plugins,
+connections and their passwords, layouts — is kept on the device, so set up what
+a flow needs once and it is there on every later launch.
 
-```bash
-EXPO_PUBLIC_DEV_SEED=1 npx expo start --clear       # opens as Kids; Alex has PIN 1234
-EXPO_PUBLIC_DEV_SEED=locked npx expo start --clear  # Alex is the default: PIN pad at launch
-```
-
-Both seeds install the `mock` plugin with one shared connection. The variable is
-read at bundle time, so change it only together with `--clear`.
-
-Against a real Jellyfin server, from the workspace's gitignored `jellyfin.env`
-(`web_ui` or `ip`, `username`, `password`):
-
-```bash
-npm run start:jellyfin              # -- --web | --ios | --android
-```
-
-Same profiles, plus one shared Jellyfin connection. The script prints key names
-only — never echo that file's values anywhere. The password is inlined into the
-development bundle, so it is for a test account on your own network. A failed
-sign-in counts against the account's lockout: do not loop a wrong password.
+- **A first launch** needs a fresh start: a new browser profile (a fresh
+  `--user-data-dir`), `xcrun simctl uninstall booted host.exp.Exponent` plus
+  `xcrun simctl keychain booted reset`, or `adb shell pm clear host.exp.exponent`.
+- **A real Jellyfin server**: Settings → Plugins → Jellyfin → Installed → Add
+  connection, filled in from the workspace's gitignored `jellyfin.env`
+  (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
+  type the values in; never echo them anywhere. A failed sign-in counts against
+  the account's lockout: do not loop a wrong password.
+- **Offline work**: the `mock` plugin (development builds only) is a pretend
+  server that needs no network. Install it and add a connection like any other.
+- **In a browser, stay on `localhost`.** On plain `http` from a network address
+  the app refuses to start: its secrets need WebCrypto, which only a secure page
+  has.
 
 ## Verified on this machine
 
@@ -94,9 +90,14 @@ builds. A link lands on a cold start too: `(app)` stays reachable while the app
 starts. Only a profile with a PIN, or no default profile, drops it.
 
 Useful paths: `/media`, `/browse/<rowId>` (`movies`, `shows`, `anime`),
-`/customize-home`, `/settings/plugins/<pluginId>`. Item pages
-(`/item/<connectionId>/<itemId>`) carry ids generated at launch, so reach them
-by tapping.
+`/customize-home`, `/settings/plugins/<pluginId>`, `/settings/pin`. Item pages
+(`/item/<connectionId>/<itemId>`) carry the connection's generated id, so reach
+them by tapping.
+
+Without Accessibility permission the iOS simulator cannot be tapped, so prove
+persistence there by reading the database: stop the app, then run `sqlite3` on
+`…/ExponentExperienceData/<project>/SQLite/streaming-center.db` in the Expo Go
+data container (`xcrun simctl get_app_container <UDID> host.exp.Exponent data`).
 
 Expo Go shows a developer-menu introduction on first launch. Skip it on iOS:
 
@@ -127,8 +128,9 @@ switches, which is the quickest real test of parking and recovery.
 If Expo Go is missing on the emulator, `npx expo start --android` installs it,
 or reuse the cached APK: `adb install ~/.expo/android-apk-cache/Expo-Go-<version>.apk`.
 
-In a browser, automation must navigate inside the app: a full page load is a
-fresh in-memory state, seeded again. Headless Chrome with
+In a browser, a full page load keeps everything — IndexedDB lives in the
+Chrome profile — so navigating by URL is fine; start with a fresh
+`--user-data-dir` for a first launch. Headless Chrome with
 `--remote-debugging-port` and Node's built-in `WebSocket` is enough to drive it
 over the DevTools protocol:
 
@@ -138,7 +140,11 @@ over the DevTools protocol:
   send `Input.insertText` — React ignores a value set directly.
 - The PIN pad takes key events (`Input.dispatchKeyEvent`).
 - `Network.enable` and `Network.requestWillBeSent` count what a source asked;
-  a browser adds a CORS preflight (`OPTIONS`) to each authenticated request.
+  a browser adds a CORS preflight (`OPTIONS`) to each authenticated request. A
+  reload should make no new `POST /Users/AuthenticateByName`: the session is
+  kept, encrypted, in `streaming-center-secrets`.
+- `Runtime.evaluate` can read IndexedDB (`indexedDB.open('streaming-center')`)
+  to check what was stored — refs, never a password.
 
 ## What you will actually see right now
 
@@ -148,7 +154,7 @@ over the DevTools protocol:
 - **Media** — an empty state until a source is connected. Then Continue
   Watching (landscape cards with progress), a row per kind (posters with
   ratings, watched checks and progress bars), a title link to each row's
-  full-screen grid, and detail pages. With the Jellyfin seed the titles and
+  full-screen grid, and detail pages. Connected to Jellyfin, the titles and
   artwork are the server's; the mock draws coloured placeholders instead of
   artwork. A source that cannot answer shows one quiet line with Retry.
 - **Customize** (the sliders button, top right) — per-row order, visibility,

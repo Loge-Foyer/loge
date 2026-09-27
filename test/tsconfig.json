@@ -1,0 +1,11 @@
+{
+  // The tests run in Node and use its modules (node:sqlite, node:async_hooks,
+  // node:fs). The app's own program never sees Node's types: code in src/
+  // runs on Hermes, where Node's globals do not exist.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../src/expo-types.d.ts", "../expo-env.d.ts", "../.expo/types/**/*.ts"],
+  "exclude": []
+}

@@ -36,16 +36,19 @@ circular. This is expensive to undo later.
 capabilities.
 
 **Reaching for the network in a write path.** Local database plus journal entry
-in one transaction, then return. The sync engine drains the journal later.
+in one transaction, then return. The sync engine drains the journal later. And
+nothing but the database inside that transaction — not the keychain, not
+WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-Phase 1 — Jellyfin as a media source. Media shows real titles from every live
-source, merged: Continue Watching, per-profile rows, a full-screen grid per
-row, and detail pages. Connections belong to the device and decide per
-connection what each profile keeps for itself (`perProfile`). Storage is still
-in memory, nothing plays, and Videos still shows skeletons. vitest covers the
-service layer.
+Phase 2 — local persistence. Everything from Phase 1 — real titles from every
+live source, merged; per-profile rows, grids and detail pages; connections that
+decide per connection what each profile keeps (`perProfile`) — now survives a
+restart: SQLite and the keychain on iOS and Android, IndexedDB and encrypted
+secrets on the web. Every local change appends a change-journal entry. Nothing
+plays, and Videos still shows skeletons. vitest covers the database on both
+engines and the service layer.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

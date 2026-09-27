@@ -1,6 +1,6 @@
 ---
 name: sc-verify
-description: Run the full verification pass for the Streaming Center app — typecheck, lint (import-boundary and Hermes rules), tests, expo-doctor, a real bundle for each target, and the check that no development secret reaches a production bundle. Use before committing, after touching config or native modules, or when asked whether the app is healthy.
+description: Run the full verification pass for the Streaming Center app — typecheck (app and tests), lint (import-boundary, Hermes and SQLite rules), tests on both database engines, expo-doctor, a real bundle for each target with only its own storage in it, and the check that no secret reaches the database. Use before committing, after touching config, storage or native modules, or when asked whether the app is healthy.
 ---
 
 # Verify the Streaming Center app
@@ -9,9 +9,9 @@ Run these in order. Each catches something the others cannot.
 
 ```bash
 npx expo start        # once, then stop it: it generates .expo/types (typed routes)
-npm run typecheck     # tsc --noEmit — strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess
-npm run lint          # expo lint, including the boundary and Hermes rules below
-npm test              # vitest over test/ — the service layer
+npm run typecheck     # the app, then test/tsconfig.json — strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess
+npm run lint          # expo lint, including the boundary, Hermes and SQLite rules below
+npm test              # vitest over test/ — the database on SQLite and IndexedDB, the credential stores, the services
 npx expo-doctor       # dependency and config diagnosis
 ```
 
@@ -30,25 +30,30 @@ npx expo export --platform web --output-dir /tmp/sc-web
 is broken, a route is invalid, or a `file:` dependency into the plugins
 repository fails to resolve. Those only surface in an export.
 
-## No development secret in a production bundle
+## Each bundle carries only its own storage
 
-`npm run start:jellyfin` inlines a real password into the development bundle.
-Prove an export never carries it — export with sentinel values, then search:
+`src/composition/storage.ts` (native) and `storage.web.ts` are chosen by
+platform. If either leaked into the other bundle, web would drag in
+expo-sqlite's WebAssembly build — and need COOP/COEP headers — or native would
+ship dead IndexedDB code:
 
 ```bash
-EXPO_PUBLIC_DEV_SEED=jellyfin EXPO_PUBLIC_DEV_JELLYFIN_URL=http://sc-sentinel-host:8096 \
-EXPO_PUBLIC_DEV_JELLYFIN_USERNAME=SC_SENTINEL_USER EXPO_PUBLIC_DEV_JELLYFIN_PASSWORD=SC_SENTINEL_42 \
-  npx expo export --platform web --source-maps --output-dir /tmp/sc-web
-grep -rl -e SC_SENTINEL_42 -e SC_SENTINEL_USER -e sc-sentinel-host /tmp/sc-web   # must print nothing
+grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore /tmp/sc-web             # must print nothing
+strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c streaming-center-secrets  # must print 0
 ```
 
-The seed's `process.env.EXPO_PUBLIC_DEV_JELLYFIN_*` reads sit behind `__DEV__`,
-so a production build drops them. Moving one outside that check leaks the
-password into every export.
+With `--source-maps` on the web export, also check the vocabulary is bundled
+once: the `sources` of the web map should list each
+`streaming_center_plugins/api/src/*` file exactly once.
 
-While the source maps are there, check the vocabulary is bundled once: the
-`sources` of the web map should list each `streaming_center_plugins/api/src/*`
-file exactly once.
+## No secret in the database
+
+The tests dump every table and store and grep for passwords, PINs and tokens
+(`test/secrets.test.ts`). On a device, check by hand after connecting a source:
+a browser's IndexedDB (DevTools → Application) holds only refs in
+`streaming-center` and ciphertext in `streaming-center-secrets`, and on the
+simulator `sqlite3 …/SQLite/streaming-center.db .dump | grep <password>` prints
+nothing (`docs/platforms/ios` has the path).
 
 ## Boundaries — a deliberate violation must fail
 
@@ -68,11 +73,20 @@ imports one of each — including a relative `../platform/clock` — and run
 ## Hermes rules
 
 iOS and Android run Hermes, which lacks `Array.prototype.toSorted`,
-`Object.groupBy` and `crypto.randomUUID`. Tests run on Node and the web runs V8,
-so nothing else notices until a phone throws. Lint rejects all three anywhere
-in `src/`; add `[1].toSorted()` to the throwaway file above and it must fail
-too. The plugins repository's `test/engine.test.ts` scans its sources for the
-same list.
+`Object.groupBy` and `crypto.randomUUID`, and may lack `structuredClone`,
+`Promise.withResolvers` and `Intl.RelativeTimeFormat`. Tests run on Node and the
+web runs V8, so nothing else notices until a phone throws. Lint rejects all of
+them anywhere in `src/`; add `[1].toSorted()` to the throwaway file above and it
+must fail too. The plugins repository's `test/engine.test.ts` scans its sources
+for the same gaps.
+
+## SQLite rules
+
+Lint also rejects `withTransactionAsync` and `withExclusiveTransactionAsync`
+anywhere in `src/`. The first folds other statements into the transaction; the
+second runs on a second connection with foreign keys, and so cascades, off.
+Transactions go through `LocalDatabase.transaction()`. A call such as
+`db.withTransactionAsync(async () => {})` in the throwaway file must fail.
 
 ## Why web gets its own bundle
 
@@ -97,10 +111,13 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
 
 ## Current state — read this before trusting a failure
 
-- Storage is **in memory**: every reload is a first launch unless the dev seed
-  is on (`sc-run`).
-- `npm test` covers services, not screens. Screens are proven by driving the
-  app on each platform (`sc-run`).
+- Storage is **real**: SQLite and the keychain on native, IndexedDB and
+  encrypted secrets on the web. Data persists between runs, so a flow that
+  expects a first launch needs a fresh start (`docs/getting-started`).
+- The web build refuses to start on plain `http` from a network address; use
+  `localhost`.
+- `npm test` covers the database, the credential stores and the services, not
+  screens. Screens are proven by driving the app on each platform (`sc-run`).
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

@@ -88,15 +88,17 @@ These are specific to Streaming Center and matter more than anything above.
 
 4. **Secrets never reach the database** — SQLite on native, IndexedDB on web.
    The database stores opaque refs; values live behind `SecureCredentialStore`
-   (keychain on native, encrypted IndexedDB on web, in memory today). Secrets
-   are manifest `password` fields, PINs and session tokens; none of them enters
-   a row, a query key, a provider fingerprint or a log. A changed secret gets a
-   new ref — never overwrite one in place.
+   (keychain on native, encrypted IndexedDB on web). Secrets are manifest
+   `password` fields, PINs and session tokens; none of them enters a row, a
+   journal entry, a query key, a provider fingerprint or a log. A changed secret
+   gets a new ref — never overwrite one in place. Session tokens and the device
+   key go in the *device-bound* store, never restored onto another phone.
 
 5. **Writes are local-first.** A user action writes to the local database and
    appends a change-journal entry in one transaction, then returns. The sync
    engine drains the journal later. No network call in a UI interaction path —
-   favouriting must work in airplane mode.
+   favouriting must work in airplane mode. Local queries and mutations run with
+   `networkMode: 'always'`: a browser saying "offline" must not pause them.
 
 6. **Profile separation is enforced twice.** Every user-owned table carries
    `user_id` with a cascade from `users`, *and* every query cache key is
@@ -120,13 +122,53 @@ These are specific to Streaming Center and matter more than anything above.
 
 ---
 
+## Persistence
+
+`src/persistence/` holds both engines behind `LocalDatabase` (`services/ports.ts`).
+`docs/data` explains each rule; these are the ones that break silently.
+
+- **A transaction awaits nothing but its `tx` repositories.** IndexedDB commits
+  a transaction the moment it waits on anything else — a keychain call,
+  WebCrypto, a fetch — and SQLite deadlocks on a call to the database that
+  skips `tx`. A write that also touches secrets is plan (read, write fresh
+  secrets) → one transaction (rows, queued stale refs) → clean up
+  (`janitor.drain()`). Fresh secrets are deleted again if the transaction fails.
+- **Never expo-sqlite's transaction helpers.** `withTransactionAsync` lets
+  other statements into the transaction; `withExclusiveTransactionAsync` runs on
+  a second connection with foreign keys, and so every cascade, off. Lint rejects
+  both. `persistence/sqlite/sql.ts` serializes one connection instead.
+- **Never `INSERT OR REPLACE` a parent row.** It deletes first, and the cascade
+  takes the children. Update in place.
+- **Migrations are numbered, committed, never edited, never destructive.** A
+  newer database is refused. A table rebuild is a `foreignKeysOff` step.
+- **Journaling is the repositories' job,** in the same transaction. A write that
+  changes nothing writes nothing. Device settings and cascaded rows are not
+  journaled; the journal's `user_id` does not cascade.
+- **Secrets are deleted through the queue.** A ref the rows stop pointing at is
+  added to `staleSecrets` in the same transaction; `SecretJanitor` deletes it
+  after the commit and at launch. The keychain cannot list its keys, so a missed
+  delete lasts for ever.
+- **A missing secret is never a sign-in.** When a row lists a saved password the
+  store no longer has — after a restore — the pool refuses with
+  `MissingSecretError` instead of signing in with nothing.
+- **The device key is never in the database,** which backups copy to other
+  phones. It lives in the device-bound secure store.
+- **Tests run on the real engines** — `node:sqlite` and fake-indexeddb, one
+  contract suite for both. Never mock a repository.
+
+---
+
 ## Web is a first-class target
 
 Not an afterthought. Things to know:
 
-- **Storage on web is IndexedDB, not SQLite** (decided; in memory today). No
-  SQLite-wasm, no COOP/COEP headers. Not localStorage either: a local-first
-  write needs the data and its journal entry in one transaction.
+- **Storage on web is IndexedDB, not SQLite.** No SQLite-wasm, no COOP/COEP
+  headers. Not localStorage either: a local-first write needs the data and its
+  journal entry in one transaction.
+- **The page must be secure** — `https` or `localhost` — because the secrets are
+  encrypted with WebCrypto. On plain `http` from a network address the app
+  refuses to start (`composition/storage.web.ts`). That is about the page only:
+  never require TLS of a source.
 - `web.output` is `"single"` — an SPA. Nothing is pre-rendered; do not add
   `+html.tsx` or server-only assumptions.
 - `src/app/_layout.tsx` imports `@tamagui/core/reset.css`; without it browser
@@ -140,11 +182,13 @@ Not an afterthought. Things to know:
 ## iOS and Android run Hermes
 
 Hermes lacks built-ins that Node and browsers have — `Array.prototype.toSorted`,
-`Object.groupBy`, `crypto.randomUUID`. Code using them typechecks, passes vitest
-(Node) and works on the web, then throws on a phone: Continue Watching broke
-exactly like that. Lint rejects them in `src/`; copy and sort
-(`[...list].sort(compare)`) instead. Plugins run on Hermes too — the plugins
-repository's tests scan for the same gaps.
+`Object.groupBy`, `crypto.randomUUID`, and possibly `structuredClone`,
+`Promise.withResolvers` and `Intl.RelativeTimeFormat`. Code using them
+typechecks, passes vitest (Node) and works on the web, then throws on a phone:
+Continue Watching broke exactly like that. Lint rejects them in `src/`; copy and
+sort (`[...list].sort(compare)`) instead. Plugins run on Hermes too — the
+plugins repository's tests scan for the same gaps. The app's TypeScript program
+never sees Node's types; only `test/tsconfig.json` does.
 
 ---
 
@@ -229,7 +273,7 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-Phase 1 — Jellyfin as a media source. Storage is still **in memory**:
+Phase 2 — local persistence. Everything survives a restart:
 
 - Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
   source), Settings (profiles, PIN lock, plugins).
@@ -241,12 +285,18 @@ Phase 1 — Jellyfin as a media source. Storage is still **in memory**:
   sort and card style, a full-screen grid per row, and detail pages for movies,
   shows, seasons and episodes — from every live source, merged. Jellyfin and
   the mock implement the media role; nothing plays yet.
+- Storage: SQLite (`expo-sqlite`) and the keychain on iOS and Android;
+  IndexedDB and WebCrypto-encrypted secrets on the web, which requires a secure
+  page. Every local change appends a change-journal entry; nothing drains it
+  until the account phase.
+- There is no development seed: set things up once, and they persist.
+  `docs/getting-started` has how to start from scratch.
 - Videos still renders skeletons: no plugin lists videos or files yet.
-- `npm run start:jellyfin` seeds a real server from the workspace's
-  `jellyfin.env`.
 - The service graph is a runtime singleton (`src/composition/provider.tsx`) —
-  a router remount must never rebuild it.
-- vitest covers the service layer (`npm test`).
+  a router remount must never rebuild it, and in development it survives Fast
+  Refresh.
+- vitest covers the database on both engines, the credential stores and the
+  service layer (`npm test`).
 
 Do not assume anything else described here exists. Build it, then update the
 docs in the same commit.
@@ -255,9 +305,9 @@ docs in the same commit.
 
 ```bash
 npx expo start          # once: generates the typed-route types
-npx tsc --noEmit
-npx expo lint           # includes the import-boundary and Hermes rules
-npm test                # vitest, the service layer
+npm run typecheck       # the app, then the tests (test/tsconfig.json)
+npx expo lint           # includes the import-boundary, Hermes and SQLite rules
+npm test                # vitest: the database, the credential stores, the services
 npx expo-doctor
 npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web

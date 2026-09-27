@@ -84,11 +84,12 @@ alone — so everything reaches them through the `MediaContext` built in
 | `client` | app name and version, device name, and an installation id stable per device, connection and credential scope |
 | `clock` | `now()`, and a `sleep()` that honours cancellation |
 
-The installation id hashes a device key — the vendor id on iOS, the Android id,
-a random id per page load on the web until storage is durable — with the
-connection and scope. A server that
-keeps one token per device then keeps one per profile that signs in, instead of
-each sign-in ending the last one's session.
+The installation id hashes a device key with the connection and scope. The
+device key is made once per install — from the vendor id on iOS or the Android
+id, at random on the web — and kept in the secure store that never moves to
+another phone, so a restored backup signs in as a new device rather than as
+this one. A server that keeps one token per device then keeps one per profile
+that signs in, instead of each sign-in ending the last one's session.
 
 ## What a plugin brings
 

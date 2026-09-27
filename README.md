@@ -26,9 +26,10 @@ npm install
 npm run ios       # or: npm run android, npm run web
 ```
 
-To try it against your own Jellyfin server, put its address and a test
-account in `../jellyfin.env` and run `npm run start:jellyfin` —
-`docs/getting-started/` has the details, and the one caveat.
+To try it against your own Jellyfin server, add it once in Settings → Plugins
+→ Jellyfin: its address and an account. The app keeps it, like everything
+else. In a browser, open the app from `localhost` — `docs/getting-started/`
+explains why.
 
 ## How it is put together
 
@@ -69,7 +70,8 @@ screens rather than a new app.
 
 ## Current state
 
-**Phase 1 — Jellyfin.** Three tabs, built with [Tamagui](https://tamagui.dev):
+**Phase 2 — nothing is lost on restart.** Three tabs, built with
+[Tamagui](https://tamagui.dev):
 
 - **Media** — films and series from every source, as one library: what you are
   in the middle of, then a row per kind in the order and sort you choose, a
@@ -81,9 +83,14 @@ screens rather than a new app.
   through a form the plugin itself describes, and decide what each profile
   keeps for itself.
 
-What is not there yet: nothing is saved between launches (it all lives in
-memory for now), nothing plays, and there is no account to carry profiles
-between devices.
+Everything is kept on the device: profiles, PINs, installed plugins,
+connections and their passwords, and each profile's home. On a phone that is
+SQLite and the keychain; in a browser, its own database, with the secrets
+encrypted. Every change is also recorded, for the sync that comes with the
+account.
+
+What is not there yet: nothing plays, and there is no account to carry
+profiles between devices.
 
 ## Documentation
 

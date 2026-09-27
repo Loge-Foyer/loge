@@ -1,6 +1,7 @@
 import { credentialsRef, type UserId } from '@sc/api';
 
-import type { Clock, IdGenerator, SecureCredentialStore, UserRepository } from './ports';
+import type { Clock, IdGenerator, LocalDatabase, SecureCredentialStore } from './ports';
+import type { SecretJanitor } from './secrets';
 
 // A profile PIN keeps children out of adult profiles; it is not an account
 // password. It is kept as typed — in the credential store, never the database —
@@ -29,18 +30,19 @@ interface Throttle {
 }
 
 export function createPinService(deps: {
-  users: UserRepository;
+  db: LocalDatabase;
   credentials: SecureCredentialStore;
+  janitor: SecretJanitor;
   ids: IdGenerator;
   clock: Clock;
 }): PinService {
-  const { users, credentials, ids, clock } = deps;
+  const { db, credentials, janitor, ids, clock } = deps;
   // In memory on purpose: a persisted lockout would hand anyone holding the
   // device a way to lock the owner out of their own profile.
   const throttles = new Map<UserId, Throttle>();
 
   const requireUser = async (userId: UserId) => {
-    const user = await users.get(userId);
+    const user = await db.users.get(userId);
     if (!user) throw new Error(`Unknown profile ${userId}`);
     return user;
   };
@@ -74,12 +76,25 @@ export function createPinService(deps: {
     return { ok: false, reason: 'wrong', attemptsLeft: ATTEMPTS_BEFORE_LOCKOUT - failures };
   };
 
+  // Like every secret, a new PIN gets a new ref, and the old one is deleted
+  // only once the profile points at the new one.
   const write = async (userId: UserId, pin: string) => {
     assertWellFormed(pin);
-    const user = await requireUser(userId);
-    const ref = user.pinCredentialRef ?? credentialsRef(ids.next());
-    await credentials.write(ref, { pin });
-    if (!user.pinCredentialRef) await users.update({ ...user, pinCredentialRef: ref });
+    await requireUser(userId);
+    const fresh = credentialsRef(ids.next());
+    await credentials.write(fresh, { pin });
+    try {
+      await db.transaction(async (tx) => {
+        const user = await tx.users.get(userId);
+        if (!user) throw new Error(`Unknown profile ${userId}`);
+        await tx.users.update({ ...user, pinCredentialRef: fresh });
+        if (user.pinCredentialRef) await tx.staleSecrets.add([user.pinCredentialRef]);
+      });
+    } catch (error) {
+      await credentials.delete(fresh).catch(() => undefined);
+      throw error;
+    }
+    await janitor.drain();
   };
 
   return {
@@ -99,11 +114,14 @@ export function createPinService(deps: {
     remove: async (userId, current) => {
       const check = await verify(userId, current);
       if (!check.ok) return check;
-      const { pinCredentialRef, ...user } = await requireUser(userId);
-      if (pinCredentialRef) {
-        await credentials.delete(pinCredentialRef);
-        await users.update(user);
-      }
+      await db.transaction(async (tx) => {
+        const found = await tx.users.get(userId);
+        if (!found?.pinCredentialRef) return;
+        const { pinCredentialRef, ...user } = found;
+        await tx.users.update(user);
+        await tx.staleSecrets.add([pinCredentialRef]);
+      });
+      await janitor.drain();
       return check;
     },
   };

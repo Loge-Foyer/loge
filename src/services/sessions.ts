@@ -15,7 +15,10 @@ export type CredentialScope = 'shared' | UserId;
 
 export type SessionStore = MediaContext['session'];
 
-/** Where a scope's session lives. Derived, never stored, so nothing has to remember it. */
+/**
+ * Where a scope's session lives. Derived, never stored, so nothing has to
+ * remember it: a connection or profile that goes queues these for deletion.
+ */
 export function sessionRef(connectionId: ConnectionId, scope: CredentialScope): CredentialsRef {
   return credentialsRef(`session:${connectionId}:${scope}`);
 }
@@ -41,9 +44,9 @@ export interface Sessions {
   bind(connectionId: ConnectionId, scope: CredentialScope, identity: string): SessionStore;
   /** For probing an unsaved draft; nothing outlives it. */
   ephemeral(): SessionStore;
-  forget(connectionId: ConnectionId, scope: CredentialScope): Promise<void>;
 }
 
+/** `credentials` is the device-bound store: a token is valid for this device only. */
 export function createSessions(credentials: SecureCredentialStore): Sessions {
   return {
     bind: (connectionId, scope, identity) => {
@@ -74,6 +77,5 @@ export function createSessions(credentials: SecureCredentialStore): Sessions {
         },
       };
     },
-    forget: (connectionId, scope) => credentials.delete(sessionRef(connectionId, scope)),
   };
 }

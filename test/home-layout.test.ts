@@ -10,6 +10,7 @@ import {
   type HomeRow,
 } from '@/services/home-layout';
 
+import { ENGINES, type Engine } from './support/engines';
 import { buildServices } from './support/services';
 
 const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
@@ -49,14 +50,18 @@ describe('home layout', () => {
     expect(ids(removeRow(rows, 'movies-added'))).not.toContain('movies-added');
   });
 
-  it('is stored per profile, and goes with the profile', async () => {
-    const { services, stores } = buildServices({ plugins: [] });
+  it.each(ENGINES)('is stored per profile, and goes with the profile (%s)', async (engine: Engine) => {
+    const { services, db } = buildServices({ plugins: [], engine });
     const kids = await services.profiles.create('Kids');
     const alex = await services.profiles.create('Alex');
     await services.homeLayout.update(alex.id, (rows) => moveRow(rows, 'shows', -1));
     expect(ids(await services.homeLayout.rows(alex.id))).toEqual(['continue', 'shows', 'movies', 'anime']);
     expect(ids(await services.homeLayout.rows(kids.id))).toEqual(['continue', 'movies', 'shows', 'anime']);
+    // Reset is a deletion of the one preference, not a rewrite of all of them.
+    await services.homeLayout.reset(alex.id);
+    expect(await db.preferences.get(alex.id)).toEqual({});
+    await services.homeLayout.update(alex.id, (rows) => moveRow(rows, 'shows', -1));
     await services.profiles.remove(alex.id);
-    expect(await stores.preferences.get(alex.id)).toEqual({});
+    expect(await db.preferences.get(alex.id)).toEqual({});
   });
 });

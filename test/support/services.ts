@@ -1,6 +1,6 @@
 // The service graph as the composition root builds it, with only the device
-// boundary faked: ids, clock, network, identity and the HTTP client. Every
-// service and repository is the real one.
+// boundary faked: ids, clock, network, identity, the keychain and the HTTP
+// client. Every service is the real one, on the real database engine.
 import {
   AppError,
   compareItems,
@@ -9,7 +9,6 @@ import {
   type HttpClient,
   type MediaItem,
   type Movie,
-  type NetworkKind,
   type Plugin,
   type PluginManifest,
   type ConnectionId,
@@ -22,51 +21,16 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { createPinService } from '@/services/pins';
 import { createPluginCatalog } from '@/services/plugin-catalog';
-import type { Clock, Logger, NetworkMonitor } from '@/services/ports';
 import { createProfileService } from '@/services/profiles';
+import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
 import { createSessions } from '@/services/sessions';
 import { createSourceService } from '@/services/sources';
-import { createMemoryStores } from '@/persistence/memory';
-import { createMemoryCredentialStore } from '@/platform/credential-store';
 
-export function counterIds() {
-  let next = 0;
-  return { next: () => `id-${(next += 1)}` };
-}
+import { openTestDatabase, type Engine, type TestDatabaseOptions } from './engines';
+import { counterIds, fakeClock, fakeNetwork, memoryCredentialStore, silentLog } from './fakes';
 
-export function fakeClock(start = 1_000_000): Clock & { advance(ms: number): void } {
-  let now = start;
-  return {
-    now: () => now,
-    sleep: async (ms) => {
-      now += ms;
-    },
-    advance: (ms) => {
-      now += ms;
-    },
-  };
-}
-
-export function fakeNetwork(initial: NetworkKind = 'wifi'): NetworkMonitor & { set(kind: NetworkKind): void } {
-  let current = initial;
-  const listeners = new Set<(kind: NetworkKind, previous: NetworkKind) => void>();
-  return {
-    current: () => current,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    set: (kind) => {
-      if (kind === current) return;
-      const previous = current;
-      current = kind;
-      for (const listener of listeners) listener(kind, previous);
-    },
-  };
-}
-
-export const silentLog: Logger = { debug: () => undefined, warn: () => undefined, error: () => undefined };
+export { counterIds, fakeClock, fakeNetwork, silentLog } from './fakes';
 
 const unusedHttp: HttpClient = {
   request: async () => {
@@ -95,11 +59,13 @@ export interface FakeSourceOptions {
   /** Thrown by every call while set. */
   readonly failWith?: () => AppError | undefined;
   readonly withImages?: boolean;
+  /** Reads its credentials before every call, the way a real source signs in. */
+  readonly signsIn?: boolean;
 }
 
 /** A media plugin backed by lists, with the counters a test needs to see what was asked. */
 export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
-  const stats = { connects: 0, calls: 0, disposed: 0, credentials: [] as Record<string, string>[] };
+  const stats = { connects: 0, calls: 0, disposed: 0, credentials: [] as Record<string, string>[], signedInWith: [] as Record<string, string>[] };
   const manifest: PluginManifest = {
     id: pluginId(id),
     displayName: id,
@@ -122,20 +88,21 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     media: {
       connect: async (target, context): Promise<ConnectedMediaProvider> => {
         stats.connects += 1;
-        const fail = () => {
+        const fail = async () => {
           stats.calls += 1;
+          if (options.signsIn) stats.signedInWith.push({ ...(await context.credentials.read()) });
           const error = options.failWith?.();
           if (error) throw error;
         };
         return {
           connectionId: target.connectionId,
           check: async () => {
-            fail();
+            await fail();
             stats.credentials.push({ ...(await context.credentials.read()) });
             return { serverName: String(target.fields.serverUrl), version: 'test' };
           },
           listItems: async (query) => {
-            fail();
+            await fail();
             const all = (options.movies?.(target.connectionId) ?? []).toSorted(compareItems(query.sort));
             const offset = query.cursor ? Number(query.cursor) : 0;
             const items = all.slice(offset, offset + query.limit);
@@ -143,14 +110,14 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
             return { items, total: all.length, ...(next < all.length ? { nextCursor: String(next) } : {}) };
           },
           getItem: async (externalId) => {
-            fail();
+            await fail();
             const item = (options.movies?.(target.connectionId) ?? []).find((candidate) => candidate.key.externalId === externalId);
             if (!item) throw new AppError('NOT_FOUND', 'No such item.');
             return { item, people: [], studios: [], externalIds: {} };
           },
           getChildren: async () => ({ items: [] }),
           getResume: async (limit) => {
-            fail();
+            await fail();
             return (options.resume?.(target.connectionId) ?? []).slice(0, limit);
           },
           ...(options.withImages
@@ -166,18 +133,29 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
   return { plugin, manifest, stats };
 }
 
-export function buildServices(options: { plugins: readonly Plugin[]; network?: ReturnType<typeof fakeNetwork> }) {
-  const stores = createMemoryStores();
-  const credentials = createMemoryCredentialStore();
+export function buildServices(options: {
+  plugins: readonly Plugin[];
+  network?: ReturnType<typeof fakeNetwork>;
+  engine?: Engine;
+  /** The same database again, for a test that restarts. */
+  where?: Pick<TestDatabaseOptions, 'path' | 'indexedDB'>;
+  clock?: ReturnType<typeof fakeClock>;
+  credentials?: ReturnType<typeof memoryCredentialStore>;
+  deviceBound?: ReturnType<typeof memoryCredentialStore>;
+}) {
+  const clock = options.clock ?? fakeClock();
+  const db = openTestDatabase(options.engine ?? 'sqlite', { clock, ...options.where });
+  const credentials = options.credentials ?? memoryCredentialStore();
+  const deviceBound = options.deviceBound ?? memoryCredentialStore();
   const ids = counterIds();
-  const clock = fakeClock();
   const network = options.network ?? fakeNetwork();
-  const sessions = createSessions(credentials);
+  const sessions = createSessions(deviceBound);
+  const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log: silentLog });
   const catalog = createPluginCatalog(options.plugins, { strict: true, warn: () => undefined });
-  const devicePlugins = createDevicePlugins(stores.deviceSettings);
-  const pins = createPinService({ users: stores.users, credentials, ids, clock });
-  const session = createSessionService({ users: stores.users, deviceSettings: stores.deviceSettings, pins });
-  const sources = createSourceService({ catalog, devicePlugins, connections: stores.connections });
+  const devicePlugins = createDevicePlugins(db.deviceSettings);
+  const pins = createPinService({ db, credentials, janitor, ids, clock });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
+  const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
   const pool = createProviderPool({
     catalog,
     credentials,
@@ -189,29 +167,21 @@ export function buildServices(options: { plugins: readonly Plugin[]; network?: R
     log: silentLog,
   });
   const connections = createConnectionService({
-    connections: stores.connections,
-    users: stores.users,
+    db,
     credentials,
     catalog,
-    sessions,
+    janitor,
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
   const media = createMediaService({ sources, pool, probeSecrets: connections.probeSecrets, network, log: silentLog });
-  const profiles = createProfileService({
-    users: stores.users,
-    connections: stores.connections,
-    credentials,
-    sessions,
-    deviceSettings: stores.deviceSettings,
-    session,
-    ids,
-    onRemoved: (id) => media.forgetUser(id),
-  });
-  const homeLayout = createHomeLayoutService(stores.preferences);
+  const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
+  const homeLayout = createHomeLayoutService(db.preferences);
   return {
-    stores,
+    db,
     credentials,
+    deviceBound,
+    janitor,
     network,
     clock,
     services: { catalog, devicePlugins, session, profiles, pins, connections, sources, homeLayout, media },

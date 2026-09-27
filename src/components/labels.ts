@@ -108,7 +108,8 @@ const ERROR_TEXT: Readonly<Partial<Record<AppErrorCode, string>>> = {
 };
 
 /** One line for a source that could not answer: "Home server is only used on your home network." */
-export function describeSourceError(error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry'>): string {
+export function describeSourceError(error: Pick<SourceError, 'label' | 'code' | 'reason' | 'retry' | 'needsPassword'>): string {
+  if (error.needsPassword) return `${error.label} needs its password again. Enter it in Settings.`;
   if (error.reason === 'local-network-only') return `${error.label} is only used on your home network.`;
   // Waiting for another network, which is why it is not tried again.
   if (error.retry === 'network-change' && error.code !== 'OFFLINE') return `${error.label} can’t be reached on this network.`;

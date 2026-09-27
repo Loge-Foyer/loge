@@ -19,6 +19,17 @@ const implementations = [
   },
 ];
 
+// expo-sqlite's transaction helpers break the database's rules: the plain one
+// folds whatever else runs meanwhile into the transaction, the exclusive one
+// runs on a second connection where foreign keys — and so cascades — are off.
+// Transactions go through persistence/sqlite/sql.ts instead.
+const sqliteTransactionHelpers = [
+  {
+    selector: "CallExpression[callee.property.name=/^with(Exclusive)?TransactionAsync$/]",
+    message: 'Use LocalDatabase.transaction(): expo-sqlite’s transaction helpers let other statements in, or switch foreign keys off.',
+  },
+];
+
 // Hermes, the engine on iOS and Android, lacks a few built-ins a browser has.
 // Code using them typechecks and works on the web, then throws on a phone.
 const missingOnHermes = {
@@ -28,11 +39,18 @@ const missingOnHermes = {
       selector: "CallExpression[callee.property.name='toSorted']",
       message: 'Hermes has no Array.prototype.toSorted. Copy, then sort: [...list].sort(compare).',
     },
+    {
+      selector: "CallExpression[callee.name='structuredClone']",
+      message: 'Hermes may lack structuredClone. Keep values immutable, or copy them explicitly.',
+    },
+    ...sqliteTransactionHelpers,
   ],
   'no-restricted-properties': [
     'error',
     { object: 'Object', property: 'groupBy', message: 'Hermes has no Object.groupBy.' },
     { object: 'crypto', property: 'randomUUID', message: 'Hermes has no crypto.randomUUID. Use expo-crypto.' },
+    { object: 'Promise', property: 'withResolvers', message: 'Hermes may lack Promise.withResolvers. Use new Promise((resolve, reject) => …).' },
+    { object: 'Intl', property: 'RelativeTimeFormat', message: 'Hermes may lack Intl.RelativeTimeFormat. Say how long ago by hand, as components/labels.ts does.' },
   ],
 };
 

@@ -1,3 +1,9 @@
+import { createClientIdentitySource } from '@/platform/client-identity';
+import { systemClock } from '@/platform/clock';
+import { createPlatformHttpClient } from '@/platform/http';
+import { uuidGenerator } from '@/platform/ids';
+import { consoleLogger } from '@/platform/log';
+import { createNetworkMonitor } from '@/platform/network';
 import { createConnectionService } from '@/services/connections';
 import { createDevicePlugins } from '@/services/device-plugins';
 import { createHomeLayoutService } from '@/services/home-layout';
@@ -7,66 +13,63 @@ import { createProviderPool } from '@/services/media/pool';
 import { createPinService } from '@/services/pins';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
+import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
 import { createSessions } from '@/services/sessions';
 import { createSourceService } from '@/services/sources';
-import { createMemoryStores } from '@/persistence/memory';
-import { createClientIdentitySource } from '@/platform/client-identity';
-import { systemClock } from '@/platform/clock';
-import { createMemoryCredentialStore } from '@/platform/credential-store';
-import { createPlatformHttpClient } from '@/platform/http';
-import { uuidGenerator } from '@/platform/ids';
-import type { IdGenerator } from '@/services/ports';
-import { consoleLogger } from '@/platform/log';
-import { createNetworkMonitor } from '@/platform/network';
 
 import { plugins } from './plugins';
+import { createStorage } from './storage';
+
+export interface AppServices {
+  readonly services: Services;
+  /** What launching does, once: clear what a crash left queued, then decide the first screen. */
+  readonly start: () => Promise<void>;
+}
 
 /** Builds the whole service graph. The only place concrete implementations are chosen. */
-export function createServices(options: { ids?: IdGenerator } = {}): Services {
-  const stores = createMemoryStores();
-  const credentials = createMemoryCredentialStore();
-  const ids = options.ids ?? uuidGenerator;
+export function createServices(): AppServices {
   const log = consoleLogger;
+  const clock = systemClock;
+  const ids = uuidGenerator;
+  const { db, credentials, deviceBound } = createStorage({ clock, log });
   const network = createNetworkMonitor();
-  const sessions = createSessions(credentials);
+  const sessions = createSessions(deviceBound);
+  const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log });
 
   const catalog = createPluginCatalog(plugins, { strict: __DEV__, warn: (message) => log.warn('app.boot', message) });
-  const devicePlugins = createDevicePlugins(stores.deviceSettings);
-  const pins = createPinService({ users: stores.users, credentials, ids, clock: systemClock });
-  const session = createSessionService({ users: stores.users, deviceSettings: stores.deviceSettings, pins });
-  const sources = createSourceService({ catalog, devicePlugins, connections: stores.connections });
+  const devicePlugins = createDevicePlugins(db.deviceSettings);
+  const pins = createPinService({ db, credentials, janitor, ids, clock });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
+  const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
   const pool = createProviderPool({
     catalog,
     credentials,
     sessions,
     http: createPlatformHttpClient(network, log),
     network,
-    identity: createClientIdentitySource(),
-    clock: systemClock,
+    identity: createClientIdentitySource(deviceBound, log),
+    clock,
     log,
   });
   const connections = createConnectionService({
-    connections: stores.connections,
-    users: stores.users,
+    db,
     credentials,
     catalog,
-    sessions,
+    janitor,
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
   const media = createMediaService({ sources, pool, probeSecrets: connections.probeSecrets, network, log });
-  const profiles = createProfileService({
-    users: stores.users,
-    connections: stores.connections,
-    credentials,
-    sessions,
-    deviceSettings: stores.deviceSettings,
-    session,
-    ids,
-    onRemoved: (id) => media.forgetUser(id),
-  });
-  const homeLayout = createHomeLayoutService(stores.preferences);
+  const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
+  const homeLayout = createHomeLayoutService(db.preferences);
 
-  return { catalog, devicePlugins, session, profiles, pins, connections, sources, homeLayout, media };
+  return {
+    services: { catalog, devicePlugins, session, profiles, pins, connections, sources, homeLayout, media },
+    start: async () => {
+      await janitor.drain();
+      // A storage failure lands on the boot screen's "could not start", never on an endless splash.
+      await session.start();
+    },
+  };
 }

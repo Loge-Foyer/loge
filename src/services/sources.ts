@@ -10,7 +10,7 @@ import {
   type UserId,
 } from '@sc/api';
 
-import type { DevicePlugins } from './device-plugins';
+import { PLUGIN_OFF, type DevicePlugins } from './device-plugins';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ConnectionRepository, ProfileValues } from './ports';
 import type { CredentialScope } from './sessions';
@@ -71,11 +71,11 @@ export function createSourceService(deps: {
   const { catalog, devicePlugins, connections } = deps;
 
   const resolve = async (userId: UserId) => {
-    const [all, own] = await Promise.all([connections.list(), connections.valuesOfProfile(userId)]);
+    const [all, own, plugins] = await Promise.all([connections.list(), connections.valuesOfProfile(userId), devicePlugins.states()]);
     const live: Source[] = [];
     const pending: PendingSource[] = [];
     for (const manifest of catalog.list()) {
-      if (!(await devicePlugins.state(manifest.id)).enabled) continue;
+      if (!(plugins[manifest.id] ?? PLUGIN_OFF).enabled) continue;
       for (const connection of all) {
         if (connection.pluginId !== manifest.id) continue;
         const profile = own.get(connection.id);

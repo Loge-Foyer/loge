@@ -29,7 +29,3 @@ export const plugins: readonly Plugin[] = [
   // A test double — offline, deliberately partial. Development builds only.
   ...(__DEV__ ? [mock] : []),
 ];
-
-/** Used by the optional development seed. */
-export const mockPlugin = mock;
-export const jellyfinPlugin = jellyfin;

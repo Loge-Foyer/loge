@@ -1,6 +1,7 @@
 import type { PluginId } from '@sc/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
+import { PLUGIN_OFF } from '@/services/device-plugins';
 import { deviceKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
@@ -15,12 +16,10 @@ export function usePluginStates() {
   const { catalog, devicePlugins } = useServices();
   return useQuery({
     queryKey: deviceKey('plugins'),
-    queryFn: async () =>
-      new Map(
-        await Promise.all(
-          catalog.list().map(async ({ id }) => [id, await devicePlugins.state(id)] as const),
-        ),
-      ),
+    queryFn: async () => {
+      const states = await devicePlugins.states();
+      return new Map(catalog.list().map(({ id }) => [id, states[id] ?? PLUGIN_OFF] as const));
+    },
   });
 }
 

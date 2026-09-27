@@ -5,6 +5,9 @@ import type {
   ConnectionValues,
   Credentials,
   CredentialsRef,
+  GlobalMediaKey,
+  MediaDetail,
+  MediaItem,
   NetworkKind,
   PluginId,
   UserId,
@@ -12,9 +15,8 @@ import type {
 
 import type { HomeLayout } from './home-layout';
 
-// What the services need from storage and the device. Everything is async so
-// today's in-memory implementations can be replaced by SQLite (native) and
-// IndexedDB (web) without touching a service.
+// What the services need from storage and the device. The database is SQLite
+// on native and IndexedDB on web; the services cannot tell which.
 
 export interface StoredUser {
   readonly id: UserId;
@@ -84,7 +86,98 @@ export interface PreferencesRepository {
   update(userId: UserId, change: (current: UserPreferences) => UserPreferences): Promise<UserPreferences>;
 }
 
-/** Keychain on native, encrypted IndexedDB on web — in memory for now. */
+/** What a source answered for one list, as it was when saved. */
+export interface SavedList {
+  readonly items: readonly MediaItem[];
+  readonly savedAt: number;
+}
+
+export interface SavedDetail {
+  readonly detail: MediaDetail;
+  readonly savedAt: number;
+}
+
+/**
+ * What sources answered, kept per profile so a screen can show it while the
+ * source is slow or unreachable. A cache, not user state: nothing here is
+ * journaled. Every entry carries the fingerprint of the values the source
+ * ran with, and one saved under other values is never served.
+ */
+export interface MediaCacheRepository {
+  list(userId: UserId, connectionId: ConnectionId, key: string, fingerprint: string): Promise<SavedList | undefined>;
+  /** Skipped when the profile or the connection is gone. */
+  putList(userId: UserId, connectionId: ConnectionId, key: string, fingerprint: string, list: SavedList): Promise<void>;
+  removeList(userId: UserId, connectionId: ConnectionId, key: string): Promise<void>;
+  detail(userId: UserId, key: GlobalMediaKey, fingerprint: string): Promise<SavedDetail | undefined>;
+  /** Skipped when the profile or the connection is gone. */
+  putDetail(userId: UserId, fingerprint: string, saved: SavedDetail): Promise<void>;
+  removeDetail(userId: UserId, key: GlobalMediaKey): Promise<void>;
+  /** Everything saved for a connection, or only for one profile's use of it. */
+  purge(connectionId: ConnectionId, userId?: UserId): Promise<void>;
+  /** Details, and lists whose key starts with `listPrefix`, not saved since `before`. */
+  prune(before: number, listPrefix: string): Promise<void>;
+}
+
+/**
+ * Credentials refs whose secrets are to be deleted. The keychain cannot list
+ * what it holds, so a ref is queued in the same transaction that stops
+ * pointing at it, and deleted from the credential store after the commit.
+ */
+export interface StaleSecretQueue {
+  add(refs: readonly CredentialsRef[]): Promise<void>;
+  list(): Promise<readonly CredentialsRef[]>;
+  remove(refs: readonly CredentialsRef[]): Promise<void>;
+}
+
+export type JournalEntity = 'user' | 'preferences' | 'connection' | 'connectionProfileValues';
+
+/**
+ * One local change, for the sync engine to carry later: a pointer to the
+ * entity, never its values. `seq` is assigned by the database, in the order
+ * changes committed.
+ */
+export interface JournalEntry {
+  readonly seq: number;
+  /** Whose entity this is. An attribute, not ownership: the journal outlives the profile. */
+  readonly userId?: UserId;
+  readonly entity: JournalEntity;
+  readonly entityId: string;
+  readonly operation: 'upsert' | 'delete';
+  readonly changedAt: number;
+  readonly localVersion: number;
+}
+
+export interface ChangeJournal {
+  /** Entries after `seq`, oldest first. */
+  entries(after?: number): Promise<readonly JournalEntry[]>;
+}
+
+/** Everything the database keeps. Each write appends its journal entry in the same transaction. */
+export interface Repositories {
+  readonly users: UserRepository;
+  readonly connections: ConnectionRepository;
+  readonly deviceSettings: DeviceSettingsRepository;
+  readonly preferences: PreferencesRepository;
+  readonly mediaCache: MediaCacheRepository;
+  readonly staleSecrets: StaleSecretQueue;
+}
+
+/**
+ * The local database — SQLite on native, IndexedDB on web. Called directly, a
+ * repository method is a transaction of its own.
+ */
+export interface LocalDatabase extends Repositories {
+  /**
+   * Several writes that land together or not at all. `work` may await only
+   * the repositories it is given: IndexedDB commits a transaction the moment
+   * it waits on anything else, and SQLite would wait on itself for ever.
+   * Secrets are written before and deleted after, never in between.
+   */
+  transaction<T>(work: (tx: Repositories) => Promise<T>): Promise<T>;
+  readonly journal: ChangeJournal;
+}
+
+/** Keychain on native, encrypted IndexedDB on web. */
 export interface SecureCredentialStore {
   read(ref: CredentialsRef): Promise<Credentials | undefined>;
   write(ref: CredentialsRef, credentials: Credentials): Promise<void>;

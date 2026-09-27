@@ -1,14 +1,9 @@
-import { userId as toUserId, type AppUser, type UserId } from '@sc/api';
+import { userId as toUserId, type AppUser, type CredentialsRef, type UserId } from '@sc/api';
 
-import type {
-  ConnectionRepository,
-  DeviceSettingsRepository,
-  IdGenerator,
-  SecureCredentialStore,
-  UserRepository,
-} from './ports';
+import type { IdGenerator, LocalDatabase } from './ports';
+import type { SecretJanitor } from './secrets';
 import type { SessionService } from './session';
-import type { Sessions } from './sessions';
+import { sessionRef } from './sessions';
 import { toAppUser } from './users';
 
 const MAX_NAME_LENGTH = 30;
@@ -26,17 +21,14 @@ export interface ProfileService {
 }
 
 export function createProfileService(deps: {
-  users: UserRepository;
-  connections: ConnectionRepository;
-  credentials: SecureCredentialStore;
-  sessions: Sessions;
-  deviceSettings: DeviceSettingsRepository;
+  db: LocalDatabase;
+  janitor: SecretJanitor;
   session: SessionService;
   ids: IdGenerator;
   /** The profile is gone: whatever runs for it can stop. */
   onRemoved?: (id: UserId) => void;
 }): ProfileService {
-  const { users, connections, credentials, sessions, deviceSettings, session, ids, onRemoved } = deps;
+  const { db, janitor, session, ids, onRemoved } = deps;
 
   const cleanName = (name: string) => {
     const trimmed = name.trim();
@@ -48,49 +40,56 @@ export function createProfileService(deps: {
   };
 
   return {
-    list: async () => (await users.list()).map(toAppUser),
+    list: async () => (await db.users.list()).map(toAppUser),
     get: async (id) => {
-      const user = await users.get(id);
+      const user = await db.users.get(id);
       return user && toAppUser(user);
     },
     create: async (name) => {
-      const isFirst = (await users.list()).length === 0;
       const user = { id: toUserId(ids.next()), name: cleanName(name) };
-      await users.insert(user);
-      if (isFirst) await deviceSettings.update((current) => ({ ...current, defaultUserId: user.id }));
+      await db.transaction(async (tx) => {
+        const isFirst = (await tx.users.list()).length === 0;
+        await tx.users.insert(user);
+        if (isFirst) await tx.deviceSettings.update((current) => ({ ...current, defaultUserId: user.id }));
+      });
       return toAppUser(user);
     },
     rename: async (id, name) => {
-      const user = await users.get(id);
+      const user = await db.users.get(id);
       if (!user) throw new Error(`Unknown profile ${id}`);
-      await users.update({ ...user, name: cleanName(name) });
+      await db.users.update({ ...user, name: cleanName(name) });
     },
     remove: async (id) => {
-      const all = await users.list();
-      const user = all.find((candidate) => candidate.id === id);
-      if (!user) return;
-      if (all.length === 1) throw new Error('The last profile cannot be deleted.');
-
-      // Secrets are not in the database, so its cascade cannot reach them.
-      const own = await connections.valuesOfProfile(id);
-      for (const values of own.values()) {
-        if (values.credentialsRef) await credentials.delete(values.credentialsRef);
-      }
-      for (const connection of await connections.list()) await sessions.forget(connection.id, id);
-      onRemoved?.(id);
-      if (user.pinCredentialRef) await credentials.delete(user.pinCredentialRef);
-
-      await users.delete(id);
-      await deviceSettings.update((current) => {
-        if (current.defaultUserId !== id) return current;
-        const { defaultUserId: _deleted, ...rest } = current;
-        return rest;
+      const removed = await db.transaction(async (tx) => {
+        const all = await tx.users.list();
+        const user = all.find((candidate) => candidate.id === id);
+        if (!user) return false;
+        if (all.length === 1) throw new Error('The last profile cannot be deleted.');
+        const own = await tx.connections.valuesOfProfile(id);
+        const connections = await tx.connections.list();
+        // The cascade takes everything the profile owns. Its secrets are not in
+        // the database, so they are queued: its own sign-ins, its PIN, its sessions.
+        await tx.users.delete(id);
+        await tx.deviceSettings.update((current) => {
+          if (current.defaultUserId !== id) return current;
+          const { defaultUserId: _deleted, ...rest } = current;
+          return rest;
+        });
+        await tx.staleSecrets.add([
+          ...[...own.values()].map((values) => values.credentialsRef).filter((ref): ref is CredentialsRef => ref !== undefined),
+          ...(user.pinCredentialRef ? [user.pinCredentialRef] : []),
+          ...connections.map((connection) => sessionRef(connection.id, id)),
+        ]);
+        return true;
       });
+      if (!removed) return;
+      await janitor.drain();
+      onRemoved?.(id);
       session.forget(id);
     },
-    defaultUserId: async () => (await deviceSettings.get()).defaultUserId,
+    defaultUserId: async () => (await db.deviceSettings.get()).defaultUserId,
     setDefault: async (id) => {
-      await deviceSettings.update((current) => ({ ...current, defaultUserId: id }));
+      await db.deviceSettings.update((current) => ({ ...current, defaultUserId: id }));
     },
   };
 }

@@ -15,5 +15,7 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     environment: 'node',
+    // node:sqlite, the real SQLite the tests run the app's database on, warns that it is experimental.
+    execArgv: ['--disable-warning=ExperimentalWarning'],
   },
 });

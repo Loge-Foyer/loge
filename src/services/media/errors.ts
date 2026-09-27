@@ -19,6 +19,20 @@ export interface SourceError {
   readonly retry: RetryHint;
   readonly reason?: AppErrorReason;
   readonly message: string;
+  /** Not even asked: the password saved for it is no longer on this device. */
+  readonly needsPassword?: true;
+}
+
+/**
+ * A row says a password is saved, and the credential store no longer has it —
+ * a backup restored the database but not the keychain. Signing in without it
+ * would count as a failed login, and servers lock accounts after a few.
+ */
+export class MissingSecretError extends AppError {
+  constructor() {
+    super('UNAUTHORIZED', 'The saved password is no longer on this device.', { retry: 'never' });
+    this.name = 'MissingSecretError';
+  }
 }
 
 /** A request cancelled by its caller — leaving a screen — which is not a failure. */
@@ -41,5 +55,6 @@ export function sourceError(source: Source, error: AppError): SourceError {
     retry: error.retry,
     ...(error.reason ? { reason: error.reason } : {}),
     message: error.message,
+    ...(error instanceof MissingSecretError ? { needsPassword: true as const } : {}),
   };
 }

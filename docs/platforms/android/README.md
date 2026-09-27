@@ -11,6 +11,20 @@ traffic from Android 9 on, so it will need a network security configuration
 allowing it to local addresses — set through a config plugin in `app.json` when
 the development build arrives.
 
+## Storage
+
+- **The database** is SQLite in the app's files folder, which Android's Auto
+  Backup includes, up to its 25 MB limit.
+- **Secrets** are encrypted under the Android keystore. Keystore keys cannot be
+  restored, so expo-secure-store's config plugin (in `app.json`) leaves that
+  data out of backups. It takes effect in development and store builds.
+- **After a restore**, the database is back but its secrets are not. A source
+  whose saved password is missing is never signed in without it — servers lock
+  accounts after failed logins. Instead it says it needs its password again.
+  A profile whose PIN is missing opens for its owner.
+- `adb shell pm clear host.exp.exponent` starts Expo Go, and every project in
+  it, from scratch.
+
 ## The emulator
 
 - An emulator has both mobile data and Wi-Fi. Check which is the default

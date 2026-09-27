@@ -5,7 +5,6 @@ import { AppState } from 'react-native';
 import { ServicesContext } from '@/hooks/services-context';
 import type { Services } from '@/services';
 
-import { devSeedFrom, devSeedIds, seedDevelopmentData } from './dev-seed';
 import { createServices } from './services';
 
 interface AppGraph {
@@ -15,23 +14,35 @@ interface AppGraph {
 
 let graph: AppGraph | undefined;
 
+// Fast Refresh runs this module again after an edit anywhere below it. A new
+// graph would open the database a second time — on iOS, on the same native
+// connection — so in development the first graph stays; reload to pick up a
+// change in a service.
+const devHolder = globalThis as { __streamingCenterGraph?: AppGraph };
+
 /**
  * Built once per JavaScript runtime, not per mount: the router may remount the
  * root layout — a deep link, the browser's back button — and that must never
- * mean a second service graph with its own, empty, state.
+ * mean a second service graph.
  */
 function appGraph(): AppGraph {
-  if (graph) return graph;
-  const seed = __DEV__ ? devSeedFrom(process.env.EXPO_PUBLIC_DEV_SEED) : null;
-  const services = createServices(seed ? { ids: devSeedIds(seed) } : {});
-  graph = {
+  const existing = __DEV__ ? devHolder.__streamingCenterGraph : graph;
+  if (existing) return existing;
+  const { services, start } = createServices();
+  const created: AppGraph = {
     services,
     queryClient: new QueryClient({
-      // Everything cached is local state that changes only through this app's
-      // own mutations, and each mutation invalidates what it touched.
-      defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+      defaultOptions: {
+        // Everything cached is local state that changes only through this
+        // app's own mutations, and each mutation invalidates what it touched.
+        // Reading or writing it needs no network: never wait for "online".
+        queries: { staleTime: Infinity, retry: false, networkMode: 'always' },
+        mutations: { networkMode: 'always' },
+      },
     }),
   };
+  if (__DEV__) devHolder.__streamingCenterGraph = created;
+  else graph = created;
   // A browser reports focus by itself; on a device, coming back to the app is the focus.
   if (process.env.EXPO_OS !== 'web') {
     focusManager.setEventListener((setFocused) => {
@@ -39,11 +50,8 @@ function appGraph(): AppGraph {
       return () => subscription.remove();
     });
   }
-  void (async () => {
-    if (seed) await seedDevelopmentData(services, seed);
-    await services.session.start();
-  })();
-  return graph;
+  void start();
+  return created;
 }
 
 export function ServicesProvider({ children }: { children: ReactNode }) {

@@ -2,41 +2,37 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { CryptoDigestAlgorithm, digestStringAsync, randomUUID } from 'expo-crypto';
 
-import type { ClientIdentity, ClientIdentitySource } from '@/services/ports';
+import type { ClientIdentity, ClientIdentitySource, Logger, SecureCredentialStore } from '@/services/ports';
+
+import { loadDeviceKey } from './device-key';
 
 const APP_NAME = 'Streaming Center';
 
 /**
- * What servers see of this install. The device key has to stay the same
- * between launches, or a media server counts a new device every time:
- *
- * - on iOS and Android it comes from the platform's per-app identifier;
- * - in a development build the start script can pin it, per platform — a
- *   browser and a simulator sharing one would end each other's sessions;
- * - on the web it lasts only as long as the page until storage exists.
+ * What servers see of this install. The device key is read from `deviceStore`
+ * — the secure store that never moves to another phone — and made once.
  */
-export function createClientIdentitySource(): ClientIdentitySource {
+export function createClientIdentitySource(deviceStore: SecureCredentialStore, log: Logger): ClientIdentitySource {
   let identity: Promise<ClientIdentity> | undefined;
   return {
-    identity: () => (identity ??= load()),
+    identity: () => (identity ??= load(deviceStore, log)),
   };
 }
 
-async function load(): Promise<ClientIdentity> {
+async function load(store: SecureCredentialStore, log: Logger): Promise<ClientIdentity> {
   return {
     appName: APP_NAME,
     appVersion: Constants.expoConfig?.version ?? '0.0.0',
     deviceName: Constants.deviceName ?? defaultDeviceName(),
-    deviceKey: await deviceKey(),
+    deviceKey: await loadDeviceKey({
+      store,
+      platformId: platformIdentifier,
+      // Hashed, so the platform's own identifier never leaves the device.
+      derive: (platformId) => digestStringAsync(CryptoDigestAlgorithm.SHA256, `${APP_NAME}:${platformId}`),
+      randomId: randomUUID,
+      log,
+    }),
   };
-}
-
-async function deviceKey(): Promise<string> {
-  const pinned = __DEV__ ? process.env.EXPO_PUBLIC_DEV_INSTALLATION_ID : undefined;
-  if (pinned) return `${pinned}:${process.env.EXPO_OS ?? 'unknown'}`;
-  const platformId = await platformIdentifier();
-  // Hashed, so the platform's own identifier never leaves the device.
-  return platformId ? digestStringAsync(CryptoDigestAlgorithm.SHA256, `${APP_NAME}:${platformId}`) : randomUUID();
 }
 
 async function platformIdentifier(): Promise<string | null> {

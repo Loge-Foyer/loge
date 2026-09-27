@@ -13,7 +13,7 @@ src/
   components/   the design system, on Tamagui; takes domain types only
   hooks/        React bindings: query hooks, the session gate
   services/     business logic, no React; ports.ts declares what they need
-  persistence/  repository implementations (in memory today)
+  persistence/  the local database: SQLite (native) and IndexedDB (web)
   platform/     device boundary: credentials, HTTP, network, identity, clock, logging
   composition/  builds the service graph
 ```
@@ -29,9 +29,27 @@ Screens and hooks reach services through `useServices()`, never through
 `composition/services.ts` wires the graph; `composition/provider.tsx` builds it
 **once per JavaScript runtime**, not once per mount. The router may remount the
 root layout — after a deep link, or the browser's back button — and that must
-never produce a second graph with empty state. The same file wires TanStack
-Query's focus manager to `AppState`, so returning to the app refreshes what is
-stale.
+never produce a second graph, which would open the database a second time. In
+development the graph is kept on `globalThis` for the same reason: Fast
+Refresh re-runs the provider's module after an edit, so a changed service
+needs a reload. The same file wires TanStack Query's focus manager to
+`AppState`, so returning to the app refreshes what is stale.
+
+`composition/storage.ts` builds the native storage — SQLite and two keychain
+services — and `storage.web.ts` the web's: IndexedDB, and secrets encrypted in
+IndexedDB. Metro picks the file by platform, so neither side ships the other's
+code. The databases open on first use; launching first deletes secrets a crash
+left queued, then makes the boot decision, and a storage failure lands on the
+boot screen's "could not start".
+
+## The local database
+
+Services reach it through `LocalDatabase` (`services/ports.ts`). Called
+directly, a repository method is a transaction of its own; several writes that
+must land together go through `transaction(work)`, and `work` awaits nothing but
+the repositories it is given. Every change to profiles, preferences and
+connections appends a change-journal entry in the same transaction. The rules,
+and why each exists, are in `docs/data`.
 
 ## The session gate
 
@@ -114,7 +132,8 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
 
 | State | Lives in |
 | --- | --- |
-| Profiles, connections, per-profile values, preferences, device settings | repositories (in memory today; SQLite / IndexedDB next) |
-| Passwords, PINs, session tokens | the credential store (in memory today; keychain / encrypted IndexedDB next) |
+| Profiles, connections, per-profile values, preferences, device settings, the change journal | repositories — SQLite on native, IndexedDB on web |
+| Passwords, PINs | the credential store — the keychain on native, encrypted IndexedDB on web |
+| Session tokens, the device key | the device-bound credential store — the keychain, never restored onto another phone |
 | Reads for screens, titles from sources | TanStack Query, every key prefixed by `device` or by the active profile |
 | The session gate | the session service, read with `useSyncExternalStore` |
