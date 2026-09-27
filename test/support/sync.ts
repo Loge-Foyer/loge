@@ -48,6 +48,8 @@ export function fakeSyncAccount(
     readonly withMedia?: boolean;
     /** An account that cannot check its owner: the device is asked instead. */
     readonly noOwnerCheck?: boolean;
+    /** A switch in its settings, on at first, that stops it carrying this. */
+    readonly toggle?: SyncCapability;
   } = {},
 ): FakeAccount {
   const pageSize = options.pageSize ?? 50;
@@ -134,7 +136,9 @@ export function fakeSyncAccount(
       sync: { capabilities: [...carries] },
       ...(options.withMedia ? { media: { contentKinds: ['files' as const], capabilities: [] } } : {}),
       connectionFields: [{ key: 'server', label: 'Server', type: 'url' }],
-      settings: [],
+      settings: options.toggle
+        ? [{ key: 'carry', label: `Carry ${options.toggle}`, type: 'boolean', default: true, gates: [`sync.${options.toggle}`] }]
+        : [],
     },
     sync: { connect: async (target) => provider(target.connectionId) },
   });

@@ -374,6 +374,31 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first, second) => {
       expect(newer.engine.status().phase).toBe('synced');
       expect(await newer.services.homeLayout.rows(alex)).toEqual(layout.rows);
     });
+
+    it('sends what changed while a kind was switched off, once it is carried again', async () => {
+      const account = fakeSyncAccount({ toggle: 'preferences' });
+      const device = buildServices({ plugins: [account.plugin], engine: first, device: 'a' });
+      const alex = (await device.services.profiles.create('Alex')).id;
+      await signIn(device, account);
+      const carrying = async (on: boolean) => {
+        const current = await device.services.account.current();
+        const edit = current && (await device.services.connections.edit(current.connection.id));
+        if (!edit) throw new Error('setup');
+        const draft = draftOf(account.plugin.manifest, edit);
+        await device.services.connections.update(edit.connection.id, { ...draft, shared: { ...draft.shared, settings: { carry: on } } });
+        await sync(device);
+      };
+
+      await carrying(false);
+      // Not carried now: it goes nowhere, and the journal moves past it.
+      await device.services.homeLayout.update(alex, () => layout.rows);
+      await sync(device);
+      const layouts = () => account.log.filter((change) => change.entity === 'preferences');
+      expect(layouts()).toEqual([]);
+
+      await carrying(true);
+      expect(layouts()).toMatchObject([{ operation: 'upsert', data: { userId: alex, key: 'homeLayout', value: layout } }]);
+    });
   });
 
   it('drops a page pulled from a cursor another run — another tab — has since moved', async () => {

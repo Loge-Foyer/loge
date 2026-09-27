@@ -21,6 +21,7 @@ function scriptedEngine() {
     status: () => status,
     subscribe: () => () => undefined,
     onApplied: () => () => undefined,
+    report: () => undefined,
     run: async () => {
       calls.runs += 1;
       status = ahead.shift() ?? status;

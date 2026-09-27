@@ -226,6 +226,30 @@ describe.each(ENGINES)('the account on %s', (engine: Engine) => {
       expect(a.engine.status().phase).toBe('synced');
     });
 
+    it('is signed in to again without the owner check, and with nothing changed but its passwords', async () => {
+      const { a, account } = pair();
+      await a.services.profiles.create('Lee');
+      await signIn(a, account);
+      const current = await a.services.account.current();
+      if (!current) throw new Error('setup');
+      const before = current.connection.values.fields;
+      // Refused as a changed password is: the account cannot vouch for the owner either.
+      account.refuseSignIn(true);
+      account.refuseOwner(true);
+      await sync(a);
+      account.refuseSignIn(false);
+
+      const edit = await a.services.connections.edit(current.connection.id);
+      if (!edit) throw new Error('setup');
+      const stored = draftOf(account.plugin.manifest, edit);
+      const elsewhere = { ...stored, shared: { ...stored.shared, fields: { ...stored.shared.fields, server: 'https://elsewhere.example' } } };
+      const prepared = await a.services.account.prepareSignIn({ connectionId: current.connection.id, draft: elsewhere });
+      await a.services.account.completeSignIn(prepared, 'both');
+
+      expect((await a.services.account.current())?.connection.values.fields).toEqual(before);
+      expect(a.engine.status().phase).toBe('synced');
+    });
+
     it('shows as unavailable in a build without its plugin, and can still be signed out of', async () => {
       const { a, account } = pair();
       await signIn(a, account);

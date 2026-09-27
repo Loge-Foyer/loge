@@ -15,7 +15,7 @@ import type { PluginCatalog } from './plugin-catalog';
 import type { Repositories, RunLock, SyncDatabase } from './ports';
 import { removeConnectionIn } from './removal';
 import type { SecretJanitor } from './secrets';
-import type { SyncParts } from './sync/apply';
+import type { Applied, SyncParts } from './sync/apply';
 import { currentAccount, type CurrentAccount } from './sync/current';
 import type { SyncEngine } from './sync/engine';
 import { joinAccount, previewAccount, type AccountPreview } from './sync/join';
@@ -73,7 +73,11 @@ export class OwnerNotVerifiedError extends Error {
 export interface AccountService {
   current(): Promise<CurrentAccount | undefined>;
   providers(): Promise<readonly AccountProvider[]>;
-  /** The owner check (when there is something to protect), one try at signing in, and the whole account read. */
+  /**
+   * The owner check (when there is something to protect), one try at signing
+   * in, and the whole account read. Signing in to this device's account again
+   * takes only its passwords, and no owner check: the password is the proof.
+   */
   prepareSignIn(target: SignInTarget): Promise<PreparedSignIn>;
   /** One transaction: the account's connection, the account's changes, this device's announced. */
   completeSignIn(prepared: PreparedSignIn, profiles: 'account' | 'both'): Promise<{ readonly profilesArrived: number }>;
@@ -130,7 +134,7 @@ export function createAccountService(deps: {
     },
 
     prepareSignIn: async (target) => {
-      await guard('Confirm it’s you to sign in to an account');
+      const current = await currentAccount(db, catalog);
       let manifest: PluginManifest | undefined;
       let existing: Connection | undefined;
       let draft: ConnectionDraft;
@@ -140,7 +144,12 @@ export function createAccountService(deps: {
         existing = edit.connection;
         manifest = catalog.get(existing.pluginId);
         if (!manifest) throw new AppError('INVALID_STATE', 'This account cannot be used in this version of the app.', { retry: 'never' });
-        draft = target.draft ?? draftOf(manifest, edit);
+        const stored = draftOf(manifest, edit);
+        // The same account again: its details stay — a new endpoint would be another account, reached without switching.
+        draft =
+          current?.connection.id === existing.id
+            ? { ...stored, shared: { ...stored.shared, secrets: target.draft?.shared.secrets ?? {} } }
+            : (target.draft ?? stored);
       } else {
         manifest = catalog.get(target.pluginId);
         if (!manifest) throw new AppError('INVALID_STATE', 'This account cannot be used in this version of the app.', { retry: 'never' });
@@ -154,8 +163,8 @@ export function createAccountService(deps: {
         throw new InvalidDraftError({ shared: {}, profiles: {}, form: 'Your account belongs to this device, so it keeps nothing per profile.' });
       }
 
-      const current = await currentAccount(db, catalog);
       const again = existing !== undefined && current?.connection.id === existing.id;
+      if (!again) await guard('Confirm it’s you to sign in to an account');
       const carried = carriedBy(manifest, draft);
       const credentials = await connections.probeSecrets(manifest.id, existing?.id, 'shared', draft.shared.secrets);
       // One try, whatever it answers: a refused sign-in is never tried again by itself.
@@ -197,6 +206,7 @@ export function createAccountService(deps: {
 
       const planned = await connections.plan(prepared.manifest.id, prepared.draft, prepared.existing, { sync: true });
       let arrived = 0;
+      let reported: Applied | undefined;
       try {
         await deps.lock.run(LOCK, async () => {
           const applied = await joinAccount(
@@ -221,12 +231,15 @@ export function createAccountService(deps: {
             },
           );
           arrived = applied.arrivedProfiles.size;
+          reported = applied;
         });
       } catch (error) {
         await connections.discard(planned);
         throw error;
       }
       await deps.janitor.drain();
+      // Profiles that arrived, or went: the gate and whatever holds on to them hear of it.
+      if (reported) engine.report(reported);
       await scheduler.accountChanged();
       return { profilesArrived: arrived };
     },

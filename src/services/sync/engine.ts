@@ -39,6 +39,8 @@ export interface SyncEngine {
   subscribe(listener: () => void): () => void;
   /** Told of every batch of changes from the account, once committed. */
   onApplied(listener: (applied: Applied) => void): () => void;
+  /** Changes from the account applied elsewhere — a sign-in's join — for the same listeners to hear of. */
+  report(applied: Applied): void;
   /** A run now, or right after the one in progress. Never throws: what went wrong is in the status. */
   run(): Promise<void>;
   /** One last push to the account, tried once, before this device leaves it. `true` when everything went. */
@@ -103,6 +105,13 @@ export function createSyncEngine(deps: {
       const stored = await parts.db.syncState.get(account.connection.id);
       if (!stored) await rejoin({ kind: 'reset' });
       else if ([...account.carried].some((capability) => !stored.carried.includes(capability))) await rejoin({ kind: 'grow' });
+      else if (stored.carried.some((capability) => !account.carried.has(capability))) {
+        // Carrying less: remembered, so carrying it again joins again and sends what changed meanwhile.
+        await parts.db.unjournaled(async (tx) => {
+          const state = await tx.syncState.get(account.connection.id);
+          if (state) await tx.syncState.put({ ...state, carried: [...account.carried] });
+        });
+      }
 
       for (;;) {
         const state = await parts.db.syncState.get(account.connection.id);
@@ -172,6 +181,7 @@ export function createSyncEngine(deps: {
         appliedListeners.delete(listener);
       };
     },
+    report: applied,
     run: () => {
       if (queued) return tail;
       queued = true;

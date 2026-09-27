@@ -145,7 +145,8 @@ A device has at most one account: the one connection whose sync role is on.
 - **Joining** (`sync/join.ts`) — signing in, switching, an account that lost
   data (`reset`), or one that carries more — reads the whole log, settles what
   both sides hold, and announces this device's rows in the journal for the
-  normal push to upload.
+  normal push to upload. Carrying less is remembered, so carrying it again
+  later joins again: what changed meanwhile was never sent.
 - **When it runs** (`sync/scheduler.ts`): at launch, on coming to the
   foreground, two seconds after a journaled commit, when the network changes,
   every minute in the foreground, and on "Sync now" — never inside a write.
@@ -153,20 +154,24 @@ A device has at most one account: the one connection whose sync role is on.
   but a new network cuts it short; `network-change` waits for one; an account
   that refused the sign-in waits for the user, always. On the web a run holds a
   Web Lock, so two tabs never sync at once.
-- **Afterwards** the engine tells its listeners what changed: the composition
-  lets running providers go and has the session gate look again; the UI
-  refreshes what it shows.
+- **Afterwards** — after a run, and after a sign-in's join — the engine tells
+  its listeners what changed: the composition lets running providers go and
+  has the session gate look again; the UI refreshes what it shows.
 
 **Signing in** is two steps. `prepareSignIn` checks the owner, tries the
 account once and reads it whole, saving nothing. `completeSignIn` writes the
 account's connection, applies what the account holds and announces this
 device's rows, all in one transaction. Between the two, the UI asks "Use the
-account's profiles" or "Keep both" when both sides hold profiles.
+account's profiles" or "Keep both" when both sides hold profiles. Signing in
+again to this device's account takes its passwords and nothing else: a new
+address would be another account, reached without switching.
 
 **The owner check** (`services/owner-check.ts`) re-verifies whoever owns the
 device's profiles: the account's own check when it has one, else Face ID or
 the passcode. Forgot PIN goes through it, and so do signing in on a device
-that has profiles, signing out and switching.
+that has profiles, signing out and switching. Signing in again to the same
+account does not: its password is the proof, and an account that refused the
+old one could not vouch for the owner either.
 
 ## Query keys
 

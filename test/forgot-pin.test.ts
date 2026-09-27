@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { signIn, sync, twoDevices } from './support/devices';
 import { ENGINES, type Engine } from './support/engines';
@@ -94,8 +94,8 @@ describe.each(ENGINES)('the session gate on %s', (engine: Engine) => {
     await b.services.session.start();
     expect(b.services.session.getSnapshot().kind).toBe('needs-first-user');
     await signIn(b, account);
-    await b.services.session.refresh();
-    expect(b.services.session.getSnapshot().kind).toBe('needs-user-selection');
+    // Nobody asks the gate to look again: what the sign-in brought reaches it by itself.
+    await vi.waitFor(() => expect(b.services.session.getSnapshot().kind).toBe('needs-user-selection'));
   });
 
   it('leaves a profile that is gone for "Who’s watching?"', async () => {
