@@ -10,6 +10,8 @@ import {
   type NetworkKind,
 } from '@sc/api';
 
+import { nodeCrypto } from './node-crypto';
+
 export interface RecordedRequest {
   readonly method: HttpMethod;
   /** The path after the server's origin, base path included. */
@@ -20,7 +22,14 @@ export interface RecordedRequest {
   readonly timeoutMs?: number;
 }
 
-export type Reply = { readonly status: number; readonly json?: unknown; readonly text?: string } | TransportError;
+export type Reply =
+  | {
+      readonly status: number;
+      readonly json?: unknown;
+      readonly text?: string;
+      readonly headers?: Readonly<Record<string, string>>;
+    }
+  | TransportError;
 
 export type Route = Reply | ((request: RecordedRequest, calls: number) => Reply | Promise<Reply>);
 
@@ -41,7 +50,7 @@ export function fakeHttp(routes: Readonly<Record<string, Route>>) {
       const route = routes[name];
       const reply = route === undefined ? { status: 404 } : typeof route === 'function' ? await route(recorded, count) : route;
       if (reply instanceof TransportError) throw reply;
-      return { status: reply.status, headers: {}, text: reply.text ?? JSON.stringify(reply.json ?? {}) };
+      return { status: reply.status, headers: reply.headers ?? {}, text: reply.text ?? JSON.stringify(reply.json ?? {}) };
     },
   };
   return {
@@ -111,6 +120,7 @@ export function fakeContext(options: FakeContextOptions) {
         now += ms;
       },
     },
+    crypto: nodeCrypto(),
   };
   return {
     context,

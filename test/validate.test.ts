@@ -1,4 +1,4 @@
-import { pluginId, validateManifest, type PluginManifest } from '@sc/api';
+import { isKdfParams, KDF_LIMITS, pluginId, validateManifest, type PluginManifest } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 const sound: PluginManifest = {
@@ -146,5 +146,84 @@ describe('validateManifest — libraries and credentials', () => {
       settings: [...sound.settings, { key: 'accountName', label: 'Account', type: 'text', credential: true }],
     });
     expect(problems).toContain('setting "accountName" cannot be a credential; credentials are connection fields');
+  });
+});
+
+describe('validateManifest — the account', () => {
+  const account = (sync: NonNullable<PluginManifest['sync']>) => problemsWith({ sync, settings: [] });
+
+  it('accepts an owner proof that names password fields', () => {
+    expect(account({ capabilities: ['profile'], ownerProof: { fields: ['password'] } })).toEqual([]);
+  });
+
+  it('rejects an owner proof that names no field, or a field that is not a password', () => {
+    expect(account({ capabilities: ['profile'], ownerProof: { fields: [] } })).toContain('ownerProof names no field');
+    expect(account({ capabilities: ['profile'], ownerProof: { fields: ['serverUrl'] } })).toContain(
+      'ownerProof field "serverUrl" is not a password connection field',
+    );
+  });
+
+  it('accepts sign-up fields beside the connection’s own', () => {
+    expect(account({ capabilities: ['profile'], signUp: { fields: [{ key: 'invite', label: 'Invite', type: 'text' }] } })).toEqual([]);
+  });
+
+  it('rejects a sign-up field that is a password, clashes, repeats or is badly named', () => {
+    const problems = account({
+      capabilities: ['profile'],
+      signUp: {
+        fields: [
+          { key: 'secret', label: 'Secret', type: 'password' },
+          { key: 'serverUrl', label: 'Again', type: 'url' },
+          { key: 'invite', label: 'Invite', type: 'text' },
+          { key: 'invite', label: 'Invite again', type: 'text' },
+          { key: 'Bad-Key', label: 'Bad', type: 'text' },
+          { key: 'plan', label: 'Plan', type: 'select', default: 'gold', options: [{ value: 'free', label: 'Free' }] },
+        ],
+      },
+    });
+    expect(problems).toEqual(
+      expect.arrayContaining([
+        'sign-up field "secret" cannot be a password field',
+        'sign-up field "serverUrl" clashes with a connection field',
+        'sign-up field key "invite" is declared twice',
+        'sign-up field key "Bad-Key" must be camelCase',
+        'select "plan" defaults to a missing option',
+      ]),
+    );
+  });
+
+  it('rejects sealed passwords without the connections they travel in', () => {
+    expect(account({ capabilities: ['profile', 'sealedPasswords'] })).toContain(
+      'sync capability "sealedPasswords" needs "providerConnections"',
+    );
+    expect(account({ capabilities: ['profile', 'providerConnections', 'sealedPasswords'] })).toEqual([]);
+  });
+});
+
+describe('isKdfParams', () => {
+  const params = { algorithm: 'pbkdf2-sha256', iterations: 600_000, salt: new Uint8Array(16) } as const;
+
+  it('accepts PBKDF2 within the limits', () => {
+    expect(isKdfParams(params)).toBe(true);
+    expect(isKdfParams({ ...params, iterations: KDF_LIMITS.minIterations })).toBe(true);
+    expect(isKdfParams({ ...params, iterations: KDF_LIMITS.maxIterations, salt: new Uint8Array(64) })).toBe(true);
+  });
+
+  // A server — or anyone between it and the device — asking for less would get a proof cheap to guess from.
+  it('refuses anything weaker, heavier, or not what the device derives', () => {
+    for (const bad of [
+      { ...params, iterations: KDF_LIMITS.minIterations - 1 },
+      { ...params, iterations: 1 },
+      { ...params, iterations: KDF_LIMITS.maxIterations + 1 },
+      { ...params, iterations: 600_000.5 },
+      { ...params, iterations: '600000' },
+      { ...params, salt: new Uint8Array(8) },
+      { ...params, salt: new Uint8Array(65) },
+      { ...params, salt: 'c2FsdA' },
+      { ...params, algorithm: 'scrypt' },
+      null,
+    ]) {
+      expect(isKdfParams(bad), JSON.stringify(bad)).toBe(false);
+    }
   });
 });

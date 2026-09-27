@@ -46,7 +46,9 @@ configure the same server twice.
    `preferences`. Declaring it anyway means the engine hands you preference
    changes, you drop them, and the checkpoint advances past them — the state is
    gone and nothing errors. A capability kept per profile needs `profile`
-   (`validateManifest` checks it).
+   (`validateManifest` checks it). `sealedPasswords` needs
+   `providerConnections`, and promises `vaultKey()`: declare it only where the
+   key can be had on every platform the account runs on.
 
 3. **The new sync role starts off, everywhere.** Existing connections were
    stored without it, and a role missing from a connection is off. Only

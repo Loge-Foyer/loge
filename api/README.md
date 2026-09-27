@@ -25,8 +25,11 @@ Written:
 - `ItemQuery` and the one ordering rule
 - `AppError` with retry hints and the `HttpClient` port
 - the media role contract, with the context the host supplies
-- the sync role contract: the changes an account carries, and the check every
-  pulled change passes (`isSyncChange`)
+- the sync role contract: the changes an account carries, the check every
+  pulled change passes (`isSyncChange`), passwords sealed by the app, owner
+  proofs, and creating an account from the app
+- the host's crypto port — random bytes, key derivation, sealing — and bytes as
+  text, both written for a host with no WebCrypto
 
 See `../docs/api/`.
 

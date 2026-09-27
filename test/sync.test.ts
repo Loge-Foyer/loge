@@ -3,6 +3,7 @@ import {
   connectionId,
   defaultRoles,
   isSyncChange,
+  MAX_CHANGE_LENGTH,
   pluginId,
   syncKey,
   userId,
@@ -120,6 +121,49 @@ describe('isSyncChange', () => {
     const [, , , , , , , , values] = valid;
     if (values?.operation !== 'upsert') throw new Error('fixture');
     expect(isSyncChange({ ...values, data: { ...values.data, secretKeys: ['pass word'] } })).toBe(false);
+  });
+});
+
+describe('isSyncChange — sealed passwords', () => {
+  const [, , , , , , connection, , values] = valid;
+  if (connection?.operation !== 'upsert' || connection.entity !== 'connection') throw new Error('fixture');
+  if (values?.operation !== 'upsert' || values.entity !== 'profileValues') throw new Error('fixture');
+  const sealedConnection = (sealed: unknown, secretKeys: readonly string[] = ['password']) => ({
+    ...connection,
+    data: { ...connection.data, secretKeys, sealed },
+  });
+
+  it('accepts sealed values for the passwords a connection or a profile lists', () => {
+    expect(isSyncChange(sealedConnection({ password: 'v1.a1b2.QUJDRA' }))).toBe(true);
+    expect(isSyncChange({ ...values, data: { ...values.data, sealed: { password: 'v1.a1b2.QUJDRA' } } })).toBe(true);
+  });
+
+  it('lets a newer version through, for the app to leave unopened', () => {
+    expect(isSyncChange(sealedConnection({ password: 'v2.x.y.z' }))).toBe(true);
+  });
+
+  it('refuses a sealed value for a password the change does not list', () => {
+    expect(isSyncChange(sealedConnection({ password: 'v1.a.b' }, []))).toBe(false);
+    expect(isSyncChange(sealedConnection({ other: 'v1.a.b' }))).toBe(false);
+  });
+
+  it('refuses a sealed value without its version, in another alphabet, or too long', () => {
+    for (const bad of ['a1b2.QUJDRA', 'v0.a.b', 'v1.', 'v1.a+b', 'v1.a/b', `v1.${'a'.repeat(5_000)}`, 42, null]) {
+      expect(isSyncChange(sealedConnection({ password: bad })), String(bad).slice(0, 12)).toBe(false);
+    }
+    expect(isSyncChange(sealedConnection('v1.a.b'))).toBe(false);
+  });
+
+  it('refuses a change heavier than both sides allow', () => {
+    const heavy = (length: number): SyncChange => ({
+      id: 'h',
+      changedAt: 1,
+      entity: 'preferences',
+      operation: 'upsert',
+      data: { userId: alex, key: 'homeLayout', value: 'x'.repeat(length) },
+    });
+    expect(isSyncChange(heavy(1_000))).toBe(true);
+    expect(isSyncChange(heavy(MAX_CHANGE_LENGTH))).toBe(false);
   });
 });
 

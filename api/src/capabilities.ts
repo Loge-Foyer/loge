@@ -26,6 +26,8 @@ export const SYNC_CAPABILITIES = [
   'watchlist',
   'history',
   'providerConnections',
+  // Connections' passwords, sealed by the app with a key the account never has (`vaultKey`).
+  'sealedPasswords',
   'customLists',
   'fullBackup',
 ] as const;

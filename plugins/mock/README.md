@@ -45,7 +45,9 @@ everything lets broken capability handling go unnoticed. For media it declares
 `browse`, `libraries` and `watchStateRead`, and declines the rest. It has no
 artwork (`remoteImages`), so the app's placeholders get exercised; it declines
 `offlineMetadata` and `search` as well. As an account it carries profiles,
-preferences and connections, and declines the rest.
+preferences and connections, and declines the rest — `sealedPasswords` among
+them, so connections reach other devices with only the names of their
+passwords, and the app's way of asking for them stays exercised.
 
 ## The pretend account
 
@@ -60,7 +62,7 @@ Choose the mock as the device's account, and it keeps a pretend one in memory:
 - **Forgets on reload**, and then answers an old cursor with `reset`, which is
   how the app's way back from a lost account gets exercised.
 - *Flaky* stores only half of every third push; *slow* waits 1.5 s on every
-  call. Its owner check always passes.
+  call. Its owner check always passes, and asks for no proof.
 
 It has no network, so it cannot link two devices: the app's two-device tests
 share one account in memory, and real devices wait for the sync server.

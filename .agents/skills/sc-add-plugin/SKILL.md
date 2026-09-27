@@ -148,8 +148,19 @@ export const sync: SyncRole = {
 - **Never overstate what you can carry.** The engine filters the change journal
   by your declared capabilities. Claim support you lack and it hands you changes
   you drop *and advances the checkpoint past them* — silent data loss.
-- **Passwords never travel**, and a `verifyOwner` you offer must really verify
-  the account's owner: "Forgot PIN" trusts it.
+- **A password travels only as the app sealed it.** To carry connections'
+  passwords, declare `sealedPasswords` and implement `vaultKey()`: the key,
+  derived on the device through `context.crypto`, that the app seals with. You
+  never see another connection's password, and the key never reaches the
+  server.
+- **A `verifyOwner` you offer must really verify the account's owner**: Forgot
+  PIN trusts it. If it takes a password, name the fields in `sync.ownerProof`;
+  it receives them typed again, never the saved ones.
+- **A 401 ends the session.** Do not sign in again with the saved password by
+  yourself; the user signs in again. A refused sign-in is never retried.
+- **Creating an account from the app** is `createAccount(fields)` with the
+  extra fields in `sync.signUp`, and **`signOut()`** ends this device's session
+  where the account can. Both are optional.
 
 ## Boundaries lint will not catch yet
 
@@ -169,7 +180,8 @@ npm test
 ## Current state
 
 `api` holds the manifest vocabulary, the media contract (`MediaRole`,
-`MediaItem`, `AppError`, `HttpClient`) and the sync contract (`SyncRole`,
-`SyncChange`, `isSyncChange`). `plugins/jellyfin` is the reference
-implementation of a media role, and `plugins/mock/src/sync.ts` a minimal sync
-role; read them before writing another.
+`MediaItem`, `AppError`, `HttpClient`), the sync contract (`SyncRole`,
+`SyncChange`, `isSyncChange`, sealed passwords, owner proofs, sign-up) and the
+host's crypto port (`PluginCrypto`, `isKdfParams`). `plugins/jellyfin` is the
+reference implementation of a media role, and `plugins/mock/src/sync.ts` a
+minimal sync role; read them before writing another.

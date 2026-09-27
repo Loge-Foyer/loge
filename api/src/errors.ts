@@ -20,8 +20,12 @@ export type AppErrorCode = (typeof APP_ERROR_CODES)[number];
  */
 export type RetryHint = 'backoff' | 'network-change' | 'never';
 
-/** Why, where the code alone would mislead. */
-export type AppErrorReason = 'local-network-only';
+/**
+ * Why, where the code alone would mislead. `local-network-only`: skipped away
+ * from home. `too-many-attempts`: throttled, so the password was not even
+ * judged. `signed-out`: the account no longer knows this device.
+ */
+export type AppErrorReason = 'local-network-only' | 'too-many-attempts' | 'signed-out';
 
 export interface AppErrorOptions {
   readonly retry?: RetryHint;

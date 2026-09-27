@@ -4,6 +4,7 @@
  * the app, not a plugin.
  */
 export * from './brand';
+export * from './bytes';
 export * from './ids';
 export * from './content';
 export * from './capabilities';
@@ -18,6 +19,7 @@ export * from './media';
 export * from './query';
 export * from './errors';
 export * from './http';
+export * from './crypto';
 export * from './context';
 export * from './media-role';
 export * from './sync';

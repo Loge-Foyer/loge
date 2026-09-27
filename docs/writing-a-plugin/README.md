@@ -9,7 +9,10 @@ holds your state is one package with two roles, not two packages.
    agree on every type.
 2. **Write the manifest** in `src/index.ts` and export it as `plugin` (see
    `api/`). Say what the source brings (`contentKinds`) and what a connection
-   needs (`connectionFields`), marking account fields with `credential`.
+   needs (`connectionFields`), marking account fields with `credential`. Give
+   an address the `url` type: the app uses a saved password only with the
+   address and account it was saved for, and an address it recognises is a
+   `url` field.
 3. **Implement the role** you declare — for media, `media.connect(target,
    context)` returning a `ConnectedMediaProvider`; for sync,
    `sync.connect(target, context)` returning a
@@ -52,10 +55,12 @@ holds your state is one package with two roles, not two packages.
   - A raw transport error reaching the app is a bug. Aborted requests are the
     exception, and are rethrown as they are.
 - **Your code runs on Hermes** in the iOS and Android apps. Hermes lacks
-  `Array.prototype.toSorted`, `Object.groupBy` and `crypto.randomUUID`; they
-  typecheck and pass on Node, then throw on a phone. Copy, then sort — on an
-  array you just made with `filter` or `map`, sorting in place is fine.
-  `test/engine.test.ts` fails if a source uses one.
+  `Array.prototype.toSorted`, `Object.groupBy`, `crypto.randomUUID` and
+  `Uint8Array.prototype.toBase64`; they typecheck, then throw on a phone. Copy,
+  then sort — on an array you just made with `filter` or `map`, sorting in
+  place is fine. Turn bytes into text with `api`'s helpers
+  (`encodeBase64Url`, `encodeUtf8`…). `test/engine.test.ts` fails if a source
+  uses one.
 - **Artwork** is an `ImageRef` you build and later resolve synchronously into an
   address. If an image needs a header, return a `headersRef` and resolve it in
   `resolveHeaders` — never put a token in a URL.
@@ -76,3 +81,18 @@ holds your state is one package with two roles, not two packages.
   prefix at the first change you refuse.
 - **Declare what you can hold, and nothing more.** The app hands you every
   change of a kind you declare, and counts it delivered once you accept it.
+- **Keys go through `context.crypto`.** An account whose server must never
+  read the household's passwords derives its keys on the device — PBKDF2 with
+  parameters `isKdfParams` accepts, checked before anything is derived — and
+  hands the app the vault key (`vaultKey`, promised by `sealedPasswords`). The
+  app seals; you never see another connection's password.
+- **An owner check checks the owner.** `verifyOwner(proof)` receives the
+  fields `sync.ownerProof` names, typed again; never compare against the saved
+  password. A wrong proof is `UNAUTHORIZED`, throttled adds
+  `too-many-attempts`, and an account that no longer knows this device says
+  `signed-out`, so the device's own check answers.
+- **A 401 ends the session.** Once the account says it no longer knows this
+  device — revoked, or deleted — do not sign in again with the saved password
+  by yourself: the user signs in again.
+- **Creating an account** is `createAccount(fields)`, with the fields
+  `sync.signUp` adds to the connection's own. Tried once, like a sign-in.

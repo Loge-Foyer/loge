@@ -1,5 +1,5 @@
 // The one place allowed to import every plugin: a conformance check over all of them.
-import { MEDIA_CAPABILITY_MEMBERS, SYNC_PROVIDER_MEMBERS, validateManifest, type Plugin } from '@sc/api';
+import { MEDIA_CAPABILITY_MEMBERS, SYNC_CAPABILITY_MEMBERS, SYNC_PROVIDER_MEMBERS, validateManifest, type Plugin } from '@sc/api';
 import { plugin as customServer } from '@sc/plugin-custom-server';
 import { plugin as emby } from '@sc/plugin-emby';
 import { plugin as google } from '@sc/plugin-google';
@@ -63,6 +63,14 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     for (const member of SYNC_PROVIDER_MEMBERS) {
       expect(typeof provider[member], `the sync role needs ${member}`).toBe('function');
     }
+    for (const capability of declared) {
+      for (const member of SYNC_CAPABILITY_MEMBERS[capability] ?? []) {
+        expect(typeof provider[member], `${capability} needs ${member}`).toBe('function');
+      }
+    }
+    // The owner check asks for a proof only an account that checks it may name, and sign-up needs its member.
+    if (plugin.manifest.sync?.ownerProof) expect(typeof provider.verifyOwner, 'ownerProof needs verifyOwner').toBe('function');
+    if (plugin.manifest.sync?.signUp) expect(typeof provider.createAccount, 'signUp needs createAccount').toBe('function');
     await provider.dispose();
   });
 });

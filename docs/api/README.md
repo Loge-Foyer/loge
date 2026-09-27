@@ -8,6 +8,7 @@ without learning about the others.
 
 | File | What it defines |
 | --- | --- |
+| `bytes.ts` | Bytes as text and back — base64, base64url, UTF-8 — written by hand, since a plugin has no `btoa` or `TextEncoder` and Hermes may lack them. |
 | `ids.ts` | Branded IDs: `PluginId`, `UserId`, `ConnectionId`, `CredentialsRef`. A `UserId` is a string at runtime, but the compiler will not accept one where a `ConnectionId` belongs. |
 | `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files`. |
 | `capabilities.ts` | The media and sync capability flags, and `CapabilityKey` (`'media.browse'`, `'sync.watchProgress'`), the form a setting uses to gate one. |
@@ -22,9 +23,10 @@ without learning about the others.
 | `query.ts` | `ItemQuery`, `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `errors.ts` | `AppError`: a code from the spec, a retry hint, and an optional reason. |
 | `http.ts` | `HttpClient`, the port a plugin reaches the network through, and `TransportError`. |
+| `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, PBKDF2, HKDF, AES-GCM — and `KdfParams` with `isKdfParams`, the limits both device and server hold a key's parameters to. |
 | `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with, whichever role it plays. |
 | `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. `MediaContext` and `MediaTarget` name the plugin context for media. |
-| `sync.ts` | `SyncRole`, `ConnectedUserStateSyncProvider`, `SyncChange` and the entities it carries, what an account needs to carry each (`SYNC_ENTITY_CAPABILITIES`), `syncKey()`, and `isSyncChange()`. |
+| `sync.ts` | `SyncRole`, `ConnectedUserStateSyncProvider`, `SyncChange` and the entities it carries, what an account needs to carry each (`SYNC_ENTITY_CAPABILITIES`), the members a sync capability promises (`SYNC_CAPABILITY_MEMBERS`), `syncKey()`, and `isSyncChange()` with its size limits. |
 
 Not yet written: playback descriptors.
 
@@ -99,6 +101,8 @@ await provider.listItems({ kind: 'movies', sort: { by: 'releaseDate', order: 'de
   - `network` — what kind of network the device is on
   - `client` — app, version, device and a stable installation id
   - `clock` — `now` and `sleep`
+  - `crypto` — random bytes, key derivation and sealing, for an account whose
+    keys the server must never have
 - **Pages come in `compareItems` order.** The app merges several sources with
   that same function, and a plugin merges its own libraries with it.
 - **Items are plain data**, connection-qualified, and carry the source's
@@ -122,8 +126,11 @@ const { accepted } = await account.push(changes);           // a prefix of the i
 
 - **Changes** are `SyncChange`s: an upsert or a delete of a profile, a
   profile's PIN, a preference, a connection, or a profile's values on one. A
-  PIN is removed by `pin: null`. Passwords never travel: a connection lists the
-  *names* of its saved password fields.
+  PIN is removed by `pin: null`. A connection lists the *names* of its saved
+  password fields; when the account carries `sealedPasswords`, the app adds
+  their values in `sealed`, encrypted with the key `vaultKey()` gives it. The
+  account stores that ciphertext and cannot open it, and a plugin never sees
+  another connection's password.
 - **`push` is idempotent by change id.** It answers the ids it durably stored,
   a prefix of those sent; the app advances only across that prefix and sends
   the rest again, verbatim.
@@ -133,7 +140,14 @@ const { accepted } = await account.push(changes);           // a prefix of the i
   joins again; `expired` says a cursor was compacted away.
 - **The log's order is the truth.** Conflicts are the app's; a plugin never
   picks a winner.
-- **`verifyOwner`**, when there is one, re-verifies whoever owns the account.
-  The app offers "Forgot PIN" through it.
+- **`verifyOwner(proof)`**, when there is one, re-verifies whoever owns the
+  account with the password fields `sync.ownerProof` names, typed again. The
+  app resets a forgotten PIN, and guards switching and signing out, through
+  it. A wrong proof is `UNAUTHORIZED`; throttled, it carries the reason
+  `too-many-attempts`; and `signed-out` says the account no longer knows this
+  device, so the device's own check answers instead.
+- **`createAccount(fields)`** creates the account from the app, with the
+  fields `sync.signUp` declares, and **`signOut()`** ends this device's
+  session, where the account can.
 - **`isSyncChange()`** checks anything that arrives; the app runs it on every
   pulled change.

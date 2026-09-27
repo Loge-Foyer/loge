@@ -34,7 +34,7 @@ describe('mock — the pretend account', () => {
     expect(plugin.manifest.sync?.capabilities).toEqual(['profile', 'preferences', 'providerConnections']);
     const { account } = await connect('mock://declares');
     expect(await account.getStatus()).toEqual({ accountName: 'mock://declares' });
-    await expect(account.verifyOwner?.()).resolves.toBeUndefined();
+    await expect(account.verifyOwner?.({})).resolves.toBeUndefined();
   });
 
   it('stores a change once, however often it is sent, and accepts it every time', async () => {

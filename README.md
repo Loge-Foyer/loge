@@ -74,8 +74,8 @@ means, and the contracts every plugin implements.
 It depends on nothing at all — not React, not Expo, not the app. That is what
 lets the app and eleven plugins agree without any of them knowing about each
 other. A plugin cannot even reach the network by itself: the app hands it an
-HTTP client, a place for its session token and a view of the network, which
-keeps secrets and logging in one place.
+HTTP client, a place for its session token, a view of the network and its
+cryptography, which keeps secrets and logging in one place.
 
 ## Current state
 
@@ -90,9 +90,11 @@ fully offline. Every other plugin still describes itself with a manifest and
 declares nothing it cannot do yet.
 
 The contract for an account is written too: what travels — profiles, their
-PINs, preferences and connections, never passwords — and how a change reaches
-every device exactly once, in one order. The mock can be an account: a pretend
-one, kept in memory.
+PINs, preferences and connections — and how a change reaches every device
+exactly once, in one order. A connection's passwords travel only sealed on the
+device, with a key the account never has, and only to an account that says it
+can carry them. The mock can be an account: a pretend one, kept in memory, and
+it keeps passwords off on purpose.
 
 Each plugin says what it needs to connect — a server address, a username, a
 password — and the app builds its settings screen from exactly that, including

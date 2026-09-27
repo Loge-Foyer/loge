@@ -1,10 +1,16 @@
 # Testing
 
 ```bash
+npm run typecheck
 npm test
 ```
 
 Vitest, run over `test/` at the repository root.
+
+`npm run typecheck` is two programs. `api` and the plugins compile with
+`lib: ["esnext"]` and no types at all, so a host global cannot creep in. The
+tests are a program of their own (`test/tsconfig.json`) with Node's types,
+because the fake context's crypto runs on `node:crypto`.
 
 **The rules in `api`:**
 
@@ -16,9 +22,14 @@ Vitest, run over `test/` at the repository root.
   values, and "set up".
 - `compare.test.ts` — the one ordering rule and `mergeSorted`.
 - `errors.test.ts` — retry hints.
+- `bytes.test.ts` — base64, base64url and UTF-8 against known vectors and
+  Node's own, both ways, and every malformed input refused.
 - `sync.test.ts` — the sync wire: `isSyncChange` for every entity and for bad
-  shapes, `syncKey`, what each entity needs an account to carry, and
-  `defaultRoles`, which never switches sync on.
+  shapes, sealed values and the size limit, `syncKey`, what each entity needs
+  an account to carry, and `defaultRoles`, which never switches sync on.
+- `validate.test.ts` also covers an account's `ownerProof` and `signUp`, and
+  `isKdfParams`: nothing weaker than the floor, nothing heavier than a phone
+  can derive.
 
 **The plugins:**
 
@@ -42,19 +53,23 @@ Vitest, run over `test/` at the repository root.
   and the household seed.
 - `manifests.test.ts` — the conformance check. Every manifest is sound, every
   plugin that declares a media capability implements its members, a plugin
-  that declares sync capabilities has a sync role with every provider member,
-  media servers stay media-only, and ids are unique. It is the one file allowed
-  to import every plugin.
+  that declares sync capabilities has a sync role with every provider member
+  and every member its capabilities promise (`vaultKey` for
+  `sealedPasswords`, `verifyOwner` for an `ownerProof`, `createAccount` for
+  `signUp`), media servers stay media-only, and ids are unique. It is the one
+  file allowed to import every plugin.
 - `engine.test.ts` — no source in `api/` or `plugins/` uses a built-in that
   Hermes lacks (`Array.prototype.toSorted`, `Object.groupBy`,
-  `crypto.randomUUID`). Plugins run on Hermes in the iOS and Android apps; the
-  compiler and Node both accept these, so without this check a plugin passes
-  everything here and throws on a phone.
+  `crypto.randomUUID`, `Uint8Array.prototype.toBase64`, `fromBase64`). Plugins
+  run on Hermes in the iOS and Android apps; the compiler accepts these, so
+  without this check a plugin passes everything here and throws on a phone.
 
 **The fake context** (`fakeContext()`) gives a plugin an in-memory session,
-credentials, a network the test can switch, a client identity and a clock whose
-`sleep` returns at once. Tests can therefore check every retry and latency path
-without waiting.
+credentials, a network the test can switch, a client identity, a clock whose
+`sleep` returns at once, and the host's crypto on `node:crypto`
+(`support/node-crypto.ts`) — the same algorithms the app runs, so a value
+sealed in a test opens on a phone. Tests can therefore check every retry and
+latency path without waiting. A route can answer with headers.
 
 Tests never live in `api/src` or `plugins/*/src`. `api` imports nothing, and a
 test file there would import vitest.

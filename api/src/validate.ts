@@ -27,6 +27,27 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
   }
   if (sync) {
     for (const c of duplicates(sync.capabilities)) problems.push(`sync capability "${c}" is listed twice`);
+    // The owner check asks for these again, as passwords, so they must be the connection's password fields.
+    const passwords = new Set(connectionFields.filter((field) => field.type === 'password').map((field) => field.key));
+    const proof = sync.ownerProof?.fields;
+    if (proof?.length === 0) problems.push('ownerProof names no field');
+    for (const key of proof ?? []) {
+      if (!passwords.has(key)) problems.push(`ownerProof field "${key}" is not a password connection field`);
+    }
+    // Sign-up values are handed to `createAccount` once and never kept, so none is a saved secret.
+    const signUp = sync.signUp?.fields ?? [];
+    for (const field of signUp) {
+      if (!KEY.test(field.key)) problems.push(`sign-up field key "${field.key}" must be camelCase`);
+      if (field.type === 'password') problems.push(`sign-up field "${field.key}" cannot be a password field`);
+      if (connectionFields.some((connectionField) => connectionField.key === field.key)) {
+        problems.push(`sign-up field "${field.key}" clashes with a connection field`);
+      }
+    }
+    for (const key of duplicates(signUp.map((field) => field.key))) problems.push(`sign-up field key "${key}" is declared twice`);
+    // A sealed password travels inside a connection's change.
+    if (sync.capabilities.includes('sealedPasswords') && !sync.capabilities.includes('providerConnections')) {
+      problems.push('sync capability "sealedPasswords" needs "providerConnections"');
+    }
   }
 
   for (const [list, entries] of [
@@ -41,7 +62,7 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     }
   }
 
-  for (const field of [...connectionFields, ...settings]) {
+  for (const field of [...connectionFields, ...settings, ...(sync?.signUp?.fields ?? [])]) {
     if (field.type !== 'select') continue;
     const values = field.options.map((option) => option.value);
     if (values.length === 0) problems.push(`select "${field.key}" has no options`);

@@ -76,14 +76,17 @@ stays genuinely tested. Jellyfin is the first real media source.
 ## Current state
 
 - **`api`:** the manifest vocabulary, per-profile values, the media contract,
-  the sync contract, errors and the HTTP port.
+  the sync contract — with sealed passwords, owner proofs and sign-up — errors,
+  the HTTP port and the host's crypto port.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
 - **Mock:** implements the media role with a fixed catalogue, and the sync role
   as a pretend account in memory.
 - **Every other plugin:** a manifest.
+- **`npm run typecheck`:** two programs — api and the plugins with no host
+  types at all, and the tests with Node's.
 - **`npm test`:** runs everything.
-  - the api rules, and the sync wire
+  - the api rules, bytes as text, and the sync wire
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
   - the mock, as a source and as an account
   - the conformance check that each declared capability is implemented

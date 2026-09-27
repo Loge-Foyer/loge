@@ -55,8 +55,11 @@ role to its existing manifest.
 
 `lib: ["esnext"]` gives `api` and plugins **no host globals**: no `fetch`,
 `URL`, `console`, `setTimeout`, `btoa`, `AbortSignal`. The compiler rejects
-them. A plugin reaches the host only through the `MediaContext` it is handed:
-`http`, `credentials`, `session`, `network`, `client`, `clock`.
+them. A plugin reaches the host only through the context it is handed:
+`http`, `credentials`, `session`, `network`, `client`, `clock`, `crypto`.
+Bytes become text through `api`'s own helpers (`encodeBase64Url`,
+`encodeUtf8`…), never `btoa` or `Uint8Array.prototype.toBase64` — Hermes has
+neither.
 
 `api` is the centre of the whole project — the app depends on it, every plugin
 depends on it, the sync server depends on it. It must stay a leaf. If you need a
@@ -132,15 +135,27 @@ the connection's values already resolved for one profile.
 
 `plugin.sync.connect(target, context)` returns a
 `ConnectedUserStateSyncProvider`: `pull`, `push`, `getStatus`, `dispose`, and
-an optional `verifyOwner` that re-verifies whoever owns the account ("Forgot
-PIN"). A connection whose sync role is on is **the device's account** — at most
-one per device, chosen in the app's Settings → Account.
+optional members:
+
+- `verifyOwner(proof)` re-verifies whoever owns the account, for Forgot PIN,
+  switching and signing out. The proof is the password fields
+  `sync.ownerProof` names, typed again — never the saved ones.
+- `vaultKey()` gives the key the app seals connections' passwords with. The
+  capability `sealedPasswords` promises it (`SYNC_CAPABILITY_MEMBERS`).
+- `createAccount(fields)` creates the account from the app, with the fields
+  `sync.signUp` declares.
+- `signOut()` ends this device's session, where the account can.
+
+A connection whose sync role is on is **the device's account** — at most one
+per device, chosen in the app's Settings → Account.
 
 It carries `SyncChange`s (`api/src/sync.ts`): profiles, their PINs,
-preferences, connections and each profile's values on them. Never passwords —
-a connection lists only the names of its saved password fields. It carries
-exactly what it declares: an entity needs every capability
-`SYNC_ENTITY_CAPABILITIES` lists.
+preferences, connections and each profile's values on them. A connection lists
+the names of its saved password fields, and, when the account carries
+`sealedPasswords`, their values **sealed by the app** in `sealed` — ciphertext
+the account stores and cannot open. The plugin never sees another connection's
+password. It carries exactly what it declares: an entity needs every
+capability `SYNC_ENTITY_CAPABILITIES` lists.
 
 ---
 
@@ -223,8 +238,11 @@ sync toggle is optional. A per-profile sync capability needs `profile`.
    hands you changes you drop *and advances the checkpoint past them* — no
    error, gone.
 
-10. **Passwords never travel.** Check every pushed change with
-    `isSyncChange()`, and end the accepted prefix at the first you refuse.
+10. **Passwords travel only as the app sealed them.** A plugin never sees or
+    sends another connection's password; its own account's keys go through
+    `context.crypto`, and the key it hands the app (`vaultKey`) never leaves
+    the device. Check every pushed change with `isSyncChange()`, and end the
+    accepted prefix at the first you refuse.
 
 ---
 
@@ -267,7 +285,11 @@ the test of whether this architecture is real.
   `isSetUpFor`)
 
 - the sync contract: `SyncRole` / `ConnectedUserStateSyncProvider`,
-  `SyncChange` and its entities, `isSyncChange`
+  `SyncChange` and its entities, `isSyncChange`; sealed passwords
+  (`sealedPasswords`, `vaultKey`), owner proofs (`ownerProof`,
+  `verifyOwner(proof)`), sign-up (`signUp`, `createAccount`) and `signOut`
+- the host's crypto port (`PluginCrypto`: random bytes, PBKDF2, HKDF,
+  AES-GCM), `isKdfParams` with its limits, and bytes as text (`bytes.ts`)
 
 **Mock** implements the sync role too: a pretend account in memory, per
 endpoint.

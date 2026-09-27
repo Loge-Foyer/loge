@@ -1,0 +1,10 @@
+{
+  // The tests run in Node and use its modules (node:crypto for the fake
+  // context). The program for api and the plugins never sees Node's types:
+  // their code runs on Hermes, where Node's globals do not exist.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

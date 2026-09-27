@@ -1,3 +1,4 @@
+import type { PluginCrypto } from './crypto';
 import type { Credentials, FieldValues } from './fields';
 import type { CancelSignal, HttpClient } from './http';
 import type { ConnectionId } from './ids';
@@ -42,4 +43,6 @@ export interface PluginContext {
     now(): number;
     sleep(ms: number, signal?: CancelSignal): Promise<void>;
   };
+  /** Random bytes, key derivation and sealing — an account's, for keys the server must never have. */
+  readonly crypto: PluginCrypto;
 }

@@ -15,6 +15,14 @@ export interface MediaRoleManifest {
 
 export interface SyncRoleManifest {
   readonly capabilities: readonly SyncCapability[];
+  /**
+   * The password fields the owner check asks for again — Forgot PIN, switching
+   * and signing out — handed to `verifyOwner`. Without them, the account
+   * vouches with no proof, or the device answers.
+   */
+  readonly ownerProof?: { readonly fields: readonly string[] };
+  /** Creating an account from the app: the fields it takes beyond the connection's own, handed to `createAccount`. */
+  readonly signUp?: { readonly fields: readonly Field[] };
 }
 
 /**
@@ -51,7 +59,9 @@ export interface PluginManifest {
 /**
  * What a plugin package exports. A role's implementation joins the manifest
  * once it is written; a declared capability promises the members it maps to
- * (`MEDIA_CAPABILITY_MEMBERS`, `SYNC_PROVIDER_MEMBERS`).
+ * (`MEDIA_CAPABILITY_MEMBERS`, `SYNC_PROVIDER_MEMBERS`,
+ * `SYNC_CAPABILITY_MEMBERS`), as `ownerProof` promises `verifyOwner` and
+ * `signUp` promises `createAccount`.
  */
 export interface Plugin {
   readonly manifest: PluginManifest;

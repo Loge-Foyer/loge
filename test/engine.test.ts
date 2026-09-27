@@ -8,6 +8,9 @@ const MISSING_ON_HERMES: readonly { readonly pattern: RegExp; readonly instead: 
   { pattern: /\.toSorted\(/, instead: 'copy, then sort' },
   { pattern: /\bObject\.groupBy\(/, instead: 'a loop into a Map' },
   { pattern: /\bcrypto\.randomUUID\(/, instead: 'an id from the context' },
+  // Typed by esnext, missing on Hermes and on Node 24 alike.
+  { pattern: /\.toBase64\(/, instead: 'encodeBase64 or encodeBase64Url from @sc/api' },
+  { pattern: /\bfromBase64\(/, instead: 'decodeBase64Url from @sc/api' },
 ];
 
 const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../plugins/*/src/**/*.ts'], {

@@ -50,6 +50,7 @@ the kinds it carries, and a kind needs every capability it depends on
 | a profile's preferences | `profile`, `preferences` |
 | a connection | `providerConnections` |
 | a profile's values on a connection | `providerConnections`, `profile` |
+| their passwords, sealed by the app | `sealedPasswords` (which needs `providerConnections`), and the member `vaultKey` |
 | `watchProgress`, `favorites`, `watchlist`, `history`, `customLists`, `fullBackup` | named, and carried by nothing in the app yet |
 
 A capability kept per profile needs `profile`; `validateManifest` checks it.
@@ -73,5 +74,8 @@ media role, with a fake context, and checks that each declared capability's
 members exist. A plugin with no implementation must declare no media
 capability, and a plugin declaring sync capabilities must have a sync role
 whose connected provider has `pull`, `push`, `getStatus` and `dispose`
-(`SYNC_PROVIDER_MEMBERS`). `mock` declares a deliberately partial set, so the
-app's capability handling is exercised rather than assumed.
+(`SYNC_PROVIDER_MEMBERS`), plus what each capability promises
+(`SYNC_CAPABILITY_MEMBERS`: `sealedPasswords` needs `vaultKey`). An
+`ownerProof` needs `verifyOwner`, and `signUp` needs `createAccount`. `mock`
+declares a deliberately partial set — it keeps passwords off — so the app's
+capability handling is exercised rather than assumed.

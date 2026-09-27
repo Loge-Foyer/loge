@@ -2,15 +2,16 @@ import type { Brand } from './brand';
 import type { SyncCapability } from './capabilities';
 import { PER_PROFILE_MODES, type PerProfile } from './connection';
 import type { PluginContext, PluginTarget } from './context';
-import { isLibrarySelection, type FieldValues } from './fields';
+import { isLibrarySelection, type Credentials, type FieldValues } from './fields';
 import type { CancelSignal } from './http';
 import type { ConnectionId, PluginId, UserId } from './ids';
 
 /**
  * What an account can be handed: one kind per entity the app journals. The
  * account stores and returns them in its own order; it never reads them and
- * never decides between two. Passwords are not among them — Phase 4 seals the
- * password fields of `connection` and `profileValues` end to end.
+ * never decides between two. A password travels only as the app sealed it, in
+ * `sealed` on a connection or a profile's values, which the account cannot
+ * open.
  */
 export const SYNC_ENTITIES = ['profile', 'pin', 'preferences', 'connection', 'profileValues'] as const;
 
@@ -71,6 +72,11 @@ export interface SyncedConnection extends ConnectionTarget {
   readonly settings: FieldValues;
   /** The password fields holding a value — names only, never the values. */
   readonly secretKeys: readonly string[];
+  /**
+   * Passwords the app sealed for the household's other devices, by field. The
+   * account stores them and cannot open them; what a value holds is the app's.
+   */
+  readonly sealed?: Readonly<Record<string, string>>;
 }
 
 export interface SyncedProfileValues extends ProfileValuesTarget {
@@ -78,6 +84,7 @@ export interface SyncedProfileValues extends ProfileValuesTarget {
   readonly fields: FieldValues;
   readonly settings: FieldValues;
   readonly secretKeys: readonly string[];
+  readonly sealed?: Readonly<Record<string, string>>;
 }
 
 interface ChangeCommon {
@@ -160,8 +167,20 @@ export interface ConnectedUserStateSyncProvider {
   push(changes: readonly SyncChange[], signal?: CancelSignal): Promise<PushResult>;
   /** Reaches the account and signs in — what "Sign in" tries, once. */
   getStatus(signal?: CancelSignal): Promise<SyncStatus>;
-  /** "Forgot PIN": resolves once whoever owns the account is verified, and throws `UNAUTHORIZED` otherwise. */
-  verifyOwner?(signal?: CancelSignal): Promise<void>;
+  /**
+   * Forgot PIN, switching and signing out: resolves once whoever owns the
+   * account is verified with `proof` — the fields `ownerProof` names, typed
+   * again. Throws `UNAUTHORIZED` for a wrong proof, with the reason
+   * `too-many-attempts` when throttled and `signed-out` when the account no
+   * longer knows this device; anything else when it cannot be asked.
+   */
+  verifyOwner?(proof: Credentials, signal?: CancelSignal): Promise<void>;
+  /** The key the app seals connections' passwords with. Derived on this device; the account never has it. */
+  vaultKey?(signal?: CancelSignal): Promise<Uint8Array>;
+  /** Creates the account the connection's values name, with the `signUp` fields, and signs in — what "Create account" tries, once. */
+  createAccount?(fields: FieldValues, signal?: CancelSignal): Promise<SyncStatus>;
+  /** Ends this device's session with the account, where it can. Tried once; the app lets go whatever it answers. */
+  signOut?(signal?: CancelSignal): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -173,12 +192,28 @@ export interface SyncRole {
 /** The members every connected account has. */
 export const SYNC_PROVIDER_MEMBERS = ['pull', 'push', 'getStatus', 'dispose'] as const satisfies readonly (keyof ConnectedUserStateSyncProvider)[];
 
+/** The members a declared sync capability promises, beyond those every account has. */
+export const SYNC_CAPABILITY_MEMBERS: Readonly<
+  Partial<Record<SyncCapability, readonly (keyof ConnectedUserStateSyncProvider)[]>>
+> = {
+  sealedPasswords: ['vaultKey'],
+};
+
+/**
+ * The most a change may weigh, in characters of JSON. Both sides refuse a
+ * heavier one, so neither can stall the other on it.
+ */
+export const MAX_CHANGE_LENGTH = 256 * 1024;
+
 const PIN = /^\d{4}$/;
 const PLUGIN_ID = /^[a-z][a-z0-9-]*$/;
 const KEY = /^[a-z][A-Za-z0-9]*$/;
 const MAX_ID = 128;
 const MAX_TEXT = 200;
 const MAX_DEPTH = 32;
+// A version, then base64url parts: a newer app's version passes, and is left unopened.
+const SEALED = /^v[1-9][0-9]*(?:\.[A-Za-z0-9_-]+)+$/;
+const MAX_SEALED = 4 * 1024;
 
 /**
  * Whether something is a change this contract allows. Pulled data is
@@ -190,9 +225,10 @@ export function isSyncChange(value: unknown): value is SyncChange {
   if (!isRecord(value)) return false;
   const { id, changedAt, entity, operation } = value;
   if (!isId(id) || typeof changedAt !== 'number' || !Number.isFinite(changedAt)) return false;
-  if (operation === 'upsert') return isUpsertData(entity, value.data);
-  if (operation === 'delete') return isDeleteTarget(entity, value.target);
-  return false;
+  const shaped =
+    operation === 'upsert' ? isUpsertData(entity, value.data) : operation === 'delete' ? isDeleteTarget(entity, value.target) : false;
+  // Checked last: only a value of this shape is sure to serialize.
+  return shaped && JSON.stringify(value).length <= MAX_CHANGE_LENGTH;
 }
 
 function isUpsertData(entity: unknown, data: unknown): boolean {
@@ -214,7 +250,8 @@ function isUpsertData(entity: unknown, data: unknown): boolean {
         (PER_PROFILE_MODES as readonly unknown[]).includes(data.perProfile) &&
         isFieldValues(data.fields) &&
         isFieldValues(data.settings) &&
-        isKeyList(data.secretKeys)
+        isKeyList(data.secretKeys) &&
+        isSealed(data.sealed, data.secretKeys)
       );
     case 'profileValues':
       return (
@@ -223,7 +260,8 @@ function isUpsertData(entity: unknown, data: unknown): boolean {
         typeof data.off === 'boolean' &&
         isFieldValues(data.fields) &&
         isFieldValues(data.settings) &&
-        isKeyList(data.secretKeys)
+        isKeyList(data.secretKeys) &&
+        isSealed(data.sealed, data.secretKeys)
       );
     default:
       return false;
@@ -266,6 +304,15 @@ function isKey(value: unknown): value is string {
 
 function isKeyList(value: unknown): boolean {
   return Array.isArray(value) && value.length <= MAX_ID && value.every(isKey);
+}
+
+/** Sealed values, if any, only for the passwords the change lists. */
+function isSealed(value: unknown, secretKeys: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value) || !Array.isArray(secretKeys)) return false;
+  return Object.entries(value).every(
+    ([key, sealed]) => secretKeys.includes(key) && typeof sealed === 'string' && sealed.length <= MAX_SEALED && SEALED.test(sealed),
+  );
 }
 
 function isFieldValues(value: unknown): boolean {
