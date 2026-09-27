@@ -12,7 +12,7 @@ they are written in. Read the workspace root `AGENTS.md` and
 api/                 @sc/api — domain types + every contract. Depends on NOTHING
 plugins/
   jellyfin/ emby/ plex/ icloud/ google/ mock/
-  yattee/ invidious/ webdav/ custom-server/ local/
+  yattee/ invidious/ webdav/ custom-server/
 test/                vitest — api rules, plugins against fake HTTP, conformance
 docs/
 ```
@@ -34,12 +34,14 @@ mock.
 | `icloud` `google` | ✓ (Drive files) | ✓ |
 | `mock` | ✓ | ✓ |
 | `yattee` `invidious` `webdav` | ✓ | — |
-| `custom-server` `local` | — | ✓ |
+| `custom-server` | — | ✓ |
 
 **Media servers are media-only.** A media server is the master of what its
 users watched: the app reads it (`watchStateRead`) and later writes progress
 back (`watchStateWrite`) through the *media* role. A device has at most one
-sync connection — the account — and a media server is never it.
+sync connection — the account — and a media server is never it. Without one,
+everything stays on the device: "this device only" is no account at all, not a
+plugin.
 
 Do not create `plugins/jellyfin-sync`. If a service gains a second role, add the
 role to its existing manifest.

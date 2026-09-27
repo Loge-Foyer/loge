@@ -34,7 +34,6 @@ is up to you.
 | WebDAV | ✓ | files | — |
 | Yattee, Invidious | ✓ | videos | — |
 | Your own sync server | — | — | ✓ |
-| This device only | — | — | ✓ |
 | Mock, for development | ✓ | everything | ✓ |
 
 What a plugin brings — movies, shows, anime, videos or files — is part of its
@@ -50,8 +49,8 @@ back. The Jellyfin web client and the app always agree.
 
 Everything else the app knows goes to **one account per device**: your profiles,
 their preferences, the home screen layout, and history for things no server
-tracks, such as plain files. That account is iCloud, Google, your own sync
-server, or simply this device.
+tracks, such as plain files. That account is iCloud, Google or your own sync
+server — or none at all, and then it all stays on the device.
 
 ```
 Jellyfin        films ✓    history: kept by the server

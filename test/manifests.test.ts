@@ -6,7 +6,6 @@ import { plugin as google } from '@sc/plugin-google';
 import { plugin as icloud } from '@sc/plugin-icloud';
 import { plugin as invidious } from '@sc/plugin-invidious';
 import { plugin as jellyfin } from '@sc/plugin-jellyfin';
-import { plugin as local } from '@sc/plugin-local';
 import { plugin as mock } from '@sc/plugin-mock';
 import { plugin as plex } from '@sc/plugin-plex';
 import { plugin as webdav } from '@sc/plugin-webdav';
@@ -22,7 +21,6 @@ const plugins: readonly Plugin[] = [
   icloud,
   invidious,
   jellyfin,
-  local,
   mock,
   plex,
   webdav,
