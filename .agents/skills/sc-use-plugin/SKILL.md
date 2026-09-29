@@ -51,8 +51,7 @@ one plugin that does both.
 ```
 
 Package names follow the folders: `@sc/source-<name>`, `@sc/iptv-<name>`,
-`@sc/player-<name>`, `@sc/sync-<name>`. Until Phase 6 regroups them, a plugin
-is `@sc/plugin-<id>` at `plugins/<id>`, and `player-kit` does not exist yet.
+`@sc/player-<name>`, `@sc/sync-<name>`. `player-kit` does not exist yet.
 
 Then `npm install`. npm links the folders and never looks inside link targets
 outside the project, so it never reaches for a registry.
@@ -242,13 +241,14 @@ A player plugin is only proven by a development build on a phone, playing.
 
 ## Current state
 
-Ten plugins are linked and registered as `@sc/plugin-<id>` (`mock` in
-development builds only), in one flat folder, with unqualified ids and
-Phase 4's roles. Jellyfin and the mock implement the media role — browse,
-libraries, watch status read, and (Jellyfin) remote images and offline
-metadata. The mock and your own server (`custom-server`) are Phase 4's
-accounts: synced through a log, with sealed passwords, the password as owner
-proof, and sign-up with an invite. The rest export manifests only: the app
-lists them, installs them on the device and configures connections, and says
-plainly that they cannot list titles yet. No player, IPTV or backup plugin is
-wired, and nothing plays. Phase 6 moves all of it onto the categories above.
+Twenty-two plugins are linked by their category paths and registered
+(`sources/mock` and `sync/mock` in development builds only), with qualified
+ids, and the catalogue keeps those that run on this platform. Their roles are
+still Phase 4's until the account moves to records. `sources/jellyfin` and
+`sources/mock` implement the media role — browse, libraries, watch status
+read, and (Jellyfin) remote images and offline metadata. `sync/mock` and your
+own server (`sync/custom-server`) are Phase 4's accounts: synced through a log,
+with sealed passwords, the password as owner proof, and sign-up with an
+invite. The rest export manifests only — IPTV, the players, the backup targets
+and the other sources: the app lists them in their category, and says plainly
+that they cannot list titles, play or keep backups yet. Nothing plays.

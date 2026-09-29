@@ -4,9 +4,10 @@ Layers, the composition root, state ownership, and the rules that keep plugins
 from leaking into screens. The full reasoning is in
 `../../.claude/streaming-center-architecture.md`.
 
-This page describes the target. Until Phase 6 the code runs Phase 4's model:
-one optional account, synced through a log, plugins that declare roles, and
-three tabs.
+This page describes the target. The four tabs and plugins by category and
+platform are in place; until the account moves to records, the code runs
+Phase 4's model under them: one optional account, synced through a log, and
+plugins that declare roles.
 
 ## Layers
 

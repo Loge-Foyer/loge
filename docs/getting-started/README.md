@@ -39,8 +39,8 @@ the device.
 
 To add a server, go to Settings → Plugins → Sources, pick the plugin, and add a
 connection. The form comes from the plugin itself, and adding a connection is
-all it takes. (Until Phase 6, Settings → Plugins is one list, and a plugin is
-installed before its first connection.) For development against your own
+all it takes. (Until the account moves to records, a source is installed on
+the device before its first connection.) For development against your own
 Jellyfin, a test account is the thing to use: a wrong password counts against
 the account's lockout on the server.
 

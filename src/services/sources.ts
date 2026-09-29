@@ -103,7 +103,7 @@ export function createSourceService(deps: {
     forTab: async (userId, tab) => {
       const tabSources: TabSource[] = [];
       for (const source of (await resolve(userId)).live) {
-        const kinds = kindsForTab(tab, source.effective.media?.contentKinds ?? []);
+        const kinds = kindsForTab(tab, source.manifest.category, source.effective.media?.contentKinds ?? []);
         if (kinds.length > 0) tabSources.push({ ...source, kinds });
       }
       return tabSources;

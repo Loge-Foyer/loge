@@ -1,22 +1,34 @@
+import { PLUGIN_CATEGORIES, type PluginCategory } from '@sc/api';
+import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { CloudOff } from '@tamagui/lucide-icons-2/icons/CloudOff';
+import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Info } from '@tamagui/lucide-icons-2/icons/Info';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
-import { Puzzle } from '@tamagui/lucide-icons-2/icons/Puzzle';
+import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
+import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
 import { SizableText } from 'tamagui';
 
-import { describeSyncStatus, ROLE_LABELS } from '@/components/labels';
+import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useAccountProviders, useSyncStatus } from '@/hooks/use-account';
-import { usePluginStates } from '@/hooks/use-plugins';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
+
+import { categoryHref } from './plugin-route';
+
+const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
+  sources: Film,
+  iptv: Tv,
+  players: CirclePlay,
+  sync: RefreshCw,
+};
 
 /** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
 export function SettingsScreen() {
@@ -26,10 +38,17 @@ export function SettingsScreen() {
   const { data: providers = [] } = useAccountProviders();
   const status = useSyncStatus();
   const { data: profiles = [] } = useProfiles();
-  const { data: states } = usePluginStates();
   const { data: sources = [] } = useSources();
   const user = profiles.find((profile) => profile.id === userId);
-  const installed = catalog.list().filter((manifest) => states?.get(manifest.id)?.enabled);
+
+  /** A list's line: what is set up in it, or what it is for. */
+  const summaryOf = (category: PluginCategory) => {
+    if (category === 'sync') return account ? `Your account: ${account.connection.label}` : CATEGORY_DESCRIPTIONS.sync;
+    if (catalog.inCategory(category).length === 0) return 'None on this device';
+    const connected = sources.filter((source) => source.manifest.category === category).length;
+    if (connected === 0) return CATEGORY_DESCRIPTIONS[category];
+    return `${connected} ${connected === 1 ? 'connection' : 'connections'}`;
+  };
 
   return (
     <Screen>
@@ -71,32 +90,20 @@ export function SettingsScreen() {
 
       <SettingsSection
         title="Plugins"
-        footer="Plugins and their connections belong to the device. A connection can keep a separate sign-in, or everything, for each profile."
+        footer="Sources and IPTV go with your account. Players, and where your account and its backups live, are set up on each device."
       >
-        {installed.map((manifest) => {
-          const live = sources.filter((source) => source.manifest.id === manifest.id);
-          const active = [
-            ...(live.some((source) => source.effective.media) ? [ROLE_LABELS.media] : []),
-            // The account is a connection too, even when it brings nothing to watch.
-            ...(account?.connection.pluginId === manifest.id ? [ROLE_LABELS.sync] : []),
-          ];
+        {PLUGIN_CATEGORIES.map((category) => {
+          const Icon = CATEGORY_ICONS[category];
           return (
             <SettingsRow
-              key={manifest.id}
-              title={manifest.displayName}
-              subtitle={`${live.length} ${live.length === 1 ? 'connection' : 'connections'}${
-                active.length > 0 ? ` · ${active.join(' · ')}` : ''
-              }`}
-              href={{ pathname: '/settings/plugins/[pluginId]', params: { pluginId: manifest.id } }}
+              key={category}
+              title={CATEGORY_LABELS[category]}
+              subtitle={summaryOf(category)}
+              icon={<Icon size={20} color="$color11" />}
+              href={categoryHref(category)}
             />
           );
         })}
-        <SettingsRow
-          title={installed.length > 0 ? 'All plugins' : 'Install a plugin'}
-          subtitle={`${catalog.list().length} available`}
-          icon={<Puzzle size={20} color="$color11" />}
-          href="/settings/plugins"
-        />
       </SettingsSection>
 
       <SettingsSection title="About">

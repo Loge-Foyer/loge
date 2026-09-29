@@ -44,8 +44,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.**
+**Phase 6 — the code is moving to the new architecture.**
 
 The target: four tabs — Media, Videos, TV, Settings. Plugins come in four
 categories, and Settings → Plugins shows one list per category for this
@@ -61,7 +60,8 @@ What runs today:
 - One optional account per device, with log-based sync, sealed passwords and
   owner proofs. Your own server is the Node server in
   `../streaming_center_sync`, created from the app with an invite.
-- Three tabs, and Settings → Plugins as one list.
+- Four tabs, TV with its empty state, and Settings → Plugins as four lists by
+  category, of the plugins that run on this platform.
 - Real titles from every live source, merged — Jellyfin the first — and kept
   across restarts where the source allows it.
 - SQLite and the keychain on phones, which run development builds

@@ -7,6 +7,7 @@ import { uuidGenerator } from '@/platform/ids';
 import { consoleLogger } from '@/platform/log';
 import { createNetworkMonitor } from '@/platform/network';
 import { createOwnerAuthentication } from '@/platform/owner-authentication';
+import { currentPlatform } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
 import { createAccountService } from '@/services/account';
 import { createConnectionService } from '@/services/connections';
@@ -47,7 +48,11 @@ export function createServices(): AppServices {
   const sessions = createSessions(deviceBound);
   const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log });
 
-  const catalog = createPluginCatalog(plugins, { strict: __DEV__, warn: (message) => log.warn('app.boot', message) });
+  const catalog = createPluginCatalog(plugins, {
+    platform: currentPlatform(),
+    strict: __DEV__,
+    warn: (message) => log.warn('app.boot', message),
+  });
   const devicePlugins = createDevicePlugins(db.deviceSettings);
   const http = createPlatformHttpClient(network, log);
   const identity = createClientIdentitySource(deviceBound, log);

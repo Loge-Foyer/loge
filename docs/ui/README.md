@@ -3,9 +3,10 @@
 The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
-This page describes the target. Until Phase 6 the app has three tabs — no TV —
-Settings → Plugins is one list, and Welcome offers to sign in or to use the
-device on its own.
+This page describes the target. Today the four tabs and Settings → Plugins'
+four lists are in place, a source is still installed on the device before its
+first connection, and Welcome offers to sign in or to use the device on its
+own.
 
 ## Tamagui
 

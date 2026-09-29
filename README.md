@@ -114,19 +114,20 @@ screens rather than a new app.
 
 ## Current state
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.** Everything above is the design. What runs today, built with
-[Tamagui](https://tamagui.dev):
+**Phase 6 — the code is moving to the new architecture.** Everything above is
+the design. What runs today, built with [Tamagui](https://tamagui.dev):
 
-- **Three tabs.** The TV tab arrives with Phase 6, and fills in with Phase 7.
+- **Four tabs.** TV shows the way to add an IPTV source; its channels arrive
+  with Phase 7.
   - **Media** — films and series from every source, as one library: what you
     are in the middle of, then a row per kind in the order and sort you choose,
     a full-screen grid behind each row, and a page for every film, series,
     season and episode. Jellyfin is the first real source.
   - **Videos** — web video and plain files, one tab per source. No source
     lists them yet.
-  - **Settings** — the account, profiles, PIN lock, and every plugin in one
-    list: add it to the device, connect it through a form the plugin itself
+  - **Settings** — the account, profiles, PIN lock, and the plugins in four
+    lists — Sources, IPTV, Players, Sync — showing only those that run on this
+    device. Install a source, connect it through a form the plugin itself
     describes, and decide what each profile keeps for itself.
 - **The account is optional.** Sign in to the earlier version of your own
   server — a small Node program in `../streaming_center_sync` — or use the
@@ -139,8 +140,8 @@ until Phase 6.** Everything above is the design. What runs today, built with
   the servers answered is kept too, where they allow it, so the home shows up
   at once when the app opens, and still shows — saying how old it is — when a
   server cannot be reached.
-- **Not yet:** nothing plays, and there is no TV tab, no backup file and no
-  limit on profiles.
+- **Not yet:** nothing plays, and there is no backup file and no limit on
+  profiles.
 
 Development builds also have a pretend account, for trying things offline.
 

@@ -64,8 +64,7 @@ are linked in with `file:` dependencies: `@sc/api`, `@sc/player-kit`, and one
 package per plugin at its category path —
 `file:../streaming_center_plugins/plugins/<category>/<name>`, named
 `@sc/source-<name>`, `@sc/iptv-<name>`, `@sc/player-<name>` or
-`@sc/sync-<name>`. (Until Phase 6: `@sc/plugin-<id>` at `plugins/<id>`.)
-Install that repository first; plugin files resolve `@sc/api` from its
+`@sc/sync-<name>`. Install that repository first; plugin files resolve `@sc/api` from its
 `node_modules`.
 
 Metro only needs to be told to watch the folder (`metro.config.js`). Each
@@ -217,8 +216,7 @@ tests scan its sources for them.
 
 Lint fails if anything outside `src/composition/` imports a plugin, a
 repository implementation or a platform module, and if anything outside
-`src/platform/` imports `expo-local-authentication`. Once the plugins move into
-their category folders (Phase 6), the plugin rule covers every category's
-packages, and `@sc/player-kit` once it exists (Phase 7); today it matches
-`@sc/plugin-*`. See the `sc-verify` skill for how to prove the rules still
-bite.
+`src/platform/` imports `expo-local-authentication`. The plugin rule matches
+every category's packages — `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and
+`@sc/sync-*` — and so `@sc/player-kit` too, once it exists (Phase 7). See the
+`sc-verify` skill for how to prove the rules still bite.

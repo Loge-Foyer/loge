@@ -168,10 +168,9 @@ Deep links use the app's own scheme, `streamingcenterapp://<path>` (from
 `app.json`). A link lands on a cold start too: `(app)` stays reachable while
 the app starts. Only a profile with a PIN, or no default profile, drops it.
 
-Useful paths: `/media`, `/videos`, `/tv` (Phase 6), `/browse/<rowId>`
+Useful paths: `/media`, `/videos`, `/tv`, `/browse/<rowId>`
 (`movies`, `shows`, `anime`), `/customize-home`, `/settings/plugins/<category>`
-and `/settings/plugins/<category>/<name>` (Phase 6; today
-`/settings/plugins/<pluginId>`), `/settings/pin`. Item pages
+and `/settings/plugins/<category>/<name>`, `/settings/pin`. Item pages
 (`/item/<connectionId>/<itemId>`) carry the connection's generated id, so reach
 them by tapping.
 
@@ -278,14 +277,15 @@ The target, once Phase 6 has landed:
   Players, Sync — each opening this platform's list. iCloud shows on iOS only.
   Nothing plays.
 
-**Today (Phase 4 code, until Phase 6):**
+**Today (the account is still Phase 4's, until it moves to records):**
 
 - Welcome offers "Sign in to sync your profiles" (the mock, in development) or
   "Use on this device only", then "Who is this?". An account with profiles
   lands on "Who's watching?" instead.
-- Three tabs — Media, Videos, Settings; no TV.
-- Settings → Plugins is one list: install a plugin on the device, then add
-  connections through forms built from its manifest, choosing what each
-  profile keeps for itself.
+- Four tabs — Media, Videos, TV, Settings; TV shows its empty state.
+- Settings → Plugins is four lists — Sources, IPTV, Players, Sync — of what
+  runs on this platform. Install a source on the device, then add connections
+  through forms built from its manifest, choosing what each profile keeps for
+  itself.
 - Settings → Account has Sync now, what it keeps in step, Switch account and
   Sign out. There is no backup file and no profile limit.

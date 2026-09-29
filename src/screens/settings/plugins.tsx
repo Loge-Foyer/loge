@@ -1,54 +1,73 @@
-import { declaredRoles, type PluginManifest } from '@sc/api';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Paragraph } from 'tamagui';
+import { declaredRoles, type PluginCategory, type PluginManifest } from '@sc/api';
+import { Stack } from 'expo-router';
+import { Paragraph, SizableText } from 'tamagui';
 
 import { Chip, ChipRow } from '@/components/chip';
-import { CONTENT_KIND_LABELS, ROLE_LABELS } from '@/components/labels';
+import { CATEGORY_LABELS, CONTENT_KIND_LABELS, ROLE_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
-import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
+import { useAccount } from '@/hooks/use-account';
 import { usePluginStates } from '@/hooks/use-plugins';
-import { TAB_CONTENT, type ContentTab } from '@/services/tab-content';
 
-type Filter = 'all' | ContentTab | 'accounts';
+import { pluginHref } from './plugin-route';
 
-const FILTERS: readonly { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'media', label: 'For Media' },
-  { id: 'videos', label: 'For Videos' },
-  { id: 'accounts', label: 'Accounts' },
-];
+/** What each list holds, and where what is set up in it applies. */
+const FOOTERS: Readonly<Record<PluginCategory, string>> = {
+  sources: 'Films, series and anime appear on Media; videos and files on Videos. A connection can keep a separate sign-in, or everything, for each profile.',
+  iptv: 'Live TV, and a provider’s films and series, appear on TV — never in your library.',
+  players: 'Players are set up on each device. Nothing plays yet: playback arrives in a later version of the app.',
+  sync: 'Where your account lives — on this device, or on your own server — and where its backups go. Each device chooses its own.',
+};
 
-function matches(manifest: PluginManifest, filter: Filter) {
-  if (filter === 'all') return true;
-  if (filter === 'accounts') return manifest.sync !== undefined;
-  return manifest.media?.contentKinds.some((kind) => TAB_CONTENT[filter].includes(kind)) ?? false;
-}
+/** Why a list is empty: its plugins do not run here. */
+const NONE_HERE: Readonly<Record<PluginCategory, string>> = {
+  sources: 'No source runs on this device.',
+  iptv: 'IPTV providers can’t be reached from a browser. Add one in the app on your phone or tablet.',
+  players: 'No player runs on this device.',
+  sync: 'Nothing can keep your account on this device yet.',
+};
 
-/** Every plugin this app ships. Installing one is enabling it on this device. */
-export function PluginsScreen() {
+/** One category's plugins, as they run on this platform. */
+export function CategoryScreen({ category }: { category: PluginCategory | undefined }) {
   const { catalog } = useServices();
   const { data: states } = usePluginStates();
-  const params = useLocalSearchParams<{ for?: string }>();
-  const filter = FILTERS.find((candidate) => candidate.id === params.for)?.id ?? 'all';
-  const shown = catalog.list().filter((manifest) => matches(manifest, filter));
+  const { data: account } = useAccount();
 
+  if (!category) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: 'Plugins' }} />
+        <SizableText color="$color10">There is no such list of plugins.</SizableText>
+      </Screen>
+    );
+  }
+
+  const shown = catalog.inCategory(category);
   return (
     <Screen gap="$4">
-      <SourceTabs tabs={FILTERS} selected={filter} onSelect={(id) => router.setParams({ for: id })} />
-      <SettingsSection>
-        {shown.map((manifest) => (
-          <SettingsRow
-            key={manifest.id}
-            title={manifest.displayName}
-            subtitle={manifest.description}
-            trailing={states?.get(manifest.id)?.enabled ? <Chip label="Installed" tone="accent" /> : null}
-            href={{ pathname: '/settings/plugins/[pluginId]', params: { pluginId: manifest.id } }}
-          />
-        ))}
-      </SettingsSection>
-      {shown.length === 0 ? <Paragraph color="$color10">No plugin fits this filter.</Paragraph> : null}
+      <Stack.Screen options={{ title: CATEGORY_LABELS[category] }} />
+      {shown.length > 0 ? (
+        <SettingsSection footer={FOOTERS[category]}>
+          {shown.map((manifest) => (
+            <SettingsRow
+              key={manifest.id}
+              title={manifest.displayName}
+              subtitle={manifest.description}
+              trailing={
+                account?.connection.pluginId === manifest.id ? (
+                  <Chip label="Your account" tone="accent" />
+                ) : states?.get(manifest.id)?.enabled ? (
+                  <Chip label="Installed" tone="accent" />
+                ) : null
+              }
+              href={pluginHref(manifest.id)}
+            />
+          ))}
+        </SettingsSection>
+      ) : (
+        <Paragraph color="$color10">{NONE_HERE[category]}</Paragraph>
+      )}
     </Screen>
   );
 }

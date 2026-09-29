@@ -27,6 +27,7 @@ import {
 import type { ConnectionService, SecretScope, ValuesDraft } from '../connections';
 import type { Clock, Logger, MediaCacheRepository, NetworkMonitor, SavedList } from '../ports';
 import type { Source, SourceService } from '../sources';
+import { showsOn } from '../tab-content';
 import { isAborted, sourceError, toAppError, type SourceError } from './errors';
 import { byLastPlayed, isExhausted, mergeRows, takeMerged, type MergeState, type SourceCursor } from './merge';
 import { fingerprintOf, type ProviderPool } from './pool';
@@ -242,8 +243,15 @@ export function createMediaService(deps: {
     };
   };
 
+  /** The library's sources: what Media and Videos show. IPTV keeps to TV. */
+  const libraryOf = async (userId: UserId) =>
+    (await sourcesOf(userId)).filter((source) => {
+      const kinds = source.effective.media?.contentKinds ?? [];
+      return showsOn('media', source.manifest.category, kinds) || showsOn('videos', source.manifest.category, kinds);
+    });
+
   const listing = async (userId: UserId, kind: ContentKind) =>
-    (await sourcesOf(userId)).filter((source) => can(source, 'browse') && (source.effective.media?.contentKinds.includes(kind) ?? false));
+    (await libraryOf(userId)).filter((source) => can(source, 'browse') && (source.effective.media?.contentKinds.includes(kind) ?? false));
 
   const listItems = (provider: ConnectedMediaProvider, query: ItemQuery, signal?: CancelSignal): Promise<ItemPage> => {
     if (!provider.listItems) throw missing('listItems');
@@ -291,7 +299,7 @@ export function createMediaService(deps: {
       return { items: mergeRows(found.map(({ saved: list }) => list.items), spec.sort, limit), sourceErrors: [] };
     },
     continueWatching: async (userId, limit = CONTINUE_LIMIT) => {
-      const list = (await sourcesOf(userId)).filter((source) => can(source, 'watchStateRead'));
+      const list = (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead'));
       const found = await savedLists(userId, list, listKey.resume);
       if (found.length === 0) return null;
       const lists = found.map(({ saved: entry }) => [...entry.items].sort(byLastPlayed));
@@ -318,7 +326,7 @@ export function createMediaService(deps: {
     },
 
     continueWatching: async (userId, limit = CONTINUE_LIMIT, signal) => {
-      const list = (await sourcesOf(userId)).filter((source) => can(source, 'watchStateRead'));
+      const list = (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead'));
       const { lists, sourceErrors } = await fanOut(userId, list, listKey.resume, (provider) => {
         if (!provider.getResume) throw missing('getResume');
         return provider.getResume(limit, signal);

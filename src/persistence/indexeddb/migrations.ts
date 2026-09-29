@@ -1,3 +1,5 @@
+import { qualifiedIdOf, qualifiedPluginStates } from '../plugin-ids';
+
 /**
  * The object stores, as IndexedDB's versioned upgrades. They mirror the SQLite
  * tables; IndexedDB has no foreign keys, so the repositories cascade by hand
@@ -57,7 +59,39 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
       cursor.continue();
     };
   },
+  // Plugins moved into category folders, and an id names its category now.
+  (_db, tx) => {
+    rewriteEach<{ readonly pluginId: string; readonly roles: Readonly<Record<string, unknown>> }>(tx, 'connections', (connection) => {
+      const pluginId = qualifiedIdOf(connection.pluginId, connection.roles);
+      return pluginId === connection.pluginId ? undefined : { ...connection, pluginId };
+    });
+    rewriteEach<{ readonly key: string; readonly value: Readonly<Record<string, unknown>> }>(tx, 'deviceSettings', (setting) =>
+      setting.key === 'plugins' ? { ...setting, value: qualifiedPluginStates(setting.value) } : undefined,
+    );
+  },
 ];
+
+/**
+ * Rewrites a store's records, each read again just before it is written, and
+ * left alone where `change` answers nothing. Every step runs in the one
+ * version-change transaction, and an earlier step's cursor may still be
+ * rewriting the same records: a value a cursor read can be stale by the time it
+ * is written back, so it is never written back as read.
+ */
+function rewriteEach<T>(tx: IDBTransaction, name: StoreName, change: (record: T) => T | undefined): void {
+  const store = tx.objectStore(name);
+  const walking = store.openKeyCursor();
+  walking.onsuccess = () => {
+    const cursor = walking.result;
+    if (!cursor) return;
+    const reading = store.get(cursor.primaryKey);
+    reading.onsuccess = () => {
+      const next = change(reading.result as T);
+      if (next !== undefined) store.put(next);
+    };
+    cursor.continue();
+  };
+}
 
 export const INDEXEDDB_VERSION = INDEXEDDB_UPGRADES.length;
 

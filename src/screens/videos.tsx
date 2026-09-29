@@ -11,6 +11,7 @@ import { FileRowSkeleton, SectionTitle, ThumbnailSkeleton } from '@/components/s
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useTabSources } from '@/hooks/use-sources';
+import { categoryHref } from '@/screens/settings/plugin-route';
 import { TAB_CONTENT } from '@/services/tab-content';
 
 const PLACEHOLDERS = Array.from({ length: 8 }, (_, index) => index);
@@ -81,7 +82,7 @@ function FileList() {
 
 function VideosEmptyState() {
   const { catalog } = useServices();
-  const names = catalog.bringing(TAB_CONTENT.videos).map((manifest) => manifest.displayName);
+  const names = catalog.showingOn('videos').map((manifest) => manifest.displayName);
   return (
     <Screen>
       <EmptyState
@@ -89,7 +90,7 @@ function VideosEmptyState() {
         title="Nothing to watch here yet"
         body={`Connect a source that brings ${listKinds(TAB_CONTENT.videos)}${names.length > 0 ? ` — ${listNames(names)}` : ''}. Each one gets its own tab here.`}
       >
-        <Link href={{ pathname: '/settings/plugins', params: { for: 'videos' } }} asChild>
+        <Link href={categoryHref('sources')} asChild>
           <PrimaryButton size="$4" icon={Plus}>
             Add a source
           </PrimaryButton>

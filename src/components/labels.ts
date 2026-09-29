@@ -6,6 +6,7 @@ import type {
   ItemSortKey,
   MediaItem,
   PerProfile,
+  PluginCategory,
   PluginRole,
   SyncCapability,
 } from '@sc/api';
@@ -21,6 +22,23 @@ export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
   anime: 'Anime',
   videos: 'Videos',
   files: 'Files',
+  live: 'Live TV',
+};
+
+/** Settings → Plugins' four lists. */
+export const CATEGORY_LABELS: Readonly<Record<PluginCategory, string>> = {
+  sources: 'Sources',
+  iptv: 'IPTV',
+  players: 'Players',
+  sync: 'Sync',
+};
+
+/** What each list is for, in a line. */
+export const CATEGORY_DESCRIPTIONS: Readonly<Record<PluginCategory, string>> = {
+  sources: 'Films, series, anime, videos and files',
+  iptv: 'Live TV, with a provider’s films and series',
+  players: 'What plays on this device',
+  sync: 'Where your account and its backups live',
 };
 
 export const ROLE_LABELS: Readonly<Record<PluginRole, string>> = {

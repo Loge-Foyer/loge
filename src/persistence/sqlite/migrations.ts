@@ -1,5 +1,7 @@
 import { AppError } from '@sc/api';
 
+import { qualifiedIdOf, qualifiedPluginStates } from '../plugin-ids';
+
 import type { SqlDatabase, SqlExecutor } from './sql';
 
 export interface SqlMigration {
@@ -128,6 +130,21 @@ export const MIGRATIONS: readonly SqlMigration[] = [
         if (roles.sync === true) {
           await tx.run('UPDATE connections SET roles = ? WHERE id = ?', [JSON.stringify({ ...roles, sync: false }), row.id]);
         }
+      }
+    },
+  },
+  {
+    version: 3,
+    up: async (tx) => {
+      // Plugins moved into category folders, and an id names its category now.
+      for (const row of await tx.all<{ id: string; plugin_id: string; roles: string }>('SELECT id, plugin_id, roles FROM connections')) {
+        const qualified = qualifiedIdOf(row.plugin_id, JSON.parse(row.roles) as Record<string, unknown>);
+        if (qualified !== row.plugin_id) await tx.run('UPDATE connections SET plugin_id = ? WHERE id = ?', [qualified, row.id]);
+      }
+      const plugins = await tx.get<{ value: string }>("SELECT value FROM device_settings WHERE key = 'plugins'");
+      if (plugins) {
+        const states = qualifiedPluginStates(JSON.parse(plugins.value) as Record<string, unknown>);
+        await tx.run("UPDATE device_settings SET value = ? WHERE key = 'plugins'", [JSON.stringify(states)]);
       }
     },
   },

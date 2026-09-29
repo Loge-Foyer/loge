@@ -93,7 +93,7 @@ log either.
 
 | Import | Allowed only in |
 | --- | --- |
-| `@sc/plugin-*` — from Phase 6, `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and `@sc/sync-*` | `src/composition/**` |
+| `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and `@sc/sync-*` | `src/composition/**` |
 | `@sc/player-kit` — covered by `@sc/player-*` (Phase 7) | `src/composition/**` — screens get a player's view from the service graph |
 | `@/persistence/*` (and relative `…/persistence/…`) | `src/composition/**` |
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |
@@ -173,8 +173,7 @@ built what they check; the rest apply today.
   The real account plugin against the real server is
   `../streaming_center_sync`'s `npm test` today — the Node server, with the
   log, sealing and owner proofs — until Phase 6 replaces it with PocketBase.
-- Plugins are still `@sc/plugin-<id>`, there is no `player-kit`, sql.js or
-  backup file yet, and nothing plays.
+- There is no `player-kit`, sql.js or backup file yet, and nothing plays.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

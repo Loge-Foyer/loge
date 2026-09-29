@@ -141,6 +141,39 @@ describe('SQLite migrations', () => {
     expect(await versionOf(path)).toBe(MIGRATIONS.length);
   });
 
+  it('carry a v2 database over to v3: every plugin id qualified by its category, the mock by what it was', async () => {
+    const path = tempFile();
+    const v2 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 2));
+    await v2.exec(`
+      INSERT INTO connections (id, plugin_id, label, roles, per_profile, fields, settings, credentials_ref, secret_keys, position, version)
+        VALUES ('c-home', 'jellyfin', 'Home', '{"media":true}', 'none', '{}', '{}', NULL, NULL, 1, 1),
+               ('c-account', 'custom-server', 'Sync', '{"sync":true}', 'none', '{}', '{}', NULL, NULL, 2, 1),
+               ('c-mock', 'mock', 'Mock', '{"media":true}', 'none', '{}', '{}', NULL, NULL, 3, 1),
+               ('c-pretend', 'mock', 'Pretend', '{"media":false,"sync":true}', 'none', '{}', '{}', NULL, NULL, 4, 1),
+               ('c-gone', 'retired', 'Gone', '{"media":true}', 'none', '{}', '{}', NULL, NULL, 5, 1);
+      INSERT INTO device_settings (key, value)
+        VALUES ('plugins', '{"jellyfin":{"enabled":true},"mock":{"enabled":true},"google":{"enabled":false}}');
+    `);
+    await v2.close();
+
+    const db = openTestDatabase('sqlite', { clock: fakeClock(), path });
+    expect((await db.connections.list()).map((connection) => [connection.id, connection.pluginId])).toEqual([
+      ['c-home', 'sources/jellyfin'],
+      ['c-account', 'sync/custom-server'],
+      ['c-mock', 'sources/mock'],
+      ['c-pretend', 'sync/mock'],
+      // A plugin this app no longer ships keeps its id: nothing is guessed.
+      ['c-gone', 'retired'],
+    ]);
+    expect((await db.deviceSettings.get()).plugins).toEqual({
+      'sources/jellyfin': { enabled: true },
+      'sources/mock': { enabled: true },
+      'sync/mock': { enabled: true },
+      'sources/google-drive': { enabled: false },
+    });
+    expect(await versionOf(path)).toBe(MIGRATIONS.length);
+  });
+
   it('insist on steps numbered one after another', async () => {
     const db = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection()), []);
     await expect(migrate(db, [{ version: 2, up: async () => undefined }])).rejects.toThrow('numbered 2');
@@ -200,6 +233,37 @@ describe('IndexedDB upgrades', () => {
     expect(old).toMatchObject({ entity: 'user', entityId: 'u-alex' });
     expect(old?.changeId).toBeUndefined();
     expect(await db.syncState.get(connectionId('c-both'))).toBeUndefined();
+  });
+
+  it('carry a v1 database to v3 in one upgrade: v3 rewrites what v2 wrote, never what it read before', async () => {
+    const indexedDB = new IDBFactory();
+    const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('streaming-center', 1);
+      opening.onupgradeneeded = () => {
+        const tx = opening.transaction;
+        if (!tx) throw new Error('no upgrade transaction');
+        upgradeIndexedDb(opening.result, 0, tx, INDEXEDDB_UPGRADES.slice(0, 1));
+        const connection = { perProfile: 'none', values: { fields: {}, settings: {} }, version: 1 };
+        tx.objectStore('connections').add({ ...connection, id: 'c-both', pluginId: 'mock', label: 'Mock', roles: { media: true, sync: true }, position: 1 });
+        tx.objectStore('connections').add({ ...connection, id: 'c-home', pluginId: 'jellyfin', label: 'Home', roles: { media: true }, position: 2 });
+        tx.objectStore('deviceSettings').add({ key: 'plugins', value: { jellyfin: { enabled: true }, 'custom-server': { enabled: true } } });
+      };
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error);
+    });
+    v1.close();
+
+    const db = open(indexedDB);
+    // Both steps rewrite connections inside one upgrade transaction: the mock loses its account to v2,
+    // and so goes to the catalogue in v3 — with v2's change kept.
+    expect((await db.connections.list()).map((connection) => [connection.pluginId, connection.roles])).toEqual([
+      ['sources/mock', { media: true, sync: false }],
+      ['sources/jellyfin', { media: true }],
+    ]);
+    expect((await db.deviceSettings.get()).plugins).toEqual({
+      'sources/jellyfin': { enabled: true },
+      'sync/custom-server': { enabled: true },
+    });
   });
 
   it('refuse data saved by a newer version of the app', async () => {

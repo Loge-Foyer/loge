@@ -1,4 +1,4 @@
-import type { PluginId } from '@sc/api';
+import type { PluginId, PluginManifest } from '@sc/api';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Stack } from 'expo-router';
@@ -15,7 +15,18 @@ import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { PLUGIN_OFF } from '@/services/device-plugins';
 
+import { newConnectionHref } from './plugin-route';
 import { PluginChips } from './plugins';
+
+/** A route that names no plugin of this app, or one that does not run on this platform. */
+export function UnknownPlugin() {
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: 'Plugin' }} />
+      <SizableText color="$color10">This plugin is not part of this app.</SizableText>
+    </Screen>
+  );
+}
 
 export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
   const { catalog } = useServices();
@@ -26,13 +37,9 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
   const { setEnabled } = usePluginActions();
   const { data: connections = [] } = usePluginConnections(pluginId);
 
-  if (!manifest) {
-    return (
-      <Screen>
-        <SizableText color="$color10">This plugin is not part of this app.</SizableText>
-      </Screen>
-    );
-  }
+  if (!manifest) return <UnknownPlugin />;
+  // A player, or a place for backups: nothing to install or connect until its engine or its role exists.
+  if (manifest.player || manifest.backup) return <NotYet manifest={manifest} />;
 
   // Signing in installed the account's plugin, and it stays installed while it is the account.
   const hostsAccount = connections.some((summary) => summary.isAccount);
@@ -127,11 +134,29 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
             <SettingsRow
               title="Add connection"
               icon={<Plus size={18} color="$accent10" />}
-              href={{ pathname: '/settings/plugins/[pluginId]/new', params: { pluginId } }}
+              href={newConnectionHref(pluginId)}
             />
           ) : null}
         </SettingsSection>
       ) : null}
+    </Screen>
+  );
+}
+
+function NotYet({ manifest }: { manifest: PluginManifest }) {
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: manifest.displayName }} />
+      <YStack gap="$3">
+        <Paragraph size="$5" color="$color11">
+          {manifest.description}
+        </Paragraph>
+        <Paragraph size="$3" color="$color10">
+          {manifest.player
+            ? 'Nothing plays yet: playback arrives in a later version of the app.'
+            : 'Backups arrive in a later version of the app.'}
+        </Paragraph>
+      </YStack>
     </Screen>
   );
 }

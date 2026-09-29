@@ -9,6 +9,7 @@ import {
   type HttpClient,
   type MediaItem,
   type Movie,
+  type PlatformId,
   type Plugin,
   type PluginManifest,
   type ConnectionId,
@@ -88,7 +89,8 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     signedInAt: [] as string[],
   };
   const manifest: PluginManifest = {
-    id: pluginId(id),
+    id: pluginId(`sources/${id}`),
+    category: 'sources',
     displayName: id,
     description: `The ${id} test source.`,
     media: {
@@ -163,6 +165,8 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
 
 export function buildServices(options: {
   plugins: readonly Plugin[];
+  /** The platform the catalogue picks plugins for; a phone unless a test says otherwise. */
+  platform?: PlatformId;
   network?: ReturnType<typeof fakeNetwork>;
   engine?: Engine;
   /** The same database again, for a test that restarts. */
@@ -183,7 +187,7 @@ export function buildServices(options: {
   const network = options.network ?? fakeNetwork();
   const sessions = createSessions(deviceBound);
   const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log: silentLog });
-  const catalog = createPluginCatalog(options.plugins, { strict: true, warn: () => undefined });
+  const catalog = createPluginCatalog(options.plugins, { platform: options.platform ?? 'ios', strict: true, warn: () => undefined });
   const devicePlugins = createDevicePlugins(db.deviceSettings);
   const identity = { identity: async () => ({ appName: 'Test', appVersion: '1', deviceName: 'Test', deviceKey: `${device}-key` }) };
   const crypto = testCrypto();

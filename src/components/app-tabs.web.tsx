@@ -1,9 +1,10 @@
 import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Settings } from '@tamagui/lucide-icons-2/icons/Settings';
+import { SquarePlay } from '@tamagui/lucide-icons-2/icons/SquarePlay';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabListProps, type TabTriggerSlotProps } from 'expo-router/ui';
 import type { ComponentProps } from 'react';
-import { Button, SizableText, XStack, YStack } from 'tamagui';
+import { Button, SizableText, XStack, YStack, useMedia } from 'tamagui';
 
 import { ProfileButton } from './profile-button';
 
@@ -14,13 +15,16 @@ export function AppTabs() {
       <TabList asChild>
         <TopBar>
           <TabTrigger name="media" href="/media" asChild>
-            <TopBarTab icon={Film}>Media</TopBarTab>
+            <TopBarTab icon={Film} label="Media" />
           </TabTrigger>
           <TabTrigger name="videos" href="/videos" asChild>
-            <TopBarTab icon={Tv}>Videos</TopBarTab>
+            <TopBarTab icon={SquarePlay} label="Videos" />
+          </TabTrigger>
+          <TabTrigger name="tv" href="/tv" asChild>
+            <TopBarTab icon={Tv} label="TV" />
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
-            <TopBarTab icon={Settings}>Settings</TopBarTab>
+            <TopBarTab icon={Settings} label="Settings" />
           </TabTrigger>
         </TopBar>
       </TabList>
@@ -42,7 +46,15 @@ function TopBar({ children }: TabListProps) {
         self="center"
         role="tablist"
       >
-        <SizableText size="$6" fontWeight="800" color="$color12" mr="$5" letterSpacing={-0.5}>
+        <SizableText
+          size="$6"
+          fontWeight="800"
+          color="$color12"
+          mr="$5"
+          letterSpacing={-0.5}
+          display="none"
+          $md={{ display: 'flex' }}
+        >
           Streaming <SizableText size="$6" fontWeight="800" color="$accent10">Center</SizableText>
         </SizableText>
         {children}
@@ -57,13 +69,17 @@ type Icon = NonNullable<ComponentProps<typeof Button>['icon']>;
 
 // Only what the trigger needs from its slot props: RN's optional props are
 // typed `| undefined`, which Tamagui's exact optional props refuse wholesale.
-function TopBarTab({ children, isFocused, onPress, icon }: TabTriggerSlotProps & { icon: Icon }) {
+// A narrow window gets the icons alone: four labels, the name and the profile
+// do not fit beside each other on a phone's browser.
+function TopBarTab({ isFocused, onPress, icon, label }: TabTriggerSlotProps & { icon: Icon; label: string }) {
+  const media = useMedia();
   return (
     <Button
       {...(onPress ? { onPress } : {})}
       size="$3"
       rounded="$10"
       role="tab"
+      aria-label={label}
       aria-selected={isFocused ?? false}
       bg={isFocused ? '$color4' : 'transparent'}
       hoverStyle={{ bg: '$color3' }}
@@ -71,7 +87,7 @@ function TopBarTab({ children, isFocused, onPress, icon }: TabTriggerSlotProps &
       color={isFocused ? '$color12' : '$color10'}
       icon={icon}
     >
-      {children}
+      {media.sm ? label : null}
     </Button>
   );
 }

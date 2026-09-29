@@ -20,6 +20,7 @@ import { useHomeRows } from '@/hooks/use-home-layout';
 import { useContinueWatching, useHomeRowQueries, useRefreshMedia } from '@/hooks/use-media';
 import { useActiveUserId } from '@/hooks/use-session';
 import { usePendingSources } from '@/hooks/use-sources';
+import { categoryHref } from '@/screens/settings/plugin-route';
 import type { HomeRowView } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import { TAB_CONTENT } from '@/services/tab-content';
@@ -190,7 +191,7 @@ function SetUpScreen({ pending }: { pending: readonly { connection: PendingConne
 
 function MediaEmptyState() {
   const { catalog } = useServices();
-  const names = catalog.bringing(TAB_CONTENT.media).map((manifest) => manifest.displayName);
+  const names = catalog.showingOn('media').map((manifest) => manifest.displayName);
   return (
     <Screen>
       <EmptyState
@@ -198,7 +199,7 @@ function MediaEmptyState() {
         title="Your library starts here"
         body={`Connect a source that brings ${listKinds(TAB_CONTENT.media)}${names.length > 0 ? ` — ${listNames(names)}` : ''}. Films and series from all of them share one library.`}
       >
-        <Link href={{ pathname: '/settings/plugins', params: { for: 'media' } }} asChild>
+        <Link href={categoryHref('sources')} asChild>
           <PrimaryButton size="$4" icon={Plus}>
             Add a source
           </PrimaryButton>

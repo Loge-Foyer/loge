@@ -62,7 +62,7 @@ import {
 } from '@/services/connections';
 import { hasErrors, hasFieldErrors, validateDraft, type DraftErrors } from '@/services/field-values';
 import type { ProbeTarget } from '@/services/media';
-import { kindsForTab } from '@/services/tab-content';
+import { showsOn } from '@/services/tab-content';
 
 const NO_ERRORS: DraftErrors = { shared: {}, profiles: {} };
 const NOTHING_SAVED: SavedSecrets = { shared: new Set(), profiles: new Map() };
@@ -136,8 +136,9 @@ function AccountOnly({ manifest }: { manifest: PluginManifest }) {
 function mediaRoleField(manifest: PluginManifest): BooleanField {
   const kinds = manifest.media?.contentKinds ?? [];
   const tabs = [
-    ...(kindsForTab('media', kinds).length > 0 ? ['Media'] : []),
-    ...(kindsForTab('videos', kinds).length > 0 ? ['Videos'] : []),
+    ...(showsOn('media', manifest.category, kinds) ? ['Media'] : []),
+    ...(showsOn('videos', manifest.category, kinds) ? ['Videos'] : []),
+    ...(showsOn('tv', manifest.category, kinds) ? ['TV'] : []),
   ];
   return {
     key: 'role.media',

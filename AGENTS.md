@@ -8,9 +8,9 @@ This repository owns **the experience**: screens, services, the local
 database, the backup file's format, platform access and composition. It does
 not own domain types or any plugin — those live in `streaming_center_plugins`.
 
-**This file describes the target.** Phase 5 wrote the new architecture down;
-the code is still Phase 4's until Phase 6 moves it. "Current state", at the
-end, says what runs today.
+**This file describes the target.** Phase 5 wrote the new architecture down,
+and Phase 6 is moving the code to it. "Current state", at the end, says what
+runs today.
 
 ---
 
@@ -455,8 +455,7 @@ package per plugin, at its category path — and Metro watches the folder:
 config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../streaming_center_plugins')];
 ```
 
-Until Phase 6 regroups them, plugins are `@sc/plugin-<id>` at `plugins/<id>`,
-and there is no `player-kit` yet.
+There is no `player-kit` yet: it arrives with the first player (Phase 7).
 
 - Install the plugins repository first; plugin files resolve `@sc/api` from it.
 - Plugins take `@sc/api` — and players `@sc/player-kit` — as a **peer**
@@ -539,11 +538,14 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.** Everything above describes the target. What runs today:
+**Phase 6 — the code is moving to the new architecture.** Everything above
+describes the target. What runs today:
 
-- **Three tabs** — Media, Videos, Settings — and Settings → Plugins as one
-  list, where plugins are still installed per device.
+- **Four tabs** — Media, Videos, TV, Settings — with TV showing the way to add
+  an IPTV source. Settings → Plugins is four lists, by category, of the
+  plugins that run on this platform; a source is still installed per device
+  before its first connection. Stored plugin ids are qualified by category
+  (database v3).
 - **One optional account per device,** synced through a log, with passwords
   sealed on the device and used only for the sign-in they were saved with, and
   owner proofs. Welcome offers "Sign in to sync your profiles" or "Use on this
@@ -555,7 +557,7 @@ until Phase 6.** Everything above describes the target. What runs today:
   order, sort and card style, a full-screen grid per row, and detail pages —
   from every live source, merged, and kept per profile where the source allows
   it. Jellyfin and the mock implement the media role. Nothing plays, Videos
-  still shows skeletons, and there is no TV tab, backup file or profile limit.
+  still shows skeletons, and there is no backup file or profile limit.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build for `modules/key-derivation`; IndexedDB and
   WebCrypto-encrypted secrets on the web, on a secure page. No development
