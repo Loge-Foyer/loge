@@ -3,33 +3,103 @@
 How the app discovers, registers and talks to plugins, and how to develop
 against the plugins repository locally.
 
+This page describes the target. Until Phase 6 the plugins sit in one flat
+folder with unqualified ids, may declare roles, and Settings → Plugins is one
+list.
+
+## Four categories
+
+Every plugin has exactly one category, which is also its folder in the plugins
+repository and the first half of its id: `sources/jellyfin`, `iptv/stalker`,
+`players/system`, `sync/custom-server`.
+
+| Category | Its contract | Scope | Where it shows |
+| --- | --- | --- | --- |
+| `sources` | the media role | account | Media (movies, shows, anime) and Videos (videos, files) |
+| `iptv` | the media role, with live members | account | TV: Live, Movies, Series |
+| `players` | the player role, with `@sc/player-kit`'s view | device | the player |
+| `sync` | the account role (your own server) or the backup role (a file) | device | Settings → Account, and Sync |
+
+A service with two jobs is two plugins in two folders: Google Drive's files
+are `sources/google-drive`, and Google Drive as a place for backups is
+`sync/google-drive`. They share no code, and the app treats them as strangers.
+
+## Four lists
+
+Settings → Plugins is four rows — Sources, IPTV, Players, Sync — and each opens
+that category's list for this platform (`settings/plugins/[category]`). A
+plugin's page is `settings/plugins/[category]/[name]`: the id's two parts are
+the two route segments, so no id is ever URL-encoded. There is no global list.
+
+- **Sources and IPTV** list their connections, each with an `enabled` switch,
+  and add new ones.
+- **Players** list this device's engines: each one's switch and settings, and
+  the default.
+- **Sync** has your own server, the backup targets, and the backup file.
+
+## Account-wide or device-wide
+
+| Category | Scope | What that means |
+| --- | --- | --- |
+| sources, IPTV | account | Connections belong to the account: journaled, carried to your server, written into backups. Every device on the account has them. |
+| players | device | Which are on, the default and their settings are device settings. |
+| sync | device | Your server's sign-in, a backup target and its key are this device's alone: never journaled, never pushed, never in a backup. |
+
+## Only this platform's plugins
+
+A manifest lists its `platforms` — `ios`, `android`, `web` — and the app lists
+and runs only the plugins that include the one it is on (`runsOn` in
+`@sc/api`). iCloud appears on iOS alone; IPTV is hidden on the web, where
+portals send no CORS headers; KSPlayer is an iOS engine.
+
+A connection on the account whose plugin cannot run here stays inert. It is
+labelled "not available on this device", is never connected, and is kept as it
+is for the devices that can run it. A stored plugin id says its category even
+in a build without the plugin.
+
 ## Linking the plugins repository
 
 The plugins live in `../streaming_center_plugins`, a separate repository, and
-are linked in with `file:` dependencies — `@sc/api` and one `@sc/plugin-<id>`
-per plugin. Install that repository first; plugin files resolve `@sc/api` from
-its `node_modules`.
+are linked in with `file:` dependencies: `@sc/api`, `@sc/player-kit`, and one
+package per plugin at its category path —
+`file:../streaming_center_plugins/plugins/<category>/<name>`, named
+`@sc/source-<name>`, `@sc/iptv-<name>`, `@sc/player-<name>` or
+`@sc/sync-<name>`. (Until Phase 6: `@sc/plugin-<id>` at `plugins/<id>`.)
+Install that repository first; plugin files resolve `@sc/api` from its
+`node_modules`.
 
 Metro only needs to be told to watch the folder (`metro.config.js`). Each
-plugin takes `@sc/api` as a peer dependency, so there is exactly one copy of
-the vocabulary in the app. `npm ls --all` reports `UNMET DEPENDENCY @sc/api@*`
-under each linked plugin; that is how npm reports links outside the project,
-not a missing package.
+plugin takes `@sc/api` as a peer dependency — players `@sc/player-kit` too —
+so there is exactly one copy of the vocabulary in the app. `npm ls --all`
+reports `UNMET DEPENDENCY @sc/api@*` under each linked plugin; that is how npm
+reports links outside the project, not a missing package.
+
+A player's engine is native code, and has to be autolinked into the
+development build from its linked package. Phases 7 and 8 prove that works
+before a player depends on it.
 
 ## Registering a plugin
 
 `src/composition/plugins.ts` is the only file that names a plugin. Adding one is
-an import and an entry in its list. The catalogue checks every manifest when the
-app starts: a broken manifest stops a development build and is left out of a
-production one. A plugin that implements a role exports it beside its manifest
-(`plugin.media`); the catalogue hands it to the media service, and nothing else
-ever holds it. A sync role (`plugin.sync`) goes only to the account service.
+an import and an entry in its list. Every plugin exports `plugin`: its
+manifest, and the one role its category's block promises — `media`, `player`,
+`account` or `backup` — once it is written.
 
-## Installed per device, configured per connection
+The catalogue checks every manifest when the app starts, with
+`validateManifest`: the category's one block, known platforms, the id's shape,
+and every rule about fields and settings. A broken manifest stops a
+development build and is left out of a production one. The catalogue hands
+each role to the one service that calls it — `media` to the media service,
+`player` to playback, `account` to the account service, `backup` to the backup
+service — and nothing else ever holds it.
 
-A plugin does nothing until someone installs it on the device — in Settings,
-*All plugins*. Its connections belong to the device too; a plugin can have
-several, and two Jellyfin servers are normal.
+## Configured per connection
+
+A source or IPTV plugin is in use once it has a connection, and adding one is
+the whole of it: connections belong to the account, so there is nothing to
+install on the device. A plugin can have several, and two Jellyfin servers are
+normal. A connection's `enabled` switch turns it off for everyone; off, it has
+nothing in effect.
 
 Each connection decides what every profile keeps for itself, with **Separate
 config per profile**:
@@ -47,8 +117,9 @@ from None keeps the login with the profile doing the editing — the saved
 password is moved, never shown — and every other profile signs in on its own
 tab; saving warns before per-profile values would be discarded.
 
-- **A profile that has not filled in its tab** sees "Finish setting up" on its
-  Media tab, linking straight to its own tab of the form.
+- **A profile that has not filled in its tab** sees "Finish setting up" on the
+  tab the connection's content belongs to, linking straight to its own tab of
+  the form.
 - **"Don't use for {profile}"** switches the connection off for that profile:
   its details are dropped and it neither sees the connection nor is asked to
   finish it. "Use for {profile}" brings it back.
@@ -71,9 +142,9 @@ reports stay chosen, in case they come back.
 
 ## What a plugin is given
 
-Plugins have no host globals — `@sc/api` compiles against `lib: ["esnext"]`
-alone — so everything reaches them through the `PluginContext` built in
-`services/plugin-context.ts`, for a media source and the account alike:
+Sources, IPTV and sync plugins have no host globals — they compile against
+`lib: ["esnext"]` alone — so everything reaches them through the
+`PluginContext` built in `services/plugin-context.ts`:
 
 | Port | What the app supplies |
 | --- | --- |
@@ -83,6 +154,7 @@ alone — so everything reaches them through the `PluginContext` built in
 | `network` | the network kind from `expo-network`; a browser only knows online or offline |
 | `client` | app name and version, device name, and an installation id stable per device, connection and credential scope |
 | `clock` | `now()`, and a `sleep()` that honours cancellation |
+| `crypto` | `platform/plugin-crypto.ts`: HKDF, AES-GCM and randomness, native where the work is heavy |
 
 The installation id hashes a device key with the connection and scope. The
 device key is made once per install — from the vendor id on iOS or the Android
@@ -91,49 +163,47 @@ another phone, so a restored backup signs in as a new device rather than as
 this one. A server that keeps one token per device then keeps one per profile
 that signs in, instead of each sign-in ending the last one's session.
 
-## What a plugin brings
+A player gets a `PlayerContext` instead: it resolves a stream's `headersRef` at
+load time, and holds the headers in memory only (`docs/playback`).
 
-Each plugin says what its media role brings — movies, shows, anime, videos or
-files — and the app decides where that appears:
+## Where content appears
 
-| Tab | Kinds |
+Each source or IPTV plugin says what its media role brings — `movies`,
+`shows`, `anime`, `videos`, `files`, `live` — and the app places it by category
+and kind:
+
+| Tab | What appears there |
 | --- | --- |
-| Media | movies, shows, anime — one library across every source |
-| Videos | videos, files — one tab per source |
+| Media | a source's movies, shows and anime — one library across every source |
+| Videos | a source's videos and files — one tab per source |
+| TV | everything an IPTV plugin brings, in Live, Movies and Series; and a source's `live` channels |
 
-That mapping lives in one place, `src/services/tab-content.ts`. Nothing in the
-app ever asks *which* plugin a source is: it branches on the effective
-capabilities of a resolved source.
+IPTV movies and series appear on TV only, never on Media. That mapping lives in
+one place, `src/services/tab-content.ts`. Nothing in the app ever asks *which*
+plugin a source is: it branches on the category and the effective capabilities
+of a resolved source.
 
-## The account
+## Sync plugins: the account and backups
 
-The device's account is the one connection with its sync role on, and only the
-account service switches that: signing in in Settings → Account (or at first
-launch), never a connection form, and never by default. Signing in is the
-opt-in, so the account carries everything its plugin declares — profiles and
-their PINs, preferences, connections, and their passwords sealed where it
-declares `sealedPasswords` — less any toggle the plugin offers and the user
-switched off. A sealing account supplies the vault key (`vaultKey()`); the app
-seals and opens, and the plugin never sees another connection's password.
+Sync plugins are device-wide, and do one of two jobs.
 
-- **One provider, apart from the media one.** `services/sync/provider.ts`
-  connects the account's sync role with its own session
-  (`session:{id}:account`), so a connection that is a source and the account
-  signs in twice without either ending the other. A sign-in is tried once, on a
-  provider outside the pool, before anything is saved — under the installation
-  id the account will use, and with the session it made handed over, so it is
-  one device at the server and one sign-in.
-- **Your own server** (`custom-server`) is the account for someone who wants
-  neither Apple nor Google. It declares `sealedPasswords`, an `ownerProof` —
-  its password, typed again — and `signUp`, an invite code; the owner check,
-  "Create an account" and signing out all come from those, with no plugin named
-  in the app.
-- **A plugin that can only be an account** — a sync server, say — has no
-  connection form: its page offers "Use as your account", and its `new` route
-  refuses. One that declares a sync role this build does not implement says it
-  cannot be an account yet.
-- **A build without the account's plugin** shows the account as unavailable,
-  and can still sign out of it.
+- **The account role** — `sync/custom-server`, "Your own server". Its fields
+  are the server address, a username and a password. It declares an `account`
+  block: `ownerProof`, the password typed again, and `signUp`, an invite code.
+  The owner check, "Create an account" and signing out all come from those,
+  with no plugin named in the app. `services/sync/` connects it with a session
+  of its own, apart from any media connection, and signs in once for a try
+  before anything is saved.
+- **The backup role** — `sync/icloud`, `sync/google-drive`, `sync/onedrive`, in
+  later phases. It declares a `backup` block and only stores bytes: `stat`,
+  `read`, `write(name, bytes, ifMatch)` and `list`. The backup service builds
+  and encrypts the file, and a write never overwrites one changed elsewhere.
+- **`sync/mock`** is a pretend server account per endpoint, and
+  **`sync/mock-backup`** a pretend backup target. Both live in memory, in
+  development builds only.
+
+A build without the account's plugin shows the account as unavailable, and can
+still sign out of it.
 
 ## Plugins run on Hermes
 
@@ -147,5 +217,8 @@ tests scan its sources for them.
 
 Lint fails if anything outside `src/composition/` imports a plugin, a
 repository implementation or a platform module, and if anything outside
-`src/platform/` imports `expo-local-authentication`. See the `sc-verify` skill
-for how to prove the rules still bite.
+`src/platform/` imports `expo-local-authentication`. Once the plugins move into
+their category folders (Phase 6), the plugin rule covers every category's
+packages, and `@sc/player-kit` once it exists (Phase 7); today it matches
+`@sc/plugin-*`. See the `sc-verify` skill for how to prove the rules still
+bite.

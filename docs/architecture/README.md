@@ -4,6 +4,10 @@ Layers, the composition root, state ownership, and the rules that keep plugins
 from leaking into screens. The full reasoning is in
 `../../.claude/streaming-center-architecture.md`.
 
+This page describes the target. Until Phase 6 the code runs Phase 4's model:
+one optional account, synced through a log, plugins that declare roles, and
+three tabs.
+
 ## Layers
 
 ```
@@ -15,11 +19,13 @@ src/
   services/     business logic, no React; ports.ts declares what they need
   persistence/  the local database: SQLite (native) and IndexedDB (web)
   platform/     device boundary: credentials, HTTP, network, identity, clock, logging,
-                the device owner's check, app activity, the run lock, cryptography
-  composition/  builds the service graph
-modules/
-  key-derivation/  the app's own native code: PBKDF2 on iOS (Swift) and Android (Kotlin)
+                the device owner's check, app activity, the run lock, cryptography, files
+  composition/  builds the service graph; the only place that names a plugin
 ```
+
+The app has no native code of its own in the target: native code comes with
+player plugins, in their packages. Until Phase 6, `modules/key-derivation`
+(PBKDF2 in Swift and Kotlin) is the exception; it retires with the vault.
 
 Dependencies point inward. Services depend only on the interfaces in
 `services/ports.ts` — never on a repository implementation or a platform module.
@@ -41,49 +47,70 @@ needs a reload. The same file wires TanStack Query's focus manager to
 `composition/storage.ts` builds the native storage — SQLite and two keychain
 services — and `storage.web.ts` the web's: IndexedDB, and secrets encrypted in
 IndexedDB. Metro picks the file by platform, so neither side ships the other's
-code. The databases open on first use; launching first deletes secrets a crash
-left queued, then makes the boot decision, and a storage failure lands on the
-boot screen's "could not start". Then the sync scheduler starts.
+code. The databases open on first use, and launching goes in this order:
+
+1. Delete the secrets a crash left queued.
+2. Make sure the device has an account (`ensureAccount`): a device that has
+   profiles but no account record — one upgraded from Phase 4 — gets a local
+   one.
+3. Make the boot decision.
+4. Start the sync scheduler. The engine never runs before the gate has
+   settled.
+
+A storage failure lands on the boot screen's "could not start".
+
+The composition root is also where plugins are registered
+(`composition/plugins.ts`), where each role is handed to the one service that
+calls it, and — once players exist — where a player's view is imported.
+Screens resolve all of it through `useServices()`.
 
 ## Cryptography
 
 Plugins have no cryptography of their own — no WebCrypto, no timers, nothing
 host-side — so the app hands them one through their context
 (`PluginContext.crypto`), and keeps one definition of it:
-`platform/plugin-crypto.ts`. It is built from the platform's parts, chosen by
-file like storage:
+`platform/plugin-crypto.ts`. The backup file uses the same parts. They are
+chosen by file, like storage:
 
-- **Deriving a key from a password** is PBKDF2-HMAC-SHA256, natively: the
-  local module `modules/key-derivation` on a phone (`crypto.ts`), WebCrypto in a
-  browser (`crypto.web.ts`). Plain JavaScript on Hermes runs a hundred times
-  slower — scrypt took 22 s on the emulator — which is why phones run a
-  development build. Nothing weaker than `isKdfParams` allows is derived,
-  whatever a plugin asks.
+- **Encrypting** is AES-256-GCM through expo-crypto, with WebCrypto behind it
+  in a browser. It runs natively on a phone, which matters: plain JavaScript
+  on Hermes is about a hundred times slower, and a backup file can be
+  megabytes. Additional data — a backup's header — goes in as base64 that
+  `@sc/api` encoded: expo-crypto reads a string of additional data as base64,
+  and would turn bytes into one through `btoa`.
 - **Expanding a key** is HKDF-SHA-256 in JavaScript (noble): a few HMACs,
-  cheap anywhere.
-- **Sealing** is AES-256-GCM through expo-crypto (WebCrypto behind it in a
-  browser). A seal's context goes in as base64 that `@sc/api` encoded:
-  expo-crypto reads a string of additional data as base64, and would turn bytes
-  into one through `btoa`.
+  cheap anywhere. The backup file's encryption key and key id come from the
+  backup key this way.
+- **Randomness** — the backup key, nonces — comes from expo-crypto.
 
-Only `src/platform/` imports noble or the module; lint enforces it.
+Only `src/platform/` imports noble; lint enforces it.
+
+Until Phase 6 the port also derives keys from passwords, for Phase 4's vault
+and owner proof: PBKDF2, through `modules/key-derivation` on a phone
+(`crypto.ts`) and WebCrypto in a browser (`crypto.web.ts`), never weaker than
+`isKdfParams` allows. Scrypt in plain JavaScript took 22 s on the emulator,
+which is why that was native. Both go with the vault.
 
 ## The local database
 
 Services reach it through `LocalDatabase` (`services/ports.ts`). Called
 directly, a repository method is a transaction of its own; several writes that
 must land together go through `transaction(work)`, and `work` awaits nothing but
-the repositories it is given. Every change to profiles, preferences and
-connections appends a change-journal entry in the same transaction. The rules,
-and why each exists, are in `docs/data`.
+the repositories it is given. Every change to account-wide state — profiles,
+their PINs and preferences, source and IPTV connections and each profile's
+values on them — appends a change-journal entry in the same transaction. The
+rules, and why each exists, are in `docs/data`.
 
 ## The session gate
 
-`services/session.ts` owns a single gate: `starting`, `needs-first-user`,
+`services/session.ts` owns a single gate: `starting`, `needs-account`,
 `needs-user-selection`, `needs-user-unlock`, `ready` or `failed`. The first
-decision after launch is the pure function in `services/boot.ts`. Every root
-route sits behind exactly one `Stack.Protected` guard on that gate, so when the
-gate moves, the guards do the navigating.
+decision after launch is the pure function in `services/boot.ts`, which reads
+whether the device has an account as well as its profiles: with no account, it
+is `needs-account`. (Until Phase 6, `needs-first-user` stands where
+`needs-account` will.) Every root route sits behind exactly one
+`Stack.Protected` guard on that gate, so when the gate moves, the guards do the
+navigating.
 
 Everything a signed-in profile can reach lives in the `(app)` group: the tabs,
 and the pages pushed over them — the full-screen grid, detail pages and the
@@ -98,35 +125,75 @@ boot screen before the app could honour it. If the gate settles anywhere else �
 a PIN to enter, a profile to pick — the guards take over as usual and the link
 is dropped.
 
-Welcome, the first-launch screen, sits outside `(app)`: signing in to an
-account there happens before any profile exists. When an account's profiles
-arrive — at sign-in or in a later run — the engine tells the composition, which
-has the gate look again (`session.refresh()`): from the first launch to "Who's
-watching?", and from a profile that another device removed to the picker. A
-PIN set elsewhere never locks the profile in use.
+Welcome, the first-launch screen, sits outside `(app)`, because it comes before
+any profile exists. It offers three ways in:
+
+- **Create an account on this device** — a name, which is also the first
+  profile's.
+- **Sign in to your server** — the server's account arrives with its profiles.
+- **Restore a backup** — a `.scbackup` file and its key, which become a local
+  account.
+
+When a sync or an import brings or removes profiles, the engine tells the
+composition, which has the gate look again (`session.refresh()`): to "Who's
+watching?" when profiles arrive, to the picker when the profile in use is gone,
+and back to `needs-account` when the account is gone. Nothing happens while
+starting or failed, and a PIN set elsewhere never locks the profile in use. The
+first profile chosen on a device without a default becomes its default, as the
+first one created does.
+
+## The plugin catalogue
+
+`services/plugin-catalog.ts` holds every registered plugin, each checked with
+`validateManifest` at startup: a broken manifest stops a development build, and
+is left out of a production one.
+
+- **Only this platform's plugins** are listed and run: those whose `platforms`
+  include the one the app runs on (`runsOn` in `@sc/api`, against
+  `Platform.OS`). An account-wide connection whose plugin cannot run here stays
+  inert, labelled "not available on this device", and is kept for the devices
+  that can. A stored plugin id names its category even in a build without the
+  plugin.
+- **One list per category** — sources, IPTV, players, sync — for the four rows
+  of Settings → Plugins. There is no global list.
+- **Each role goes to one service:** `media` to the media service, `player` to
+  playback (Phase 7), `account` to the account service and its sync engine,
+  `backup` to the backup service. Nothing else ever holds one.
 
 ## Where a source comes from
 
-Every connection belongs to the device. Its `perProfile` mode decides what each
-profile keeps for itself: nothing (`none`), its own sign-in (`credentials`), or
-its own value for every field and setting (`all`). For the active profile,
-`services/sources.ts` resolves each connection of each installed plugin to one
-of three standings:
+Source and IPTV connections belong to the account: every device on it has
+them. Each connection's `perProfile` mode decides what each profile keeps for
+itself: nothing (`none`), its own sign-in (`credentials`), or its own value for
+every field and setting (`all`). For the active profile, `services/sources.ts`
+resolves each connection to one of three standings:
 
 | Standing | When | What the profile sees |
 | --- | --- | --- |
 | live | shared, or the profile's own values are complete | the connection's titles |
-| pending | the profile has not filled in its own values | "Finish setting up" on Media |
+| pending | the profile has not filled in its own values | "Finish setting up" on the tab its content belongs to |
 | off | the profile was switched off for it | nothing at all |
 
 A live source carries the values it runs with — shared values, with the
-profile's own where the mode separates them — and `@sc/api`'s `effectiveRoles`
-runs on those resolved values. Under `all`, two profiles can differ in what the
-same connection may do. The screens only ever see that result.
+profile's own where the mode separates them — and `@sc/api`'s
+`effectiveCapabilities(manifest, { enabled, settings })` runs on those resolved
+values. A connection switched off has nothing in effect; otherwise a declared
+capability is in effect when every toggle gating it is on. Under `all`, two
+profiles can differ in what the same connection may do. The screens only ever
+see that result. (Until Phase 6 the same job is done over Phase 4's roles.)
+
+**Where its content appears** is its category plus its content kind, mapped in
+one place, `services/tab-content.ts`:
+
+- a source's movies, shows and anime on Media
+- a source's videos and files on Videos
+- everything an IPTV plugin brings — live channels, and its movies and series —
+  on TV, and a source's `live` channels there too
 
 ## Talking to sources
 
-`services/media/` is the only place that calls a plugin's media role.
+`services/media/` is the only place that calls a plugin's media role, for
+sources and IPTV alike.
 
 - **One provider per connection and credential scope** (`pool.ts`). Every
   profile sharing a login shares a provider and a session: a provider each
@@ -155,78 +222,147 @@ same connection may do. The screens only ever see that result.
   query — never `setQueryData`, which would make a snapshot look fresh and let
   the grid page from old positions.
 
-## The account and its sync
+## The account
 
-A device has at most one account: the one connection whose sync role is on.
-`services/account.ts` is the only thing that switches a sync role, and
-`services/sync/` is the engine that keeps the account and the device in step.
+A device holds exactly one account once it is set up: **local**, living on
+this device alone, or **on your own server**. The `account` row says which,
+and `services/account.ts` is the only thing that changes it:
 
-- **A run** (`sync/engine.ts`) pulls the account's log from the device's
-  cursor, applies it page by page — each page in one transaction together with
-  the new cursor — then pushes the journal after the checkpoint. The account's
-  log order decides every conflict; no clock does.
-- **Four rules** decide what a pulled change does (`sync/apply.ts`):
-  1. A change this device has not had back from the account protects its
-     entity — pending, or accepted and on its way back. A pulled change to it
-     is skipped: this device's is later in the log.
-  2. A remote delete of a profile or connection is always applied.
-  3. The device's own changes come back and are applied like any other, which
-     is what makes every device converge.
-  4. A pulled change carrying the id of a pending entry is that entry's lost
-     acknowledgement.
-- **Joining** (`sync/join.ts`) — signing in, switching, an account that lost
-  data (`reset`), or one that carries more — reads the whole log, settles what
-  both sides hold, and announces this device's rows in the journal for the
-  normal push to upload. Carrying less is remembered, so carrying it again
-  later joins again: what changed meanwhile was never sent.
-- **Passwords** (`sync/sealed.ts`) are used only with the sign-in they were
-  saved for. On an account that carries `sealedPasswords`, a run asks the
-  account for its vault key once — only when something is to be sealed or
-  opened — and hands it to join, apply and push: pushing seals a connection's
-  passwords, applying opens them before the transaction and takes each only
-  for its sign-in. Two narrow exceptions to rule 1 keep every device's copy
-  whole; `docs/data` has them.
+| Action | What happens |
+| --- | --- |
+| Create a local account | a name, and a first profile with the same name |
+| Sign in to your server | try once, read the whole account, confirm — with an offer to export a backup first, and the owner check — then replace this device's account in one transaction |
+| Create an account on your server | from a fresh device, the server makes a first profile named after it (`firstProfile: true`); from a local account, the device uploads what it holds — refused up front when it has more profiles than the server takes |
+| Sign out | a local copy stays, and becomes a local account |
+| Switch | sign out, then sign in |
+| Import a backup | the file's account replaces this device's, as a local account; a device signed in to your server signs out first, after asking |
+
+Accounts are never merged. Your server's sign-in is a sync-category
+connection: it belongs to the device, and is never journaled, pushed or
+backed up. A build without the account's plugin shows the account as
+unavailable, and can still sign out.
+
+**It signs in once.** The try runs on a provider outside the pool, and the
+session it made is handed to the account inside the run lock, so no run signs
+in again. Once `createAccount` has succeeded, a failure after it is
+`AccountCreatedError`, and the form only signs in from then on. Signing out
+tells the server once, for at most five seconds, and lets it go whatever it
+answers.
+
+**The profile limit** is ten on a local account, and on your server the
+`maxProfiles` that `info()` reads without signing in. The profiles service
+refuses a profile past it.
+
+## The sync engine
+
+`services/sync/` keeps a server account and the device in step. An account is
+small — at most ten profiles, their PINs and preferences, and a few
+connections — so a run (`sync/engine.ts`) reads all of it:
+
+1. **Push** (`sync/push.ts`) the journal after the checkpoint, as one batch the
+   server stores all or nothing, parents first. Each journaled entity goes as
+   its whole current row (`sync/records.ts`), with its passwords read from the
+   keychain outside any transaction, or as a soft delete. A refused batch is
+   split to find the write it refused: a profile over the limit stays on this
+   device only, and says so; a write to a deleted profile or connection gives
+   way to the delete. The checkpoint moves past what was stored.
+2. **Read** every record of the account, deleted ones included, each checked
+   with `isAccountRecord`.
+3. **Reconcile** (`sync/reconcile.ts`). First the plan, outside any
+   transaction: PINs and passwords go into the keychain under fresh refs. Then
+   one unjournaled transaction:
+   - an entity with a pending local change is skipped: this device's change
+     goes next
+   - a deleted profile or connection is deleted here, always
+   - otherwise the server's version replaces the local one when they differ
+   - a local row the server does not have, and that is not pending, was lost
+     by the server — a restore — so it is announced again, and the next push
+     puts it back
+4. **Clean up.** Refs nothing adopted go through the janitor, "last synced" is
+   recorded, and the engine tells its listeners what changed.
+
+There are no cursors, revisions or logs: the server's collections are the
+truth. Two devices editing the same profile or connection end on whichever
+pushed last, never by a clock, and nothing is merged field by field. (Until
+Phase 6 the engine pulls a log after a cursor, and joins an account on sign-in;
+this replaces all of it.)
+
 - **When it runs** (`sync/scheduler.ts`): at launch, on coming to the
   foreground, two seconds after a journaled commit, when the network changes,
   every minute in the foreground, and on "Sync now" — never inside a write.
-  Retry hints decide the rest: `backoff` doubles up to 15 minutes, and nothing
-  but a new network cuts it short; `network-change` waits for one; an account
-  that refused the sign-in waits for the user, always. On the web a run holds a
-  Web Lock, so two tabs never sync at once.
-- **Afterwards** — after a run, and after a sign-in's join — the engine tells
-  its listeners what changed: the composition lets running providers go and
-  has the session gate look again; the UI refreshes what it shows.
+  Retry hints decide the rest: `backoff` starts at 30 seconds and doubles up to
+  15 minutes, and nothing but the retry itself or a new network cuts it short;
+  `network-change` waits for one; an account that refused the sign-in, or
+  whose password is not on this device, waits for the user, always; a
+  throttled sign-in (`too-many-attempts`) waits, since nothing judged the
+  password. On the web a run holds a Web Lock, so two tabs never sync at once.
+- **Afterwards** — after a run, and after signing in — the engine tells its
+  listeners what changed: the composition lets running providers go and has the
+  session gate look again; the UI refreshes what it shows.
+- **A phone restored from its OS backup** keeps its database but not its
+  device-bound keychain. A device-key fingerprint in the database spots it at
+  boot: the pending journal and the session are dropped, and the next sign-in
+  replaces, so a stale journal is never pushed.
 
-**Signing in** is two steps. `prepareSignIn` checks the owner, tries the
-account once — or creates it, with the plugin's `signUp` fields — and reads it
-whole, and its vault key for the join, saving nothing. `completeSignIn` writes
-the account's connection, applies what the account holds and announces this
-device's rows, all in one transaction. Between the two, the UI asks "Use the
-account's profiles" or "Keep both" when both sides hold profiles. Signing in
-again to this device's account takes its passwords and nothing else: a new
-address would be another account, reached without switching.
+On a local account there is nothing to sync. Its journal is pruned, since no
+server waits for it, and a backup target, when there is one, saves after
+changes instead.
 
-**It signs in once.** The try runs under the installation id the account will
-use (`account|{pluginId}`), so the server sees one device, and the session it
-made is handed to the account inside the run lock, right after the join: no run
-signs in again, and a session a revoke left behind is replaced. Signing out and
-switching tell the old account once, for at most five seconds, and let it go
-whatever it answers.
+## The owner check
 
-**The owner check** (`services/owner-check.ts`) re-verifies whoever owns the
-device's profiles: the account's own check when it has one, else Face ID or
-the passcode. Forgot PIN goes through it, and so do signing in on a device
-that has profiles, signing out and switching. Signing in again to the same
-account does not: its password is the proof.
+`services/owner-check.ts` re-verifies whoever owns the device's profiles:
 
-- An account whose check takes its password (`ownerProof`) gets it typed
-  again — never the saved one. Nothing typed is refused before anything is
-  asked, so it never counts as a wrong try; a throttled check is `throttled`.
-- An account that no longer lets this device in — revoked, or refusing its
-  saved password — cannot vouch for anyone: the device answers instead, as it
-  does when the account says `signed-out` mid-check.
-- An account that cannot be reached is `failed`, never a quiet fallback to the
+- **On a server account,** its password, typed again, checked by the server
+  (`verifyOwner`) — never the saved one. Nothing typed is refused before
+  anything is asked, so it never counts as a wrong try; a throttled check is
+  `throttled`.
+- **On a local account, or when the server has let this device go** — its
+  password changed, or it answers `signed-out` mid-check — the device answers
+  instead: Face ID, a fingerprint or the passcode, asked only from the platform
+  layer.
+- **Where neither exists** — a browser on a local account — a PIN stays until
+  it is typed.
+- A server that cannot be reached is `failed`, never a quiet fallback to the
   device.
+
+It guards, on a device that holds profiles: Forgot PIN, signing out, replacing
+or switching the account (asked of the account being left), importing a
+backup, and showing the backup key. Signing in again to the same account does
+not ask: its password is the proof. At first launch there is nothing to
+protect.
+
+## Backups
+
+`services/backup/` (Phase 6) writes and reads the account as one encrypted
+file, `.scbackup`. `docs/data` has its format.
+
+- **Writing:** the account's rows, mapped to the backup's own schema by the
+  same mapper that makes the server's records, with passwords and PINs read
+  from the keychain outside any transaction. The database is built in memory —
+  expo-sqlite on native, sql.js on the web, loaded only then — serialized, and
+  encrypted with the backup key.
+- **Export and import** exist on every platform: the share sheet or a download
+  out, the document picker or a file input in.
+- **Importing** checks everything before it replaces anything — size, key id,
+  decryption, `quick_check`, schema version, every row — then writes the
+  secrets under fresh refs, the rows in one transaction, and runs the janitor.
+  The result is always a local account.
+- **Backup targets** — iCloud, Google Drive and OneDrive, in later phases —
+  save the same file after journaled commits, debounced, and when the app goes
+  to the background, staged in the cache directory, which OS backups skip.
+  Writes are conditional: the service remembers `{ lineage, generation, etag }`
+  per target, and when the file changed elsewhere it asks — open theirs, keep
+  this device's, or keep both — and never overwrites silently. The target only
+  stores bytes.
+
+## Choosing a player
+
+Nothing plays until Phase 7; `docs/playback` has the design. A source's
+`getPlaybackDescriptor` says what to play, and a player plugin plays it.
+`choosePlayer` in `@sc/api`, a pure function, picks the device's default if it
+can play the item, else the best enabled player on this platform that can, and
+otherwise says which one would. Players are device settings, and the chosen
+player's view reaches the screen from the composition root.
 
 ## Query keys
 
@@ -248,10 +384,12 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
 
 | State | Lives in |
 | --- | --- |
-| Profiles, connections, per-profile values, preferences, device settings, the change journal | repositories — SQLite on native, IndexedDB on web |
-| Passwords, PINs | the credential store — the keychain on native, encrypted IndexedDB on web |
-| Session tokens, the device key, the account's vault key | the device-bound credential store — the keychain, never restored onto another phone |
+| The account-wide state — profiles, preferences, source and IPTV connections, per-profile values — and the change journal | repositories — SQLite on native, IndexedDB on web |
+| Device settings — the default profile, players, sync settings — and sync-category connections | repositories, never journaled |
+| The account: `account`, `account_sync` (the checkpoint, last synced), `backup_state` | repositories, never journaled, cleared when the device changes account |
+| Passwords, PINs, your server's account password | the credential store — the keychain on native, encrypted IndexedDB on web |
+| Session tokens, the device key, the backup key | the device-bound credential store — the keychain, never restored onto another phone |
+| Playback descriptors and stream URLs | memory only |
 | Reads for screens, titles from sources | TanStack Query, every key prefixed by `device` or by the active profile |
 | The session gate | the session service, read with `useSyncExternalStore` |
-| Where the account's log stands — cursor, checkpoint, what waits to come back | `sync_state`, in the repositories, never journaled |
 | How the account stands — syncing, synced, waiting, changes not sent | the sync engine, read with `useSyncExternalStore` |

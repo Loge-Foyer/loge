@@ -2,12 +2,16 @@
 
 Building and running on emulator and device, native modules, and Android-specific configuration.
 
-The app runs in a **development build**, not Expo Go: it has a native module of
-its own, `modules/key-derivation`, which derives keys from an account password
-with PBKDF2 on `javax.crypto`'s HMAC. JavaScript on Hermes is far too slow for
-that (measured: over twenty seconds on the emulator). `npm run android` builds
-the client and installs it; after that, Metro serves the JavaScript as usual.
-Change the Kotlin, or add a native module, and build again.
+The app runs in a **development build**, not Expo Go. The built-in player is
+expo-video on Media3 / ExoPlayer (Phase 7), and mpv (libmpv) and VLC (libVLC)
+are Expo modules in their own plugins (Phase 8), autolinked into the build.
+Until Phase 6 the app also has a native module of its own,
+`modules/key-derivation`, which derives keys from an account password with
+PBKDF2 on `javax.crypto`'s HMAC — JavaScript on Hermes is far too slow for that
+(measured: over twenty seconds on the emulator).
+
+`npm run android` builds the client and installs it; after that, Metro serves
+the JavaScript as usual. Change native code, or add a player, and build again.
 
 The Material tab bar is themed from Tamagui explicitly, because it would
 otherwise follow the system's light theme under a dark app.
@@ -15,10 +19,14 @@ otherwise follow the system's light theme under a dark app.
 ## Servers on the local network
 
 The development build is a debug build, whose generated manifest allows plain
-`http` — a Jellyfin on your network, your own sync server, and Metro itself. A
+`http` — a Jellyfin on your network, your own server, and Metro itself. A
 release build blocks cleartext from Android 9 on, and will need it allowed
 through a config plugin in `app.json` (`expo-build-properties`) — never an edit
 to the generated `android/` folder.
+
+The emulator reaches the computer at `10.0.2.2`, so your own server running
+there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
+`http://localhost:8090`.
 
 ## Storage
 
@@ -30,18 +38,33 @@ to the generated `android/` folder.
 - **After a restore**, the database is back but its secrets are not. A source
   whose saved password is missing is never signed in without it — servers lock
   accounts after failed logins. Instead it says it needs its password again.
-  A profile whose PIN is missing opens for its owner.
+  A profile whose PIN is missing opens for its owner. The backup key is gone
+  too, so opening a `.scbackup` takes the key, typed in.
 - `adb shell pm clear com.fakg.streaming_center_app` starts the app from
   scratch.
 
+## Players
+
+- **ExoPlayer**, the built-in player through expo-video (Phase 7), plays HLS
+  and MPEG-TS, so IPTV channels play on it.
+- **mpv and VLC** (Phase 8) are for what it cannot: some containers, codecs and
+  subtitle formats.
+- Which players are on, and the default, are this device's settings.
+
+## The backup file
+
+From Phase 6, export goes through the share sheet and import through the
+document picker. On the emulator, `adb push <file> /sdcard/Download/` puts a
+file where the picker finds it. The backup key is shown only after the owner
+check.
+
 ## Forgot PIN
 
-With your own server, Forgot PIN asks for the account's password, and the key
-it gives is worked out natively in about a second. Without an account that can
-vouch for its owner — or with one that has let this device go — it asks the
-device: a fingerprint, or the screen lock's PIN, pattern or password. It is
-offered once a screen lock is set — `getEnrolledLevelAsync()` reports at least
-`SECRET`.
+On your own server, Forgot PIN asks for the account's password, and the server
+checks it. On a local account — or when the server has let this device go — it
+asks the device: a fingerprint, or the screen lock's PIN, pattern or password.
+It is offered once a screen lock is set — `getEnrolledLevelAsync()` reports at
+least `SECRET`.
 
 On the emulator: Settings → Security → Screen lock → PIN, then Fingerprint,
 touching the sensor with `adb -e emu finger touch 1` when asked. At the app's

@@ -4,8 +4,13 @@ The Streaming Center client: an Expo/React Native app targeting **iOS, Android
 and web**. Read the workspace root `AGENTS.md` and
 `../.claude/streaming-center-architecture.md` first.
 
-This repository owns **the experience**. It does not own domain types or any
-adapter — those live in `streaming_center_plugins`.
+This repository owns **the experience**: screens, services, the local
+database, the backup file's format, platform access and composition. It does
+not own domain types or any plugin — those live in `streaming_center_plugins`.
+
+**This file describes the target.** Phase 5 wrote the new architecture down;
+the code is still Phase 4's until Phase 6 moves it. "Current state", at the
+end, says what runs today.
 
 ---
 
@@ -61,11 +66,17 @@ Docs: https://docs.expo.dev/eas/index.md
 - Expo Go only includes its bundled native modules. After adding a library with
   native code, the app needs a development build: `npx expo run:ios|android`
   locally, or `eas build --profile development`.
-- **This app is past that point.** Its key derivation is a local module
-  (`modules/key-derivation`, Swift and Kotlin), so phones run a development
-  build: `npm run android` / `npm run ios` build and install it, then Metro
-  serves the JavaScript as before. A native change means building again — a
-  stale build looks like code that did not change. The web needs no build.
+- **This app is past that point.** Phones run a development build:
+  `npm run android` / `npm run ios` build and install it, then Metro serves the
+  JavaScript as before.
+  - Player engines are native code: expo-video for the built-in player
+    (Phase 7), Expo modules for KSPlayer, mpv and VLC (Phase 8).
+  - Face ID needs the app's usage text, which Expo Go cannot carry.
+  - Until Phase 6 the app also has native code of its own,
+    `modules/key-derivation` (Swift and Kotlin), which retires with the vault.
+
+  A native change means building again — a stale build looks like code that
+  did not change. The web needs no build.
 - Prefer recommended Expo modules over third-party libraries, and check your
   available skills before adding dependencies.
   Docs: https://docs.expo.dev/versions/latest/index.md
@@ -77,42 +88,64 @@ Docs: https://docs.expo.dev/eas/index.md
 These are specific to Streaming Center and matter more than anything above.
 
 1. **Never define a domain type here.** `MediaItem`, `GlobalMediaKey`, the
-   capability types and every plugin contract live in `@sc/api`, in the
-   plugins repository. Defining them here makes the dependency graph circular.
+   capability types and every plugin contract live in `@sc/api`, and the React
+   half of the player contract in `@sc/player-kit` — both in the plugins
+   repository. Defining them here makes the dependency graph circular.
 
 2. **No plugin names above the composition root.** There must never be an
    `if (providerId === 'jellyfin')` in a screen, component or service. Branch on
-   **effective** capabilities — what the plugin declares, intersected with what
-   the user enabled for that connection, on the values the active profile runs
-   it with (`services/sources.ts`). Branching on declared alone calls features
-   the user switched off.
+   the plugin's **category** and its **effective** capabilities — what it
+   declares, intersected with the toggles switched on for that connection, on
+   the values the active profile runs it with (`effectiveCapabilities`, through
+   `services/sources.ts`). A connection switched off (`enabled: false`) has
+   nothing in effect. Branching on declared alone calls features the user
+   switched off. Where content appears is category plus kind, decided in
+   `services/tab-content.ts` and nowhere else.
 
-3. **Only the composition root imports a concrete plugin.** Screens resolve what
-   they need from injected services. This is what keeps the boundary real rather
-   than aspirational.
+3. **Only the composition root imports a concrete plugin** — a source, IPTV,
+   player or sync package, a player's view, and `@sc/player-kit`. Screens
+   resolve what they need from injected services. This is what keeps the
+   boundary real rather than aspirational.
 
 4. **Secrets never reach the database** — SQLite on native, IndexedDB on web.
    The database stores opaque refs; values live behind `SecureCredentialStore`
    (keychain on native, encrypted IndexedDB on web). Secrets are manifest
-   `password` fields, PINs and session tokens; none of them enters a row, a
-   journal entry, a query key, a provider fingerprint or a log. A changed secret
-   gets a new ref — never overwrite one in place. Session tokens and the device
-   key go in the *device-bound* store, never restored onto another phone.
+   `password` fields — anything that signs in on its own is one, a portal's
+   MAC address included — PINs, session tokens and the backup key; none of
+   them enters a row, a journal entry, a query key, a provider fingerprint or
+   a log.
+   A changed secret gets a new ref — never overwrite one in place. Session
+   tokens, the device key and the backup key go in the *device-bound* store,
+   never restored onto another phone.
+   - Account-wide passwords do travel — in plain text to your own server, and
+     inside the encrypted backup file — but on a device they go from the wire or
+     the file straight into the keychain.
+   - A stream URL can carry credentials, so a playback descriptor lives in
+     memory only: never persisted, never logged.
 
 5. **Writes are local-first.** A user action writes to the local database and
    appends a change-journal entry in one transaction, then returns. The sync
-   engine drains the journal later. No network call in a UI interaction path —
-   favouriting must work in airplane mode. Local queries and mutations run with
-   `networkMode: 'always'`: a browser saying "offline" must not pause them.
+   engine, or the next backup, takes it later. No network call in a UI
+   interaction path — favouriting must work in airplane mode. Local queries and
+   mutations run with `networkMode: 'always'`: a browser saying "offline" must
+   not pause them. State a source masters, like watch status on Jellyfin, is
+   cached locally and written through an outbox (Phase 7).
 
 6. **Profile separation is enforced twice.** Every user-owned table carries
    `user_id` with a cascade from `users`, *and* every query cache key is
    prefixed with the active user (`userKey()` / `deviceKey()` in
-   `src/services/query-keys.ts`). The database alone is not enough.
-   Connections belong to the device; what a profile keeps for itself on one —
-   its values under the connection's `perProfile` mode — is user-owned and goes
-   with the profile. What a source answered is keyed with `remoteKey()`, so a
-   local change never refetches every server.
+   `src/services/query-keys.ts`). The database alone is not enough. What a
+   source answered is keyed with `remoteKey()`, so a local change never
+   refetches every server. What lives where:
+   - **Account-wide** — profiles, their PINs and preferences, and source and
+     IPTV connections with each profile's values on them. Journaled, carried to
+     your server, written into backups. What a profile keeps for itself on a
+     connection — its values under the connection's `perProfile` mode — is
+     user-owned and goes with the profile.
+   - **Device-wide** — players (on or off, the default, their settings), sync
+     plugins (your server's sign-in, a backup target and its key), the default
+     profile, sessions, the device key, caches, the journal and sync state.
+     Never journaled, never pushed, never in a backup.
 
 7. **Components take domain types.** `<PosterCard item={item} />`, never
    `<JellyfinPoster raw={payload} />`. Artwork goes through
@@ -121,9 +154,10 @@ These are specific to Streaming Center and matter more than anything above.
    must not sit where a component can read it.
 
 8. **Never try a failed sign-in again on your own.** Servers lock accounts
-   after a few failures. A source that answers `UNAUTHORIZED` is parked until
-   the user acts, a plugin signs in once per 401 at most, and Test connection /
-   Load libraries are buttons — never a probe while someone is typing.
+   after a few failures — Jellyfin, your own server and an IPTV portal alike. A
+   source that answers `UNAUTHORIZED` is parked until the user acts, a plugin
+   signs in once per 401 at most, and Test connection / Load libraries are
+   buttons — never a probe while someone is typing.
 
 ---
 
@@ -145,11 +179,16 @@ These are specific to Streaming Center and matter more than anything above.
 - **Never `INSERT OR REPLACE` a parent row.** It deletes first, and the cascade
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
-  newer database is refused. A table rebuild is a `foreignKeysOff` step.
+  newer database is refused. A table rebuild is a `foreignKeysOff` step. The
+  next three: v3 qualifies stored plugin ids by category and v4 brings the
+  account model (both Phase 6); v5 adds watch status and its outbox (Phase 7).
+  `docs/data` has what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
-  changes nothing writes nothing. Device settings and cascaded rows are not
-  journaled; the journal's `user_id` does not cascade. A PIN is journaled apart
-  from its profile's name (`userPin`).
+  changes nothing writes nothing. Only account-wide state is journaled: device
+  settings, sync-category connections, the account's own rows (`account`,
+  `account_sync`, `backup_state`), the media cache and cascaded rows are not.
+  The journal's `user_id` does not cascade. A PIN is journaled apart from its
+  profile's name (`userPin`).
 - **What arrives from the account is written unjournaled** —
   `SyncDatabase.unjournaled`, which only the sync engine and the account service
   receive. Journaled, a pulled change would be sent straight back. Never use it
@@ -161,68 +200,173 @@ These are specific to Streaming Center and matter more than anything above.
 - **A missing secret is never a sign-in.** When a row lists a saved password the
   store no longer has — after a restore — the pool refuses with
   `MissingSecretError` instead of signing in with nothing.
-- **The device key is never in the database,** which backups copy to other
-  phones. It lives in the device-bound secure store.
-- **The media cache is a cache.** Never journaled; every read and write best
-  effort; kept only where `offlineMetadata` is effective for that profile, and
-  served only under the fingerprint it was saved with. A connection change
-  purges it in the same transaction. Screens show it as `placeholderData`, never
-  through `setQueryData`.
+- **The device key is never in the database,** which phone backups copy to
+  other phones. It lives in the device-bound secure store. A fingerprint of it
+  in the database — never the key — spots a phone restored from its OS backup
+  at boot: the pending journal and the session are dropped, so a stale journal
+  is never pushed.
+- **The backup database is not the device database.** A `.scbackup` has its
+  own versioned schema, is built and read in memory — expo-sqlite's
+  `serializeAsync` / `deserializeDatabaseAsync` on native, sql.js on the web —
+  and is never opened as a database the app runs on. Never copy the device
+  database into a backup, or restore one by replacing the device database's
+  file.
+- **sql.js is only for backups on the web,** loaded through `import()` from a
+  web-only file when a backup is written or opened, so no native bundle carries
+  it. The web's own data stays in IndexedDB; never move it to SQLite compiled
+  to WebAssembly.
+- **The media cache is a cache.** Never journaled, never synced, never in a
+  backup; every read and write best effort; kept only where `offlineMetadata`
+  is effective for that profile, and served only under the fingerprint it was
+  saved with. A connection change purges it in the same transaction. Screens
+  show it as `placeholderData`, never through `setQueryData`.
 - **Tests run on the real engines** — `node:sqlite` and fake-indexeddb, one
-  contract suite for both. Never mock a repository.
+  contract suite for both, and sql.js for backups. Never mock a repository.
 
 ---
 
 ## The account
 
-A device has at most one account: the one connection with its sync role on.
-`services/sync/` keeps it in step; `docs/architecture` and `docs/data` explain
-each rule. These break silently:
+A device holds exactly one account once it is set up: **local**, or **on your
+own server** (PocketBase, `../streaming_center_sync`). It holds up to ten
+profiles — fixed at ten locally, `info().maxProfiles` on a server
+(`SC_MAX_PROFILES`, default 10). The `account` row says which it is;
+`services/account.ts` changes it, and `services/sync/` keeps a server account
+in step. `docs/architecture` and `docs/data` explain each rule. These break
+silently:
 
-- **Only `AccountService` switches a sync role.** `connections.save` keeps the
-  stored one whatever the draft says, and a new connection never has it.
-- **What arrives from the account is written unjournaled,** or it would be
-  sent straight back.
-- **An apply or join transaction awaits nothing but `tx`** — not the
-  credential store, not `devicePlugins`, not `profiles.remove` (use the
-  helpers in `services/removal.ts`). PINs are read and written before it;
-  fresh refs it does not adopt are queued inside it, never before they exist.
+- **Only `AccountService` changes the account** — creating one, signing in,
+  signing up, signing out, importing a backup. Your server's sign-in is a
+  sync-category connection that belongs to the device: no connection form
+  edits it, and it is never journaled, pushed or backed up.
+- **Changing account replaces; accounts are never merged.**
+  - Signing in to an existing server account: try once, read it whole, then —
+    after a confirmation that offers to export a backup first, and the owner
+    check — replace this device's account in one transaction.
+  - Signing up from a local account uploads it: refuse up front when it holds
+    more profiles than the server's `maxProfiles`, then
+    `createAccount(fields, { firstProfile: false })`, then announce every local
+    row for the first push. A fresh device signs up with `firstProfile: true`.
+  - Never build a merge or a "join". Phase 4 had one; it is retired.
+- **Signing out keeps a local copy,** which becomes a local account. Importing
+  a backup always yields a local account; on a device signed in to your server,
+  it signs out first, after asking.
+- **A run pushes, then reads, then reconciles.** The journal after the
+  checkpoint goes as one all-or-nothing batch, parents first; then every record
+  of the account is read; then one unjournaled transaction reconciles. There
+  are no cursors and no log: the server's collections are the truth.
+- **Reconcile by these rules and no other** — never by a clock:
+  1. an entity with a pending local change is skipped: this device's change
+     goes next
+  2. a deleted profile or connection is deleted here, always
+  3. otherwise the server's version replaces the local one when they differ
+  4. a local row the server lacks, and that is not pending, was lost by a
+     restore: announce it again, and the next push puts it back
+- **A refused batch is split to find the write refused.** A profile over the
+  limit stays on this device only, and says so; a write to a deleted profile or
+  connection gives way to the delete. The checkpoint moves past what was
+  stored, and no further.
+- **A reconcile or replace transaction awaits nothing but `tx`** — not the
+  credential store, not a plugin, not `profiles.remove` (use the helpers in
+  `services/removal.ts`). PINs and passwords are written to the keychain under
+  fresh refs before it; refs it does not adopt are queued inside it, never
+  before they exist; the janitor runs after.
 - **Nothing in an apply may fail on the data.** Check, then insert or update:
   on IndexedDB a failed request aborts the whole transaction even when caught,
-  and the page would never move on.
+  and the page would never move on. A record `isAccountRecord` refuses, or
+  whose parent is gone, is skipped and logged — never its payload.
 - **A refused sign-in is never retried by itself** — not on a network change,
   not on a poll, not on "Sync now". The engine parks until the user signs in
-  again.
+  again. When a session ends — 30 days offline, or the password changed
+  elsewhere — the plugin signs in once with the saved password; a refusal is
+  latched.
+- **Sign in once.** The try's session becomes the account's, handed over inside
+  the run lock. A second sign-in at the server for one "Sign in" means the
+  handover broke.
+- **Signing in again changes only the password.** The address and username
+  are the account's, read-only: a different one is another account, and
+  reaching it is Switch, which replaces.
+- **A created account is never created again.** After `createAccount`, a
+  failure is `AccountCreatedError`, and the form turns to signing in.
 - **The sign-in flow uses no profile's hook.** Welcome shares it, outside
-  `(app)`, before any profile exists. And it never navigates after "Use the
-  account's profiles": that may have taken the profile in use, and `(app)` with
-  it — the gate moves instead.
-- **Signing in again changes only passwords.** A new address or username
-  would be another account reached without the switch; the service keeps every
-  other detail, and the connection form shows the account's details read-only.
-- **A password never follows a connection somewhere else.** Sealed or kept, it
-  is used only with the sign-in it was saved for (`signInOf` in
-  `sync/sealed.ts`: the plugin, `url` fields and credential fields). Keeping a
-  ref because the name is still listed would let whoever controls the account
-  send it anywhere.
-- **Seals are opened before the transaction, and adopted inside it** — the
-  PINs' plan, transaction and cleanup. Plans are keyed by the change object,
-  never its id. A run asks for the vault key once, and stops before the page
-  when it cannot have it: applying without it would pass the seals for good.
+  `(app)`, before any profile exists. And it never navigates after replacing
+  the account or importing a backup: that may have taken the profile in use,
+  and `(app)` with it — the gate moves instead (`session.refresh()`).
+- **The profile limit is the profiles service's.** "Add a profile" is hidden
+  at the limit and says why. A local copy kept on signing out that holds more
+  than ten keeps them all, and takes no new one until there are fewer.
 - **Only `src/platform/` imports `expo-local-authentication`.** Screens ask
   `OwnerCheck` (`useOwnerMethod`, `pins.forgot`); lint enforces it, and the web
   build gets a stub that answers "unavailable".
-- **The owner's proof is typed, never saved.** An account's `ownerProof`
-  fields are asked for again in `OwnerProofForm` and passed to
-  `owner.verify(reason, proof)`; the saved password is never the proof. An
-  empty proof is refused before anything is asked. An account that has let
-  this device go cannot vouch: the device answers, never a quiet yes.
-- **Sign in once.** The probe and the account share an installation id, and
-  the probe's session is written into the account's inside the run lock, right
-  after the join. A second derivation — seconds on a phone — or a second device
-  row at the server means that handover broke.
-- **A created account is never created again.** After `createAccount`, a
-  failure is `AccountCreatedError`, and the form turns to signing in.
+- **The owner's proof is typed, never saved.** On a server account its
+  `ownerProof` fields — the account password — are asked for again in
+  `OwnerProofForm` and passed to `owner.verify(reason, proof)`; the saved
+  password is never the proof. An empty proof is refused before anything is
+  asked. On a local account, or when the server has let this device go, the
+  device answers — never a quiet yes. A server that cannot be reached is a
+  failure, never a fallback to the device.
+- **The owner check guards** Forgot PIN, signing out, replacing or switching
+  the account, importing a backup, and showing the backup key — on a device
+  that holds profiles. At first launch there is nothing to protect, and
+  nothing is asked.
+- **Retired, still in the code until Phase 6:** the log and its cursors,
+  joining an account, sealed passwords, the vault key and the sign-in rule
+  (`sync/sealed.ts`), the derived owner proof, and `modules/key-derivation`.
+  Do not build on them.
+
+---
+
+## Backups
+
+`services/backup/` (Phase 6) writes and reads the account as one encrypted
+`.scbackup` file. `docs/data` has the format. These break silently:
+
+- **It holds every password and PIN of the account,** so it is encrypted as a
+  whole, and its key lives in the device-bound store, shown only after the
+  owner check. Never write a backup, or any part of one, unencrypted — not to
+  the cache directory, not to a log.
+- **It never holds** caches, device settings, players, sync settings, tokens,
+  the device key, the journal or sync state.
+- **One mapper** turns the account into the server's records, the sign-up
+  upload and the backup's rows. A new account-wide field is added there, once;
+  anywhere else, a sync or a backup round trip drops it.
+- **Import checks everything before it replaces anything** — size (64 MiB at
+  most), key id, decryption, `quick_check`, schema version, every row — then
+  writes secrets under fresh refs, the rows in one transaction, and runs the
+  janitor. A newer schema is refused, never guessed at.
+- **A lost key is an unreadable backup.** Say so plainly; never offer a way
+  around it.
+- **A backup target never overwrites a file changed elsewhere.** Writes are
+  conditional on the etag; `backup_state` remembers `{ lineage, generation,
+  etag }` per target, and a clash asks — open theirs, keep this device's, or
+  keep both. A target only stores bytes, and is not live sync.
+
+---
+
+## Players
+
+Nothing plays until Phase 7. `docs/playback` has the design; these are the
+rules:
+
+- **Players are device-wide plugins.** Which are on, the default and their
+  settings are device settings — never journaled, never on the server, never
+  in a backup.
+- **Only the composition root imports a player package or `@sc/player-kit`.**
+  Screens get the chosen player's controller and view from it through
+  `useServices()`. The app never imports an engine — expo-video, an Expo
+  module — itself: that is the player plugin's.
+- **Choosing is `choosePlayer` from `@sc/api`, and pure:** the device's
+  default if it can play one of the item's sources, else the first enabled
+  player on this platform that can, else none — and the app says what would
+  ("This channel needs a player that plays MPEG-TS."). Never by an engine's
+  name.
+- **A descriptor lives in memory only.** Never persisted, never in the media
+  cache, never logged; redaction covers URLs and MAC addresses. `headersRef` is
+  resolved by the engine at load time, never inlined.
+- **Progress goes through the outbox,** never straight from the player to the
+  source: the `watch_status` cache and an outbox entry in one transaction (v5).
+- **The null engine fails loudly.** A silent no-op turns "playback not
+  implemented" into a mystery bug.
 
 ---
 
@@ -230,13 +374,20 @@ each rule. These break silently:
 
 Not an afterthought. Things to know:
 
-- **Storage on web is IndexedDB, not SQLite.** No SQLite-wasm, no COOP/COEP
-  headers. Not localStorage either: a local-first write needs the data and its
-  journal entry in one transaction.
+- **Storage on web is IndexedDB, not SQLite.** No SQLite-wasm for the data, no
+  COOP/COEP headers. Not localStorage either: a local-first write needs the
+  data and its journal entry in one transaction. The only WebAssembly is
+  sql.js, loaded to write or open a backup file.
 - **The page must be secure** — `https` or `localhost` — because the secrets are
   encrypted with WebCrypto. On plain `http` from a network address the app
   refuses to start (`composition/storage.web.ts`). That is about the page only:
   never require TLS of a source.
+- **The Content-Security-Policy allows `'wasm-unsafe-eval'`, for sql.js, and
+  nothing more.** Any script on the page can use the secrets' key, so the CSP
+  is part of their protection.
+- **IPTV is hidden on the web** until a proxy exists: portals send no CORS
+  headers, and a browser forbids a `Cookie` header. Their manifests leave `web`
+  out of `platforms`; never work around that in the app.
 - `web.output` is `"single"` — an SPA. Nothing is pre-rendered; do not add
   `+html.tsx` or server-only assumptions.
 - `src/app/_layout.tsx` imports `@tamagui/core/reset.css`; without it browser
@@ -261,45 +412,66 @@ TypeScript program never sees Node's types; only `test/tsconfig.json` does.
 
 Hermes also has no JIT: cryptography written in JavaScript runs about a hundred
 times slower than on a browser's engine. Measured on the emulator, scrypt at a
-useful strength took 22 s. So key derivation is native — the local module on
-phones, WebCrypto on the web — and only cheap work (HKDF: a few HMACs) is left
-to JavaScript.
+useful strength took 22 s. So anything heavy is native — AES-GCM through
+expo-crypto, over a whole backup file too — and only cheap work (HKDF: a few
+HMACs) is left to JavaScript. That is why key derivation was a native module
+in Phase 4.
 
 ## Cryptography
 
-- **Only `src/platform/` does cryptography.** noble and
-  `modules/key-derivation` are imported there alone (lint). Plugins reach it
-  through their context (`PluginContext.crypto`); services through what the
-  composition root hands them.
+- **Only `src/platform/` does cryptography.** noble is imported there alone
+  (lint), and so is `modules/key-derivation` while it exists. Plugins reach it
+  through their context (`PluginContext.crypto`); services — the backup file's
+  included — through what the composition root hands them.
 - **One definition, per-platform parts:** `platform/plugin-crypto.ts` builds
-  the port from the platform's PBKDF2 (the module, or WebCrypto in
-  `crypto.web.ts`), expo-crypto's AES-GCM and randomness, and noble's HKDF.
+  the port from expo-crypto's AES-GCM and randomness and noble's HKDF. Until
+  Phase 6 it also carries the platform's PBKDF2 (the module, or WebCrypto in
+  `crypto.web.ts`) for the vault, and nothing weaker than `isKdfParams` is
+  derived, whatever a plugin asks.
 - **expo-crypto reads a string of additional data as base64**, and turns bytes
-  into base64 through `btoa`. The port passes a seal's context as base64 that
-  `@sc/api` encoded — never raw text, never bytes.
-- **Nothing weaker than `isKdfParams` is derived,** whatever a plugin asks.
+  into base64 through `btoa`. Additional data — a backup's header — goes in as
+  base64 that `@sc/api` encoded: never raw text, never bytes.
 
 ---
 
 ## Consuming plugins
 
 The plugins are a separate repository, so npm workspaces cannot span them. They
-are linked with `file:` dependencies — `@sc/api` plus one `@sc/plugin-<id>` per
-plugin — and Metro watches the folder:
+are linked with `file:` dependencies — `@sc/api`, `@sc/player-kit`, and one
+package per plugin, at its category path — and Metro watches the folder:
+
+```jsonc
+// package.json — one line per plugin; the names follow the folders
+"@sc/api": "file:../streaming_center_plugins/api",
+"@sc/player-kit": "file:../streaming_center_plugins/player-kit",
+"@sc/source-jellyfin": "file:../streaming_center_plugins/plugins/sources/jellyfin",
+"@sc/iptv-stalker": "file:../streaming_center_plugins/plugins/iptv/stalker",
+"@sc/player-system": "file:../streaming_center_plugins/plugins/players/system",
+"@sc/sync-custom-server": "file:../streaming_center_plugins/plugins/sync/custom-server"
+```
 
 ```js
 // metro.config.js — this is all of it
 config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../streaming_center_plugins')];
 ```
 
+Until Phase 6 regroups them, plugins are `@sc/plugin-<id>` at `plugins/<id>`,
+and there is no `player-kit` yet.
+
 - Install the plugins repository first; plugin files resolve `@sc/api` from it.
-- Plugins take `@sc/api` as a **peer** dependency: one copy, one set of brands.
+- Plugins take `@sc/api` — and players `@sc/player-kit` — as a **peer**
+  dependency: one copy, one set of brands.
 - `npm ls --all` shows `UNMET DEPENDENCY @sc/api@*` under each linked plugin.
   Cosmetic — npm does not resolve deps of links outside the root.
 - No `resolver.nodeModulesPaths` is needed: babel-preset-expo imports its
   runtime helpers by absolute path (verified in dev and production bundles).
 - Register a plugin in `src/composition/plugins.ts` — the only file that may
-  import one; lint enforces it. Every plugin exports `plugin`.
+  import one; lint enforces it. Every plugin exports `plugin`: its manifest,
+  and the one role its category's block promises.
+- **A player's native code** — expo-video, or an Expo module in its own
+  package — has to reach the development build by autolinking from a
+  `file:`-linked package. That is unproven: Phases 7 and 8 open with a spike.
+  A new or changed player means building again.
 
 **This is the main technical risk in the repository split.** Verify with a
 real export, not a typecheck.
@@ -326,6 +498,11 @@ real export, not a typecheck.
   deprecated.
 - Screen kinds come from `src/components/stack-options.tsx`: tab root,
   full-screen page, detail (transparent header), sheet.
+- **Four tabs:** Media, Videos, TV, Settings. Settings → Plugins is four rows —
+  Sources, IPTV, Players, Sync — each opening that category's list for this
+  platform (`settings/plugins/[category]`, then `[category]/[name]`: the id's
+  two parts are the two segments, so no id is ever URL-encoded). There is no
+  global list.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
   `field.type` only. Never write a form for a specific plugin.
 
@@ -362,53 +539,33 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-Phase 4 — your own server as the account. One account per device, the
-household's profiles under it, and everything from Phase 2 surviving a
-restart:
+**Phase 5 — the new architecture is written down; the code is still Phase 4's
+until Phase 6.** Everything above describes the target. What runs today:
 
-- Three tabs — Media (movies, shows, anime), Videos (videos, files; one tab per
-  source), Settings (the account, profiles, PIN lock, plugins).
-- The account: Welcome offers "Sign in to sync your profiles" or "Use on this
-  device only"; Settings → Account shows how it stands, Sync now, Switch and
-  Sign out. The sync engine drains the journal to it and applies what it
-  brings: profiles and their PINs, preferences, and connections — with their
-  passwords sealed on the device, where the account carries them, and only
-  ever for the sign-in they were saved with. Forgot PIN re-verifies the owner —
-  through the account (its password, typed again), or Face ID, a fingerprint
-  or the passcode (`expo-local-authentication`, in `src/platform/` only).
-- Your own server (`custom-server`, against `../streaming_center_sync`) is the
-  first real account: "Create an account" with an invite, one sign-in handed
-  to the account, and its password as the owner check for Forgot PIN, signing
-  out and switching. The dev-only mock is still there, in memory; iCloud and
-  Google come in Phase 5.
-- Plugins are installed per device. Connections belong to the device, and each
-  decides what every profile keeps for itself: nothing, its own sign-in, or
-  everything — with PIN-gated profile tabs, "Finish setting up" for profiles
-  that have not, and "Don't use for {profile}".
-- Media is real: Continue Watching, one row per kind with per-profile order,
-  sort and card style, a full-screen grid per row, and detail pages for movies,
-  shows, seasons and episodes — from every live source, merged. Jellyfin and
-  the mock implement the media role; nothing plays yet.
-- Storage: SQLite (`expo-sqlite`) and the keychain on iOS and Android;
-  IndexedDB and WebCrypto-encrypted secrets on the web, which requires a secure
-  page. Every local change appends a change-journal entry, which the account
-  drains when there is one.
-- What sources answered is kept per profile where the source allows it: the
-  home, grids and visited detail pages render from it at launch, and in its
-  place when a source cannot answer, saying how old it is.
-- There is no development seed: set things up once, and they persist.
-  `docs/getting-started` has how to start from scratch.
-- Videos still renders skeletons: no plugin lists videos or files yet.
-- The service graph is a runtime singleton (`src/composition/provider.tsx`) —
-  a router remount must never rebuild it, and in development it survives Fast
-  Refresh.
-- Plugins get the host's cryptography through their context: native PBKDF2
-  (`modules/key-derivation` on phones, WebCrypto on the web), HKDF, and
-  expo-crypto's AES-GCM. Phones therefore run a development build, not Expo
-  Go.
-- vitest covers the database on both engines, the credential stores and the
-  service layer, and two devices syncing through one fake account on every
-  pair of engines (`npm test`).
+- **Three tabs** — Media, Videos, Settings — and Settings → Plugins as one
+  list, where plugins are still installed per device.
+- **One optional account per device,** synced through a log, with passwords
+  sealed on the device and used only for the sign-in they were saved with, and
+  owner proofs. Welcome offers "Sign in to sync your profiles" or "Use on this
+  device only". Your own server (`custom-server`) is the Node server in
+  `../streaming_center_sync`: created from the app with an invite, signed in to
+  once, and its password — typed again — is the owner check. The dev-only mock
+  is a pretend account in memory.
+- **Media is real:** Continue Watching, one row per kind with per-profile
+  order, sort and card style, a full-screen grid per row, and detail pages —
+  from every live source, merged, and kept per profile where the source allows
+  it. Jellyfin and the mock implement the media role. Nothing plays, Videos
+  still shows skeletons, and there is no TV tab, backup file or profile limit.
+- **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
+  which run a development build for `modules/key-derivation`; IndexedDB and
+  WebCrypto-encrypted secrets on the web, on a secure page. No development
+  seed: set things up once, and they persist (`docs/getting-started`).
+- **The service graph is a runtime singleton** (`src/composition/provider.tsx`)
+  — a router remount must never rebuild it, and in development it survives
+  Fast Refresh. That stays.
+- **vitest** covers the database on both engines, the credential stores, the
+  services, and two devices syncing through one fake account on every pair of
+  engines (`npm test`).
 
 Do not assume anything else described here exists. Build it, then update the
 docs in the same commit.
@@ -425,5 +582,9 @@ npx expo-doctor
 npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web
 ```
+
+After a change to the account contract, run the sync repository's tests too:
+`npm test` there today; from Phase 6, `go test ./...` and its harness, which
+drives the real `sync/custom-server` plugin against the real server.
 
 Never run Metro with `CI=1` while iterating: CI mode disables file watching.

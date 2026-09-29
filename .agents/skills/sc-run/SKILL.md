@@ -1,6 +1,6 @@
 ---
 name: sc-run
-description: Launch the Streaming Center app on the iOS simulator, Android emulator or a browser and confirm a change works in the real app. Use when asked to run, start, open, screenshot or visually verify something.
+description: Launch the Streaming Center app on the iOS simulator, Android emulator or a browser and confirm a change works in the real app — including a first launch, your own server (PocketBase) run locally, and exporting or importing a backup. Use when asked to run, start, open, screenshot or visually verify something.
 ---
 
 # Run the Streaming Center app
@@ -12,43 +12,79 @@ npm run web        # browser — no build
 npm start          # Metro alone, for a development client already installed
 ```
 
+**Phase 5 — the new architecture is written down; the code is still Phase 4's
+until Phase 6.** This skill describes the target, and says where today
+differs. "What you will see" at the end has both.
+
 ## Which runtime you need
 
-**A development build, not Expo Go.** The app has a native module of its own —
-`modules/key-derivation`, PBKDF2 on CommonCrypto and `javax.crypto` — and Expo
-Go carries only its bundled modules. JavaScript on Hermes is far too slow to
-derive keys itself: scrypt took 22 s in Expo Go on the emulator, where the
-module takes a second at 600k iterations.
+**A development build, not Expo Go.** Expo Go carries only its bundled
+modules, and the app needs more: player engines are native code (expo-video
+from Phase 7, Expo modules for KSPlayer, mpv and VLC in Phase 8), and Face ID
+needs the app's usage text. Until Phase 6 there is also the app's own module,
+`modules/key-derivation` — PBKDF2 on CommonCrypto and `javax.crypto`.
+JavaScript on Hermes is far too slow to derive keys itself: scrypt took 22 s in
+Expo Go on the emulator, where the module takes a second at 600k iterations.
 
 `npm run android` / `npm run ios` build the client (the first Android build
 took about seven minutes), install it and start it against Metro. After that,
 JavaScript changes load as usual; a change to `modules/`, a config plugin in
-`app.json` or a new native dependency needs the build again — and a stale build
-looks like code that did not change. Face ID works in the iOS development
-build, which carries the app's usage text.
+`app.json`, a new native dependency or a player plugin needs the build again —
+and a stale build looks like code that did not change. Face ID works in the iOS
+development build, which carries the app's usage text.
 
 **Never start Metro with `CI=1` while iterating.** CI mode turns off file
 watching: every edit after startup is silently served stale.
 
 ## Data persists — set it up once
 
-There is no development seed. Everything — profiles, PINs, installed plugins,
-connections and their passwords, layouts — is kept on the device, so set up what
-a flow needs once and it is there on every later launch.
+There is no development seed. Everything — the account, profiles, PINs,
+connections and their passwords, layouts — is kept on the device, so set up
+what a flow needs once and it is there on every later launch.
 
 - **A first launch** needs a fresh start: a new browser profile (a fresh
   `--user-data-dir`), `xcrun simctl uninstall booted <bundle id>` plus
   `xcrun simctl keychain booted reset`, or
-  `adb shell pm clear com.fakg.streaming_center_app`.
-- **A real Jellyfin server**: Settings → Plugins → Jellyfin → Installed → Add
-  connection, filled in from the workspace's gitignored `jellyfin.env`
+  `adb shell pm clear com.fakg.streaming_center_app`. Welcome then offers three
+  ways in: **Create an account on this device** (a name, which the first
+  profile takes too), **Sign in to your server**, or **Restore a backup**.
+  Today it offers "Sign in to sync your profiles" or "Use on this device only".
+- **A real Jellyfin server**: Settings → Plugins → Sources → Jellyfin → Add
+  connection (today: Settings → Plugins → Jellyfin → Installed → Add
+  connection), filled in from the workspace's gitignored `jellyfin.env`
   (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
   type the values in; never echo them anywhere. A failed sign-in counts against
   the account's lockout: do not loop a wrong password.
-- **Offline work**: the `mock` plugin (development builds only) is a pretend
-  server that needs no network. Install it and add a connection like any other.
-- **A real account**: your own server. Start it with a data directory of its
-  own, and make an invite:
+- **Offline work**: the mock plugins (development builds only) need no
+  network. `sources/mock` is a pretend library, and `iptv/mock` pretend
+  channels, a guide and a little VOD for the TV tab (Phase 7). Add a
+  connection like any other. Today there is one `mock`, installed first.
+- **A real account: your own server** — PocketBase, from Phase 6. Give it a
+  data directory of its own:
+
+  ```bash
+  cd ../streaming_center_sync
+  go run . serve --dir /tmp/sc-pb &                                           # http://127.0.0.1:8090, dashboard at /_/
+  go run . superuser upsert admin@example.com <a-password> --dir /tmp/sc-pb   # the dashboard's login
+  go run . invite --dir /tmp/sc-pb                                            # a one-time invite code
+  ```
+
+  Then **Sign in to your server → New here? Create an account**, at
+  `http://localhost:8090` in a browser or the iOS simulator, and
+  `http://10.0.2.2:8090` on the Android emulator (or `adb reverse tcp:8090
+  tcp:8090` and `localhost`). From a device with a local account, creating the
+  account uploads it. A second device signs in with the same username and
+  password, confirms that the account replaces its own, and gets the
+  connections with their passwords.
+  - The dashboard (`http://localhost:8090/_/`) shows each account's records —
+    the sources' passwords among them, in plain text, as designed for now.
+  - PocketBase logs each request: a second `auth-with-password` for one
+    "Sign in" means the session handover broke.
+  - To try a lost phone, change the account's password (in the dashboard, or
+    from another device): the other device is refused once, then asks, and
+    never tries again by itself.
+  - `rm -rf /tmp/sc-pb` starts the server from scratch.
+- **Until Phase 6 the server is still the Node one**, on port 8730:
 
   ```bash
   cd ../streaming_center_sync && npm run build
@@ -57,18 +93,26 @@ a flow needs once and it is there on every later launch.
   ```
 
   Then **Sign in → Your own server → New here? Create an account**, at
-  `http://localhost:8730` in a browser or the iOS simulator, and
-  `http://10.0.2.2:8730` on the Android emulator (or `adb reverse tcp:8730
-  tcp:8730` and `localhost`). A second device signs in with the same username
-  and password, and its connections arrive with their passwords. The server's
-  log shows every request by route — a second `POST /v1/auth/login` for one
-  sign-in means the session handover broke — and `dist/cli.mjs devices <user>`
-  and `revoke <id>` are the way to try a lost phone.
-- **A pretend account**: the mock is one too. Sign in to it — at first
-  launch, or in Settings → Account — and its endpoint names the account:
-  `mock://household` holds Sam (PIN 1234) and Robin, any other endpoint is
-  empty. It lives in the JavaScript runtime's memory: a reload forgets it, and
-  the next run joins it again with nothing local lost.
+  `http://localhost:8730`, or `http://10.0.2.2:8730` on the emulator. Its log
+  shows every request by route — a second `POST /v1/auth/login` for one
+  sign-in means the handover broke — and `dist/cli.mjs devices <user>` and
+  `revoke <id>` are the way to try a lost phone.
+- **A pretend account**: the mock is one too (`sync/mock` from Phase 6). Sign
+  in to it — at first launch, or in Settings → Account — and its endpoint names
+  the account: `mock://household` holds Sam (PIN 1234) and Robin, any other
+  endpoint is empty. It lives in the JavaScript runtime's memory: a reload
+  forgets it, and the next run puts back what the device holds, as for a
+  server restored from an old backup. Nothing local is lost.
+- **A backup** (Phase 6): Settings → Plugins → Sync → Export — the share sheet
+  on a phone, a download in a browser — and Show the backup key, after the
+  owner check. Import it on another device with the key: at first launch
+  through Restore a backup, or from the same Sync page. Importing replaces
+  that device's account with a local one.
+  - In headless Chrome, `Browser.setDownloadBehavior` (`behavior: 'allow'`,
+    a `downloadPath`) catches the export, and `DOM.setFileInputFiles` hands a
+    file to the import's file input.
+  - On the Android emulator, `adb push <file> /sdcard/Download/` puts a file
+    where the document picker finds it.
 - **In a browser, stay on `localhost`.** On plain `http` from a network address
   the app refuses to start: its secrets need WebCrypto, which only a secure page
   has.
@@ -84,22 +128,25 @@ a flow needs once and it is there on every later launch.
 ## The account and Forgot PIN, per platform
 
 - **Your own server** — "Forgot PIN?" opens a password form in place of the
-  PIN pad. Five wrong passwords and the server throttles the device for 30 s:
-  the form then says "Too many tries". Revoked, the device asks itself instead.
-- **Web** — "Forgot PIN?" works with the mock account signed in (it vouches for
-  its owner); without an account the unlock screen shows "Forgot it? An account
-  lets you reset a PIN." and no link.
+  PIN pad. After too many wrong passwords the server throttles, and the form
+  says "Too many tries" (Phase 4's server: five, then 30 s). Once the server has
+  let the device go — its password changed elsewhere — the device asks itself
+  instead.
+- **Web** — "Forgot PIN?" works with a server account, or with the mock (it
+  vouches for its owner). On a local account the unlock screen shows a hint and
+  no link.
 - **Android emulator** — a screen lock and a fingerprint, without the Settings
   app: `adb shell locksettings set-pin 1111`, then `adb shell am start -a
   android.settings.FINGERPRINT_ENROLL`, type `1111`, accept, and
   `adb -e emu finger touch 1` about ten times until "Fingerprint added". At the
   app's prompt, `touch 1` answers yes and `touch 2` (an unenrolled finger) no.
 - **iOS simulator** — no passcode. In the development build, Face ID can be
-  enrolled from the simulator's Features menu; otherwise, without an account,
+  enrolled from the simulator's Features menu; otherwise, on a local account,
   there is only the hint.
 
-Sign out and Switch ask for the owner the same way when the device has
-profiles; at first launch nothing is asked.
+Sign out, Switch, importing a backup and showing the backup key ask for the
+owner the same way when the device has profiles; at first launch nothing is
+asked.
 
 ## Screenshots without a human
 
@@ -121,8 +168,10 @@ Deep links use the app's own scheme, `streamingcenterapp://<path>` (from
 `app.json`). A link lands on a cold start too: `(app)` stays reachable while
 the app starts. Only a profile with a PIN, or no default profile, drops it.
 
-Useful paths: `/media`, `/browse/<rowId>` (`movies`, `shows`, `anime`),
-`/customize-home`, `/settings/plugins/<pluginId>`, `/settings/pin`. Item pages
+Useful paths: `/media`, `/videos`, `/tv` (Phase 6), `/browse/<rowId>`
+(`movies`, `shows`, `anime`), `/customize-home`, `/settings/plugins/<category>`
+and `/settings/plugins/<category>/<name>` (Phase 6; today
+`/settings/plugins/<pluginId>`), `/settings/pin`. Item pages
 (`/item/<connectionId>/<itemId>`) carry the connection's generated id, so reach
 them by tapping.
 
@@ -199,13 +248,15 @@ over the DevTools protocol:
 - `Runtime.evaluate` can read IndexedDB (`indexedDB.open('streaming-center')`)
   to check what was stored — refs, never a password.
 
-## What you will actually see right now
+## What you will see
 
-- **First launch** — Welcome: "Sign in to sync your profiles" (the mock, in
-  development) or "Use on this device only", then "Who is this?". An account
-  with profiles lands on "Who's watching?" instead.
-- **Three tabs** — Media, Videos, Settings. Native tab bars on iOS and Android;
-  a top navigation bar in the browser. Dark only.
+The target, once Phase 6 has landed:
+
+- **First launch** — Welcome, with its three ways in. A new local account opens
+  on its one profile; a server account with profiles lands on "Who's
+  watching?".
+- **Four tabs** — Media, Videos, TV, Settings. Native tab bars on iOS and
+  Android; a top navigation bar in the browser. Dark only.
 - **Media** — an empty state until a source is connected. Then Continue
   Watching (landscape cards with progress), a row per kind (posters with
   ratings, watched checks and progress bars), a title link to each row's
@@ -218,8 +269,23 @@ over the DevTools protocol:
 - **Customize** (the sliders button, top right) — per-row order, visibility,
   sort and card style, per profile.
 - **Videos** — one tab per source, skeleton shelves: nothing lists videos yet.
-- **Settings** — the account first ("Synced just now · 1 change waiting"), then
-  the current profile, all profiles, PIN lock, and every plugin: install it on
-  the device and add connections through forms built from each plugin's
-  manifest, choosing what each profile keeps for itself. Settings → Account
-  has Sync now, what it keeps in step, Switch account and Sign out.
+- **TV** — its empty state, pointing to Settings → Plugins → IPTV. Live, Movies
+  and Series fill in with Phase 7. In a browser IPTV is hidden, so it stays
+  empty there.
+- **Settings** — the account first (local, or "Synced just now · 1 change
+  waiting"), then the current profile, profiles (up to ten: "Add a profile"
+  goes at the limit), PIN lock, and Plugins as four rows — Sources, IPTV,
+  Players, Sync — each opening this platform's list. iCloud shows on iOS only.
+  Nothing plays.
+
+**Today (Phase 4 code, until Phase 6):**
+
+- Welcome offers "Sign in to sync your profiles" (the mock, in development) or
+  "Use on this device only", then "Who is this?". An account with profiles
+  lands on "Who's watching?" instead.
+- Three tabs — Media, Videos, Settings; no TV.
+- Settings → Plugins is one list: install a plugin on the device, then add
+  connections through forms built from its manifest, choosing what each
+  profile keeps for itself.
+- Settings → Account has Sync now, what it keeps in step, Switch account and
+  Sign out. There is no backup file and no profile limit.

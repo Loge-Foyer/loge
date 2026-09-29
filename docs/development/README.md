@@ -15,11 +15,18 @@ npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web
 ```
 
-The exports are not optional: they are the only proof that Metro resolves the
+The exports are not optional. They are the only proof that Metro resolves the
 plugins across the repository boundary, and that each platform's bundle holds
-only its own storage — SQLite and the keychain for iOS, IndexedDB for the web.
+only its own storage — SQLite and the keychain for iOS, IndexedDB for the web —
+and, once backups exist, that sql.js stays out of the native bundles and in a
+chunk of its own on the web. The `sc-verify` skill has the full pass, with the
+checks for each.
+
 After changing the plugins repository, run `npm run typecheck && npm test`
-there as well. The `sc-verify` skill has the full pass.
+there as well. After a change to the account contract, run the sync
+repository's tests too: `npm test` today, and from Phase 6 `go test ./...` and
+its harness, which drives the real `sync/custom-server` plugin against the real
+PocketBase binary.
 
 Typechecking is two programs. `tsconfig.json` covers the app, which runs on
 Hermes and never sees Node's types. `test/tsconfig.json` covers the tests,
@@ -35,38 +42,58 @@ else is real, including the database engine:
   and on IndexedDB through fake-indexeddb. It covers cascades, all-or-nothing
   transactions, the change journal, creation order, and updates that must not
   replace their children. Migrations and upgrades are tested separately,
-  including a table rebuild and a database from a newer version.
+  including a table rebuild and a database from a newer version. From Phase 6,
+  a v2 database with rows migrates through v3 and v4 on both engines, keeping
+  every profile, connection and password ref.
 - **The credential stores** — the keychain adapter against a SecureStore
   look-alike that refuses keys the way the real one does, and the web store on
   Node's WebCrypto.
-- **The host's crypto** — the web's PBKDF2 against RFC 7914's vectors, HKDF
-  against RFC 5869's, and AES-GCM opening what Node sealed and the other way
-  round, all on Node's WebCrypto. The native key-derivation module cannot run
-  on Node; it is checked against the same vector on the emulator.
-- **The services** — connections and per-profile values, profiles and PINs,
-  secrets and what happens to them, session binding, the provider pool, merged
-  rows, grid pages and Continue Watching, the home layout. The writes that span
-  rows run on both engines.
+- **The host's crypto** — HKDF against RFC 5869's vectors, and AES-GCM opening
+  what Node sealed and the other way round, on Node's WebCrypto. Until Phase 6
+  also the web's PBKDF2 against RFC 7914's vectors; the native key-derivation
+  module cannot run on Node, and is checked against the same vector on the
+  emulator.
+- **The services** — connections and per-profile values, profiles and PINs and
+  the profile limit, secrets and what happens to them, session binding, the
+  provider pool, merged rows, grid pages and Continue Watching, the home
+  layout, and the catalogue by platform, category and kind. The writes that
+  span rows run on both engines.
 - **The account and its sync** — two devices, each a whole service graph on
-  its own database, share one fake account (`test/support/sync.ts`), on every
-  pair of engines: SQLite and SQLite, IndexedDB and IndexedDB, and one of each.
-  The fake account can store only part of a push, lose an answer, fail, forget
-  everything, roll back, expire a cursor or refuse its owner, and the suites
-  prove the devices converge through all of it. It keeps a session in each
-  device's context as a real account plugin does — signing in only without one,
-  never after being let go — and can seal passwords, ask for an owner's
-  password, throttle, create an account from an invite, and revoke. Signing in
-  once, creating an account, switching, signing out, the owner check and
-  Forgot PIN run on both engines too; passwords sealed and opened, the sign-in
-  rule and filling in run on every pair.
+  its own database, share one fake PocketBase account (`test/support/sync.ts`),
+  on every pair of engines: SQLite and SQLite, IndexedDB and IndexedDB, and one
+  of each. The fake refuses writes, fails, loses an answer, forgets everything
+  (a restore), throttles, refuses a sign-in, and changes its password. The
+  suites prove:
+  - edits, renames, deletes and PINs converge
+  - a pending edit survives a read, and a remote delete of a profile or
+    connection beats it
+  - a refused batch is split, and a profile over the limit stays local
+  - a lost answer converges on the next run, and a server that forgot
+    everything gets every row back from the devices
+  - passwords arrive in the keychain and never in a database dump, while the
+    fake server holds them in plain text
+  - a password changed elsewhere is refused once, then parked — never tried
+    again
+  - signing in replaces, signing up uploads, signing out keeps a local copy,
+    and the owner check and Forgot PIN hold on both engines
+  - a device-key fingerprint that no longer matches drops the pending journal
+- **Backups** — a round trip on both engines, with sql.js in Node standing in
+  for expo-sqlite; the passwords arrive in the keychain, never in a database
+  dump. A wrong key, a tampered byte, a file over 64 MiB and a newer schema
+  are refused, and a changed generation or etag asks rather than overwrites.
 
-The real account plugin runs against the real server in
-`../streaming_center_sync` (`test/plugin.test.ts` there). The scheduler
-  runs on fake timers against a scripted engine.
+Until Phase 6 the fake account is a log server's. It can store part of a push,
+expire a cursor, seal passwords and revoke a device, and the suites prove
+joining an account and the sign-in rule too. Phase 6 replaces it.
 
-`test/support/services.ts` builds the service graph as the app wires it.
-`test/support/engines.ts` opens a fresh database per test. Two things there
-make mistakes fail loudly:
+The real account plugin meets the real server in the sync repository: its
+harness from Phase 6, `test/plugin.test.ts` there today. The scheduler runs on
+fake timers against a scripted engine. Choosing a player is a pure function in
+`@sc/api`, tested there over a matrix of descriptors and profiles.
+
+`test/support/services.ts` builds the service graph as the app wires it, and
+stays in step with `composition/`. `test/support/engines.ts` opens a fresh
+database per test. Two things there make mistakes fail loudly:
 
 - A call to the database from inside one of its own transactions throws, where
   on SQLite it would hang.
@@ -84,3 +111,7 @@ and screens are only proven by driving the app: see the `sc-run` skill.
   a source makes, without query strings, headers or bodies.
 - The web build logs to the browser console. A browser's `fetch` must be called
   unbound; the HTTP client does, and a test keeps it that way.
+- **Your own server** logs every request, and PocketBase's dashboard
+  (`http://localhost:8090/_/`) shows each account's records as the devices left
+  them. That includes the sources' passwords, in plain text, which is why the
+  dashboard stays private.

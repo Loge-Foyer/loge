@@ -10,8 +10,9 @@ Expo and React Native.
 ## What it is for
 
 You have films and shows somewhere — a Jellyfin server in a cupboard, a Plex
-library, a folder on a NAS, a Yattee or Invidious instance. Each of those has its
-own app, and they all present your collection differently.
+library, a folder on a NAS, a Yattee or Invidious instance, an IPTV
+subscription. Each of those has its own app, and they all present your
+collection differently.
 
 This is one app for all of them. Same rows, same detail pages, same search, same
 sense of where you got to — regardless of which machine the file actually lives
@@ -26,15 +27,20 @@ npm install
 npm run ios       # or: npm run android, npm run web
 ```
 
-On a phone or simulator this builds a development client first — the app has a
-little native code of its own, for deriving keys — so the first run takes a few
-minutes. After that, changes to the JavaScript load as usual. The web needs no
-build.
+On a phone or simulator this builds a development client first — the app
+carries native code, and will carry more once it plays video — so the first run
+takes a few minutes. After that, changes to the JavaScript load as usual. The
+web needs no build.
 
-To try it against your own Jellyfin server, add it once in Settings → Plugins
-→ Jellyfin: its address and an account. The app keeps it, like everything
-else. In a browser, open the app from `localhost` — `docs/getting-started/`
-explains why.
+The first launch asks how to begin: create an account on this device, sign in
+to your own server, or restore a backup. To try it against your own Jellyfin
+server, add it once in Settings → Plugins → Sources → Jellyfin: its address and
+an account. The app keeps it, like everything else. In a browser, open the app
+from `localhost` — `docs/getting-started/` explains why.
+
+Until the code catches up with the design (below), the first launch offers to
+sign in or to use the device on its own, and Jellyfin sits directly under
+Settings → Plugins.
 
 ## How it is put together
 
@@ -44,9 +50,13 @@ Four ideas, and the rest follows from them.
 what "halfway through episode 3" means. Every server it talks to gets translated
 into that vocabulary at the edge. The home screen has never heard of Jellyfin.
 
-**Servers are plugins, and they live somewhere else.** They are in a separate
-repository entirely, so the app cannot accidentally grow a dependency on one.
-Adding Plex should mean one new folder over there and one line here.
+**Everything it talks to is a plugin, and plugins live somewhere else.** They
+are in a separate repository entirely, so the app cannot accidentally grow a
+dependency on one. There are four kinds: *sources* bring your media, *IPTV*
+brings a provider's live channels, films and series, *players* play them, and
+*sync* decides where your account lives. Adding Plex should mean one new
+folder over there and one line here. The app only shows the plugins that work
+on the device you are holding.
 
 **Your data is yours and it is local.** What you have watched, what you have
 favourited, where you got to — the app keeps its own copy in a local database.
@@ -55,13 +65,38 @@ server going down. Where a server already keeps that record, as Jellyfin does,
 the server stays the authority and the app's copy is a cache that works
 offline; for plain files and web video, the app's copy is the record.
 
-**Profiles are real.** Not a colour scheme — genuinely separate preferences,
+**One account, and profiles that are real.** A device holds one account, and
+the account holds the household: up to ten profiles, and the sources everyone
+shares. Profiles are not a colour scheme — genuinely separate preferences,
 history and favourites, enforced by the database rather than by remembering to
-filter. Sources are set up once for the whole device, which is what a household
-with one media server wants. Each connection then decides what every profile
-keeps for itself — nothing, its own sign-in, or everything, down to which
-libraries it shows — and a connection can be switched off for a profile
+filter. A source is set up once for the whole account, which is what a
+household with one media server wants. Each connection then decides what every
+profile keeps for itself — nothing, its own sign-in, or everything, down to
+which libraries it shows — and a connection can be switched off for a profile
 entirely. A PIN keeps a profile, and its sign-ins, for its owner.
+
+## Your account
+
+The account lives on this device alone, or on a server you run yourself —
+[PocketBase](https://pocketbase.io), set up by `../streaming_center_sync`. On
+your server, every device signed in to the account stays in step: profiles,
+PINs, settings and sources, with their passwords, so nobody types the Jellyfin
+password twice. Your server keeps those passwords readable, for now. It is
+yours, so keep it private, and behind TLS anywhere but your home network.
+
+Some things stay with each device, whatever the account: which players it uses,
+and how it syncs or backs up.
+
+Changing account replaces what is on the device; two accounts are never mixed.
+Signing in to another account asks first, and offers to export a backup before
+anything goes. Creating an account on your server takes this device's profiles
+and sources up with it. Signing out keeps a copy here.
+
+**Backups.** An account can be exported as one file — encrypted, with every
+password and PIN inside — and opened on another phone or browser with its
+backup key. Later, the app will keep that file in iCloud, Google Drive or
+OneDrive by itself. A backup is a copy, not sync: for devices that stay in
+step, use your server.
 
 ## Platforms
 
@@ -70,51 +105,43 @@ are the platform's own; in a browser the tabs become a top navigation bar. The
 web keeps its data in the browser's own database rather than SQLite, so it runs
 from any static host with no special headers — see `docs/platforms/web/`.
 
+Not every plugin runs everywhere, and the app only lists those that run here:
+iCloud is an iPhone thing, and IPTV runs on phones, because most providers do
+not let a browser talk to them.
+
 TV layouts are a later goal. The design system is built so those would be new
 screens rather than a new app.
 
 ## Current state
 
-**Phase 3 — one account, the household's profiles under it.** Three tabs,
-built with [Tamagui](https://tamagui.dev):
+**Phase 5 — the new architecture is written down; the code is still Phase 4's
+until Phase 6.** Everything above is the design. What runs today, built with
+[Tamagui](https://tamagui.dev):
 
-- **Media** — films and series from every source, as one library: what you are
-  in the middle of, then a row per kind in the order and sort you choose, a
-  full-screen grid behind each row, and a page for every film, series, season
-  and episode. Jellyfin is the first real source.
-- **Videos** — web video and plain files, one tab per source. No source lists
-  them yet.
-- **Settings** — the account, profiles, PIN lock, and every plugin: install
-  it, connect it through a form the plugin itself describes, and decide what
-  each profile keeps for itself.
+- **Three tabs.** The TV tab arrives with Phase 6, and fills in with Phase 7.
+  - **Media** — films and series from every source, as one library: what you
+    are in the middle of, then a row per kind in the order and sort you choose,
+    a full-screen grid behind each row, and a page for every film, series,
+    season and episode. Jellyfin is the first real source.
+  - **Videos** — web video and plain files, one tab per source. No source
+    lists them yet.
+  - **Settings** — the account, profiles, PIN lock, and every plugin in one
+    list: add it to the device, connect it through a form the plugin itself
+    describes, and decide what each profile keeps for itself.
+- **The account is optional.** Sign in to the earlier version of your own
+  server — a small Node program in `../streaming_center_sync` — or use the
+  device on its own. Signed in, profiles, PINs, settings and connections stay
+  in step between devices, with the passwords sealed on the devices. A
+  forgotten PIN is reset by confirming it's you: with the account's password,
+  or with Face ID, a fingerprint or the passcode.
+- **Everything is kept on the device**: in SQLite and the keychain on a phone,
+  in the browser's own database with the secrets encrypted on the web. What
+  the servers answered is kept too, where they allow it, so the home shows up
+  at once when the app opens, and still shows — saying how old it is — when a
+  server cannot be reached.
+- **Not yet:** nothing plays, and there is no TV tab, no backup file and no
+  limit on profiles.
 
-**The account.** At first launch, sign in and the household's profiles arrive
-in "Who's watching?" — or use the device on its own. Signed in, profiles and
-their PINs, each profile's settings, and connections are kept in step on every
-device on the same account — with their passwords, sealed on the device, where
-the account can carry them. A forgotten PIN is reset
-by confirming it's you: through the account, or with Face ID, a fingerprint or
-the passcode.
-
-Everything is kept on the device: profiles, PINs, installed plugins,
-connections and their passwords, and each profile's home. On a phone that is
-SQLite and the keychain; in a browser, its own database, with the secrets
-encrypted. Every change is also recorded, and sent to the account when there is
-one.
-
-What the servers answered is kept too, where they allow it. So the home shows
-up at once when the app opens, and when a server cannot be reached — away from
-home, or with the server off — you still see your library and how old that
-view is.
-
-The account can be a server you run yourself — "Your own server", with
-`../streaming_center_sync`. Create it from the app with an invite; every other
-device signs in with its username and password, and gets the household's
-connections with their passwords, sealed on the device that had them. The
-account's password is also what resets a forgotten PIN, and what signing out
-or switching asks for.
-
-What is not there yet: nothing plays, and iCloud and Google come next.
 Development builds also have a pretend account, for trying things offline.
 
 ## Documentation

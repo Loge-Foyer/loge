@@ -1,6 +1,6 @@
 ---
 name: sc-verify
-description: Run the full verification pass for the Streaming Center app — typecheck (app and tests), lint (import-boundary, Hermes and SQLite rules), tests on both database engines, expo-doctor, a real bundle for each target with only its own storage in it, and the check that no secret reaches the database. Use before committing, after touching config, storage or native modules, or when asked whether the app is healthy.
+description: Run the full verification pass for the Streaming Center app — typecheck (app and tests), lint (import-boundary, Hermes and SQLite rules), tests on both database engines, expo-doctor, a real bundle for each target with only its own storage in it and sql.js only in a lazily loaded web chunk, and the check that no secret reaches the database. Use before committing, after touching config, storage, backups, players or native modules, or when asked whether the app is healthy.
 ---
 
 # Verify the Streaming Center app
@@ -8,7 +8,7 @@ description: Run the full verification pass for the Streaming Center app — typ
 Run these in order. Each catches something the others cannot.
 
 ```bash
-npm run android       # after a native change (modules/, app.json plugins, a new native dependency): rebuild the development client
+npm run android       # after a native change (modules/, app.json plugins, a new native dependency or player): rebuild the development client
 npx expo start        # once, then stop it: it generates .expo/types (typed routes)
 npm run typecheck     # the app, then test/tsconfig.json — strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess
 npm run lint          # expo lint, including the boundary, Hermes and SQLite rules below
@@ -19,8 +19,8 @@ npx expo-doctor       # dependency and config diagnosis
 Typed routes are generated only by the dev server, never by `expo export`.
 Without `.expo/types`, `tsc` accepts any `href` and a broken link type-checks.
 
-Then, for anything touching config, native modules, routes or the plugins
-dependency, bundle for real:
+Then, for anything touching config, native modules, routes, backups, players or
+the plugins dependency, bundle for real:
 
 ```bash
 npx expo export --platform ios --output-dir /tmp/sc-ios
@@ -44,13 +44,34 @@ grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore -e ExpoLocalAuthenticati
 strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c streaming-center-secrets  # must print 0
 ```
 
-The same goes for the host crypto: `src/platform/crypto.ts` derives keys with
-the native module, `crypto.web.ts` with WebCrypto, and the web bundle must not
-ask for a native module it does not have.
+The same goes for the host crypto: `src/platform/crypto.ts` is the native
+side and `crypto.web.ts` the web's, and the web bundle must not ask for a
+native module it does not have. (`KeyDerivation` stays in the grep until
+Phase 6 retires the module.)
 
 With `--source-maps` on the web export, also check the vocabulary is bundled
 once: the `sources` of the web map should list each
 `streaming_center_plugins/api/src/*` file exactly once.
+
+## sql.js only for backups, only on the web (Phase 6)
+
+The backup file is built with expo-sqlite on native and with sql.js on the
+web, loaded through `import()` when a backup is written or opened. So sql.js
+must be absent from the native bundle, and on the web it must sit in a chunk
+of its own — never in the entry bundle every visit loads:
+
+```bash
+strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c sql-wasm     # must print 0
+find /tmp/sc-ios -name '*.wasm'                                      # must print nothing
+grep -l sql-wasm /tmp/sc-web/_expo/static/js/web/entry-*.js          # must print nothing
+grep -l sql-wasm /tmp/sc-web/_expo/static/js/web/*.js                # must print one other chunk
+find /tmp/sc-web -name '*.wasm'                                      # the one sql.js file, fetched only by that chunk
+```
+
+`"sql-wasm.wasm"` is a string literal in sql.js's loader, so it survives
+minification. If the build falls back to `sql-asm.js`, grep for `sql-asm`
+instead. A web page that loads WebAssembly needs `'wasm-unsafe-eval'` in its
+Content-Security-Policy — and nothing more than that.
 
 ## No secret in the database
 
@@ -61,18 +82,27 @@ a browser's IndexedDB (DevTools → Application) holds only refs in
 simulator `sqlite3 …/SQLite/streaming-center.db .dump | grep <password>` prints
 nothing (`docs/platforms/ios` has the path).
 
+The same holds after a sync and after importing a backup: the passwords the
+server holds in plain text, and the ones inside the file, must land in the
+keychain only. No stream URL, token or MAC address may appear in a dump or a
+log either.
+
 ## Boundaries — a deliberate violation must fail
 
 `eslint.config.js` turns the composition-root rule (spec §15) into lint errors:
 
 | Import | Allowed only in |
 | --- | --- |
-| `@sc/plugin-*` | `src/composition/**` |
+| `@sc/plugin-*` — from Phase 6, `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and `@sc/sync-*` | `src/composition/**` |
+| `@sc/player-kit` — covered by `@sc/player-*` (Phase 7) | `src/composition/**` — screens get a player's view from the service graph |
 | `@/persistence/*` (and relative `…/persistence/…`) | `src/composition/**` |
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |
 | `@/composition/*` | `src/app/_layout.tsx` |
 | `expo-local-authentication` | `src/platform/**` — everything else asks `OwnerCheck` |
-| `@noble/*`, `modules/key-derivation` | `src/platform/**` — cryptography is the platform's |
+| `@noble/*`, and `modules/key-derivation` until Phase 6 | `src/platform/**` — cryptography is the platform's |
+
+The rows marked with a phase are the target: add them to `eslint.config.js`
+when the packages they name exist, in the same commit.
 
 Do not trust them, prove them. Drop a throwaway file into `src/screens/` that
 imports one of each — including a relative `../platform/clock` — and run
@@ -106,19 +136,29 @@ Web is a first-class target and breaks independently of native:
   reset, browser defaults such as button padding break switches and buttons.
 - The tab bar is a different component on web (`app-tabs.web.tsx`).
 - `web.output` is `"single"`: one `index.html`, no pre-rendering.
+- Its storage, its crypto and its backup engine are all web-only files.
 
 An iOS bundle passing tells you nothing about web.
 
 ## Cross-repository check
 
 If you changed anything in `../streaming_center_plugins`, verify there too —
-nothing enforces consistency across the two repositories:
+nothing enforces consistency across the repositories:
 
 ```bash
 cd ../streaming_center_plugins && npm run typecheck && npm test
 ```
 
+After a change to the account contract, run the sync repository's tests as
+well: `npm test` there today; from Phase 6, `go test ./...` and
+`(cd harness && npm test)`, which drives the real `sync/custom-server` plugin
+against the real PocketBase binary.
+
 ## Current state — read this before trusting a failure
+
+**Phase 5 — the new architecture is written down; the code is still Phase 4's
+until Phase 6.** The checks marked with a phase apply once that phase has
+built what they check; the rest apply today.
 
 - Storage is **real**: SQLite and the keychain on native, IndexedDB and
   encrypted secrets on the web. Data persists between runs, so a flow that
@@ -131,8 +171,10 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
   the account and two devices syncing through one fake account included — not
   screens. Screens are proven by driving the app on each platform (`sc-run`).
   The real account plugin against the real server is
-  `../streaming_center_sync`'s `npm test`: run it too after a change to the
-  sync contract or to sealing.
+  `../streaming_center_sync`'s `npm test` today — the Node server, with the
+  log, sealing and owner proofs — until Phase 6 replaces it with PocketBase.
+- Plugins are still `@sc/plugin-<id>`, there is no `player-kit`, sql.js or
+  backup file yet, and nothing plays.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

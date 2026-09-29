@@ -3,6 +3,10 @@
 The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
+This page describes the target. Until Phase 6 the app has three tabs — no TV —
+Settings → Plugins is one list, and Welcome offers to sign in or to use the
+device on its own.
+
 ## Tamagui
 
 The app is built with [Tamagui](https://tamagui.dev) 2.7.7 on its `v5` preset.
@@ -41,6 +45,22 @@ right), a full-screen page with its own header, a detail page whose header
 floats over the artwork, and a sheet (`formSheet` on iOS and Android, a plain
 page in a browser).
 
+## Four tabs
+
+**Media, Videos, TV, Settings.** What appears on each is decided by category
+and kind in `services/tab-content.ts` (`docs/plugins`), never by a plugin's
+name.
+
+- **Media** — a source's movies, shows and anime, merged across every source.
+- **Videos** — web video and files, one tab per source. It shows skeleton
+  shelves until a source lists videos or files.
+- **TV** — everything IPTV brings, in Live, Movies and Series sections, plus any
+  source's `live` channels. Media and Videos never show IPTV content.
+- **Settings** — the account, profiles, plugins, about.
+
+Phase 6 gives Videos new icons, gives TV the TV ones, and makes the web's top
+bar compact on narrow screens; today it wraps below about 400 px wide.
+
 ## Media
 
 **Home** (`screens/media/home.tsx`) is Continue Watching, then one row per kind
@@ -73,75 +93,122 @@ All of this only where the source may be kept on the device (`docs/data`).
 row's own sort, with as many columns as the width allows (`FlashList`, keyed by
 the column count). **Detail pages** switch on the item's type — a movie's hero
 and cast, a show's seasons and episodes, an episode's still with a way to its
-show. There is no Play button until playback exists.
+show. Play, Resume, Mark watched and Next episode arrive with playback
+(Phase 7, `docs/playback`).
 
 **Customize** is a sheet with everything inline, because a Tamagui portal would
 render behind a native sheet: per row, up and down, shown or hidden, sort and
 direction, poster or scene cards. Rows a profile adds can be removed; the
 default ones can only be hidden. Reset puts the default back.
 
+## TV
+
+The TV tab arrives in Phase 6 with its empty state, which points to Settings →
+Plugins → IPTV. Phase 7 fills it:
+
+- **Live** — group chips, the channel list with what is on now and next, and a
+  day guide.
+- **Movies** and **Series** — the media components, for IPTV content only.
+- **Offline** — channels and the guide are kept per profile, like the media
+  cache, and shown with how old they are when the provider cannot be reached.
+
+IPTV is hidden on the web until a proxy exists, so in a browser the tab holds
+only what sources bring as `live`.
+
+## Settings
+
+- **Account** — local, or on your own server, and how it stands.
+- **Profiles** — up to ten on a local account, and up to the server's limit on
+  your own server. At the limit, "Add a profile" is hidden and the list says
+  why. A profile the server refused for the limit stays on this device only,
+  and says so. A local copy kept after signing out that holds more than ten
+  keeps them all, but adds none until there are fewer.
+- **PIN lock**, per profile.
+- **Plugins** — four rows: Sources, IPTV, Players, Sync. Each opens that
+  category's list for this platform (`settings/plugins/[category]`), and each
+  plugin has its page (`settings/plugins/[category]/[name]`). There is no
+  global list.
+  - **Sources** and **IPTV** list their connections and add new ones.
+  - **Players** list this device's engines: each one's switch and settings,
+    and which is the default. Until Phase 7, the built-in player says it is
+    not there yet.
+  - **Sync** has your own server, the backup targets — iCloud on iOS only,
+    Google Drive and OneDrive, as they arrive — and the backup file: Export,
+    Import, and Show the backup key, behind the owner check. When a save finds
+    the file changed on another device, it asks: open theirs, keep this
+    device's, or keep both.
+- **About.**
+
+## The connection form
+
+The form is built from the plugin's manifest (`components/manifest-form/`),
+switching on `field.type` only; the app has no form of its own for any plugin.
+It has one switch of its own, `enabled`, for the whole account, and the
+per-profile tabs `docs/plugins` describes. A connection whose plugin cannot run
+on this device shows "not available on this device", and its values are kept
+for the devices that can.
+
 ## The account
 
-**Welcome** (`screens/welcome.tsx`) is the first launch: "Sign in to sync your
-profiles" or "Use on this device only". Signing in picks an account — straight
-to its form when there is only one kind — asks for its connection fields and
-nothing else, and tries once. When the account brings profiles, a spinner holds
-while the gate moves to "Who's watching?"; an empty account leads to "Who is
-this?", as using the device alone does. A build with no account to sign in to
-goes straight to "Who is this?".
+**Welcome** (`screens/welcome.tsx`) is the first launch, with three ways in:
+
+- **Create an account on this device** — a name, which the first profile takes
+  too, and the app opens on it.
+- **Sign in to your server** — its connection fields and nothing else, tried
+  once. When the account brings profiles, a spinner holds while the gate moves
+  to "Who's watching?".
+- **Restore a backup** — a `.scbackup` file and its key.
 
 **Settings → Account** (`screens/settings/account.tsx`) shows the account and how
-it stands — "Synced 5 min ago · 2 changes waiting" — with Sync now, what it
-keeps in step, Switch account and Sign out. An account that refused the sign-in,
-or let this device go, offers "Sign in again", which takes its passwords and
-nothing else. Where the account seals passwords, the list says so, and that it
-cannot read them. Without an account the screen says everything is kept on this
-device, and offers Sign in. A row at the top of Settings says the same in one
+it stands. On your server: "Synced 5 min ago · 2 changes waiting", Sync now,
+what it keeps in step, Switch account and Sign out. An account that refused
+the sign-in — its password changed elsewhere — offers "Sign in again", which
+takes its password and nothing else; the address and username are read-only,
+since another would be another account. On a local account the screen says
+everything is kept on this device, and offers to sign in to your server or to
+create an account there. A row at the top of Settings says the same in one
 line.
 
-**The sign-in flow** (`screens/sign-in-flow.tsx`) is shared by both, so it uses
-no hook that needs a profile: at first launch there is none. Every step has its
-own Back, and a sign-in that does not go through says why in words, never
-retried. When both sides have profiles it asks once: "Keep both", or "Use the
-account's profiles", which asks again before removing this device's own. A
-switch asks "Move your profiles and settings to X?" — after "Confirm it's
-you", where the account being left checks its owner with its password.
-Choosing the account's profiles can take the profile in use, and everything
-under `(app)` with it, so Settings never navigates after that; the gate does.
+**The sign-in flow** (`screens/sign-in-flow.tsx`) is shared by Welcome and
+Settings, so it uses no hook that needs a profile: at first launch there is
+none. Every step has its own Back, and a sign-in that does not go through says
+why in words, never retried.
+
+- **Signing in on a device that holds an account** says what will happen — the
+  server's account replaces this device's profiles and sources — offers to
+  export a backup first, and asks "Confirm it's you", checked by the account
+  being left. Accounts are never merged.
+- **Replacing can take the profile in use**, and everything under `(app)` with
+  it, so Settings never navigates afterwards; the gate does. Importing a backup
+  behaves the same way.
 
 **Creating an account** is the same form. Where the plugin can create one
-(`sync.signUp`), "New here? Create an account" adds its fields — your own
-server's invite code — and the button reads "Create account". Once the account
+(`account.signUp`), "New here? Create an account" adds its fields — your own
+server's invite code — and the button reads "Create account". From a local
+account the form says its profiles and sources will be uploaded, and refuses
+up front when there are more profiles than the server takes. Once the account
 exists, the form only signs in to it: going back, or a step that fails after,
-never tries to create it twice. While a key is worked out, the form says it can
-take a few seconds on a phone.
+never tries to create it twice.
 
 **The owner's password** is asked for in a form of its own
 (`components/owner-proof-form.tsx`), inline, because a native alert cannot hold
 a text field: the fields the account's `ownerProof` names, Continue and Cancel,
-"Checking…" while the key is worked out, and the verdict in words — "That
-password isn't right.", or too many tries. Nothing is retried by itself. Sign
-out opens it in place of the button, after the confirmation; Forgot PIN opens
-it in place of the PIN pad.
+"Checking…" while the server answers, and the verdict in words — "That password
+isn't right.", or too many tries. Nothing is retried by itself. Sign out opens
+it in place of the button, after the confirmation; Forgot PIN opens it in place
+of the PIN pad.
 
 **Forgot PIN?** sits under the PIN pad — at launch, when switching, and on PIN
-lock's current-PIN step — wherever the owner can be asked: through the account
-(its password, where it asks for one), or with Face ID, a fingerprint or the
-passcode. Where nobody can be asked — a browser without an account — it reads
-"Forgot it? An account lets you reset a PIN.", or, with an account that no
-longer lets this device in, to sign in to it again. A yes clears the PIN and
-opens the profile; PIN lock then offers "Set a PIN".
+lock's current-PIN step — wherever the owner can be asked: on your server, with
+the account's password; otherwise with Face ID, a fingerprint or the passcode.
+Where nobody can be asked — a browser on a local account — a hint takes the
+link's place, and a server account that no longer lets this device in points
+to signing in to it again. A yes clears the PIN and opens the profile; PIN lock
+then offers "Set a PIN".
 
 **Screens scroll with taps passing through** (`components/screen.tsx`,
 `keyboardShouldPersistTaps="handled"`): otherwise the first tap on a button
 after typing only puts the keyboard away, and Continue seems to do nothing.
-
-**The connection form** has one switch, for the media role. The account is not
-a switch: a row says "Your account", or points to Settings → Account. On the
-account's own connection the details are read-only — another address would be
-another account — and neither Remove nor per-profile values are offered. A
-plugin that can only be an account offers "Use as your account" on its page;
-its `new` route refuses, since no form switches a sync role on.
 
 ## Artwork
 
@@ -152,7 +219,8 @@ result with `expo-image`: a blurhash while loading, a crop for images cut from
 a sheet, and a disk cache only when the source allows it. The resolved source is
 memoized, because the web image component fetches again whenever it gets a new
 object. Without a reference, or from a source that has no images, a card shows
-its title on a colour derived from its key.
+its title on a colour derived from its key. Channel logos go through the same
+resolver.
 
 `components/scrim.tsx` fades artwork into the page with `expo-linear-gradient`,
 which takes resolved colours. `pointerEvents` goes in its style: React Native
@@ -166,5 +234,3 @@ browser's own styles leak in — button padding alone squeezes every switch.
 Tamagui 2.7.7 warns in development that an `AlertDialogContent` "requires a
 description" even when it has one; its check runs before the dialog's portal
 mounts. The dialog is correctly described — check `aria-describedby` in the DOM.
-
-The web's top bar wraps below about 400 px wide. It predates the media screens.

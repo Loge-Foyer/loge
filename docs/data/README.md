@@ -1,11 +1,16 @@
 # Data
 
-The local database: what it holds, transactions, the change journal,
-migrations, secrets, and what a backup brings back.
+The local database: what it holds, account-wide and device-wide, transactions,
+the change journal, syncing with your server, the backup file, migrations,
+secrets, and what a phone's own backup brings back.
+
+This page describes the target. Until Phase 6 the code runs Phase 4's model:
+the account is one of the device's connections, synced through a log, with
+passwords sealed on the device. This page's history in git has how that works.
 
 ## Where things live
 
-| Platform | Database | Passwords, PINs | Session tokens, the device key |
+| Platform | Database | Passwords, PINs | Session tokens, the device key, the backup key |
 | --- | --- | --- | --- |
 | iOS, Android | SQLite (`expo-sqlite`) | the keychain / keystore | the keychain, this device only |
 | Web | IndexedDB | encrypted in IndexedDB | the same |
@@ -14,23 +19,42 @@ The services cannot tell which. They depend on `LocalDatabase` and
 `SecureCredentialStore` (`src/services/ports.ts`); `src/composition/storage.ts`
 builds the native side and `storage.web.ts` the web's.
 
-The web does not get SQLite compiled to WebAssembly: expo-sqlite's web build is
-alpha, and needs WebAssembly and COOP/COEP headers from whatever serves the
-page. Nor localStorage: a local-first write stores the data and its journal
-entry together, which needs real transactions.
+The web does not keep its data in SQLite compiled to WebAssembly: expo-sqlite's
+web build is alpha, and needs WebAssembly and COOP/COEP headers from whatever
+serves the page. Nor localStorage: a local-first write stores the data and its
+journal entry together, which needs real transactions. WebAssembly runs on the
+web for one thing only — sql.js, loaded to write or open a backup file.
 
 ## What is stored
 
-- **The device** — installed plugins and the default profile, and every
-  connection with its shared values and its `perProfile` mode.
-- **A profile** — its own values for each connection that keeps values per
-  profile (fields, settings, a credentials ref, or `off` when the profile does
-  not use that connection), its preferences (today the home layout), and what
-  sources answered it. Everything a profile owns cascades from `users`, so
+**Account-wide** — with the account, on your server and in backups:
+
+- **Profiles**, at most ten: a name, the ref of a PIN, and their preferences
+  (today the home layout). Everything a profile owns cascades from `users`, so
   deleting the profile is one statement.
-- **The credential store** — passwords, PINs and session tokens, by ref. A row
-  holds a `credentialsRef` and the names of the password fields that are saved
-  (`secretKeys`), never a value.
+- **Source and IPTV connections**, with their shared values, their category,
+  `enabled` and their `perProfile` mode. Every device on the account has them.
+- **A profile's own values** on a connection that keeps values per profile:
+  fields, settings, a credentials ref, or `off` when the profile does not use
+  that connection.
+
+**Device-wide** — never leave the device:
+
+- **Device settings:** the default profile, players (on or off, the default,
+  their settings) and sync settings.
+- **Sync-category connections:** your server's sign-in, a backup target.
+- **The account's own rows**, never journaled, and all three cleared when the
+  device changes account:
+  - `account` — a single row: local or server, its id and name, and the server
+    connection for a server account
+  - `account_sync` — the checkpoint, and when it last synced
+  - `backup_state` — per target, the `{ lineage, generation, etag }` last seen
+- **What sources answered**, per profile: the media cache (below).
+- **The change journal.**
+
+**The credential store** holds passwords, PINs, session tokens and the backup
+key, by ref. A row holds a `credentialsRef` and the names of the password
+fields that are saved (`secretKeys`), never a value.
 
 Relational columns are kept for what is filtered or sorted; values read whole,
 such as a connection's fields, are JSON. `list()` returns profiles and
@@ -72,140 +96,134 @@ in the same transaction, and refuse a row whose profile or connection is gone.
 
 ## The change journal
 
-Every change to one of these appends a journal entry in the same transaction:
+Every change to account-wide state appends a journal entry in the same
+transaction:
 
-- a profile's name, and its PIN as an entry of its own — so a rename can never
-  carry away a PIN set on another device
+- a profile's name, and its PIN as an entry of its own (`userPin`) — so a
+  rename can never carry away a PIN set on another device
 - its preferences, key by key
-- a connection
+- a source or IPTV connection
 - a profile's values on a connection
 
 An entry records the entity, its id, `upsert` or `delete`, when it happened,
-the row's new version, and a random change id. The account stores a change once
-by that id, however often it is sent. It is random rather than built from the
-device, because a backup restored onto the same phone repeats sequence numbers:
-the account would take the new changes for old ones, answer that it had them,
-and lose them. Entries written before the account phase have no id, and are
-never sent.
-
-Entries point at data and never copy it, so nothing secret can end up there.
-The database numbers them (`AUTOINCREMENT`), so they keep the order changes
-committed, whatever the clock says.
+the row's new version, and a random change id. It points at data and never
+copies it, so nothing secret can end up there. The database numbers entries
+(`AUTOINCREMENT`), so they keep the order changes committed, whatever the clock
+says, and a number is never used twice: a checkpoint cannot skip changes
+written in the same millisecond. Entries the account has stored are pruned.
 
 Some writes are not journaled:
 
-- Device settings. The default profile and the installed plugins belong to
-  this device.
+- Device settings: the default profile, players, sync settings.
+- Sync-category connections, and the account's own rows.
 - What sources answered. It is a cache, not user state.
 - Rows a cascade deleted. The parent's entry implies them.
 - Writes that change nothing.
 - What arrives from the account. The sync engine writes it through
   `SyncDatabase.unjournaled`, a port only it and the account service receive:
-  journaled, a pulled change would be sent straight back. Joining an account
-  still *announces* this device's rows by hand (`journal.announce`), in the
-  same transaction.
+  journaled, a pulled change would be sent straight back. Rows the server lost,
+  and a local account's rows when it is uploaded to a new server account, are
+  *announced* by hand (`journal.announce`) in the same transaction, for the
+  normal push to carry.
 
 The journal belongs to the device, not to a profile. Deleting a profile is
 itself a change, so its `user_id` in the journal does not cascade. This is the
 one table with a `user_id` that does not.
 
-The sync engine drains it to the account. It reads the journal inside a
-transaction (`tx.journal`), and hears through `journal.subscribe` about every
-commit that journaled something — never a rollback, a read or an unjournaled
-write.
+The sync engine reads the journal inside a transaction (`tx.journal`), and
+hears through `journal.subscribe` about every commit that journaled something —
+never a rollback, a read or an unjournaled write. The same signal tells a
+backup target that there is something to save.
 
-Where the device stands with its account is `sync_state`: one row, cascading
-from the account's connection. It holds the device's place in the account's
-log, how far the journal has been sent, and which of its changes the account
-has not returned yet. Like device settings, it is never journaled.
+## Syncing with your server
 
-## Syncing with the account
+On a server account, each run pushes the journal, reads the whole account, and
+reconciles; `docs/architecture` has the steps. The server keeps one record per
+profile, PIN, preference, connection and profile's values, keyed by the app's
+own ids. Deletes are soft, so every device learns of one by reading, and a
+server restored from an old backup can be told apart from a deletion.
 
-The account carries profiles, their PINs, their preferences, connections and
-each profile's values on them. Other devices get them the next time they sync.
-
-- **What never travels.** Session tokens, credentials refs, the account's own
-  connection, a connection's sync role, device settings (the default profile,
-  installed plugins), connections of plugins this build does not register —
-  and passwords, except sealed, on an account that carries them. A connection
-  lists the *names* of its saved passwords, so a device without them asks —
-  "needs its password on this device" — instead of signing in with nothing. A
-  password saved there stays listed when this device edits the connection
-  without having it.
+- **Passwords travel in plain text**, in the `secrets` of each connection and
+  each profile's values, because the server is the household's own. They are
+  read from the keychain for a push, outside any transaction, and written to
+  the keychain under fresh refs before a reconcile — never into the database.
+  That makes the server's data folder as sensitive as every password the
+  household uses; `../streaming_center_sync` says how to keep it.
 - **The PIN travels readable**, as a lock against the wrong family member
   rather than an account secret. It arrives in the credential store, under a
   fresh ref, never in the database. A PIN this device cannot read — after a
   restore — is not sent at all, rather than sent as "no PIN".
-- **Passwords travel sealed**, on an account that carries `sealedPasswords`
-  (below).
-- **A connection new to this device** installs its plugin.
+- **A connection lists the names of its saved passwords,** so a device where
+  one is missing asks — "needs its password on this device" — instead of
+  signing in with nothing.
+- **What never travels:** session tokens and credentials refs, `position` and
+  `version`, device settings, sync-category connections, and connections of
+  plugins this build does not register.
+- **A connection new to this device** is simply there: sources and IPTV belong
+  to the account, and nothing needs installing. One whose plugin cannot run
+  here stays inert, labelled "not available on this device".
 - **The first profile chosen** on a device without a default becomes it, as
-  the first profile created does — so a device that joined an account does not
-  ask "Who's watching?" at every launch.
+  the first profile created does — so a device that signed in does not ask
+  "Who's watching?" at every launch.
 
-Joining an account announces this device's rows as journal entries, and the
-normal push uploads them. Which side wins where both hold something:
+Conflicts are resolved per entity, never globally and never by a clock: a
+pending local change goes next and wins; a delete of a profile or a connection
+always wins, and a later write to it gives way; otherwise the last push wins,
+the whole entity at once. Every device applies the same server state, so they
+converge.
 
-| Joining | Where both sides hold it |
-| --- | --- |
-| "Use the account's profiles" | the account's, for profiles, their PINs and preferences; this device's other profiles go |
-| "Keep both", and connections under either choice | the account's, unless this device changed it since it last left an account |
-| the account lost data (`reset`), or carries more | this device's |
+**Nothing in an apply may fail on the data.** Each write is checked, then made:
+on IndexedDB a failed request aborts the whole transaction even when caught. A
+record that `isAccountRecord` refuses, or whose parent is gone, is skipped and
+logged — never its payload.
 
-Something deleted here since the device last left an account is not brought
-back, and its delete is announced. Signing out keeps everything on the device
-and records the journal's head (`leftAccountAt`).
+## The backup file
 
-### Passwords
+A backup is one encrypted SQLite file, `.scbackup`, written by
+`services/backup/` (Phase 6). It holds the account: its name, its profiles and
+their PINs, preferences, and source and IPTV connections with each profile's
+values — and their passwords, so nobody types a Jellyfin password again on a
+new device. It never holds caches, device settings, players, sync settings,
+tokens, the device key, the journal or sync state.
 
-**The sign-in rule.** A password is only ever used with the sign-in it was
-saved for: its plugin, and its scope's address and account — the `url` fields
-and the credential fields, resolved over the connection for a profile's own.
-A pulled change that points a connection anywhere else leaves its passwords
-behind, every profile's that moved with it included, and the device asks. It
-holds on every account, sealing or not: whoever controls the account can
-rewrite an address, and a password must never follow it. Other fields — such
-as "local only" — are no part of a sign-in, or every toggle would make other
-devices ask again.
+- **It is not a copy of the device database.** It has its own versioned schema,
+  because the web has no device SQLite, and the device database never holds a
+  secret:
+  - `meta` — the lineage, the account's name, the app version
+  - `profiles`, `pins`, `preferences`
+  - `connections` and `profile_values`, each with a `secrets` JSON column
 
-**Sealed.** On an account that carries `sealedPasswords` the engine seals each
-saved password of a connection, and of each profile's values on it, with the
-account's vault key: AES-256-GCM over the password and its sign-in, bound to
-the change it travels in and its field (`sc/sealed/v1|{syncKey}|{field}`). The
-account stores `v1.{key id}.{…}`, which it cannot open. A password this device
-cannot read, or one too long to travel, is left out and its name still goes;
-a change too long with its seals goes without them.
+  Row shapes are the server's records' shapes, so one mapper serves the
+  server, the upload to a new server account, and backups. The tables are
+  plain, with `journal_mode=DELETE`, `application_id` and `user_version`.
+- **Built and read in memory,** never opened as a database the app runs on:
+  expo-sqlite's `serializeAsync` / `deserializeDatabaseAsync` on native, and
+  sql.js (WebAssembly) on the web, loaded only when a backup is written or
+  opened.
+- **Encrypted as a whole.** A 76-byte header, then AES-256-GCM over the
+  serialized database, with the header as additional data. The header holds the
+  magic `SCBK`, the format and schema versions, the key id, the lineage (the
+  local account's id), the generation (+1 each save), the writer (this
+  install), when it was created, and the nonce. Anything over 64 MiB is refused
+  before it is read; a typical file is under 1 MB.
+- **The backup key** is 20 random bytes, shown as eight groups of four in
+  Crockford base32 plus a checksum group, and forgiving when typed. The file's
+  encryption key and key id are derived from it with HKDF. It is kept in the
+  device-bound store, and shown only after the owner check, because it opens
+  every password in the file. A lost key means an unreadable backup, and the
+  app says so.
+- **Importing** checks everything before it replaces anything: size, key id,
+  decryption, `quick_check`, schema version, and every row against the record
+  guards. Then the secrets go into the keychain under fresh refs, the rows are
+  written in one transaction, and the janitor runs. The result is always a
+  local account.
+- **Backup targets** save the same file after changes, debounced, and when the
+  app goes to the background. Writes are conditional on the etag last seen;
+  when the file changed elsewhere the app asks — open theirs, keep this
+  device's, or keep both — and never overwrites. To move from iCloud to Google,
+  copy the file and import it with the key.
 
-**Arriving**, a seal is opened before the transaction — the credential store is
-no part of one — and written under a fresh ref:
-
-- Each is judged against the connection as the log stands at that change: the
-  page's own upserts and deletes, folded over this device's rows. The
-  transaction takes a ref only if its sign-in is still the row's.
-- The first change to a scope on a page that holds what this device holds
-  already gets no ref, so an echo writes nothing and purges nothing. Every
-  other change gets one, so a page that goes A → B → A ends on A — PINs alike.
-- A seal that does not open — another account's key, a newer version, another
-  connection's — is left out, and the names still count.
-
-**Two exceptions to rule 1**, both narrow:
-
-- A connection that now signs in somewhere else takes the passwords off every
-  profile whose sign-in moved with it, even one this device changed.
-- A password a row lists but this device lacks is filled in from a seal made
-  for that row's own sign-in, even from a change the device does not take —
-  its own change still wins everything else. That is how every device ends up
-  with every password, in whatever order the runs came.
-
-A save here that moves a connection announces its profiles' rows again, after
-it, so they go out sealed for where they sign in now.
-
-**The vault key** comes from the account's plugin, once per run, and only when
-something is to be sealed or opened. If it cannot be had, the run stops before
-the page that needed it: applied without, the seals would be passed for good.
-Signing in reads it while the sign-in is open, for the join. The plugin keeps
-it in the account's session — the device-bound store, never the database,
-never restored onto another phone — and signing out removes that.
+A backup target is not live sync between devices. Your own server is.
 
 ## Migrations
 
@@ -219,12 +237,36 @@ destructive: viewing history is not disposable.
   - `foreign_key_check` must pass before such a step commits.
 - **IndexedDB** — `src/persistence/indexeddb/migrations.ts`, one upgrade per
   database version, run by the browser's `onupgradeneeded`. A step gets the
-  version-change transaction, so it can rewrite records.
+  version-change transaction, so it can rewrite records, and aborts on any
+  error.
 
-Version 2 added the change ids and `sync_state`, and switched every
-connection's sync role off. Until then, adding a sync-only plugin switched it
-on by itself; from then on a connection carries state only once it is chosen
-as the device's account.
+The steps, the same on both engines:
+
+- **v1** — the tables.
+- **v2** — the journal's change ids, and Phase 4's `sync_state`.
+- **v3** (Phase 6) — plugin ids qualified by category, wherever one is stored:
+  `jellyfin` becomes `sources/jellyfin`.
+- **v4** (Phase 6) — the account model:
+  1. Phase 4's account connection — `custom-server`, and any connection that
+     was only the account — goes. Its secrets are queued for deletion first, and
+     the cascade takes its values, its cache and `sync_state`.
+  2. `sync_state` goes; `account`, `account_sync` and `backup_state` arrive.
+  3. A connection's roles become `enabled`, plus its `category`.
+  4. Device settings lose `plugins` for sources — a connection is what puts a
+     source in use now — and `leftAccountAt`, and gain `players`.
+  5. The journal is cleared. Its entries were for the old log, and an account
+     now starts with a full upload or a full download.
+
+  Then, before the gate, `ensureAccount()` gives a device that has profiles a
+  local account, named after its default profile, or else its first; a device
+  without profiles meets `needs-account`. Every profile, connection and
+  password survives. An account on Phase 4's server is signed in to again, on
+  the new server.
+- **v5** (Phase 7) — watch status and its outbox (`docs/playback`).
+
+The media cache survives v3 and v4: its fingerprints and the installation ids
+never contained a plugin id, so Jellyfin sessions and device ids outlive the
+rename.
 
 A database written by a newer version of the app is refused rather than
 guessed at, and the boot screen says so. In a browser, a tab still open on the
@@ -255,22 +297,32 @@ connection-field values and its credentials ref. A token whose identity no
 longer matches is discarded. A new server address, username or password (by ref
 rotation) therefore signs in afresh, with nothing to remember.
 
-## Backups
+Your server's session lasts 30 days, and is refreshed on every sync. When it
+ends — a long time offline, or the password changed elsewhere — the plugin
+signs in once with the saved password, and a refusal parks the account until
+the user signs in again.
 
-A phone backup can carry the database to another phone. This is what comes
-with it:
+## Phone backups
 
-- **iOS** — an encrypted backup restores passwords and PINs. Session tokens
-  and the device key stay behind (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`), so
-  the restored phone signs in to each server as a new device. It does not
-  share, and end, the old phone's sessions.
+A phone's own backup can carry the database to another phone. That is not the
+`.scbackup` file above, and this is what comes with it:
+
+- **iOS** — an encrypted backup restores passwords and PINs. Session tokens,
+  the device key and the backup key stay behind
+  (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`), so the restored phone signs in to
+  each server as a new device, rather than sharing — and ending — the old
+  phone's sessions. Opening a `.scbackup` there takes the key, typed in.
 - **Android** — the database comes back, but no secret: keystore keys cannot
   be restored, so expo-secure-store's data is left out of Auto Backup.
   - A source whose saved password is gone is not signed in without it, because
     servers lock accounts after failed logins. It says it needs its password
     again, and the connection form asks for it.
-  - A PIN that is gone lets its profile's owner in, as a child lock should,
-    until the account phase brings "Forgot PIN".
+  - A PIN that is gone lets its profile's owner in, as a child lock should.
+  - The backup key is gone too.
+- **Either way,** a device-key fingerprint in the database spots the restore
+  at boot: the pending journal and the session are dropped, and the next
+  sign-in replaces what is on the device, so a stale journal is never pushed
+  over what other devices did meanwhile.
 
 The device key is kept out of the database for the same reason: a copy on a
 second phone would sign both in as one device.
@@ -282,10 +334,10 @@ device, per profile and per source:
 
 - **What is kept:** each source's answer for a row (its first page, in the
   source's own order), the grid's first page, Continue Watching, a show's
-  seasons and episodes, and a detail page once it has been opened. Watch
-  status is kept as the source reported it, inside each item. A separate
-  watch-status cache, with the outbox that sends changes back, arrives with
-  playback.
+  seasons and episodes, and a detail page once it has been opened — and for
+  IPTV, the channel list and the guide (Phase 7). Watch status is kept as the
+  source reported it, inside each item. A separate watch-status cache, with the
+  outbox that sends changes back, arrives with playback (v5).
 - **Only where allowed.** Nothing is kept unless the source declares
   `offlineMetadata` — stable ids, artwork versioned by tag — and the
   connection's "Keep metadata on this device" switch is on for that profile.
@@ -295,8 +347,9 @@ device, per profile and per source:
   credentials ref. After a changed address, library selection or password,
   nothing saved before is shown. Changing a connection also purges its saved
   answers outright, in the same transaction.
-- **A cache, not user state:** never journaled, and every read and write is
-  best effort. A failure to save never fails a screen.
+- **A cache, not user state:** never journaled, never synced, never in a
+  backup, and every read and write is best effort. A failure to save never
+  fails a screen.
 
 How screens use it:
 
@@ -326,4 +379,5 @@ The app's database code runs on the real engines, in memory:
 One contract suite runs against both. The service tests use the same databases,
 and the credential store they get settles on a later macrotask, as a keychain
 or WebCrypto does. A service that awaits it inside a transaction therefore
-fails its test, as it would fail in a browser.
+fails its test, as it would fail in a browser. Backups round-trip on both
+engines, with sql.js standing in for expo-sqlite in Node.

@@ -17,13 +17,15 @@ Only then start work.
 
 ## What this repository is and is not
 
-**Owns:** screens, navigation, the design system, application services, the
-local database, platform access (keychain, biometrics), and the composition root
-that wires everything together.
+**Owns:** screens, navigation, the design system, application services — boot,
+the account, profiles and PINs, the sync engine, backups — the local database
+and the backup file's format, platform access (keychain, biometrics, crypto,
+files), and the composition root that wires everything together.
 
-**Does not own:** domain types, plugin contracts, or any adapter. Those are in
-`../streaming_center_plugins`. If you find yourself writing a `MediaItem`
-interface here, stop — it belongs in `@sc/api`.
+**Does not own:** domain types, plugin contracts, the player view contract, or
+any plugin. Those are in `../streaming_center_plugins` — `@sc/api`,
+`@sc/player-kit`, and `plugins/<category>/<name>`. If you find yourself writing
+a `MediaItem` interface here, stop — it belongs in `@sc/api`.
 
 ## The three mistakes to avoid
 
@@ -33,31 +35,41 @@ circular. This is expensive to undo later.
 
 **Naming a plugin above the composition root.** An `if (providerId ===
 'jellyfin')` in a screen means the abstraction has already failed. Branch on
-capabilities.
+the plugin's category and its effective capabilities.
 
 **Reaching for the network in a write path.** Local database plus journal entry
-in one transaction, then return. The sync engine drains the journal later. And
-nothing but the database inside that transaction — not the keychain, not
-WebCrypto: IndexedDB commits early, SQLite deadlocks.
+in one transaction, then return. The sync engine carries the journal to the
+account later. And nothing but the database inside that transaction — not the
+keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-Phase 4 — your own server as the account. A device has at most one: Welcome
-offers to sign in or to stay on this device, Settings → Account shows it and
-switches or signs out, and the sync engine drains the change journal to it and
-applies what it brings — profiles and their PINs, preferences, connections, and
-their passwords sealed where the account carries them. A password is only ever
-used with the sign-in it was saved for. The first real account is your own
-server (`custom-server`, against `../streaming_center_sync`): created from the
-app with an invite, signed in to once, and its password — typed again — is the
-owner check for Forgot PIN, signing out and switching. The dev-only mock is
-still there, and declines sealing; iCloud and Google come in Phase 5.
-Everything from Phase 2 stands: real titles from every live source, merged,
-kept across restarts in SQLite and the keychain, or IndexedDB and encrypted
-secrets on the web. Plugins get the host's cryptography through their context —
-native PBKDF2 among it — so phones run a development build, not Expo Go.
-Nothing plays, and Videos still shows skeletons. vitest covers the database on
-both engines, the services, and two devices syncing on every pair of engines.
+**Phase 5 — the new architecture is written down; the code is still Phase 4's
+until Phase 6.**
+
+The target: four tabs — Media, Videos, TV, Settings. Plugins come in four
+categories, and Settings → Plugins shows one list per category for this
+platform. A device holds one account, local or on your own server
+(PocketBase), with up to ten profiles. Source and IPTV connections are
+account-wide; players and sync plugins are device-wide. A server account syncs
+by pushing the journal, then reading the whole account. An encrypted
+`.scbackup` file carries a local account between devices, and players are
+plugins.
+
+What runs today:
+
+- One optional account per device, with log-based sync, sealed passwords and
+  owner proofs. Your own server is the Node server in
+  `../streaming_center_sync`, created from the app with an invite.
+- Three tabs, and Settings → Plugins as one list.
+- Real titles from every live source, merged — Jellyfin the first — and kept
+  across restarts where the source allows it.
+- SQLite and the keychain on phones, which run development builds
+  (`modules/key-derivation`); IndexedDB with WebCrypto-encrypted secrets on
+  the web.
+- Nothing plays, and Videos still shows skeletons.
+- vitest covers the database on both engines, the services, and two devices
+  syncing on every pair of engines.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.
