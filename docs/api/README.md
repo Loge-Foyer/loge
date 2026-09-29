@@ -8,34 +8,43 @@ without learning about the others.
 
 | File | What it defines |
 | --- | --- |
+| `category.ts` | The four categories — `sources`, `iptv`, `players`, `sync` — and whether each is account-wide or device-wide (`CATEGORY_SCOPE`). The platforms (`PlatformId`: `ios`, `android`, `web`) and `runsOn()`. `qualifiedPluginId()` and `categoryOfPluginId()`, for ids like `sources/jellyfin`. |
 | `bytes.ts` | Bytes as text and back — base64, base64url, UTF-8 — written by hand, since a plugin has no `btoa` or `TextEncoder` and Hermes may lack them. |
 | `ids.ts` | Branded IDs: `PluginId`, `UserId`, `ConnectionId`, `CredentialsRef`. A `UserId` is a string at runtime, but the compiler will not accept one where a `ConnectionId` belongs. |
-| `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files`. |
-| `capabilities.ts` | The media and sync capability flags, and `CapabilityKey` (`'media.browse'`, `'sync.watchProgress'`), the form a setting uses to gate one. |
+| `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files`; and, from Phase 6, `live`. |
+| `capabilities.ts` | The media capability flags, and `CapabilityKey` (`'media.offlineMetadata'`), the form a setting uses to gate one. |
 | `fields.ts` | The field descriptors a plugin uses to ask for input: `text` (optionally a `credential`), `url`, `password`, `boolean`, `select`, and the setting-only `libraries`. |
-| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, plus a role's implementation once it exists. |
-| `connection.ts` | `Connection` — one configured instance of a plugin, owned by the device — and `PerProfile`, which says what each profile keeps for itself. |
+| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists. |
+| `connection.ts` | `Connection` — one configured instance of a source or IPTV plugin, owned by the account — and `PerProfile`, which says what each profile keeps for itself. |
 | `per-profile.ts` | Which keys a mode keeps per profile, the values one profile runs with (`resolveValues`), and whether a profile is set up (`isSetUpFor`). |
-| `user.ts` | `AppUser` — a local profile. |
-| `effective.ts` | `effectiveRoles()` — what a connection may actually do. |
+| `user.ts` | `AppUser` — a profile. |
+| `effective.ts` | What a connection may actually do: declared capabilities, less what a toggle switched off. |
 | `validate.ts` | `validateManifest()` — the rules every manifest must satisfy. |
 | `media.ts` | `MediaItem` (movie, show, season, episode), `GlobalMediaKey`, `MediaDetail`, `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. |
+| `live.ts` | `ChannelGroup`, `Channel`, `Programme`, and the queries for channels and the guide. |
 | `query.ts` | `ItemQuery`, `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
+| `playback.ts` | What to play: `PlaybackDescriptor` and its sources, audio and subtitle tracks; `PlayerProfile`, what an engine plays; `PlaybackRequest`; and `PlaybackReport`, what playing reports back to a source. |
+| `player.ts` | The player role: `MediaPlayer`, `PlayerEvent`, `PlayerManifest`, and the pure `canPlay()`, `missingFor()` and `choosePlayer()`. |
 | `errors.ts` | `AppError`: a code from the spec, a retry hint, and an optional reason. |
 | `http.ts` | `HttpClient`, the port a plugin reaches the network through, and `TransportError`. |
-| `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, PBKDF2, HKDF, AES-GCM — and `KdfParams` with `isKdfParams`, the limits both device and server hold a key's parameters to. |
-| `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with, whichever role it plays. |
-| `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. `MediaContext` and `MediaTarget` name the plugin context for media. |
-| `sync.ts` | `SyncRole`, `ConnectedUserStateSyncProvider`, `SyncChange` and the entities it carries, what an account needs to carry each (`SYNC_ENTITY_CAPABILITIES`), the members a sync capability promises (`SYNC_CAPABILITY_MEMBERS`), `syncKey()`, and `isSyncChange()` with its size limits. |
+| `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, PBKDF2, HKDF, AES-GCM — and `KdfParams` with `isKdfParams`. |
+| `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with. |
+| `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. |
+| `account.ts` | The account role: `AccountRecord` and its kinds, `AccountSnapshot`, `PushOutcome`, `AccountInfo`, `ConnectedAccount`, `recordKey()` and `isAccountRecord()`, and `DEFAULT_MAX_PROFILES`. |
+| `backup.ts` | The backup role: `ConnectedBackupTarget` — `stat`, `read`, `write` with `ifMatch`, `list`. |
+| `sync.ts` | Phase 4's log-based sync role, until Phase 6 retires it. |
 
-Not yet written: playback descriptors.
+`fixtures/account-records.json` holds records every side must accept or
+refuse. The tests here read it, and so do the sync server's.
 
 ## The manifest
 
 ```ts
 export const plugin: Plugin = {
   manifest: {
-    id: pluginId('jellyfin'),
+    id: pluginId('sources/jellyfin'),
+    category: 'sources',
+    platforms: ['ios', 'android', 'web'],
     displayName: 'Jellyfin',
     description: 'Self-hosted film and TV server.',
     media: {
@@ -57,24 +66,30 @@ export const plugin: Plugin = {
 };
 ```
 
-- **Roles** — `media` and `sync` are both optional. A role that is not declared
-  is absent, and the app never asks for it.
-- **`contentKinds`** — what the source brings. The plugin states it; the app
+- **`id`** — the category, then the name: the plugin's folder under
+  `plugins/`.
+- **`category`** — which list the plugin is in, and which one block it
+  declares:
+  - sources and IPTV: `media`
+  - players: `player`
+  - sync: `account` or `backup`
+- **`platforms`** — where it runs. The app shows and runs a plugin only where
+  it runs.
+- **`contentKinds`** — what a source brings. The plugin states it; the app
   decides where each kind appears.
 - **`connectionFields`** — what a connection needs: endpoint, account, secrets.
-  They are shared by every role, because one connection has one endpoint and
-  one set of credentials. The app's Settings screen renders them; it has no
-  form of its own for any plugin.
+  The app's Settings screen renders them; it has no form of its own for any
+  plugin.
 - **`settings`** — plain values, capability toggles, and at most one
   `libraries` choice. See `settings/`.
 
 ## Connections
 
-A connection is one configured instance of a plugin — "Jellyfin Home". Two
-connections to the same plugin are normal. Every connection belongs to the
-device. It records:
+A connection is one configured instance of a source or IPTV plugin — "Jellyfin
+Home". Two connections to the same plugin are normal. Every one belongs to the
+account, so each device on the account has it. It records:
 
-- which roles are switched on
+- whether it is switched on (`enabled`)
 - its `perProfile` mode
 - its shared `values`: non-secret field values, settings, and an opaque
   `credentialsRef` pointing at the secret values in the app's credential store,
@@ -101,8 +116,7 @@ await provider.listItems({ kind: 'movies', sort: { by: 'releaseDate', order: 'de
   - `network` — what kind of network the device is on
   - `client` — app, version, device and a stable installation id
   - `clock` — `now` and `sleep`
-  - `crypto` — random bytes, key derivation and sealing, for an account whose
-    keys the server must never have
+  - `crypto` — random bytes, hashing and sealing
 - **Pages come in `compareItems` order.** The app merges several sources with
   that same function, and a plugin merges its own libraries with it.
 - **Items are plain data**, connection-qualified, and carry the source's
@@ -110,44 +124,60 @@ await provider.listItems({ kind: 'movies', sort: { by: 'releaseDate', order: 'de
 - **Artwork is an `ImageRef`** only the plugin can turn into an `ImageSource`,
   synchronously. Headers an image needs are resolved separately and never
   stored.
+- **Live TV** — `listChannelGroups`, `listChannels` and `getGuide`, behind the
+  `channels` and `epg` capabilities.
+- **`getPlaybackDescriptor(request)`**, behind `playback`, says what to play
+  for the engine the request describes. A descriptor lives in memory only: its
+  addresses can carry credentials.
 
-## The sync contract
-
-A sync role lets a connection be **the device's account** — at most one per
-device. The app hands it this device's changes and asks for everyone else's;
-the account stores and returns them, and never decides between two.
+## Players
 
 ```ts
-const account = await plugin.sync.connect(target, context); // no network work yet
-await account.getStatus();                                  // reach the account and sign in
-const page = await account.pull(cursor);                    // the log after the cursor
-const { accepted } = await account.push(changes);           // a prefix of the ids sent
+const choice = choosePlayer(descriptor.sources, enabledPlayers, devicesDefault);
+if (choice.kind === 'play') {
+  const player = plugins.get(choice.player).player.create(context);
+  await player.load({ source: choice.source, startMs: descriptor.startMs });
+}
 ```
 
-- **Changes** are `SyncChange`s: an upsert or a delete of a profile, a
-  profile's PIN, a preference, a connection, or a profile's values on one. A
-  PIN is removed by `pin: null`. A connection lists the *names* of its saved
-  password fields; when the account carries `sealedPasswords`, the app adds
-  their values in `sealed`, encrypted with the key `vaultKey()` gives it. The
-  account stores that ciphertext and cannot open it, and a plugin never sees
-  another connection's password.
-- **`push` is idempotent by change id.** It answers the ids it durably stored,
-  a prefix of those sent; the app advances only across that prefix and sends
-  the rest again, verbatim.
-- **`pull` returns the whole log in the account's order**, the caller's own
-  changes included, with an opaque cursor to resume from. A device waits to see
-  its own changes come back. `reset` says the account lost data, so the device
-  joins again; `expired` says a cursor was compacted away.
-- **The log's order is the truth.** Conflicts are the app's; a plugin never
-  picks a winner.
-- **`verifyOwner(proof)`**, when there is one, re-verifies whoever owns the
-  account with the password fields `sync.ownerProof` names, typed again. The
-  app resets a forgotten PIN, and guards switching and signing out, through
-  it. A wrong proof is `UNAUTHORIZED`; throttled, it carries the reason
-  `too-many-attempts`; and `signed-out` says the account no longer knows this
-  device, so the device's own check answers instead.
-- **`createAccount(fields)`** creates the account from the app, with the
-  fields `sync.signUp` declares, and **`signOut()`** ends this device's
-  session, where the account can.
-- **`isSyncChange()`** checks anything that arrives; the app runs it on every
-  pulled change.
+- **`PlayerProfile`** says what an engine plays: protocols, containers,
+  codecs, subtitle formats. A player plugin declares one per platform.
+- **`choosePlayer`** prefers the device's default whenever it can play any
+  source, then the others in order, and tries sources best first.
+  `missingFor` names what stops an engine — a protocol, a container, a codec —
+  so the app can say which player would do.
+- **`MediaPlayer`** drives the engine and reports `PlayerEvent`s. Its view, the
+  part that draws, is `player-kit`'s.
+
+## The account contract
+
+```ts
+const account = await plugin.account.connect(target, context); // no network work yet
+await account.status();                 // sign in, once
+await account.push(records);            // one batch, all or nothing
+const { records } = await account.pull(); // every record of the account
+```
+
+- **Records** are profiles, PINs, preferences, connections and profiles'
+  values on them. Each has a kind, a key (`recordKey`), `deleted`, and its
+  data.
+  - Deletes are soft, and a deleted profile or connection stays deleted.
+  - A connection's passwords travel in `secrets`, in plain text, because the
+    server is the household's own. A name listed without a value keeps the
+    stored one.
+- **`push`** answers `stored`, or which write it refused and why: a profile
+  over the limit, a write to something deleted, or a malformed record.
+- **`pull`** returns everything. An account is small, so a device reads all of
+  it every time, and conflicts are the app's to settle.
+- **`info()`** gives the server's profile limit and how it takes sign-ups,
+  without signing in. **`createAccount(fields, { firstProfile })`** takes the
+  `signUp` fields. **`verifyOwner(proof)`** checks the `ownerProof` fields,
+  typed again.
+- **`isAccountRecord()`** checks anything that arrives; the app runs it on
+  every record it reads.
+
+## The backup contract
+
+A backup target stores bytes and nothing else: `stat`, `read`, `list`, and
+`write(name, bytes, ifMatch)`, which refuses with `SYNC_CONFLICT` when the file
+changed since `ifMatch`. The file's format and its encryption are the app's.

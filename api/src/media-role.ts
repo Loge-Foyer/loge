@@ -2,7 +2,9 @@ import type { MediaCapability } from './capabilities';
 import type { PluginContext, PluginTarget } from './context';
 import type { CancelSignal } from './http';
 import type { ConnectionId } from './ids';
+import type { ChannelGroup, ChannelPage, ChannelQuery, GuideQuery, Programme } from './live';
 import type { HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
+import type { PlaybackDescriptor, PlaybackRequest } from './playback';
 import type { ItemPage, ItemQuery } from './query';
 
 /** One connection's values, resolved for the profile it runs for. */
@@ -40,6 +42,12 @@ export interface ConnectedMediaProvider {
   /** Builds an address, so it never waits. `null` when there is nothing to show. */
   resolveImage?(ref: ImageRef, size: ImageSize): ImageSource | null;
   resolveHeaders?(ref: HeadersRef): Promise<Readonly<Record<string, string>> | undefined>;
+  listChannelGroups?(signal?: CancelSignal): Promise<readonly ChannelGroup[]>;
+  /** Pages in the provider's own channel order. */
+  listChannels?(query: ChannelQuery, signal?: CancelSignal): Promise<ChannelPage>;
+  getGuide?(query: GuideQuery, signal?: CancelSignal): Promise<readonly Programme[]>;
+  /** What to play, for the engine the request describes. Its addresses are held in memory only. */
+  getPlaybackDescriptor?(request: PlaybackRequest, signal?: CancelSignal): Promise<PlaybackDescriptor>;
   dispose(): Promise<void>;
 }
 
@@ -56,4 +64,7 @@ export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   libraries: ['getLibraries'],
   watchStateRead: ['getResume'],
   remoteImages: ['resolveImage'],
+  channels: ['listChannelGroups', 'listChannels'],
+  epg: ['getGuide'],
+  playback: ['getPlaybackDescriptor'],
 };

@@ -1,8 +1,12 @@
+import type { AccountManifest, AccountRole } from './account';
+import type { BackupManifest, BackupRole } from './backup';
 import type { CapabilityKey, MediaCapability, SyncCapability } from './capabilities';
+import type { PlatformId, PluginCategory } from './category';
 import type { ContentKind } from './content';
 import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
 import type { MediaRole } from './media-role';
+import type { PlayerManifest, PlayerRole } from './player';
 import type { SyncRole } from './sync';
 
 export type PluginRole = 'media' | 'sync';
@@ -42,12 +46,20 @@ export interface ToggleSetting extends BooleanField {
 export type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting | LibrariesField;
 
 export interface PluginManifest {
+  /** `category/name` once a manifest names its category (`sources/jellyfin`); a bare name before. */
   readonly id: PluginId;
+  /** Which list the plugin is in, and which one block it declares. */
+  readonly category?: PluginCategory;
+  /** Where it runs. A manifest without it runs everywhere. */
+  readonly platforms?: readonly PlatformId[];
   readonly displayName: string;
   /** One sentence for the plugin list. */
   readonly description: string;
   readonly media?: MediaRoleManifest;
   readonly sync?: SyncRoleManifest;
+  readonly player?: PlayerManifest;
+  readonly account?: AccountManifest;
+  readonly backup?: BackupManifest;
   /**
    * What a connection needs: endpoint, account, secrets. Shared by every role,
    * because one connection has one endpoint and one set of credentials.
@@ -67,6 +79,9 @@ export interface Plugin {
   readonly manifest: PluginManifest;
   readonly media?: MediaRole;
   readonly sync?: SyncRole;
+  readonly player?: PlayerRole;
+  readonly account?: AccountRole;
+  readonly backup?: BackupRole;
 }
 
 export function declaredRoles(manifest: PluginManifest): readonly PluginRole[] {

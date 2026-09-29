@@ -6,6 +6,10 @@ export const MEDIA_CAPABILITIES = [
   'playlists',
   'channels',
   'live',
+  // The guide for the channels a source brings.
+  'epg',
+  // Something to play: `getPlaybackDescriptor`.
+  'playback',
   'watchStateRead',
   'watchStateWrite',
   'favoritesRead',

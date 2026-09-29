@@ -227,3 +227,104 @@ describe('isKdfParams', () => {
     }
   });
 });
+
+describe('validateManifest — categories and platforms', () => {
+  const source: PluginManifest = {
+    id: pluginId('sources/fixture'),
+    category: 'sources',
+    platforms: ['ios', 'android', 'web'],
+    displayName: 'Fixture',
+    description: 'A source that exists only in tests.',
+    media: { contentKinds: ['movies'], capabilities: ['browse'] },
+    connectionFields: [
+      { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
+      { key: 'password', label: 'Password', type: 'password' },
+    ],
+    settings: [],
+  };
+  const player: PluginManifest = {
+    id: pluginId('players/fixture'),
+    category: 'players',
+    platforms: ['android'],
+    displayName: 'Fixture player',
+    description: 'A player that exists only in tests.',
+    player: {
+      profiles: {
+        android: { protocols: ['progressive'], containers: ['mp4'], videoCodecs: ['h264'], audioCodecs: ['aac'], subtitleFormats: [] },
+      },
+    },
+    connectionFields: [],
+    settings: [],
+  };
+  const with_ = (base: PluginManifest, overrides: Partial<PluginManifest>) => validateManifest({ ...base, ...overrides });
+
+  it('accepts a plugin in each category with its one block', () => {
+    expect(validateManifest(source)).toEqual([]);
+    expect(validateManifest(player)).toEqual([]);
+    expect(with_(source, { id: pluginId('iptv/fixture'), category: 'iptv' })).toEqual([]);
+    const { media: _media, ...blockless } = source;
+    expect(
+      validateManifest({
+        ...blockless,
+        id: pluginId('sync/fixture'),
+        category: 'sync',
+        account: { ownerProof: { fields: ['password'] }, signUp: { fields: [{ key: 'invite', label: 'Invite', type: 'text' }] } },
+      }),
+    ).toEqual([]);
+    expect(validateManifest({ ...blockless, id: pluginId('sync/drive'), category: 'sync', backup: { location: 'Drive → Streaming Center' } })).toEqual([]);
+  });
+
+  it('needs the id to be the category and a name', () => {
+    expect(with_(source, { id: pluginId('fixture') })).toContain('id "fixture" must be "sources/<kebab-case name>"');
+    expect(with_(source, { id: pluginId('iptv/fixture') })).toContain('id "iptv/fixture" must be "sources/<kebab-case name>"');
+    expect(with_(source, { category: 'widgets' as never })).toContain('category "widgets" is not one of sources, iptv, players, sync');
+  });
+
+  it('allows only the block the category declares, and only one', () => {
+    expect(with_(source, { account: {} })).toEqual(
+      expect.arrayContaining(['a sources plugin cannot declare the account block', 'declares media and account; a plugin declares one block']),
+    );
+    expect(with_(player, { media: { contentKinds: ['movies'], capabilities: [] } })).toContain('a players plugin cannot declare the media block');
+  });
+
+  it('checks the platforms', () => {
+    expect(with_(source, { platforms: [] })).toContain('runs on no platform');
+    expect(with_(source, { platforms: ['ios', 'tvos' as never] })).toContain('platform "tvos" is not one of ios, android, web');
+    expect(with_(source, { platforms: ['ios', 'ios'] })).toContain('platform "ios" is listed twice');
+  });
+
+  it('checks a player profile against where it runs', () => {
+    expect(
+      with_(player, {
+        player: {
+          profiles: {
+            android: { protocols: [], containers: [], videoCodecs: [], audioCodecs: [], subtitleFormats: [] },
+            ios: { protocols: ['hls'], containers: [], videoCodecs: [], audioCodecs: [], subtitleFormats: [] },
+          },
+        },
+      }),
+    ).toEqual(
+      expect.arrayContaining(['player profile for "android" plays no protocol', 'player profile for "ios", which the plugin does not run on']),
+    );
+  });
+
+  it('checks an account block as the sync block was', () => {
+    const { media: _media, ...blockless } = source;
+    const problems = validateManifest({
+      ...blockless,
+      id: pluginId('sync/fixture'),
+      category: 'sync',
+      account: { ownerProof: { fields: ['serverUrl'] }, signUp: { fields: [{ key: 'secret', label: 'Secret', type: 'password' }] } },
+    });
+    expect(problems).toEqual(
+      expect.arrayContaining(['ownerProof field "serverUrl" is not a password connection field', 'sign-up field "secret" cannot be a password field']),
+    );
+  });
+
+  it('needs a backup target to say where it keeps the file', () => {
+    const { media: _media, ...blockless } = source;
+    expect(validateManifest({ ...blockless, id: pluginId('sync/drive'), category: 'sync', backup: { location: ' ' } })).toContain(
+      'backup location is empty',
+    );
+  });
+});
