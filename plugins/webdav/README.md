@@ -2,9 +2,10 @@
 
 Plain files on a NAS. No media server supplies titles or artwork, so this one infers what it can from filenames and is honest about the rest.
 
-## Roles
+## Category
 
-**Media** — exposes content. No sync role.
+**Source** — `sources/webdav`, at `plugins/sources/webdav` once Phase 6
+regroups the folders (today `plugins/webdav`). Its connections belong to the account, and each can be switched off without being removed.
 
 ## Brings
 
@@ -18,11 +19,11 @@ Files.
 
 ## Settings
 
-Connection fields only. Its single role can be switched off per connection without removing the connection.
+Connection fields only.
 
 ## Status
 
-Manifest only. No role is implemented yet, so no capability is declared —
+Manifest only. No media role is implemented yet, so no capability is declared —
 capabilities arrive with the code that honours them.
 
 See `docs/writing-a-plugin/` at the repository root.

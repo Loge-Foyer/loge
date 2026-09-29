@@ -1,10 +1,19 @@
 # Mock
 
-A pretend server with a deterministic catalogue, so the whole app can be built and exercised with no network at all. Carries a sync role too, so syncing can be tested end to end without a real destination.
+A pretend server with a deterministic catalogue, so the whole app can be built
+and exercised with no network at all. Development builds only.
 
-## Roles
+## Category
 
-**Media** — implemented. **Sync** — implemented: a pretend account.
+In Phase 6 this folder becomes three plugins, one per job:
+
+| Plugin | Category | Job |
+| --- | --- | --- |
+| `sources/mock` | source | the catalogue below |
+| `iptv/mock` | IPTV | channels, groups, a guide and a little VOD, for the TV tab (Phase 7) |
+| `sync/mock` | sync | a pretend account on "your own server", and a pretend backup target |
+
+Today it is one plugin with Phase 4's two roles, media and sync.
 
 ## Brings
 
@@ -40,36 +49,34 @@ One field of every type the app renders:
   fails every third call with a retryable error.
 - *Libraries to show*.
 
-It deliberately does **not** declare every capability. A mock that can do
-everything lets broken capability handling go unnoticed. For media it declares
-`browse`, `libraries` and `watchStateRead`, and declines the rest. It has no
-artwork (`remoteImages`), so the app's placeholders get exercised; it declines
-`offlineMetadata` and `search` as well. As an account it carries profiles,
-preferences and connections, and declines the rest — `sealedPasswords` among
-them, so connections reach other devices with only the names of their
-passwords, and the app's way of asking for them stays exercised.
+It deliberately does **not** declare every capability: a mock that can do
+everything lets broken capability handling go unnoticed.
+
+- **As a source,** it declares `browse`, `libraries` and `watchStateRead`, and
+  declines the rest. It has no artwork (`remoteImages`), so the app's
+  placeholders get exercised, and it declines `offlineMetadata` and `search`
+  as well.
 
 ## The pretend account
 
-Choose the mock as the device's account, and it keeps a pretend one in memory:
+Today, Phase 4's: a pretend account in memory, per endpoint, that stores each
+change once, answers the prefix it stored, and returns its log in order.
 
-- **One per endpoint.** Every connection in the running app with the same
-  endpoint shares one; `mock://household` starts with two profiles, Sam (PIN
-  1234) and Robin.
-- **Like a real account.** It stores each change once however often it is
-  sent, answers the prefix it stored, and returns the whole log in its order —
-  the sender's own changes too — fifty at a time.
-- **Forgets on reload**, and then answers an old cursor with `reset`, which is
-  how the app's way back from a lost account gets exercised.
-- *Flaky* stores only half of every third push; *slow* waits 1.5 s on every
-  call. Its owner check always passes, and asks for no proof.
+From Phase 6, `sync/mock` plays at being your own server:
 
-It has no network, so it cannot link two devices: the app's two-device tests
-share one account in memory, and real devices use your own server
-(`custom-server`).
+- **Records, not a log.** Soft deletes, and a profile limit.
+- **One account per endpoint.** Every connection with the same endpoint
+  shares one; `mock://household` starts with two profiles, Sam (PIN 1234) and
+  Robin.
+- **It forgets on reload.** That is how the app's way back from a server that
+  lost its data gets exercised.
+- **A backup target,** in memory, with conditional writes.
+
+It has no network, so it cannot link two devices. The app's two-device tests
+share one fake account in memory, and real devices use your own server.
 
 ## Status
 
-Both roles are implemented.
+Media and Phase 4's sync role are implemented.
 
 See `docs/writing-a-plugin/` at the repository root.

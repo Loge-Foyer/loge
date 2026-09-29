@@ -23,42 +23,46 @@ that would make plugins depend on the app and the dependency graph circular.
 
 So this repository depends on nothing, and everything else points at it. An
 `import` of React, Expo or the app anywhere in `api` breaks the property the
-whole split exists to provide.
+whole split exists to provide. The React half of the player contract has its
+own package, `player-kit`, for exactly that reason.
 
-## One plugin per service
+## One category per plugin
 
-A plugin is defined by the **service** it talks to, not by what it does with it.
-iCloud serves Drive files and can be the device's account — that is one package
-with two roles.
+A plugin does one job — serve media, bring IPTV, play, or keep the account —
+and lives in that job's folder: `plugins/sources`, `plugins/iptv`,
+`plugins/players`, `plugins/sync`. Its id is the path: `sources/jellyfin`.
 
-Do not split a service into `jellyfin` and `jellyfin-sync`. If a service gains a
-role, add it to the existing manifest.
+A service that does two jobs is two plugins. Google Drive's files are
+`sources/google-drive`; Google Drive as a backup place is `sync/google-drive`.
+They share no code.
 
-Media servers (Jellyfin, Emby, Plex) are **media-only**. The server is the
-master of what its users watched. The app reads it and writes progress back
-through the media role, and a device's single sync connection — its account — is
-never a media server.
+Media servers (Jellyfin, Emby, Plex) are **sources only**. The server is the
+master of what its users watched; the app reads it and writes progress back
+through the media role, never through the account.
 
 ## The mistake that costs the most
 
-**Overstating a capability.** The sync engine filters the change journal by what
-you declare it can carry. Claim you handle watch progress when you do not, and
-the engine hands you those changes, you drop them, and the checkpoint advances
-past them. The state is gone, nothing errors, and it surfaces weeks later as "my
-progress disappeared."
+**Overstating a capability.** The app acts on what you declare.
 
-Declare honestly. Carrying less is always better than pretending.
+- Claim `browse` without it working, and every row shows an error for that
+  source.
+- Claim a player plays MKV when it does not, and the user gets a black screen
+  instead of the player that would have worked.
+- Claim an account can hold something it drops, and state disappears with no
+  error, surfacing weeks later as "my settings are gone".
+
+Declare honestly. Doing less is always better than pretending.
 
 ## The mistake that is new
 
-**Branching on declared capabilities instead of effective ones.** A plugin
-declares what it *can* do; the user decides per connection what it *may* do.
-Effective = declared ∩ enabled, and that is what the app must read.
+**Putting a second job into a plugin.** It is tempting to give the Google
+Drive source an `account` block "because it is the same sign-in". Don't. The
+categories keep the lists in Settings honest, and keep the property that
+adding a source never changes where your account lives.
 
-A new connection's sync role is **off**, and only choosing it as the device's
-account switches it on. Connecting Google Drive for its files must never
-silently make it the place your profiles go. That independence is the reason
-merging the packages was safe in the first place.
+The second new one: **forgetting `platforms`.** A plugin that cannot run in a
+browser — iCloud's container, a portal without CORS — must not say `web`, or
+the app offers something that can only fail.
 
 ## The third mistake
 
@@ -69,31 +73,40 @@ its quirks. Map inside the package, always.
 ## Order of work
 
 `api` first — nothing else can be built correctly until the vocabulary exists.
-The manifest, the media contract and the sync contract are written. `mock` implements the media role so the app works offline,
-and deliberately declines some capabilities so the app's capability handling
-stays genuinely tested. Jellyfin is the first real media source.
+The manifest, the media contract, the player contract, the account role and the
+backup role are written. `mock` implements the media role so the app works
+offline, and deliberately declines some capabilities, so the app's capability
+handling stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
-- **`api`:** the manifest vocabulary, per-profile values, the media contract,
-  the sync contract — with sealed passwords, owner proofs and sign-up — errors,
-  the HTTP port and the host's crypto port.
+Phase 5 — the new architecture, written down. The code keeps its Phase 4
+layout — `plugins/<id>/`, roles — until Phase 6 regroups it.
+
+- **`api`:** holds these, with its tests:
+  - the manifest vocabulary, with categories, platforms, qualified ids, and
+    the player, account and backup blocks
+  - per-profile values, the media contract with live TV and playback members
+  - the player contract, the account role (records), the backup role
+  - errors, the HTTP port and the host's crypto port
+  - Phase 4's roles and log-based sync role, still here until Phase 6
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
-- **Mock:** implements the media role with a fixed catalogue, and the sync role
-  as a pretend account in memory. It declines sealing on purpose.
-- **Custom server:** implements the sync role against `streaming_center_sync` —
-  sealed passwords, the owner proof, creating an account with an invite — and
-  never signs itself back in after a 401.
+- **Mock:** implements the media role with a fixed catalogue, and Phase 4's
+  sync role as a pretend account.
+- **Custom server:** implements Phase 4's sync role against the Phase 4 server.
+  Phase 6 moves it to PocketBase.
 - **Every other plugin:** a manifest.
-- **`npm run typecheck`:** two programs — api and the plugins with no host
-  types at all, and the tests with Node's.
+- **`npm run typecheck`:** two programs — `api` and the plugins with no host
+  types at all, and the tests with Node's. Players get a third, with React
+  Native's types, when the first one arrives.
 - **`npm test`:** runs everything.
-  - the api rules, bytes as text, and the sync wire
+  - the api rules, bytes as text, the sync wire, and the new contracts:
+    categories, account records against their shared fixtures, choosing a
+    player
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
   - the mock, as a source and as an account
-  - the custom server against a fake of the server's routes: keys, sessions,
-    refusals, the log, the owner check, creating an account
+  - the custom server against a fake of its routes
   - the conformance check that each declared capability is implemented
 
 ## Git

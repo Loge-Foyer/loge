@@ -5,11 +5,16 @@ library and what each server user has watched. Jellyfin stays the master of that
 watch status: the app keeps a cache, and — once playback exists — sends progress
 back to it.
 
-## Roles
+## Category
 
-**Media.** No sync role: the device's one account (iCloud, Google, your own sync
-server) is where the app keeps its own state, and a Jellyfin server has no place
-for profiles or preferences anyway.
+**Source** — `sources/jellyfin`, at `plugins/sources/jellyfin` once Phase 6
+regroups the folders (today `plugins/jellyfin`). It runs everywhere: iOS,
+Android and the web, since Jellyfin answers a browser's CORS request.
+
+A source and nothing else: Jellyfin masters what its users watched, and that
+never goes through the account. Your account — local, or on your own server —
+keeps the profiles and preferences; a Jellyfin server has no place for them
+anyway. Its connections belong to the account, so every device on it has them.
 
 ## Brings
 
@@ -58,6 +63,8 @@ Worth knowing:
 ## Status
 
 The media role is implemented and tested against recorded 12.x payloads.
-Writing progress back (`watchStateWrite`) arrives with playback.
+Playback arrives in Phase 7: `getPlaybackDescriptor`, asking the server for
+what the chosen player can play, and writing progress back
+(`watchStateWrite`).
 
 See `docs/writing-a-plugin/` at the repository root.

@@ -2,11 +2,10 @@
 
 Plex Media Server. Its own account and authentication model, which stays entirely inside this plugin.
 
-## Roles
+## Category
 
-**Media.** No sync role: the server stays the master of what each
-of its users watched. The app will read that and, with playback, write progress
-back through the media role — never through a sync role.
+**Source** — `sources/plex`, at `plugins/sources/plex` once Phase 6
+regroups the folders (today `plugins/plex`). The server stays the master of what each of its users watched. The app will read that and, with playback, write progress back through the media role — never through the account.
 
 ## Brings
 
@@ -23,7 +22,7 @@ None yet.
 
 ## Status
 
-Manifest only. No role is implemented yet, so no capability is declared —
+Manifest only. No media role is implemented yet, so no capability is declared —
 capabilities arrive with the code that honours them.
 
 See `docs/writing-a-plugin/` at the repository root.

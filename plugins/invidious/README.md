@@ -2,9 +2,10 @@
 
 A privacy-respecting YouTube front end. Instance-based, so the connection form collects an instance URL rather than an account.
 
-## Roles
+## Category
 
-**Media** — exposes content. No sync role.
+**Source** — `sources/invidious`, at `plugins/sources/invidious` once Phase 6
+regroups the folders (today `plugins/invidious`). Its connections belong to the account, and each can be switched off without being removed.
 
 ## Brings
 
@@ -16,11 +17,11 @@ Videos.
 
 ## Settings
 
-Connection fields only. Its single role can be switched off per connection without removing the connection.
+Connection fields only.
 
 ## Status
 
-Manifest only. No role is implemented yet, so no capability is declared —
+Manifest only. No media role is implemented yet, so no capability is declared —
 capabilities arrive with the code that honours them.
 
 See `docs/writing-a-plugin/` at the repository root.

@@ -3,29 +3,35 @@
 Two levels, and the difference matters.
 
 **Declared** capabilities are static, in the manifest: what a plugin *can* do.
-**Effective** capabilities are per connection: what the user has allowed it to
-do. The app branches on effective, always — branching on declared would call
-features the user switched off.
+**Effective** capabilities are per connection and per profile: what the user
+has allowed it to do. The app branches on effective, always — branching on
+declared would call features the user switched off.
 
 ## The rule
 
-`effectiveRoles(manifest, { roles, settings })` computes it, so the app and
-anything else agree on one definition:
+`effectiveCapabilities(manifest, { enabled, settings })` computes it, so the
+app and anything else agree on one definition:
 
-- A **role** is in effect when the plugin declares it **and** the connection
-  has it switched on. A role missing from the connection counts as off, so a
-  role a plugin gains later never appears enabled on an existing connection.
+- A connection that is **switched off** (`enabled: false`) has nothing in
+  effect.
 - A declared **capability** is in effect when every toggle that gates it is on
   — the stored value, or the toggle's default when nothing is stored.
-- A capability no toggle gates simply follows its role.
+- A capability no toggle gates is in effect whenever its connection is.
 - `settings` are the ones the connection runs with **for a profile**
   (`resolveValues`). A connection that keeps every setting per profile can
   cache metadata for one profile and not another.
 
-The result always has both keys: `{ media, sync }`, each `null` when that role
-is not in effect.
+Until Phase 6, the same rule runs as `effectiveRoles` over Phase 4's role
+switches.
 
-## The media capabilities
+Players and sync plugins have no capabilities of this kind.
+
+- **A player's** manifest says what its engine plays instead: its
+  `PlayerProfile` per platform.
+- **An account or backup target** has a fixed set of members: every one listed
+  in `ACCOUNT_MEMBERS` or `BACKUP_MEMBERS` must exist.
+
+## The media capabilities — sources and IPTV
 
 | Capability | Means | Provider members |
 | --- | --- | --- |
@@ -33,30 +39,15 @@ is not in effect.
 | `libraries` | It has libraries the user can choose between | `getLibraries` |
 | `watchStateRead` | Items carry what the user watched there; there is a resume list | `getResume` |
 | `remoteImages` | Items carry artwork | `resolveImage`, `resolveHeaders` |
+| `channels` | It brings live channels, in groups | `listChannelGroups`, `listChannels` |
+| `epg` | It has a guide for those channels | `getGuide` |
+| `playback` | It can say what to play for an item | `getPlaybackDescriptor` |
 | `offlineMetadata` | Items keep stable ids and tag-versioned artwork, so the app may keep them on the device | none — a permission, not a call |
-| `search`, `collections`, `playlists`, `channels`, `live`, `watchStateWrite`, `favoritesRead`, `favoritesWrite` | Named now, promised by nobody yet | arrive with their first implementation |
+| `watchStateWrite` | It takes progress and played state back | arrive with playback (Phase 7) |
+| `search`, `collections`, `playlists`, `favoritesRead`, `favoritesWrite` | Named now, promised by nobody yet | arrive with their first implementation |
 
-`MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code.
-
-## The sync capabilities
-
-A sync capability says what an account can hold. The app hands an account only
-the kinds it carries, and a kind needs every capability it depends on
-(`SYNC_ENTITY_CAPABILITIES` in `api`):
-
-| What travels | Needs |
-| --- | --- |
-| a profile, and its PIN | `profile` |
-| a profile's preferences | `profile`, `preferences` |
-| a connection | `providerConnections` |
-| a profile's values on a connection | `providerConnections`, `profile` |
-| their passwords, sealed by the app | `sealedPasswords` (which needs `providerConnections`), and the member `vaultKey` |
-| `watchProgress`, `favorites`, `watchlist`, `history`, `customLists`, `fullBackup` | named, and carried by nothing in the app yet |
-
-A capability kept per profile needs `profile`; `validateManifest` checks it.
-Signing in to an account is the opt-in, so a sync capability needs no toggle. A
-plugin may offer one anyway — to keep history back, say — and it may default
-on.
+`MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code. The capability
+`live` goes in Phase 6, in favour of the `live` content kind.
 
 ## Declare honestly
 
@@ -64,18 +55,22 @@ Capabilities are not documentation.
 
 - **Media:** declaring `browse` means the app calls `listItems`. If that
   throws, every row shows an error for that source.
-- **Sync:** the sync engine filters the change journal by what you declare.
-  Claim support you lack and it hands you changes you drop *and advances the
-  checkpoint past them* — silent data loss.
+- **Players:** a profile that claims MKV sends the user to a black screen
+  instead of the player that would have played it.
+- **Accounts:** a server that stores half a batch and answers "stored" loses
+  the rest, silently.
 
 So a capability is declared in the same change that implements it. The
-conformance test (`test/manifests.test.ts`) connects every plugin that has a
-media role, with a fake context, and checks that each declared capability's
-members exist. A plugin with no implementation must declare no media
-capability, and a plugin declaring sync capabilities must have a sync role
-whose connected provider has `pull`, `push`, `getStatus` and `dispose`
-(`SYNC_PROVIDER_MEMBERS`), plus what each capability promises
-(`SYNC_CAPABILITY_MEMBERS`: `sealedPasswords` needs `vaultKey`). An
-`ownerProof` needs `verifyOwner`, and `signUp` needs `createAccount`. `mock`
-declares a deliberately partial set — it keeps passwords off — so the app's
-capability handling is exercised rather than assumed.
+conformance test (`test/manifests.test.ts`) does three things:
+
+- **It connects every plugin that has a media role**, with a fake context, and
+  checks that each declared capability's members exist.
+- **Without an implementation, nothing may be declared.** A plugin with no
+  media role declares no media capability.
+- **Every block has its role:** a `player` block needs `plugin.player`, an
+  `account` block needs every `ACCOUNT_MEMBERS` member, and a `backup` block
+  every `BACKUP_MEMBERS` one. An `ownerProof` needs `verifyOwner`, and a
+  `signUp` needs `createAccount`.
+
+`mock` declares a deliberately partial set, so the app's capability handling
+is exercised rather than assumed.

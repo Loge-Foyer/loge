@@ -1,28 +1,29 @@
-# Google
+# Google Drive
 
-The Android counterpart to iCloud. Reads video files from Drive as a media source, and carries the same broad set of user state as a sync target.
+Google's storage. It does two jobs for the app, so in Phase 6 this folder
+becomes two plugins:
 
-## Roles
+| Plugin | Category | Job | Platforms |
+| --- | --- | --- | --- |
+| `sources/google-drive` | source | video files from Drive, on the Videos tab | iOS, Android, web |
+| `sync/google-drive` | sync | a place for the account's encrypted backup file, in a visible "Streaming Center" folder, saved after changes and opened on another device | iOS, Android, web |
 
-**Media** — exposes content. **Sync** — carries your user state.
+They sign in separately — each asks Google only for what its job needs — and
+adding one never switches on the other.
 
 ## Brings
 
-Files — video files on Google Drive.
+Files — video files on Google Drive (`sources/google-drive`).
 
 ## Connection
 
-No fields yet: signing in is an OAuth flow that arrives with the implementation.
-
-## Settings
-
-Its sync role stays off until you choose it as your account in Settings → Account. Connecting it for media does nothing to your profiles or your viewing state.
-
-Both roles are independent.
+No fields: signing in is an OAuth flow (PKCE), with a client id per platform,
+which arrives with the implementation. Tokens go to the credential store.
 
 ## Status
 
-Manifest only. No role is implemented yet, so no capability is declared —
-capabilities arrive with the code that honours them.
+Manifest only, and still Phase 4's single `google` plugin with two empty
+roles. No role is implemented, so no capability is declared. The backup target
+is planned for after the players (Phase 9's list).
 
 See `docs/writing-a-plugin/` at the repository root.

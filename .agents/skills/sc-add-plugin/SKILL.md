@@ -1,42 +1,55 @@
 ---
 name: sc-add-plugin
-description: Create a new Streaming Center plugin — a media source, a sync target, or both — with a manifest, roles, capabilities and settings. Use when adding support for a new service like Jellyfin, Plex, iCloud or a sync backend.
+description: Create a new Streaming Center plugin in its category folder — a source, an IPTV provider, a player, or a sync plugin (your own server, or a backup target) — with a manifest, its one block, capabilities and settings. Use when adding support for a new service or engine like Plex, a Stalker portal, mpv or OneDrive.
 ---
 
 # Adding a plugin
 
-Read `docs/writing-a-plugin/` and `../.claude/streaming-center-architecture.md`
-section 7 first. This is the working checklist.
+Read `docs/categories/`, `docs/writing-a-plugin/` and
+`../.claude/streaming-center-architecture.md` section 7 first. This is the
+working checklist.
+
+**Transitional:** until Phase 6 regroups the folders, existing plugins sit at
+`plugins/<id>/` with Phase 4's roles. A plugin added before then still goes
+where the others are, with the category and platforms declared, so it moves
+with them.
 
 ## The test of success
 
-One new folder under `plugins/`, and one line registering it in the app. If you
-find yourself editing the app's screens, services or database schema, the
-abstraction in `api` is wrong — fix that instead of working around it.
+One new folder under `plugins/<category>/`, and one line registering it in the
+app. If you find yourself editing the app's screens, services or database
+schema, the abstraction in `api` is wrong — fix that instead of working around
+it.
 
-## One plugin per service, not per job
+## One job per plugin
 
-A plugin is defined by **the service it talks to**, not by what it does with it.
+First decide the category (`sc-plugin-categories` if in doubt):
 
-iCloud serves Drive files *and* can be the device's account. That is one package
-declaring two roles — not `icloud` plus `icloud-sync`. Same for Google.
+| It… | Category | Block |
+| --- | --- | --- |
+| brings films, series, anime, videos or files | `sources` | `media` |
+| brings live TV, and maybe a provider's films and series | `iptv` | `media`, with `live` |
+| plays | `players` | `player` |
+| keeps the account, or its backup | `sync` | `account` or `backup` |
 
-A **media server** (Jellyfin, Emby, Plex) is media-only: it is the master of what
-its users watched, and the app reads and writes that through the *media* role.
-Never give one a sync role.
-
-If the service you are adding already has a folder, you are adding a **role**,
-not a plugin. Use the `sc-plugin-roles` skill instead.
+A service with two jobs is **two plugins**: `sources/google-drive` and
+`sync/google-drive`, each with its own sign-in. A **media server** (Jellyfin,
+Emby, Plex) is a source and nothing else — it masters its users' watch status
+through the media role.
 
 ## Checklist
 
-1. **Create `plugins/<id>/`** with `package.json` (`@sc/plugin-<id>`,
-   `"exports": "./src/index.ts"`, `@sc/api` as its only **peer** dependency —
-   the host supplies the one instance, so branded IDs match), `src/index.ts`
-   and a `README.md` stating its roles and what it brings.
+1. **Create `plugins/<category>/<name>/`** with:
+   - a `package.json`: `@sc/<source|iptv|player|sync>-<name>`,
+     `"exports": "./src/index.ts"`, and `@sc/api` as a **peer** dependency, so
+     the host supplies the one instance and branded IDs match. A player adds
+     `@sc/player-kit`, `react`, `react-native` and its engine as peers.
+   - `src/index.ts`
+   - a `README.md` stating its category, what it brings or does, where it
+     runs, and its status
 
-2. **Write the manifest** and export it as `plugin`. Declare only the roles the
-   service actually has:
+2. **Write the manifest** and export it as `plugin`. Declare the category's
+   **one** block, and where it really runs:
 
    ```ts
    import { pluginId, type Plugin } from '@sc/api';
@@ -45,7 +58,9 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 
    export const plugin: Plugin = {
      manifest: {
-       id: pluginId('<id>'),
+       id: pluginId('sources/<name>'),
+       category: 'sources',
+       platforms: ['ios', 'android', 'web'],
        displayName: '…',
        description: 'One sentence for the plugin list.',
        media: { contentKinds: ['movies', 'shows'], capabilities: ['browse'] },
@@ -61,43 +76,37 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    };
    ```
 
-   `createProvider(target, context)` returns a `ConnectedMediaProvider`. It
-   reaches the host only through `context`:
+   - **A player** declares `player: { profiles: { ios: {…}, android: {…} } }`
+     and exports `player: { create }` plus a `PlayerView`.
+   - **An account** declares `account: { ownerProof?, signUp? }` and exports
+     `account: { connect }`.
+   - **A backup target** declares `backup: { location }` and exports
+     `backup: { connect }`.
 
-   - `http` for requests
-   - `session` for a token
-   - `credentials` for passwords
-   - `network`, `client` and `clock`
-
-   `api/` and `plugins/` have no host globals: the compiler refuses `fetch`,
-   `URL`, `console` and timers.
-
-   A role you do not declare is absent, and the app never asks for it.
-   `contentKinds` is what the source brings — `movies`, `shows`, `anime`,
-   `videos`, `files`; the app decides where each appears. `connectionFields`
-   are shared by every role (one connection, one endpoint, one set of
-   credentials), and the Settings screen renders them — never hard-code a form
-   in the app.
+   The provider reaches the host only through `context`: `http` for requests,
+   `session` for a token, `credentials` for passwords, and `network`,
+   `client`, `clock` and `crypto`. `api/` and every non-player plugin have no
+   host globals: the compiler refuses `fetch`, `URL`, `console` and timers.
 
 3. **Declare capabilities honestly.** They are not documentation — application
-   code branches on them. Listing `search` while `search()` throws turns every
-   query into a `sourceError`; leaving it out means the method is never called.
-   Declare a capability in the same change that implements it. The conformance
-   test fails a declared capability whose members
-   (`MEDIA_CAPABILITY_MEMBERS`) are missing.
+   code branches on them.
+   - Listing `search` while `search()` throws turns every query into a
+     `sourceError`; leaving it out means the method is never called.
+   - Declare a capability in the same change that implements it.
+   - The conformance test fails a declared capability whose members
+     (`MEDIA_CAPABILITY_MEMBERS`) are missing, and a block without its role.
 
-   Also, for media:
-
+   Also, for a source or IPTV plugin:
    - Order `listItems` pages exactly by `compareItems(query.sort)`.
    - Sign in once for concurrent callers.
    - Never retry a refused login.
+   - Keep playback addresses in memory only.
 
-4. **Leave the sync role to the account.** A new connection starts with its
-   sync role off; only choosing it as the device's account switches it on.
-   Connecting a server for media must never make it the place profiles go —
-   that independence is the only reason merging media and sync into one
-   package was safe. A sync capability needs no toggle (signing in is the
-   opt-in), so declare exactly what the account can hold.
+4. **Say where it runs.** `platforms` is honest.
+   - A plugin that needs iCloud's container is `['ios']`.
+   - A portal without CORS headers, or one that needs a `Cookie` header, is not
+     `web`.
+   - A player's profiles name only platforms in `platforms`.
 
 5. **Map at the boundary.** Remote payloads become domain types *inside* this
    package. No external type may appear in a return value. Adapter-only data
@@ -105,9 +114,12 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
 
 6. **Route secrets through the injected credential store.** A secret is a
    `password` connection field; the app stores it behind an opaque
-   `credentialsRef`. `settings` is a plain database column and cannot hold a
-   `password` field at all. Artwork needing auth carries a `headersRef`, never
-   an inline header.
+   `credentialsRef`. A MAC address or device id a portal signs in with is a
+   `credential` text field.
+   - `settings` is a plain database column and cannot hold a `password` field
+     at all.
+   - Artwork or a stream needing auth carries a `headersRef`, never an inline
+     header.
 
 7. **Normalize errors** to `AppError` with a known code and a retry hint
    (`backoff`, `network-change`, `never`). A raw HTTP or transport error reaching
@@ -118,55 +130,62 @@ not a plugin. Use the `sc-plugin-roles` skill instead.
    payloads in `test/fixtures/`.
 
 9. **Register it** in the app's composition root —
-   `streaming_center_app/src/composition/plugins.ts`, one line.
+   `streaming_center_app/src/composition/plugins.ts`, one line — and add the
+   `file:` dependency by its folder path.
 
-## If it has a sync role
+## If it is your own server's account role
 
 ```ts
-import { syncCursor, type SyncRole } from '@sc/api';
+import type { AccountRole } from '@sc/api';
 
-export const sync: SyncRole = {
+export const account: AccountRole = {
   connect: async (target, context) => ({
     connectionId: target.connectionId,
-    getStatus: async () => ({ accountName: '…' }),          // reach the account, sign in once
-    pull: async (cursor) => ({ kind: 'changes', changes: [], cursor: syncCursor('…'), more: false }),
-    push: async (changes) => ({ accepted: [] }),            // a prefix, each durably stored
+    info: async () => ({ serverVersion: '…', maxProfiles: 10, signUp: 'invite' }), // no sign-in
+    status: async () => ({ accountId: '…', accountName: '…' }),                    // sign in, once
+    pull: async () => ({ records: [] }),                                           // every record
+    push: async (records) => ({ kind: 'stored' }),                                 // all or nothing
     dispose: async () => {},
   }),
 };
 ```
 
-- **`push` must be idempotent.** It may see the same change twice after a crash
-  or a rejected batch. Store it once, keyed by its id, and return the IDs you
-  **accepted**; the engine advances its checkpoint only across the accepted
-  prefix and retries the rest verbatim. End the prefix at the first change
-  `isSyncChange()` refuses.
-- **`pull` must be resumable and complete.** Return an opaque cursor, and the
-  whole log in your order — the caller's own changes included. Answer `reset`
-  when you lost data, `expired` when a cursor was compacted away.
-- **Never resolve conflicts.** The app resolves them from your log's order.
-- **Never overstate what you can carry.** The engine filters the change journal
-  by your declared capabilities. Claim support you lack and it hands you changes
-  you drop *and advances the checkpoint past them* — silent data loss.
-- **A password travels only as the app sealed it.** To carry connections'
-  passwords, declare `sealedPasswords` and implement `vaultKey()`: the key,
-  derived on the device through `context.crypto`, that the app seals with. You
-  never see another connection's password, and the key never reaches the
-  server.
-- **A `verifyOwner` you offer must really verify the account's owner**: Forgot
-  PIN trusts it. If it takes a password, name the fields in `sync.ownerProof`;
-  it receives them typed again, never the saved ones.
-- **A 401 ends the session.** Do not sign in again with the saved password by
-  yourself; the user signs in again. A refused sign-in is never retried.
-- **Creating an account from the app** is `createAccount(fields)` with the
-  extra fields in `sync.signUp`, and **`signOut()`** ends this device's session
-  where the account can. Both are optional.
+- **`pull` is complete.** Every record of the account, deleted ones included.
+  A record left out reads as lost.
+- **`push` is all or nothing.** Store the batch in one transaction, or none of
+  it, and name the write that stopped it: `limit`, `deleted` or `invalid`.
+- **Deletes are soft**, and a deleted profile or connection stays deleted.
+- **Passwords travel in `secrets`**, in plain text, to your own server. A name
+  listed without a value keeps the stored one.
+- **Never resolve conflicts.** The app does.
+- **A session that ends gets one sign-in** with the saved password. A refusal
+  is latched until the user acts; a throttled one is `backoff` with
+  `too-many-attempts`.
+- **`verifyOwner(proof)`** checks the `ownerProof` fields, typed again —
+  never the saved ones. **`createAccount(fields, { firstProfile })`** takes
+  the `signUp` fields, tried once.
+
+## If it is a backup target
+
+`stat`, `read`, `list`, and `write(name, bytes, ifMatch)`, which refuses with
+`SYNC_CONFLICT` when the file changed since that etag. Bytes only: the file's
+format and encryption are the app's.
+
+## If it is a player
+
+- **A `MediaPlayer`:** framework-free, reporting `PlayerEvent`s.
+- **A `PlayerView`**, from `@sc/player-kit`, that draws it.
+- **A profile per platform** that states only what the engine really plays.
+- **Native code,** if any: an Expo module in the package's own folder,
+  compiled into the app's development build.
 
 ## Boundaries lint will not catch yet
 
-- A plugin may import `@sc/api` and nothing else from this project.
-- No framework imports — not React, not Expo.
-- **Plugins never import each other.** If two need the same HTTP client, that
+- A non-player plugin may import `@sc/api` and nothing else from this project,
+  and no framework — not React, not Expo.
+- A player may add `@sc/player-kit`, React, React Native and its engine, and
+  nothing from another plugin.
+- **Plugins never import each other.** If two need the same client, that
   client becomes its own package.
 
 ## Verify
@@ -179,10 +198,19 @@ npm test
 
 ## Current state
 
-`api` holds the manifest vocabulary, the media contract (`MediaRole`,
-`MediaItem`, `AppError`, `HttpClient`), the sync contract (`SyncRole`,
-`SyncChange`, `isSyncChange`, sealed passwords, owner proofs, sign-up) and the
-host's crypto port (`PluginCrypto`, `isKdfParams`). `plugins/jellyfin` is the
-reference implementation of a media role, `plugins/mock/src/sync.ts` a minimal
-sync role, and `plugins/custom-server` a real account — keys, sealing, the
-owner proof and the session rules; read them before writing another.
+**`api` holds the target vocabulary:**
+
+- categories, platforms and qualified ids
+- the media contract, with live TV and playback members
+- the player contract and `choosePlayer`
+- the account role (`AccountRecord`, `isAccountRecord`, with fixtures shared
+  with the server)
+- the backup role
+
+Phase 4's roles and log-based sync role stay until Phase 6.
+
+**Read these before writing another:**
+
+- `plugins/jellyfin` — the reference implementation of a media role
+- `plugins/mock` — a partial one, on purpose
+- `plugins/custom-server` — Phase 4's account

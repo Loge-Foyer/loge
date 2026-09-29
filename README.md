@@ -7,38 +7,44 @@ Everything the app plugs into, and the language they speak.
 ## The idea
 
 The app itself does not know how to talk to a Jellyfin server. It does not know
-what a Plex library looks like, or how Invidious paginates, or how iCloud stores
-things. That is deliberate, and it is the whole point of this repository.
+what a Plex library looks like, how a Stalker portal hands out a channel, how
+to decode an MKV file, or where iCloud keeps a file. That is deliberate, and it
+is the whole point of this repository.
 
 Each of those is a **plugin**: a self-contained folder that knows one service
-inside out and translates it into the app's own vocabulary. The app only ever
-sees the translation.
+or one engine inside out and translates it into the app's own vocabulary. The
+app only ever sees the translation.
 
 The payoff is that adding a new service should be one new folder here plus one
 line registering it — not a redesign of the home screen. If it ever costs more
 than that, something shared is wrong, and that is what should be fixed.
 
-## One plugin per service, not per job
+## Four kinds of plugin
 
-A service can do two different things for you. iCloud can *hold your files*,
-and it can *carry your profiles and settings* between your devices. Those are
-genuinely different jobs, but they are the same account.
+Every plugin does one job, and lives in the folder for that job:
 
-So there is one iCloud plugin, and it does both. Which of them it actually does
-is up to you.
+| Folder | What its plugins do | Travels with | Examples |
+| --- | --- | --- | --- |
+| `plugins/sources/` | bring your films, series, videos and files | the account | Jellyfin, Plex, Emby, WebDAV, iCloud Drive, Google Drive, OneDrive, Yattee, Invidious |
+| `plugins/iptv/` | bring live TV — and a provider's films and series | the account | M3U playlists, Stalker portals, Xtream Codes |
+| `plugins/players/` | play it | the device | the phone's or browser's own player, KSPlayer, mpv, VLC |
+| `plugins/sync/` | keep the account somewhere | the device | your own server; a backup in iCloud, Google Drive or OneDrive |
 
-| Plugin | Can serve media | Brings | Can be your account |
-| --- | :---: | --- | :---: |
-| Jellyfin, Emby, Plex | ✓ | movies, shows | — |
-| iCloud, Google | ✓ | files on Drive | ✓ |
-| WebDAV | ✓ | files | — |
-| Yattee, Invidious | ✓ | videos | — |
-| Your own sync server | — | — | ✓ |
-| Mock, for development | ✓ | everything | ✓ |
+The app's Settings has the same four lists, and shows only the plugins that
+work on the device in your hand: iCloud on an iPhone, not in a browser.
 
-What a plugin brings — movies, shows, anime, videos or files — is part of its
-manifest. The app uses it to decide where things appear: films and series on
-the Media tab, web video and plain files on the Videos tab.
+A service that does two jobs is two plugins. Google Drive can hold your films
+*and* keep your backup. So there is `sources/google-drive`, and there is
+`sync/google-drive`, and adding one never switches on the other.
+
+## Account-wide or device-wide
+
+Sources and IPTV belong to the account. Add Jellyfin once and every device on
+the account has it — for every profile, or with each profile's own sign-in.
+
+Players and sync belong to each device. Your phone may play MKV files with mpv
+while the browser uses its own player; one device may keep its backups in
+iCloud and another nowhere.
 
 ## Where your viewing history lives
 
@@ -47,63 +53,69 @@ from Jellyfin, Emby or Plex, **the server stays the master**: the app reads it
 from there and keeps a cache, and — once it can play — reports your progress
 back. The Jellyfin web client and the app always agree.
 
-Everything else the app knows goes to **one account per device**: your profiles,
-their preferences, the home screen layout, and history for things no server
-tracks, such as plain files. That account is iCloud, Google or your own sync
-server — or none at all, and then it all stays on the device.
+Everything else the app knows — your profiles, their preferences, your sources
+— belongs to **the account**: on the device alone, or on your own server,
+which keeps it in step between devices.
 
-```
-Jellyfin        films ✓    history: kept by the server
-iCloud          account    profiles, preferences, the rest
-```
+## Plugins say what they can do
 
-## Not every account can hold everything
+A plugin states plainly what it can do, and the app asks it for exactly that.
+Nothing is silently dropped, and no plugin is asked to pretend.
 
-A plugin states plainly what it can carry, and the app sends it only that.
-Nothing is silently dropped, and no destination is asked to pretend.
-
-This is the part that matters most to get right. A plugin that claims it can
-hold something and then quietly discards it causes the worst kind of bug — your
-progress vanishes, and nothing reports an error.
+This is the part that matters most to get right. A plugin that claims it can do
+something and then quietly doesn't causes the worst kind of bug — a row that
+never fills, a setting that does nothing, and nothing reports an error.
 
 ## `api`
 
-The shared vocabulary. What a film is, what a profile is, what watch progress
-means, and the contracts every plugin implements.
+The shared vocabulary. What a film is, what a profile is, what a channel is,
+what watch progress means, and the contracts every plugin implements.
 
 It depends on nothing at all — not React, not Expo, not the app. That is what
-lets the app and eleven plugins agree without any of them knowing about each
-other. A plugin cannot even reach the network by itself: the app hands it an
-HTTP client, a place for its session token, a view of the network and its
+lets the app and a few dozen plugins agree without any of them knowing about
+each other. A plugin cannot even reach the network by itself: the app hands it
+an HTTP client, a place for its session token, a view of the network and its
 cryptography, which keeps secrets and logging in one place.
+
+Players are the exception that proves the rule. They have to draw video, so
+they may use React, React Native and native code. The React half of their
+contract lives in `player-kit`, next to `api`, so `api` itself stays free of
+it.
 
 ## Current state
 
-**Jellyfin is real.** It signs in and lists films and series in any order.
-Libraries can be limited to some, or all but some. It pages across them, opens
-detail pages with cast and studios, lists seasons and episodes, knows what each
-user watched, and builds artwork addresses. It is tested against recorded
-server answers, and has been run against a real Jellyfin 12 server.
+**Phase 5 — the new layout, written down.** The documents describe the four
+folders; the code still has its Phase 4 layout, one folder per plugin under
+`plugins/`, until Phase 6 moves it.
 
-The **mock** has a fixed catalogue behind the same contract, so the app works
-fully offline. Every other plugin still describes itself with a manifest and
-declares nothing it cannot do yet.
+What is real today:
 
-The contract for an account is written too: what travels — profiles, their
-PINs, preferences and connections — and how a change reaches every device
-exactly once, in one order. A connection's passwords travel only sealed on the
-device, with a key the account never has, and only to an account that says it
-can carry them. The mock can be an account: a pretend one, kept in memory, and
-it keeps passwords off on purpose.
+- **Jellyfin** signs in and lists films and series in any order.
+  - Libraries can be limited to some, or all but some, and it pages across
+    them.
+  - It opens detail pages with cast and studios, lists seasons and episodes,
+    knows what each user watched, and builds artwork addresses.
+  - It is tested against recorded server answers, and has been run against a
+    real Jellyfin 12 server.
+- **The mock** has a fixed catalogue behind the same contract, so the app works
+  fully offline. It can also play at being an account.
+- **Your own server** (`custom-server`) is a working account, against the
+  Phase 4 sync server.
+- **Every other plugin** still describes itself with a manifest, and declares
+  nothing it cannot do yet.
 
-Each plugin says what it needs to connect — a server address, a username, a
-password — and the app builds its settings screen from exactly that, including
-which fields each profile may keep for itself.
+The contracts for the new plugins are written too:
+
+- categories and platforms
+- what to play, and the player that plays it
+- live TV
+- the account on your own server, record by record
+- a place to keep a backup
 
 ## Documentation
 
-`docs/` covers the API, writing a plugin, the two roles, the capability model,
-settings, testing and publishing.
+`docs/` covers the API, the four categories, writing a plugin, the capability
+model, settings, testing and publishing.
 
 The full architecture is in
 [`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).

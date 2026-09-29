@@ -5,8 +5,9 @@ both from the manifest. Nothing about a plugin is hard-coded in the app.
 
 ## Connection fields
 
-What a connection needs — a server address, an account, a token. Shared by
-every role of the plugin.
+What a connection needs — a server address, an account, a MAC address, a
+token. One list per plugin: one connection has one endpoint and one set of
+credentials.
 
 | `type` | Rendered as | Notes |
 | --- | --- | --- |
@@ -45,10 +46,9 @@ A boolean setting may **gate** capabilities:
 }
 ```
 
-- A toggle gates capabilities of one role only.
-- A sync capability needs no toggle. Signing in to an account is the opt-in,
-  and the account carries what it declares. A plugin may offer one anyway, and
-  it may default on.
+- A toggle gates media capabilities (`media.…`): the ones its plugin's block
+  declares.
+- A capability no toggle gates is in effect whenever the connection is on.
 
 ### `libraries`
 
@@ -70,7 +70,8 @@ The plugin applies the selection itself in `listItems` and `getResume`;
 
 ## Per profile
 
-Every connection belongs to the device. Its `perProfile` mode says what each
+A source's or an IPTV plugin's connections belong to the account, so every
+device on it has them. Each one's `perProfile` mode says what each
 profile keeps for itself, and the form shows profile tabs above the first field
 that differs per profile:
 
@@ -84,10 +85,14 @@ that differs per profile:
 when some field is a credential. A profile whose required per-profile values
 are missing is *not set up*: the connection is simply not live for it.
 
-## Role switches
+## On or off
 
-Besides settings, each connection has a switch per declared role. A new
-connection starts with media on and sync off. The sync role is switched on
-only by choosing the connection as the device's account — at most one per
-device — never by adding it. Connecting a plugin to watch films never makes it
-the place your profiles go.
+Besides its settings, each connection has one switch, `enabled`. Switched off,
+it stays configured and nothing of it is used, on any device of the account.
+
+A player has no connection: it is on or off on each device, with its
+settings. A sync plugin's connection stays on its device too: your server's
+address and sign-in, or a backup target. It is chosen in Settings as the
+account's home, or as its backup's, and never by adding a source.
+
+Until Phase 6, connections still carry Phase 4's role switches instead.

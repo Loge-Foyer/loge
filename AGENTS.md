@@ -9,65 +9,79 @@ they are written in. Read the workspace root `AGENTS.md` and
 ## Shape
 
 ```
-api/                 @sc/api — domain types + every contract. Depends on NOTHING
+api/                     @sc/api — domain types + every contract. Depends on NOTHING
+  fixtures/              records every side must judge alike (the Go server's tests read them too)
+player-kit/              @sc/player-kit — the React half of the player contract (Phase 7)
 plugins/
-  jellyfin/ emby/ plex/ icloud/ google/ mock/
-  yattee/ invidious/ webdav/ custom-server/
-test/                vitest — api rules, plugins against fake HTTP, conformance
+  sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
+  iptv/<name>/           m3u stalker xtream mock
+  players/<name>/        system ksplayer mpv vlc
+  sync/<name>/           custom-server icloud google-drive onedrive mock
+test/                    vitest — api rules, plugins against fake HTTP, conformance
 docs/
 ```
 
-npm workspaces (`["api", "plugins/*"]`), source-only —
-`"exports": "./src/index.ts"`, no build step. Every plugin lists `@sc/api` as a
-**peer** dependency: the host supplies the one instance, so branded IDs from
-the app and from a plugin are the same type.
+**Transitional:** until Phase 6 regroups them, the plugins still sit one
+folder deep, `plugins/<id>/` with unqualified ids, and carry Phase 4's roles.
+Everything below describes the layout they move to.
 
-## One plugin per service
+npm workspaces (`["api", "player-kit", "plugins/*/*"]` once regrouped),
+source-only — `"exports": "./src/index.ts"`, no build step. Every plugin lists
+`@sc/api` as a **peer** dependency: the host supplies the one instance, so
+branded IDs from the app and from a plugin are the same type.
 
-**Not one per role.** iCloud serves Drive files *and* can be the device's
-account; it is `plugins/icloud`, one package, two roles. Same for Google and
-mock.
+## One category per plugin
 
-| Plugin | media | sync |
-| --- | :---: | :---: |
-| `jellyfin` `emby` `plex` | ✓ | — |
-| `icloud` `google` | ✓ (Drive files) | ✓ |
-| `mock` | ✓ | ✓ |
-| `yattee` `invidious` `webdav` | ✓ | — |
-| `custom-server` | — | ✓ |
+Every plugin has exactly one category, and its folder says which. The id is
+that folder path: `sources/jellyfin`, `iptv/stalker`, `players/system`,
+`sync/custom-server`.
 
-**Media servers are media-only.** A media server is the master of what its
-users watched: the app reads it (`watchStateRead`) and later writes progress
-back (`watchStateWrite`) through the *media* role. A device has at most one
-sync connection — the account — and a media server is never it. Without one,
-everything stays on the device: "this device only" is no account at all, not a
-plugin.
+| Category | Declares | Implements | Scope |
+| --- | --- | --- | --- |
+| `sources` | `media` (content kinds, capabilities) | the media role | account |
+| `iptv` | `media`, with `live` | the media role, with live members | account |
+| `players` | `player` (a profile per platform) | the player role and `player-kit`'s view | device |
+| `sync` | `account` or `backup` | the account role or the backup role | device |
 
-Do not create `plugins/jellyfin-sync`. If a service gains a second role, add the
-role to its existing manifest.
+**A service with two jobs is two plugins.** Google Drive's files are
+`sources/google-drive`; Google Drive as a backup place is `sync/google-drive`.
+They share no code: a plugin never imports another. If two ever need the same
+client, that client becomes a package of its own.
+
+**Media servers are media-only.** A media server masters what its users
+watched. The app reads it (`watchStateRead`) and later writes progress back
+(`watchStateWrite`) through the media role — never through the account. Do not
+create `plugins/sync/jellyfin`.
 
 ## Boundaries
 
 | Package | May import | Must not import |
 | --- | --- | --- |
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
-| any plugin | `@sc/api` | any framework, the app, another plugin |
+| `player-kit` | `@sc/api`, `react` (peer) | any plugin, the app |
+| a sources, IPTV or sync plugin | `@sc/api` | any framework, the app, another plugin |
+| a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder) | the app, another plugin |
 
-`lib: ["esnext"]` gives `api` and plugins **no host globals**: no `fetch`,
-`URL`, `console`, `setTimeout`, `btoa`, `AbortSignal`. The compiler rejects
-them. A plugin reaches the host only through the context it is handed:
-`http`, `credentials`, `session`, `network`, `client`, `clock`, `crypto`.
-Bytes become text through `api`'s own helpers (`encodeBase64Url`,
-`encodeUtf8`…), never `btoa` or `Uint8Array.prototype.toBase64` — Hermes has
-neither.
+`lib: ["esnext"]` gives `api` and every non-player plugin **no host globals**:
+no `fetch`, `URL`, `console`, `setTimeout`, `btoa`, `AbortSignal`. The compiler
+rejects them.
 
-`api` is the centre of the whole project — the app depends on it, every plugin
-depends on it, the sync server depends on it. It must stay a leaf. If you need a
-capability there, declare an interface and implement it outside.
+- A plugin reaches the host only through the context it is handed: `http`,
+  `credentials`, `session`, `network`, `client`, `clock`, `crypto`.
+- Bytes become text through `api`'s own helpers (`encodeBase64Url`,
+  `encodeUtf8`…), never `btoa` or `Uint8Array.prototype.toBase64`. Hermes has
+  neither.
 
-**Plugins never import each other.** If two eventually need the same HTTP
-client, that client becomes its own package rather than an import across the
-boundary.
+Players compile in a program of their own, with React Native's types, because
+an engine has to draw.
+
+`api` is the centre of the whole project — the app depends on it, and every
+plugin does. It must stay a leaf. If you need a capability there, declare an
+interface and implement it outside.
+
+The sync server is Go and cannot import `api`. The account records in
+`api/src/account.ts` are its contract, and `api/fixtures/account-records.json`
+is what both sides test against. Change them together.
 
 ---
 
@@ -75,40 +89,43 @@ boundary.
 
 Each plugin's `src/index.ts` exports `plugin: Plugin` — the same name
 everywhere, so the app's registration line is always
-`import { plugin as x } from '@sc/plugin-x'`.
+`import { plugin as x } from '@sc/source-x'`.
 
 ```ts
 interface PluginManifest {
-  readonly id: PluginId;
+  readonly id: PluginId;                         // 'sources/jellyfin'
+  readonly category: PluginCategory;
+  readonly platforms: readonly PlatformId[];     // where it runs; the app shows it only there
   readonly displayName: string;
   readonly description: string;
   readonly media?: { contentKinds: readonly ContentKind[]; capabilities: readonly MediaCapability[] };
-  readonly sync?: { capabilities: readonly SyncCapability[] };
-  readonly connectionFields: readonly Field[];               // shared by every role
+  readonly player?: PlayerManifest;
+  readonly account?: AccountManifest;
+  readonly backup?: BackupManifest;
+  readonly connectionFields: readonly Field[];
   readonly settings: readonly PluginSettingDescriptor[];     // never a password
 }
 ```
 
-A role you do not declare is absent, and the app never asks for it.
+It declares **exactly the one block its category needs**. `validateManifest()`
+checks it, along with the rest; `npm test` runs it over every plugin.
 
-- **`contentKinds`** — what the source brings: `movies`, `shows`, `anime`,
-  `videos`, `files`. The app decides where each kind appears; a plugin never
-  names a tab.
-- **`connectionFields`** — endpoint, account, secrets; one list for every role,
-  because one connection has one endpoint and one set of credentials. The app
-  renders them. A `password` field is the only secret. Mark a text field that is
-  part of the account (a username) with `credential: true`: a connection that
-  keeps credentials per profile keeps exactly those, plus every password.
+- **`contentKinds`** — what a media role brings: `movies`, `shows`, `anime`,
+  `videos`, `files`, `live`. The app decides where each kind appears, by
+  category and kind; a plugin never names a tab.
+- **`connectionFields`** — endpoint, account, secrets. The app renders them. A
+  `password` field is the only secret. Mark a text field that is part of the
+  account on the other side — a username, a MAC address — with
+  `credential: true`: a connection that keeps credentials per profile keeps
+  exactly those, plus every password.
 - **A `libraries` setting** lets the user pick from the libraries the source
   reports. It needs the `libraries` capability, because the app fills it by
   asking the connection.
-- **Capabilities** are declared with the code that honours them — the
+- **Capabilities** are declared with the code that honours them. The
   conformance test checks that every declared capability's members
-  (`MEDIA_CAPABILITY_MEMBERS`) exist.
-- `validateManifest()` in `api` enforces the rules below; `npm test` runs it over
-  every plugin.
+  (`MEDIA_CAPABILITY_MEMBERS`) and every block's role exist.
 
-### Media role
+### The media role — sources and IPTV
 
 `plugin.media.connect(target, context)` returns a `ConnectedMediaProvider`. It
 does no network work: signing in waits for the first call. The target holds
@@ -120,42 +137,59 @@ the connection's values already resolved for one profile.
 | `libraries` | `getLibraries` |
 | `watchStateRead` | `getResume` (items carry `watch` too) |
 | `remoteImages` | `resolveImage` (synchronous), `resolveHeaders` |
+| `channels` | `listChannelGroups`, `listChannels` |
+| `epg` | `getGuide` |
+| `playback` | `getPlaybackDescriptor` |
 | `offlineMetadata` | none — permission for the app to keep items on the device |
 
 `check()` and `dispose()` are always present. Rules every provider follows:
 
 - **Pages are ordered exactly by `compareItems(query.sort)`.** The app merges
-  sources with it.
+  sources with it. Channels come in the provider's own order.
 - **Sign-in is single-flight.** Several calls start together.
-- **A refused login is never retried.** Servers lock accounts.
+- **A refused login is never retried.** Servers lock accounts; portals too.
 - **Throw only `AppError`**, with a retry hint: `backoff`, `network-change` or
   `never`.
+- **A playback descriptor lives in memory only.** A stream address can carry a
+  password (Xtream) or a session token (Stalker). Never put one in a log, a
+  cache or a session.
 
-### Sync role
+### The player role
 
-`plugin.sync.connect(target, context)` returns a
-`ConnectedUserStateSyncProvider`: `pull`, `push`, `getStatus`, `dispose`, and
-optional members:
+`plugin.player.create(context)` returns a `MediaPlayer`, framework-free: load,
+play, pause, seek, tracks, and `PlayerEvent`s. The view that draws it is
+`player-kit`'s `PlayerView`, exported from the same package.
 
-- `verifyOwner(proof)` re-verifies whoever owns the account, for Forgot PIN,
-  switching and signing out. The proof is the password fields
-  `sync.ownerProof` names, typed again — never the saved ones.
-- `vaultKey()` gives the key the app seals connections' passwords with. The
-  capability `sealedPasswords` promises it (`SYNC_CAPABILITY_MEMBERS`).
-- `createAccount(fields)` creates the account from the app, with the fields
-  `sync.signUp` declares.
-- `signOut()` ends this device's session, where the account can.
+- The manifest's `player.profiles` say, per platform, what the engine plays:
+  protocols, containers, codecs, subtitle formats. `choosePlayer` in `api`
+  reads them. Overstating one sends the user to a black screen, so state only
+  what the engine really plays.
+- A null engine that fails loudly is the right placeholder. A silent no-op
+  turns "not implemented" into a mystery.
 
-A connection whose sync role is on is **the device's account** — at most one
-per device, chosen in the app's Settings → Account.
+### The account role — your own server
 
-It carries `SyncChange`s (`api/src/sync.ts`): profiles, their PINs,
-preferences, connections and each profile's values on them. A connection lists
-the names of its saved password fields, and, when the account carries
-`sealedPasswords`, their values **sealed by the app** in `sealed` — ciphertext
-the account stores and cannot open. The plugin never sees another connection's
-password. It carries exactly what it declares: an entity needs every
-capability `SYNC_ENTITY_CAPABILITIES` lists.
+`plugin.account.connect(target, context)` returns a `ConnectedAccount`:
+
+- `info`, `status`, `pull`, `push`, `dispose`
+- optionally `createAccount` (with the `account.signUp` fields), `verifyOwner`
+  (with the `account.ownerProof` fields, typed again) and `signOut`
+
+It moves `AccountRecord`s — profiles, PINs, preferences, connections, profiles'
+values:
+
+- **`pull`** returns every record of the account. An account is small.
+- **`push`** sends one batch, all or nothing. It answers `stored`, or the write
+  it refused and why.
+- **Passwords travel in plain text**, in `secrets`, to your own server, for
+  now.
+
+### The backup role
+
+`plugin.backup.connect(target, context)` returns a `ConnectedBackupTarget`:
+`stat`, `read`, `list`, and `write(name, bytes, ifMatch)`, which refuses with
+`SYNC_CONFLICT` when the file changed since that etag. It stores bytes and
+nothing else. The file's format and encryption are the app's.
 
 ---
 
@@ -164,7 +198,8 @@ capability `SYNC_ENTITY_CAPABILITIES` lists.
 The distinction that matters most in this repository.
 
 - **Declared** — static, in the manifest. What the plugin *can* do.
-- **Effective** — per connection. Declared ∩ what the user switched on.
+- **Effective** — per connection and per profile. Declared ∩ what the user
+  switched on.
 
 The app branches on **effective**. A setting can gate a capability:
 
@@ -172,35 +207,31 @@ The app branches on **effective**. A setting can gate a capability:
 type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting | LibrariesField;
 
 interface ToggleSetting {
-  readonly key: string;                        // 'syncWatchProgress'
+  readonly key: string;                        // 'cacheMetadata'
   readonly label: string;
   readonly type: 'boolean';
-  readonly default: boolean;                   // a sync toggle is optional, and may default on
-  readonly gates?: readonly CapabilityKey[];   // 'sync.watchProgress' — one role per toggle
+  readonly default: boolean;
+  readonly gates?: readonly CapabilityKey[];   // 'media.offlineMetadata'
 }
 ```
 
-`effectiveRoles(manifest, connection)` is the one definition: a role is in
-effect when declared **and** switched on (missing means off); a declared
-capability when every toggle gating it is on (stored value, else default); an
-ungated capability follows its role.
+`effectiveCapabilities(manifest, { enabled, settings })` is the one
+definition:
 
-**The sync role is off on every new connection** (`defaultRoles`). Only
-choosing the connection as the device's account switches it on: connecting
-Google Drive to browse files never makes it the account. Merging the packages
-was allowed precisely because the roles stay independently switchable — break
-that and the merge has broken the property it was supposed to preserve.
+- A connection switched off has nothing in effect.
+- A declared capability is in effect when every toggle gating it is on — the
+  stored value, else the default.
+- An ungated capability follows its connection.
 
-Signing in *is* the opt-in, so an account carries everything it declares; a
-sync toggle is optional. A per-profile sync capability needs `profile`.
+Until Phase 6, the same rule is `effectiveRoles` over Phase 4's role switches.
 
 ---
 
 ## Non-negotiables
 
 1. **Declare capabilities honestly.** They are not documentation; application
-   code branches on them. Declaring `search: true` while `search()` throws turns
-   every query into a `sourceError`. Declaring `false` means the method is never
+   code branches on them. Declaring `search` while `search()` throws turns
+   every query into a `sourceError`. Not declaring it means the method is never
    called.
 
 2. **Map at the boundary.** Remote payloads become domain types *inside* this
@@ -209,40 +240,38 @@ sync toggle is optional. A per-profile sync capability needs `profile`.
 
 3. **Secrets through the injected credential store.** A secret is a `password`
    connection field; the connection stores only an opaque `credentialsRef`.
-   Settings are a plain database column and cannot be `password` — the type
-   refuses it, and `validateManifest` flags secret-looking keys on other field
-   types. Artwork needing auth carries a `headersRef`, never an inline header.
+   - Settings are a plain database column and cannot be `password` — the type
+     refuses it, and `validateManifest` flags secret-looking keys on other field
+     types.
+   - Artwork or a stream that needs auth carries a `headersRef`, never an
+     inline header.
 
 4. **Normalize errors.** Throw `AppError` with a known code and a retry hint.
    A raw HTTP or transport error reaching the UI is a bug.
 
 5. **Never assume you are the only connection.** Two connections to the same
-   plugin are normal, and they may enable different roles.
+   plugin are normal.
 
-### The sync role specifically
+6. **One block, the category's.** A plugin with two jobs is two plugins. Never
+   give a source an `account` block, or a sync plugin a `media` one.
 
-6. **`push` must be idempotent.** It may receive the same change twice after a
-   crash or a rejected batch. Return the IDs you **accepted** — the engine
-   advances its checkpoint only across the accepted prefix and retries the rest
-   verbatim.
+7. **Say where you run.** `platforms` is honest: a plugin that needs iCloud's
+   container is `['ios']`. A portal that sends no CORS headers is not `web`
+   until something proxies it.
 
-7. **`pull` must be resumable, and complete.** Return an opaque cursor the app
-   stores, and the whole log in your order — the caller's own changes
-   included: a device waits to see its changes come back. Answer `reset` when
-   you lost data and `expired` when a cursor was compacted away.
+### The account role specifically
 
-8. **Do not resolve conflicts.** The app's conflict resolver owns that.
+8. **`pull` is complete.** Every record of the account, deleted ones included.
+   The app decides what to apply, and a record left out reads as lost.
 
-9. **Overstating capabilities causes silent data loss.** The engine filters the
-   change journal by what you declare. Claim support you lack and the engine
-   hands you changes you drop *and advances the checkpoint past them* — no
-   error, gone.
+9. **`push` is all or nothing.** Store the whole batch, or none of it and say
+   which write stopped it. Never store half and answer "stored".
 
-10. **Passwords travel only as the app sealed them.** A plugin never sees or
-    sends another connection's password; its own account's keys go through
-    `context.crypto`, and the key it hands the app (`vaultKey`) never leaves
-    the device. Check every pushed change with `isSyncChange()`, and end the
-    accepted prefix at the first you refuse.
+10. **Do not resolve conflicts.** The app's sync engine owns that.
+
+11. **Never sign in again after a refusal by yourself.** A session that ends —
+    expired, or the password changed — gets one sign-in with the saved
+    password; a refusal is latched until the user acts.
 
 ---
 
@@ -252,7 +281,11 @@ It ripples into every plugin and into the app. Update `api`, then each plugin
 implementing the changed contract, then the app. Commit each repository
 separately.
 
-Nothing enforces cross-repo consistency. Verify by hand.
+An account record change also reaches the Go server. Update
+`api/fixtures/account-records.json` in the same commit, and the server's
+collections and tests in its own.
+
+Nothing else enforces cross-repo consistency. Verify by hand.
 
 If adding a plugin requires changing the app's screens, schema or services, the
 abstraction in `api` is wrong — fix that instead of working around it. That is
@@ -264,9 +297,9 @@ the test of whether this architecture is real.
 
 `.agents/skills/` in this repository:
 
-- **`sc-add-plugin`** — create a new plugin for a service that has none.
-- **`sc-plugin-roles`** — add or change a role on an existing plugin. Use this,
-  not `sc-add-plugin`, when the service already has a folder.
+- **`sc-add-plugin`** — create a new plugin, in the folder for its category.
+- **`sc-plugin-categories`** — which category a plugin belongs in, and how to
+  split a service that does two jobs.
 - **`sc-verify-plugins`** — verification, including the boundary greps and the
   cross-repository check after touching `api`.
 
@@ -274,29 +307,32 @@ the test of whether this architecture is real.
 
 ## Current state
 
-`api` holds the manifest vocabulary and the **media contract**:
+Phase 5 — the new architecture, written down; the code is Phase 4's until
+Phase 6 regroups it.
 
-- `MediaItem` and friends
-- `ItemQuery` / `compareItems` / `mergeSorted`
-- `AppError` with retry hints
-- `HttpClient`
-- `MediaRole` / `ConnectedMediaProvider` / `MediaContext`
+**`api` holds:**
+
+- the manifest vocabulary, with categories, platforms, qualified ids and one
+  block per category
+- the media contract: `MediaItem` and friends, `ItemQuery` / `compareItems` /
+  `mergeSorted`, live TV (`Channel`, `Programme`) and the playback members
 - per-connection per-profile values (`PerProfile`, `resolveValues`,
   `isSetUpFor`)
+- `AppError` with retry hints, and `HttpClient`
+- playback: `PlaybackDescriptor`, `PlayerProfile`, `MediaPlayer`,
+  `choosePlayer`
+- the account role, record by record (`AccountRecord`, `isAccountRecord`), and
+  the backup role
+- the host's crypto port (`PluginCrypto`), and bytes as text (`bytes.ts`)
+- until Phase 6: Phase 4's roles (`effectiveRoles`, `defaultRoles`) and its
+  log-based sync role (`sync.ts`), with sealed passwords and owner proofs
 
-- the sync contract: `SyncRole` / `ConnectedUserStateSyncProvider`,
-  `SyncChange` and its entities, `isSyncChange`; sealed passwords
-  (`sealedPasswords`, `vaultKey`), owner proofs (`ownerProof`,
-  `verifyOwner(proof)`), sign-up (`signUp`, `createAccount`) and `signOut`
-- the host's crypto port (`PluginCrypto`: random bytes, PBKDF2, HKDF,
-  AES-GCM), `isKdfParams` with its limits, and bytes as text (`bytes.ts`)
+**The plugins:**
 
-**Mock** implements the sync role too: a pretend account in memory, per
-endpoint. **Custom server** implements the sync role against the sync server:
-the keys, the session and its rules are in its README.
-
-**Jellyfin** implements the media role. **Mock** implements it with a fixed
-catalogue. Every other plugin is a manifest that declares no capability.
+- **Jellyfin** implements the media role.
+- **Mock** implements it with a fixed catalogue, and plays at being an account.
+- **Custom server** implements Phase 4's sync role against the Phase 4 server.
+- **Every other plugin** is a manifest that declares no capability.
 
 ## Verify
 

@@ -1,77 +1,71 @@
 # Your own server
 
-The account for someone who wants neither Apple nor Google: a Streaming Center
-sync server they run themselves (`streaming_center_sync`). It carries the
-household's profiles, their PINs and preferences, and connections — with
-their passwords, sealed on the device.
+The account for someone who wants neither Apple nor Google: a server they run
+themselves (`streaming_center_sync`). It keeps the household's account — its
+profiles, their PINs and preferences, and its sources and IPTV connections
+with their passwords — so every device signed in to it has the same.
 
-## Roles
+## Category
 
-**Sync** — implemented. No media role.
+**Sync**, with an `account` block — `sync/custom-server`, at
+`plugins/sync/custom-server` once Phase 6 regroups the folders (today
+`plugins/custom-server`). Device-wide: each device chooses its own account.
 
 ## Connection
 
 - **Server address** — required. The base every route hangs off; a query, a
   fragment and a trailing slash are dropped, a base path is kept.
-- **Username** — required, and part of the sign-in (`credential`). Compared as
-  the server compares it: NFC, lower case.
-- **Password** — required, stored as a secret. It never leaves the device.
+- **Username** — required, and part of the sign-in (`credential`).
+- **Password** — required, stored as a secret in the device's keychain.
 
-**Creating an account** takes one more field, `invite`: a code from
-`sc-sync invite` on the server, good for one account.
+**Creating an account** takes one more field, `invite`: a code from the
+server's `invite` command, good for one account.
 
-## The keys
+## From Phase 6: PocketBase, used as it is
 
-The device derives everything from the account password and never sends it:
+The server becomes PocketBase, and this plugin speaks its own API.
 
-```
-password ─ PBKDF2-SHA256 (the account's salt, 600k iterations) ─ master
-master ─ HKDF "sc/custom-server/v1/proof" ─ proof   → the server keeps SHA-256 of it
-master ─ HKDF "sc/custom-server/v1/wrap"  ─ wrap    → never leaves the device
-vault key (32 random bytes) ─ AES-GCM(wrap) ─ the wrapped vault key → kept by the server, opaque
-```
+- **Signing in** is PocketBase's password sign-in, over TLS.
+  - The session token is kept in the device-bound session store, and
+    refreshed on every sync.
+  - When a session ends — 30 days offline, or the password changed — the
+    plugin signs in once with the saved password. A refusal is latched and
+    never tried again by itself.
+  - A throttled sign-in waits (`backoff`, `too-many-attempts`): nothing judged
+    the password.
+- **Reading and writing:**
+  - `pull` lists every record of the account.
+  - `push` sends one batch, all or nothing, parents first. It answers which
+    write the server refused, if any: over the profile limit, deleted, or
+    malformed.
+- **Record ids** are derived from the account and the app's own ids, so a
+  resent write updates the same record, and two accounts on one server never
+  collide.
+- **Passwords travel in plain text**, in `secrets`, because the server is the
+  household's own. A name listed without a value keeps the one stored: a device
+  that lacks a password never erases it.
+- **The owner check** (`verifyOwner`, `ownerProof: ['password']`) signs in with
+  the password typed again, never the saved one.
+- **Creating an account** calls the server's sign-up route with the invite,
+  and with `firstProfile` when the device has no profiles of its own to
+  upload.
 
-- **Signing in** asks for the account's parameters, refuses any under
-  `isKdfParams`' floor before deriving, and sends the proof. The answer carries
-  the wrapped vault key, which only the password opens; `vaultKey()` hands it
-  to the app, which seals connections' passwords with it.
-- **The owner check** (`verifyOwner`, `ownerProof: ['password']`) derives from
-  the password typed again, with the parameters kept from signing in, and
-  sends that proof — never the saved password.
-- **Creating an account** makes a fresh salt and vault key, sends the proof and
-  the wrapped key with the invite, and refuses a password under 10 characters
-  before asking.
+## Today: Phase 4's zero-knowledge sign-in
 
-## The session
+Until Phase 6, this plugin speaks to the Phase 4 server:
 
-Kept in the account's session, in the device-bound store: this device's token,
-the vault key and the key's parameters.
+- **It never sends the password.** The device derives a proof and a wrap key
+  from it with PBKDF2 and HKDF.
+- **Passwords are sealed.** Connections' passwords are sealed with a vault
+  key that only the password opens.
+- **The server keeps a change log** per account.
 
-- With none — the first call, or after a restore — it signs in once, shared by
-  every caller. A caller's signal stops its own wait, never the shared sign-in.
-- A refused sign-in is remembered, and never tried again by this provider. A
-  throttled one (`429`) waits (`backoff`, `too-many-attempts`): nothing judged
-  the password.
-- **A 401 on a call with a token means the server let this device go** —
-  `sc-sync revoke`, or its account deleted. It tries a newer token this device
-  saved meanwhile, once; otherwise it leaves a tombstone, answers every call
-  with `UNAUTHORIZED` / `signed-out`, and never signs itself back in: that would
-  undo a revoke. Only the user signs in again.
-- `signOut()` lets this device's token go at the server, once, and never signs
-  in to do it.
-
-## The log
-
-`pull` passes the server's cursor through and leaves out any change the
-contract does not allow. `push` sends requests of at most 4 MiB and 1,000
-changes; the accepted prefix runs across them, and a request that stores less
-than it was sent ends the push. One that fails after others stored answers
-what they stored.
+Phase 6 retires all of this, for now; the code stays in git.
 
 ## Status
 
-The sync role is implemented and tested against a fake of the server's routes
-(`test/custom-server.test.ts`); `streaming_center_sync` runs it against the
-real server.
+Phase 4's sync role is implemented and tested against a fake of that server's
+routes (`test/custom-server.test.ts`); `streaming_center_sync` runs it against
+the real server. The PocketBase version arrives in Phase 6.
 
 See `docs/writing-a-plugin/` at the repository root.

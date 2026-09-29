@@ -7,29 +7,39 @@ npm test
 
 Vitest, run over `test/` at the repository root.
 
-`npm run typecheck` is two programs. `api` and the plugins compile with
-`lib: ["esnext"]` and no types at all, so a host global cannot creep in. The
-tests are a program of their own (`test/tsconfig.json`) with Node's types,
-because the fake context's crypto runs on `node:crypto`.
+`npm run typecheck` is two programs today, and three once the first player
+plugin arrives:
+
+1. **`api` and the non-player plugins** compile with `lib: ["esnext"]` and no
+   types at all, so a host global cannot creep in.
+2. **Player plugins and `player-kit`** get React Native's types, because an
+   engine draws.
+3. **The tests** are a program of their own (`test/tsconfig.json`), with
+   Node's types, because the fake context's crypto runs on `node:crypto`.
 
 **The rules in `api`:**
 
-- `effective.test.ts` — the effective-roles rule: roles off, toggles off,
-  defaults, ungated capabilities, undeclared roles.
-- `validate.test.ts` — every `validateManifest` rule, including `libraries` and
-  `credential`.
+- `category.test.ts` — qualified ids (`sources/jellyfin`), reading a category
+  back, what is account-wide and device-wide, and `runsOn`.
+- `validate.test.ts` — every `validateManifest` rule: libraries, credentials,
+  the account's owner proof and sign-up fields, and, for a manifest that names
+  its category, the id's shape, one block per category, platforms and player
+  profiles.
+- `account.test.ts` — `isAccountRecord` over `api/fixtures/account-records.json`,
+  every valid record accepted and every invalid one refused. The sync server's
+  Go tests read the same file, so both sides judge a record alike. Also the
+  size limit and `recordKey`.
+- `player.test.ts` — `canPlay`, `missingFor` and `choosePlayer`: the preferred
+  player when it can, the others in order, sources best first, and "none".
+- `effective.test.ts` — the effective-capabilities rule: connections off,
+  toggles off, defaults, ungated capabilities.
 - `per-profile.test.ts` — which keys each mode keeps per profile, resolved
   values, and "set up".
 - `compare.test.ts` — the one ordering rule and `mergeSorted`.
 - `errors.test.ts` — retry hints.
 - `bytes.test.ts` — base64, base64url and UTF-8 against known vectors and
   Node's own, both ways, and every malformed input refused.
-- `sync.test.ts` — the sync wire: `isSyncChange` for every entity and for bad
-  shapes, sealed values and the size limit, `syncKey`, what each entity needs
-  an account to carry, and `defaultRoles`, which never switches sync on.
-- `validate.test.ts` also covers an account's `ownerProof` and `signUp`, and
-  `isKdfParams`: nothing weaker than the floor, nothing heavier than a phone
-  can derive.
+- `sync.test.ts` — Phase 4's sync wire, until Phase 6 retires it.
 
 **The plugins:**
 
@@ -45,29 +55,22 @@ because the fake context's crypto runs on `node:crypto`.
   - paging across libraries with no duplicates or gaps
   - mapping every item type
   - artwork addresses
-- `mock.test.ts` — the catalogue is deterministic and honours sort, libraries,
-  paging and latency.
-- `mock-sync.test.ts` — the pretend account: a change stored once however often
-  it is sent, the accepted prefix, the caller's own changes returned, paging,
-  resuming, one account per endpoint, `reset` for a cursor it did not give out,
-  and the household seed.
-- `custom-server.test.ts` — the account on your own server, against a fake of
-  the server's routes (`support/fake-sync-server.ts`), which knows only that a
-  proof hashes to what it stored: the address reduced to its base, a proof and
-  never the password, the session reused and sign-in shared, weak parameters
-  refused before deriving, a refused sign-in never tried again, a 401 leaving a
-  tombstone that outlives a relaunch, pushes split at 4 MiB with the prefix
-  across them, the vault key the same on two devices, the owner check's four
-  answers, creating an account and its refusals, signing out, and the error
-  table.
-- `manifests.test.ts` — the conformance check. Every manifest is sound, every
-  plugin that declares a media capability implements its members, a plugin
-  that declares sync capabilities has a sync role with every provider member
-  and every member its capabilities promise (`vaultKey` for
-  `sealedPasswords`, `verifyOwner` for an `ownerProof`, `createAccount` for
-  `signUp`), media servers stay media-only, and ids are unique. It is the one
-  file allowed to import every plugin.
-- `engine.test.ts` — no source in `api/` or `plugins/` uses a built-in that
+- `mock.test.ts` and `mock-sync.test.ts` — the catalogue is deterministic and
+  honours sort, libraries, paging and latency; the pretend account behaves as
+  its contract says.
+- `custom-server.test.ts` — your own server's plugin against a fake of the
+  server's routes (`support/fake-sync-server.ts`). Phase 6 points it at
+  PocketBase's routes.
+- `manifests.test.ts` — the conformance check. It is the one file allowed to
+  import every plugin. It checks, per category:
+  - every manifest is sound, runs somewhere, and ids are unique
+  - every declared media capability has its members
+  - a `player` block has its role
+  - an `account` block has `ACCOUNT_MEMBERS`, plus `verifyOwner` for an
+    `ownerProof` and `createAccount` for a `signUp`
+  - a `backup` block has `BACKUP_MEMBERS`
+  - media servers stay sources
+- `engine.test.ts` — no source in `api/` or any plugin uses a built-in that
   Hermes lacks (`Array.prototype.toSorted`, `Object.groupBy`,
   `crypto.randomUUID`, `Uint8Array.prototype.toBase64`, `fromBase64`). Plugins
   run on Hermes in the iOS and Android apps; the compiler accepts these, so
@@ -75,14 +78,19 @@ because the fake context's crypto runs on `node:crypto`.
 
 **Quick crypto** (`quickCrypto()`) is the same port with a key derivation that
 takes no time and counts itself, for tests that sign in many times; it refuses
-weak parameters as the app's does. One test derives for real.
+weak parameters as the app's does.
 
-**The fake context** (`fakeContext()`) gives a plugin an in-memory session,
-credentials, a network the test can switch, a client identity, a clock whose
-`sleep` returns at once, and the host's crypto on `node:crypto`
-(`support/node-crypto.ts`) — the same algorithms the app runs, so a value
-sealed in a test opens on a phone. Tests can therefore check every retry and
-latency path without waiting. A route can answer with headers.
+**The fake context** (`fakeContext()`) gives a plugin:
 
-Tests never live in `api/src` or `plugins/*/src`. `api` imports nothing, and a
+- an in-memory session and credentials
+- a network the test can switch
+- a client identity
+- a clock whose `sleep` returns at once
+- the host's crypto on `node:crypto` (`support/node-crypto.ts`) — the same
+  algorithms the app runs
+
+So tests can check every retry and latency path without waiting, and a route
+can answer with headers.
+
+Tests never live in `api/src` or `plugins/**/src`. `api` imports nothing, and a
 test file there would import vitest.
