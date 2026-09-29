@@ -99,7 +99,8 @@ Decide where the account lives. A sync plugin declares one of two blocks:
 
 Sync plugins are device-wide: each device chooses its own. Choosing one is an
 account action, in Settings — never a side effect of adding a source.
-`sync/mock` plays at being both, for development.
+For development, `sync/mock` plays at being your own server and
+`sync/mock-backup` at being a backup target — two plugins, one block each.
 
 ## One service, two jobs
 

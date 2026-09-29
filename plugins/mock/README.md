@@ -11,7 +11,8 @@ In Phase 6 this folder becomes three plugins, one per job:
 | --- | --- | --- |
 | `sources/mock` | source | the catalogue below |
 | `iptv/mock` | IPTV | channels, groups, a guide and a little VOD, for the TV tab (Phase 7) |
-| `sync/mock` | sync | a pretend account on "your own server", and a pretend backup target |
+| `sync/mock` | sync | a pretend account on "your own server" |
+| `sync/mock-backup` | sync | a pretend backup target |
 
 Today it is one plugin with Phase 4's two roles, media and sync.
 
@@ -70,7 +71,8 @@ From Phase 6, `sync/mock` plays at being your own server:
   Robin.
 - **It forgets on reload.** That is how the app's way back from a server that
   lost its data gets exercised.
-- **A backup target,** in memory, with conditional writes.
+- **`sync/mock-backup`** keeps backup files in memory, with conditional
+  writes — a plugin of its own, since a plugin declares one block.
 
 It has no network, so it cannot link two devices. The app's two-device tests
 share one fake account in memory, and real devices use your own server.

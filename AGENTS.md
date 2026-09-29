@@ -16,7 +16,7 @@ plugins/
   sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
   iptv/<name>/           m3u stalker xtream mock
   players/<name>/        system ksplayer mpv vlc
-  sync/<name>/           custom-server icloud google-drive onedrive mock
+  sync/<name>/           custom-server icloud google-drive onedrive mock mock-backup
 test/                    vitest — api rules, plugins against fake HTTP, conformance
 docs/
 ```
