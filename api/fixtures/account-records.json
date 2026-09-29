@@ -36,10 +36,10 @@
         "label": "Portal",
         "enabled": false,
         "perProfile": "none",
-        "fields": { "portalUrl": "http://portal.example.com/c/", "mac": "00:1A:79:12:34:56" },
+        "fields": { "portalUrl": "http://portal.example.com/c/" },
         "settings": {},
-        "secretKeys": [],
-        "secrets": {}
+        "secretKeys": ["mac"],
+        "secrets": { "mac": "00:1A:79:12:34:56" }
       }
     },
     {
