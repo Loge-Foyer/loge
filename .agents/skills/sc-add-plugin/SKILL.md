@@ -114,8 +114,9 @@ through the media role.
 
 6. **Route secrets through the injected credential store.** A secret is a
    `password` connection field; the app stores it behind an opaque
-   `credentialsRef`. A MAC address or device id a portal signs in with is a
-   `credential` text field.
+   `credentialsRef`. Anything that signs in on its own is a password field,
+   whatever it looks like — a portal's MAC address or device id, a playlist
+   address with the sign-in in it.
    - `settings` is a plain database column and cannot hold a `password` field
      at all.
    - Artwork or a stream needing auth carries a `headersRef`, never an inline

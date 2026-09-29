@@ -114,10 +114,12 @@ checks it, along with the rest; `npm test` runs it over every plugin.
   `videos`, `files`, `live`. The app decides where each kind appears, by
   category and kind; a plugin never names a tab.
 - **`connectionFields`** — endpoint, account, secrets. The app renders them. A
-  `password` field is the only secret. Mark a text field that is part of the
-  account on the other side — a username, a MAC address — with
-  `credential: true`: a connection that keeps credentials per profile keeps
-  exactly those, plus every password.
+  `password` field is the only secret — and anything that signs in on its own
+  is a password field, whatever it looks like: a portal's MAC address, a
+  playlist address with the sign-in in it. Mark a text field that is part of
+  the account on the other side — a username — with `credential: true`: a
+  connection that keeps credentials per profile keeps exactly those, plus
+  every password.
 - **A `libraries` setting** lets the user pick from the libraries the source
   reports. It needs the `libraries` capability, because the app fills it by
   asking the connection.

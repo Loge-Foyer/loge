@@ -5,8 +5,7 @@ both from the manifest. Nothing about a plugin is hard-coded in the app.
 
 ## Connection fields
 
-What a connection needs — a server address, an account, a MAC address, a
-token. One list per plugin: one connection has one endpoint and one set of
+What a connection needs — a server address, an account, a token. One list per plugin: one connection has one endpoint and one set of
 credentials.
 
 | `type` | Rendered as | Notes |

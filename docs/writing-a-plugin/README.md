@@ -87,9 +87,11 @@ Everything above, plus:
   order.
 - **A provider's films and series** come through the ordinary browse members,
   as `movies` and `shows`. The app shows all of it on the TV tab.
-- **A MAC address, or a portal's device id, is a credential.** Mark the field
-  `credential: true`, keep it out of logs, and never retry a portal that
-  refused it.
+- **A MAC address, or a portal's device id, is a secret.** Whoever has it has
+  the subscription, so it is a `password` field: in the keychain, never in the
+  database or a log. Never retry a portal that refused it.
+- **So is a playlist address with the sign-in in it** — most M3U links from a
+  provider carry a username and password in their query.
 - **Links are short-lived.** A portal's `create_link` answer, or an Xtream
   address with the password in its path, belongs in a playback descriptor,
   made when playing and held in memory only.
