@@ -1,47 +1,87 @@
 // The one place allowed to import every plugin: a conformance check over all of them.
-import { MEDIA_CAPABILITY_MEMBERS, SYNC_CAPABILITY_MEMBERS, SYNC_PROVIDER_MEMBERS, validateManifest, type Plugin } from '@sc/api';
-import { plugin as customServer } from '@sc/plugin-custom-server';
-import { plugin as emby } from '@sc/plugin-emby';
-import { plugin as google } from '@sc/plugin-google';
-import { plugin as icloud } from '@sc/plugin-icloud';
-import { plugin as invidious } from '@sc/plugin-invidious';
-import { plugin as jellyfin } from '@sc/plugin-jellyfin';
-import { plugin as mock } from '@sc/plugin-mock';
-import { plugin as plex } from '@sc/plugin-plex';
-import { plugin as webdav } from '@sc/plugin-webdav';
-import { plugin as yattee } from '@sc/plugin-yattee';
+import {
+  ACCOUNT_MEMBERS,
+  BACKUP_MEMBERS,
+  categoryOfPluginId,
+  MEDIA_CAPABILITY_MEMBERS,
+  SYNC_CAPABILITY_MEMBERS,
+  SYNC_PROVIDER_MEMBERS,
+  validateManifest,
+  type Plugin,
+} from '@sc/api';
+import { plugin as m3u } from '@sc/iptv-m3u';
+import { plugin as stalker } from '@sc/iptv-stalker';
+import { plugin as xtream } from '@sc/iptv-xtream';
+import { plugin as ksplayer } from '@sc/player-ksplayer';
+import { plugin as mpv } from '@sc/player-mpv';
+import { plugin as systemPlayer } from '@sc/player-system';
+import { plugin as vlc } from '@sc/player-vlc';
+import { plugin as emby } from '@sc/source-emby';
+import { plugin as googleDrive } from '@sc/source-google-drive';
+import { plugin as icloudDrive } from '@sc/source-icloud-drive';
+import { plugin as invidious } from '@sc/source-invidious';
+import { plugin as jellyfin } from '@sc/source-jellyfin';
+import { plugin as mockSource } from '@sc/source-mock';
+import { plugin as onedrive } from '@sc/source-onedrive';
+import { plugin as plex } from '@sc/source-plex';
+import { plugin as webdav } from '@sc/source-webdav';
+import { plugin as yattee } from '@sc/source-yattee';
+import { plugin as customServer } from '@sc/sync-custom-server';
+import { plugin as googleDriveBackup } from '@sc/sync-google-drive';
+import { plugin as icloudBackup } from '@sc/sync-icloud';
+import { plugin as mockAccount } from '@sc/sync-mock';
+import { plugin as onedriveBackup } from '@sc/sync-onedrive';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';
 
 const plugins: readonly Plugin[] = [
-  customServer,
-  emby,
-  google,
-  icloud,
-  invidious,
   jellyfin,
-  mock,
+  emby,
   plex,
   webdav,
   yattee,
+  invidious,
+  icloudDrive,
+  googleDrive,
+  onedrive,
+  mockSource,
+  m3u,
+  stalker,
+  xtream,
+  systemPlayer,
+  ksplayer,
+  mpv,
+  vlc,
+  customServer,
+  icloudBackup,
+  googleDriveBackup,
+  onedriveBackup,
+  mockAccount,
 ];
 
+const context = () => fakeContext({ http: fakeHttp({}).client }).context;
+
 describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%s', (_, plugin) => {
-  it('has a sound manifest', () => {
-    expect(validateManifest(plugin.manifest)).toEqual([]);
+  const { manifest } = plugin;
+
+  it('has a sound manifest, in the category its id names, running somewhere', () => {
+    expect(validateManifest(manifest)).toEqual([]);
+    expect(manifest.category).toBeDefined();
+    expect(categoryOfPluginId(manifest.id)).toBe(manifest.category);
+    expect(manifest.platforms?.length ?? 0).toBeGreaterThan(0);
   });
 
   // A declared capability is a promise the app acts on. Every one of them
   // must be kept by a member of the connected provider.
   it('declares only media capabilities it implements', async () => {
-    const declared = plugin.manifest.media?.capabilities ?? [];
+    const declared = manifest.media?.capabilities ?? [];
     if (!plugin.media) {
       expect(declared).toEqual([]);
       return;
     }
-    expect(plugin.manifest.media).toBeDefined();
-    const provider = await plugin.media.connect(target({}), fakeContext({ http: fakeHttp({}).client }).context);
+    expect(manifest.media).toBeDefined();
+    const provider = await plugin.media.connect(target({}), context());
     for (const capability of declared) {
       for (const member of MEDIA_CAPABILITY_MEMBERS[capability] ?? []) {
         expect(typeof provider[member], `${capability} needs ${member}`).toBe('function');
@@ -50,16 +90,40 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     await provider.dispose();
   });
 
-  // The app hands an account only what it declares, and drops nothing on its
-  // side — a declared sync capability without an implementation loses data.
+  // A profile is what the app picks a player by; an engine not written yet states none.
+  it('states a player profile only for an engine it has', () => {
+    if (!manifest.player) return;
+    if (!plugin.player) expect(manifest.player.profiles).toEqual({});
+    else expect(typeof plugin.player.create).toBe('function');
+  });
+
+  it('has every member its account role promises', async () => {
+    if (!plugin.account) return;
+    expect(manifest.account).toBeDefined();
+    const account = await plugin.account.connect(target({}), context());
+    for (const member of ACCOUNT_MEMBERS) expect(typeof account[member], `the account role needs ${member}`).toBe('function');
+    if (manifest.account?.ownerProof) expect(typeof account.verifyOwner, 'ownerProof needs verifyOwner').toBe('function');
+    if (manifest.account?.signUp) expect(typeof account.createAccount, 'signUp needs createAccount').toBe('function');
+    await account.dispose();
+  });
+
+  it('has every member its backup role promises', async () => {
+    if (!plugin.backup) return;
+    expect(manifest.backup).toBeDefined();
+    const backup = await plugin.backup.connect(target({}), context());
+    for (const member of BACKUP_MEMBERS) expect(typeof backup[member], `the backup role needs ${member}`).toBe('function');
+    await backup.dispose();
+  });
+
+  // Phase 4's sync role, until Phase 6's S3 retires it.
   it('declares only sync capabilities it implements', async () => {
-    const declared = plugin.manifest.sync?.capabilities ?? [];
+    const declared = manifest.sync?.capabilities ?? [];
     if (!plugin.sync) {
       expect(declared).toEqual([]);
       return;
     }
-    expect(plugin.manifest.sync).toBeDefined();
-    const provider = await plugin.sync.connect(target({}), fakeContext({ http: fakeHttp({}).client }).context);
+    expect(manifest.sync).toBeDefined();
+    const provider = await plugin.sync.connect(target({}), context());
     for (const member of SYNC_PROVIDER_MEMBERS) {
       expect(typeof provider[member], `the sync role needs ${member}`).toBe('function');
     }
@@ -68,9 +132,8 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
         expect(typeof provider[member], `${capability} needs ${member}`).toBe('function');
       }
     }
-    // The owner check asks for a proof only an account that checks it may name, and sign-up needs its member.
-    if (plugin.manifest.sync?.ownerProof) expect(typeof provider.verifyOwner, 'ownerProof needs verifyOwner').toBe('function');
-    if (plugin.manifest.sync?.signUp) expect(typeof provider.createAccount, 'signUp needs createAccount').toBe('function');
+    if (manifest.sync?.ownerProof) expect(typeof provider.verifyOwner, 'ownerProof needs verifyOwner').toBe('function');
+    if (manifest.sync?.signUp) expect(typeof provider.createAccount, 'signUp needs createAccount').toBe('function');
     await provider.dispose();
   });
 });
@@ -80,6 +143,14 @@ it('gives every plugin a distinct id', () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-it('keeps media servers media-only: they are the master of their watch state', () => {
-  for (const server of [jellyfin, emby, plex]) expect(server.manifest.sync).toBeUndefined();
+it('keeps media servers sources: they are the master of their watch state', () => {
+  for (const server of [jellyfin, emby, plex]) {
+    expect(server.manifest.category).toBe('sources');
+    expect(server.manifest.sync).toBeUndefined();
+    expect(server.manifest.account).toBeUndefined();
+  }
+});
+
+it('keeps IPTV off the web, where portals send no CORS headers', () => {
+  for (const provider of [m3u, stalker, xtream]) expect(provider.manifest.platforms).not.toContain('web');
 });

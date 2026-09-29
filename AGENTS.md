@@ -21,11 +21,11 @@ test/                    vitest — api rules, plugins against fake HTTP, confor
 docs/
 ```
 
-**Transitional:** until Phase 6 regroups them, the plugins still sit one
-folder deep, `plugins/<id>/` with unqualified ids, and carry Phase 4's roles.
-Everything below describes the layout they move to.
+**Transitional:** the account code — `sync/custom-server` and `sync/mock` —
+still carries Phase 4's sync role until your own server becomes PocketBase,
+and `player-kit` arrives with the first player (Phase 7).
 
-npm workspaces (`["api", "player-kit", "plugins/*/*"]` once regrouped),
+npm workspaces (`["api", "plugins/*/*"]`, and `player-kit` when it exists),
 source-only — `"exports": "./src/index.ts"`, no build step. Every plugin lists
 `@sc/api` as a **peer** dependency: the host supplies the one instance, so
 branded IDs from the app and from a plugin are the same type.
@@ -309,8 +309,9 @@ the test of whether this architecture is real.
 
 ## Current state
 
-Phase 5 — the new architecture, written down; the code is Phase 4's until
-Phase 6 regroups it.
+Phase 6 — the code is moving to the new architecture. The plugins are in
+their category folders, with qualified ids; the account still speaks Phase 4's
+log.
 
 **`api` holds:**
 
@@ -326,15 +327,19 @@ Phase 6 regroups it.
 - the account role, record by record (`AccountRecord`, `isAccountRecord`), and
   the backup role
 - the host's crypto port (`PluginCrypto`), and bytes as text (`bytes.ts`)
-- until Phase 6: Phase 4's roles (`effectiveRoles`, `defaultRoles`) and its
-  log-based sync role (`sync.ts`), with sealed passwords and owner proofs
+- until the account moves to records: Phase 4's roles (`effectiveRoles`,
+  `defaultRoles`) and its log-based sync role (`sync.ts`), with sealed
+  passwords and owner proofs
 
 **The plugins:**
 
-- **Jellyfin** implements the media role.
-- **Mock** implements it with a fixed catalogue, and plays at being an account.
-- **Custom server** implements Phase 4's sync role against the Phase 4 server.
-- **Every other plugin** is a manifest that declares no capability.
+- **`sources/jellyfin`** implements the media role.
+- **`sources/mock`** implements it with a fixed catalogue; **`sync/mock`**
+  plays at being an account, on Phase 4's sync role.
+- **`sync/custom-server`** implements Phase 4's sync role against the Phase 4
+  server.
+- **Every other plugin** is a manifest that declares no capability: IPTV,
+  players with no profile, backup targets with no role.
 
 ## Verify
 

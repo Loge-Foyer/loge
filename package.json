@@ -5,7 +5,7 @@
   "type": "module",
   "workspaces": [
     "api",
-    "plugins/*"
+    "plugins/*/*"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",

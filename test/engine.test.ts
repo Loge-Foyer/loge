@@ -13,7 +13,7 @@ const MISSING_ON_HERMES: readonly { readonly pattern: RegExp; readonly instead: 
   { pattern: /\bfromBase64\(/, instead: 'decodeBase64Url from @sc/api' },
 ];
 
-const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../plugins/*/src/**/*.ts'], {
+const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../plugins/*/*/src/**/*.ts'], {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -21,7 +21,10 @@ const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../plugins/*/sr
 
 describe('code that runs on phones', () => {
   it('finds the source files it checks', () => {
-    expect(Object.keys(sources).length).toBeGreaterThan(10);
+    const files = Object.keys(sources);
+    expect(files.filter((file) => file.startsWith('../api/')).length).toBeGreaterThan(10);
+    // A glob that stops matching after the folders move would check nothing, and pass.
+    expect(files.some((file) => file.startsWith('../plugins/sources/jellyfin/src/'))).toBe(true);
   });
 
   it('uses no built-in that Hermes lacks', () => {

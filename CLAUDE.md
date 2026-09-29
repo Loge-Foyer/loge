@@ -80,8 +80,9 @@ handling stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
-Phase 5 — the new architecture, written down. The code keeps its Phase 4
-layout — `plugins/<id>/`, roles — until Phase 6 regroups it.
+Phase 6 — the code is moving to the new architecture. The plugins are in
+their category folders, with qualified ids, categories and platforms; the
+account still speaks Phase 4's log until your own server becomes PocketBase.
 
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and
@@ -89,14 +90,16 @@ layout — `plugins/<id>/`, roles — until Phase 6 regroups it.
   - per-profile values, the media contract with live TV and playback members
   - the player contract, the account role (records), the backup role
   - errors, the HTTP port and the host's crypto port
-  - Phase 4's roles and log-based sync role, still here until Phase 6
+  - Phase 4's roles and log-based sync role, until the account moves to
+    records
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
-- **Mock:** implements the media role with a fixed catalogue, and Phase 4's
-  sync role as a pretend account.
-- **Custom server:** implements Phase 4's sync role against the Phase 4 server.
-  Phase 6 moves it to PocketBase.
-- **Every other plugin:** a manifest.
+- **Mock:** `sources/mock` implements the media role with a fixed catalogue;
+  `sync/mock` implements Phase 4's sync role as a pretend account.
+- **Custom server:** implements Phase 4's sync role against the Phase 4 server,
+  until it moves to PocketBase.
+- **Every other plugin:** a manifest — the IPTV and player plugins and the
+  backup targets included.
 - **`npm run typecheck`:** two programs — `api` and the plugins with no host
   types at all, and the tests with Node's. Players get a third, with React
   Native's types, when the first one arrives.

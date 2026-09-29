@@ -57,9 +57,8 @@ run the sync server's tests too. Until Phase 6 that is the TypeScript server:
 
 ## Boundary checks
 
-These are rules, not lint, until someone writes the lint. Check by reading. The
-paths below cover both layouts: today's `plugins/<id>/src`, and the categories'
-`plugins/<category>/<name>/src` after Phase 6.
+These are rules, not lint, until someone writes the lint. Check by reading.
+Plugins sit at `plugins/<category>/<name>/src`.
 
 ```bash
 # api must import nothing from this project or any framework
@@ -77,9 +76,9 @@ find api/src plugins -type f -name '*.ts' -path '*/src/*' -not -path '*/players/
   -exec grep -HnE "\bfetch\(|new URL\(|\bconsole\.|\bsetTimeout\(|\bbtoa\(|\batob\(" {} +
 ```
 
-All four should return nothing. The `find` form works in zsh and bash alike,
-and in either layout. A glob such as `plugins/*/*/src` would abort in zsh
-wherever it matches nothing.
+All four should return nothing. The `find` form works in zsh and bash alike.
+A glob such as `plugins/*/*/src` would abort in zsh wherever it matches
+nothing.
 
 - The compiler already refuses host globals (`lib: ["esnext"]`); the last grep
   catches them in files it has not seen yet.
@@ -137,12 +136,14 @@ state an account quietly drops.
 - the account role, by record, with fixtures shared with the server
 - the backup role
 - the host's crypto port
-- Phase 4's roles and log-based sync role, until Phase 6
+- Phase 4's roles and log-based sync role, until the account moves to records
 
-**The plugins:**
+**The plugins,** in their category folders with qualified ids:
 
-- **Jellyfin and the mock** implement the media role.
-- **The mock and `custom-server`** implement Phase 4's sync role.
+- **`sources/jellyfin` and `sources/mock`** implement the media role.
+- **`sync/mock` and `sync/custom-server`** implement Phase 4's sync role.
+- **Every other plugin** is a manifest: IPTV, the players with no profile,
+  and the backup targets.
 
 **Passing checks prove:**
 

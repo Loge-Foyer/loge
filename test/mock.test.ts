@@ -1,5 +1,5 @@
 import type { ConnectedMediaProvider, FieldValues, ItemPage, MediaItem } from '@sc/api';
-import { plugin } from '@sc/plugin-mock';
+import { plugin } from '@sc/source-mock';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';

@@ -1,5 +1,5 @@
 import { syncCursor, userId, type ConnectedUserStateSyncProvider, type FieldValues, type SyncChange, type SyncCursor } from '@sc/api';
-import { plugin } from '@sc/plugin-mock';
+import { plugin } from '@sc/sync-mock';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';

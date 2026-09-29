@@ -13,8 +13,6 @@ test/                 vitest: the api rules, each implemented plugin against a f
 docs/
 ```
 
-Until Phase 6 regroups them, plugins sit one level up, at `plugins/<id>/`.
-
 ```bash
 npm install         # npm workspaces: links api and every plugin
 npm run typecheck

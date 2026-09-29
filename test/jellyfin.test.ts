@@ -12,12 +12,12 @@ import {
   type Season,
   type Show,
 } from '@sc/api';
-import { plugin } from '@sc/plugin-jellyfin';
+import { plugin } from '@sc/source-jellyfin';
 import { describe, expect, it } from 'vitest';
 
-import { fnv1a64 } from '../plugins/jellyfin/src/hash';
-import { bucket } from '../plugins/jellyfin/src/images';
-import { normalizeBaseUrl } from '../plugins/jellyfin/src/url';
+import { fnv1a64 } from '../plugins/sources/jellyfin/src/hash';
+import { bucket } from '../plugins/sources/jellyfin/src/images';
+import { normalizeBaseUrl } from '../plugins/sources/jellyfin/src/url';
 import * as fixtures from './fixtures/jellyfin';
 import { fakeContext, fakeHttp, target, type Route } from './support/fake-http';
 

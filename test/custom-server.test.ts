@@ -9,7 +9,7 @@ import {
   type PluginCrypto,
   type SyncChange,
 } from '@sc/api';
-import { plugin } from '@sc/plugin-custom-server';
+import { plugin } from '@sc/sync-custom-server';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext } from './support/fake-http';

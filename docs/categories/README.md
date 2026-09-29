@@ -15,8 +15,8 @@ category and declares that category's one block.
 The app's Settings → Plugins has the same four lists, and shows only plugins
 whose `platforms` include the one it runs on.
 
-**Until Phase 6 regroups the folders**, plugins sit at `plugins/<id>/` with
-unqualified ids, and declare Phase 4's roles.
+**Until the account moves to records**, `sync/custom-server` and `sync/mock`
+still declare Phase 4's `sync` block.
 
 ## Sources
 

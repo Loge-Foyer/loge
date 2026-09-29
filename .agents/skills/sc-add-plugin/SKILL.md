@@ -9,10 +9,9 @@ Read `docs/categories/`, `docs/writing-a-plugin/` and
 `../.claude/streaming-center-architecture.md` section 7 first. This is the
 working checklist.
 
-**Transitional:** until Phase 6 regroups the folders, existing plugins sit at
-`plugins/<id>/` with Phase 4's roles. A plugin added before then still goes
-where the others are, with the category and platforms declared, so it moves
-with them.
+**Transitional:** until the account moves to records, `sync/custom-server`
+and `sync/mock` declare Phase 4's `sync` block. A new sync plugin declares
+`account` or `backup`.
 
 ## The test of success
 
@@ -208,10 +207,12 @@ npm test
   with the server)
 - the backup role
 
-Phase 4's roles and log-based sync role stay until Phase 6.
+Phase 4's roles and log-based sync role stay until the account moves to
+records.
 
 **Read these before writing another:**
 
-- `plugins/jellyfin` — the reference implementation of a media role
-- `plugins/mock` — a partial one, on purpose
-- `plugins/custom-server` — Phase 4's account
+- `plugins/sources/jellyfin` — the reference implementation of a media role
+- `plugins/sources/mock` — a partial one, on purpose
+- `plugins/sync/custom-server` — Phase 4's account, until it moves to
+  PocketBase

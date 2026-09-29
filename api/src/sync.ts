@@ -207,7 +207,8 @@ export const SYNC_CAPABILITY_MEMBERS: Readonly<
 export const MAX_CHANGE_LENGTH = 256 * 1024;
 
 const PIN = /^\d{4}$/;
-const PLUGIN_ID = /^[a-z][a-z0-9-]*$/;
+// A plugin's id: its name, or — once qualified by category — `category/name`.
+const PLUGIN_ID = /^[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)?$/;
 // A version, then base64url parts: a newer app's version passes, and is left unopened.
 const SEALED = /^v[1-9][0-9]*(?:\.[A-Za-z0-9_-]+)+$/;
 const MAX_SEALED = 4 * 1024;

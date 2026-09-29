@@ -16,6 +16,3 @@ build step, and the app links it straight from this repository.
 - **Native code** in a player plugin is picked up by the app's development
   build through Expo's autolinking. A native change means building the app
   again.
-
-Until Phase 6 regroups them, the packages are `@sc/plugin-<id>` at
-`plugins/<id>/`.
