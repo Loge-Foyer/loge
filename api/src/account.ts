@@ -1,3 +1,4 @@
+import { encodeHex, encodeUtf8 } from './bytes';
 import { CATEGORY_SCOPE, categoryOfPluginId } from './category';
 import { PER_PROFILE_MODES, type PerProfile } from './connection';
 import type { PluginContext, PluginTarget } from './context';
@@ -140,6 +141,22 @@ export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): s
     default:
       return `${String(parts.connectionId)}/${String(parts.userId)}`;
   }
+}
+
+/**
+ * A record's id on your own server: the first 15 hex digits of SHA-256 over
+ * the account's id, the kind and the key, a line apart. Derived, never chosen:
+ * a resent write lands on the same record, two accounts on one server never
+ * collide, and the server derives the same for the profile it creates at
+ * sign-up. PocketBase's ids are 15 characters of `[a-z0-9]`.
+ */
+export async function recordId(
+  sha256: (data: Uint8Array) => Promise<Uint8Array>,
+  accountId: string,
+  kind: RecordKind,
+  key: string,
+): Promise<string> {
+  return encodeHex(await sha256(encodeUtf8(`${accountId}\n${kind}\n${key}`))).slice(0, 15);
 }
 
 /**

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import {
@@ -6,9 +7,11 @@ import {
   isAccountRecord,
   MAX_RECORD_LENGTH,
   pluginId,
+  recordId,
   recordKey,
   userId,
   type AccountRecord,
+  type RecordKind,
 } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
@@ -16,7 +19,21 @@ import { describe, expect, it } from 'vitest';
 const fixtures = JSON.parse(readFileSync(new URL('../api/fixtures/account-records.json', import.meta.url), 'utf8')) as {
   readonly valid: readonly unknown[];
   readonly invalid: readonly { readonly why: string; readonly record: unknown }[];
+  readonly recordIds: readonly { readonly accountId: string; readonly kind: RecordKind; readonly key: string; readonly id: string }[];
 };
+
+const sha256 = async (data: Uint8Array) => new Uint8Array(createHash('sha256').update(data).digest());
+
+describe('recordId', () => {
+  // The server derives the same, from the same vectors: the first profile it creates must be the one a device writes.
+  it.each(fixtures.recordIds.map((vector) => [`${vector.kind} ${vector.key}`, vector] as const))('derives %s', async (_, vector) => {
+    expect(await recordId(sha256, vector.accountId, vector.kind, vector.key)).toBe(vector.id);
+  });
+
+  it('answers what PocketBase takes for an id', async () => {
+    expect(await recordId(sha256, 'k4r9x2m1q8w3e5t', 'profile', 'u1')).toMatch(/^[a-z0-9]{15}$/);
+  });
+});
 
 describe('isAccountRecord', () => {
   it.each(fixtures.valid.map((record) => [JSON.stringify(record).slice(0, 80), record] as const))('accepts %s', (_, record) => {

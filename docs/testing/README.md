@@ -28,7 +28,8 @@ plugin arrives:
 - `account.test.ts` — `isAccountRecord` over `api/fixtures/account-records.json`,
   every valid record accepted and every invalid one refused. The sync server's
   Go tests read the same file, so both sides judge a record alike. Also the
-  size limit and `recordKey`.
+  size limit, `recordKey`, and `recordId` against the file's vectors, which the
+  server derives too.
 - `player.test.ts` — `canPlay`, `missingFor` and `choosePlayer`: the preferred
   player when it can, the others in order, sources best first, and "none".
 - `effective.test.ts` — the effective-capabilities rule: connections off,

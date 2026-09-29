@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { decodeBase64Url, decodeUtf8, encodeBase64, encodeBase64Url, encodeUtf8 } from '@sc/api';
+import { decodeBase64Url, decodeUtf8, encodeBase64, encodeBase64Url, encodeHex, encodeUtf8 } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 const ascii = (text: string) => Uint8Array.from(text, (char) => char.charCodeAt(0));
@@ -46,6 +46,14 @@ describe('base64', () => {
 
   it('refuses what is not unpadded base64url, written the one way it can be', () => {
     for (const text of ['Zg==', 'Zm9v+', 'Zm9v/', 'Z', 'Zh', 'Zm9 v']) expect(decodeBase64Url(text), text).toBeUndefined();
+  });
+});
+
+describe('hex', () => {
+  it('matches Node for every byte', () => {
+    const bytes = Uint8Array.from({ length: 256 }, (_, index) => index);
+    expect(encodeHex(bytes)).toBe(Buffer.from(bytes).toString('hex'));
+    expect(encodeHex(randomBytes(33))).toMatch(/^[0-9a-f]{66}$/);
   });
 });
 

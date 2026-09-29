@@ -30,7 +30,7 @@ without learning about the others.
 | `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, PBKDF2, HKDF, AES-GCM — and `KdfParams` with `isKdfParams`. |
 | `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with. |
 | `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. |
-| `account.ts` | The account role: `AccountRecord` and its kinds, `AccountSnapshot`, `PushOutcome`, `AccountInfo`, `ConnectedAccount`, `recordKey()` and `isAccountRecord()`, and `DEFAULT_MAX_PROFILES`. |
+| `account.ts` | The account role: `AccountRecord` and its kinds, `AccountSnapshot`, `PushOutcome`, `AccountInfo`, `ConnectedAccount`, `recordKey()`, `recordId()` and `isAccountRecord()`, and `DEFAULT_MAX_PROFILES`. |
 | `backup.ts` | The backup role: `ConnectedBackupTarget` — `stat`, `read`, `write` with `ifMatch`, `list`. |
 | `sync.ts` | Phase 4's log-based sync role, until Phase 6 retires it. |
 
@@ -175,6 +175,10 @@ const { records } = await account.pull(); // every record of the account
   typed again.
 - **`isAccountRecord()`** checks anything that arrives; the app runs it on
   every record it reads.
+- **`recordId()`** is a record's id on your own server: SHA-256 over the
+  account's id, the kind and the key. Derived, never chosen, so a resent write
+  lands on the same record — and the server derives the same for the profile
+  it creates at sign-up.
 
 ## The backup contract
 

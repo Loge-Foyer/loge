@@ -58,6 +58,13 @@ function encode(bytes: Uint8Array, alphabet: string, pad: boolean): string {
   return text;
 }
 
+/** Lowercase hexadecimal, two digits a byte. */
+export function encodeHex(bytes: Uint8Array): string {
+  let text = '';
+  for (const byte of bytes) text += (byte < 16 ? '0' : '') + byte.toString(16);
+  return text;
+}
+
 /** UTF-8, with a lone surrogate written as U+FFFD — as `TextEncoder` writes it. */
 export function encodeUtf8(text: string): Uint8Array {
   const bytes: number[] = [];
