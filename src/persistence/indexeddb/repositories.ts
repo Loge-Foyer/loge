@@ -1,4 +1,4 @@
-import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, UserId } from '@sc/api';
+import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
 
 import type {
   AccountRepository,
@@ -12,6 +12,8 @@ import type {
   JournalEntry,
   JournalRepository,
   MediaCacheRepository,
+  OutboxEntry,
+  OutboxRepository,
   PreferencesRepository,
   ProfileValues,
   Repositories,
@@ -20,11 +22,14 @@ import type {
   StoredUser,
   UserPreferences,
   UserRepository,
+  WatchStatusRepository,
 } from '@/services/ports';
 import { accountWide } from '@/services/scope';
+import { itemKeyOf } from '@/services/watch/item-key';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
+import { SUPERSEDES } from '../outbox';
 import type { WriteOptions } from '../writes';
 import { request, walk, type IndexedDbEnvironment } from './idb';
 import type { StoreName } from './migrations';
@@ -67,6 +72,27 @@ interface MediaDetailRecord {
   readonly fingerprint: string;
   readonly detail: MediaDetail;
   readonly savedAt: number;
+}
+
+interface WatchRecord {
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  readonly externalId: string;
+  readonly status: WatchStatus;
+  readonly item?: MediaItem;
+  readonly updatedAt: number;
+}
+
+interface OutboxRecord {
+  readonly seq?: number;
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  readonly externalId: string;
+  readonly kind: PlaybackReport['kind'];
+  readonly report: PlaybackReport;
+  readonly createdAt: number;
+  readonly attempts: number;
+  readonly notBefore?: number;
 }
 
 function toUser({ position: _position, version: _version, ...user }: UserRecord): StoredUser {
@@ -136,7 +162,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<UserRecord>('users', id);
       if (!row) return;
       await request(store('users').delete(id));
-      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails'] as const) {
+      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox'] as const) {
         await deleteWhere(name, 'byUser', id);
       }
       await record({ userId: id, entity: 'user', entityId: id, operation: 'delete', localVersion: row.version + 1 });
@@ -171,7 +197,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<ConnectionRecord>('connections', id);
       if (!row) return;
       await request(store('connections').delete(id));
-      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails'] as const) {
+      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
       await request(store('backupState').delete(id));
@@ -335,6 +361,79 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  const watchStatus: WatchStatusRepository = {
+    get: async (user, key) => {
+      const row = await get<WatchRecord>('watchStatus', [user, key.connectionId, key.externalId]);
+      return row && toWatchEntry(row);
+    },
+    list: async (user) =>
+      (await request(store('watchStatus').index('byUser').getAll(user) as IDBRequest<WatchRecord[]>))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map(toWatchEntry),
+    put: async (user, entry) => {
+      if (!(await parentsExist(user, entry.key.connectionId))) return;
+      await request(
+        store('watchStatus').put({
+          userId: user,
+          connectionId: entry.key.connectionId,
+          externalId: entry.key.externalId,
+          status: entry.status,
+          ...(entry.item ? { item: entry.item } : {}),
+          updatedAt: entry.updatedAt,
+        } satisfies WatchRecord),
+      );
+    },
+    prune: async (before) => {
+      const rows = await request(store('watchStatus').index('byUpdatedAt').getAll(env.IDBKeyRange.upperBound(before, true)) as IDBRequest<WatchRecord[]>);
+      for (const row of rows) {
+        const waiting = await request(store('outbox').index('byItem').count([row.userId, row.connectionId, row.externalId]));
+        if (waiting === 0) await request(store('watchStatus').delete([row.userId, row.connectionId, row.externalId]));
+      }
+    },
+  };
+
+  const outbox: OutboxRepository = {
+    add: async (user, report) => {
+      const { connectionId: connection, externalId } = report.key;
+      if (!(await parentsExist(user, connection))) return;
+      const superseded = SUPERSEDES[report.kind];
+      if (superseded.length > 0) {
+        const waiting = await request(store('outbox').index('byItem').getAll([user, connection, externalId]) as IDBRequest<OutboxRecord[]>);
+        for (const row of waiting) {
+          if (row.seq !== undefined && superseded.includes(row.kind)) await request(store('outbox').delete(row.seq));
+        }
+      }
+      await request(
+        store('outbox').add({
+          userId: user,
+          connectionId: connection,
+          externalId,
+          kind: report.kind,
+          report,
+          createdAt: clock.now(),
+          attempts: 0,
+        } satisfies OutboxRecord),
+      );
+    },
+    list: async () => (await request(store('outbox').getAll() as IDBRequest<OutboxRecord[]>)).flatMap((row) => toOutboxEntry(row) ?? []),
+    pendingKeys: async (user) =>
+      new Set(
+        (await request(store('outbox').index('byUser').getAll(user) as IDBRequest<OutboxRecord[]>)).map((row) =>
+          itemKeyOf({ connectionId: row.connectionId, externalId: row.externalId }),
+        ),
+      ),
+    remove: async (seq) => {
+      await request(store('outbox').delete(seq));
+    },
+    defer: async (seq, attempts, notBefore) => {
+      const row = await get<OutboxRecord>('outbox', seq);
+      if (row) await request(store('outbox').put({ ...row, attempts, notBefore } satisfies OutboxRecord));
+    },
+    clear: async () => {
+      await request(store('outbox').clear());
+    },
+  };
+
   const staleSecrets: StaleSecretQueue = {
     add: async (refs) => {
       for (const ref of refs) await request(store('staleSecrets').put({ ref }));
@@ -385,5 +484,26 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, journal };
+}
+
+function toWatchEntry(row: WatchRecord) {
+  return {
+    key: { connectionId: row.connectionId, externalId: row.externalId },
+    status: row.status,
+    ...(row.item ? { item: row.item } : {}),
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toOutboxEntry(row: OutboxRecord): OutboxEntry | undefined {
+  if (row.seq === undefined) return undefined;
+  return {
+    seq: row.seq,
+    userId: row.userId,
+    report: row.report,
+    createdAt: row.createdAt,
+    attempts: row.attempts,
+    ...(row.notBefore === undefined ? {} : { notBefore: row.notBefore }),
+  };
 }

@@ -60,6 +60,20 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       get: (id) => read((r) => r.backupState.get(id)),
       put: (state) => write((r) => r.backupState.put(state)),
     },
+    watchStatus: {
+      get: (userId, key) => read((r) => r.watchStatus.get(userId, key)),
+      list: (userId) => read((r) => r.watchStatus.list(userId)),
+      put: (userId, entry) => write((r) => r.watchStatus.put(userId, entry)),
+      prune: (before) => write((r) => r.watchStatus.prune(before)),
+    },
+    outbox: {
+      add: (userId, report) => write((r) => r.outbox.add(userId, report)),
+      list: () => read((r) => r.outbox.list()),
+      pendingKeys: (userId) => read((r) => r.outbox.pendingKeys(userId)),
+      remove: (seq) => write((r) => r.outbox.remove(seq)),
+      defer: (seq, attempts, notBefore) => write((r) => r.outbox.defer(seq, attempts, notBefore)),
+      clear: () => write((r) => r.outbox.clear()),
+    },
     journal: {
       entries: (after, limit) => read((r) => r.journal.entries(after, limit)),
       head: () => read((r) => r.journal.head()),

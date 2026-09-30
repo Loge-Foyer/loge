@@ -8,11 +8,13 @@ import {
   type ConnectedMediaProvider,
   type HttpClient,
   type MediaItem,
+  type GlobalMediaKey,
   type Movie,
   type PlatformId,
   type Plugin,
   type PluginManifest,
   type ConnectionId,
+  type ProgressReport,
 } from '@sc/api';
 
 import initSqlJs from 'sql.js';
@@ -40,6 +42,8 @@ import type { SyncParts } from '@/services/sync/parts';
 import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
+import { createWatchService } from '@/services/watch';
+import { createOutboxDrainer } from '@/services/watch/drainer';
 
 import { testCrypto } from './crypto';
 import { openTestDatabase, type Engine, type TestDatabaseOptions } from './engines';
@@ -91,6 +95,8 @@ export interface FakeSourceOptions {
   readonly signsIn?: boolean;
   /** A field that says nothing of where or as whom it signs in — as Jellyfin's "local only". */
   readonly withNote?: boolean;
+  /** Takes progress and watched state back (`watchStateWrite`), recording each report. */
+  readonly writesWatchState?: boolean;
 }
 
 /** A media plugin backed by lists, with the counters a test needs to see what was asked. */
@@ -103,6 +109,8 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     signedInWith: [] as Record<string, string>[],
     /** Where each sign-in went. */
     signedInAt: [] as string[],
+    /** What reached the source, in order: `started 0`, `stopped 90000`, `played true`. */
+    reports: [] as string[],
   };
   const manifest: PluginManifest = {
     id: pluginId(`sources/${id}`),
@@ -112,7 +120,12 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     description: `The ${id} test source.`,
     media: {
       contentKinds: ['movies', 'shows'],
-      capabilities: ['browse', 'watchStateRead', ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : [])],
+      capabilities: [
+        'browse',
+        'watchStateRead',
+        ...(options.writesWatchState ? (['watchStateWrite'] as const) : []),
+        ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
+      ],
     },
     connectionFields: [
       { key: 'serverUrl', label: 'Server', type: 'url', required: true },
@@ -169,6 +182,18 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
           },
           ...(options.withImages
             ? { resolveImage: (ref: string, size: { width: number }) => ({ uri: `https://img.test/${ref}?w=${size.width}` }) }
+            : {}),
+          ...(options.writesWatchState
+            ? {
+                reportPlayback: async (report: ProgressReport) => {
+                  await fail();
+                  stats.reports.push(`${report.key.externalId} ${report.kind} ${report.positionMs}`);
+                },
+                setPlayed: async (key: GlobalMediaKey, played: boolean) => {
+                  await fail();
+                  stats.reports.push(`${key.externalId} played ${played}`);
+                },
+              }
             : {}),
           dispose: async () => {
             stats.disposed += 1;
@@ -233,18 +258,21 @@ export function buildServices(options: {
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
+  const activity = fakeActivity();
+  const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log: silentLog, afterQueueMs: 0 });
+  const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
   const media = createMediaService({
     sources,
     pool,
     probeSecrets: connections.probeSecrets,
     network,
     cache: db.mediaCache,
+    watch,
     clock,
     log: silentLog,
   });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
-  const activity = fakeActivity();
   const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity });
   const account = createAccountService({
     db,
@@ -311,6 +339,8 @@ export function buildServices(options: {
     ownerAuthentication,
     parts,
     lock,
+    drainer,
+    pool,
     services: {
       catalog,
       session,
@@ -327,6 +357,7 @@ export function buildServices(options: {
       backupTargets,
       files: options.files ?? unusedFiles,
       players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
+      watch,
     },
   };
 }

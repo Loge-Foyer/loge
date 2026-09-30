@@ -17,6 +17,8 @@ export const STORES = [
   'mediaDetails',
   'account',
   'backupState',
+  'watchStatus',
+  'outbox',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -105,6 +107,17 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     };
     rewriteEach<{ readonly key: string }>(tx, 'deviceSettings', (setting) => (setting.key === 'plugins' || setting.key === 'leftAccountAt' ? null : undefined));
     tx.objectStore('journal').clear();
+  },
+  // Watch status and its outbox: as SQLite's v5.
+  (db) => {
+    const watch = db.createObjectStore('watchStatus', { keyPath: ['userId', 'connectionId', 'externalId'] });
+    watch.createIndex('byUser', 'userId');
+    watch.createIndex('byConnection', 'connectionId');
+    watch.createIndex('byUpdatedAt', 'updatedAt');
+    const outbox = db.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true });
+    outbox.createIndex('byUser', 'userId');
+    outbox.createIndex('byConnection', 'connectionId');
+    outbox.createIndex('byItem', ['userId', 'connectionId', 'externalId']);
   },
 ];
 

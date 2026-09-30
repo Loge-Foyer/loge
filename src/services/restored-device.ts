@@ -12,7 +12,8 @@ export type DeviceCheck = 'first' | 'same' | 'restored';
  * another phone's, and stale: pushed, it would put back what that phone had
  * changed long before. So the database keeps a fingerprint of the key — never
  * the key, which must not travel — and when it no longer matches, the pending
- * journal goes, and the account's session with it. The next run reads the
+ * journal goes — and the watch outbox, whose old positions would overwrite
+ * the source's — and the account's session with it. The next run reads the
  * account and takes the server's version of everything; a row the server
  * never had is sent again, as for a server that lost it.
  */
@@ -29,6 +30,8 @@ export async function checkRestoredDevice(deps: {
     await tx.deviceSettings.update((current) => ({ ...current, deviceKeyPrint: print }));
     if (known === undefined) return;
     await tx.journal.prune(await tx.journal.head());
+    // Progress reported from another phone, perhaps months ago, would put an old position back on the source.
+    await tx.outbox.clear();
     const account = await tx.account.get();
     if (account?.kind === 'server') await tx.staleSecrets.add([sessionRef(account.connectionId, 'account')]);
   });

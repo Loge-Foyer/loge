@@ -4,8 +4,9 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Database v4 — the account model — and the
-backup file are in place; watch status (v5) comes in Phase 7. Phase 4's model — the account as one of the device's connections,
+This page describes the target. Database v5 — the account model, and watch
+status with its outbox — and the backup file are in place. Phase 4's model —
+the account as one of the device's connections,
 synced through a log, with passwords sealed on the device — is in this page's
 history in git.
 
@@ -279,7 +280,20 @@ The steps, the same on both engines:
   without profiles meets `needs-account`. Every profile, connection and
   password survives. An account on Phase 4's server is signed in to again, on
   the new server.
-- **v5** (Phase 7) — watch status and its outbox (`docs/playback`).
+- **v5** (Phase 7) — watch status and its outbox (`docs/playback`):
+  - `watch_status`, keyed `(user_id, connection_id, external_id)`: this
+    device's state for an item it played or marked — the `WatchStatus`, the
+    item as last seen (only where its metadata may be kept) and when.
+  - `outbox`: reports waiting for the source, in `seq` order, with their
+    attempts and when to try again. An item's newest progress replaces the
+    progress before it, a stop takes that progress along, and the newest
+    watched state replaces the one before it (`persistence/outbox.ts`), so an
+    evening offline stays a short queue.
+  - Both cascade from `users` and `connections` — on IndexedDB through their
+    `byUser` and `byConnection` indexes — and neither is journaled, carried
+    to your server or written into a backup. A phone restored from another's
+    backup clears the outbox: its old positions would overwrite newer ones.
+    Watch state nothing waits for is pruned after 30 days.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the
@@ -353,8 +367,9 @@ device, per profile and per source:
   source's own order), the grid's first page, Continue Watching, a show's
   seasons and episodes, and a detail page once it has been opened — and for
   IPTV, the channel list and the guide (Phase 7). Watch status is kept as the
-  source reported it, inside each item. A separate watch-status cache, with the
-  outbox that sends changes back, arrives with playback (v5).
+  source reported it, inside each item; what this device changed since lives
+  in `watch_status` and the outbox (v5), and is laid over it until the source
+  has heard.
 - **Only where allowed.** Nothing is kept unless the source declares
   `offlineMetadata` — stable ids, artwork versioned by tag — and the
   connection's "Keep metadata on this device" switch is on for that profile.

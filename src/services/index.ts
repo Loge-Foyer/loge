@@ -14,6 +14,7 @@ import type { SessionService } from './session';
 import type { SourceService } from './sources';
 import type { Applied } from './sync/parts';
 import type { SyncStatus } from './sync/engine';
+import type { WatchService } from './watch';
 
 /** The sync engine as screens see it: how it stands, what it brought, and "Sync now". */
 export interface SyncService {
@@ -43,4 +44,6 @@ export interface Services {
   readonly files: FileExchange;
   /** This device's players: which are on, and which plays first. */
   readonly players: PlayerService;
+  /** Watch status for sources that master it: written here first, carried to them by the outbox. */
+  readonly watch: WatchService;
 }

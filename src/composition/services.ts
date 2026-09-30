@@ -33,6 +33,8 @@ import { createSyncEngine } from '@/services/sync/engine';
 import type { SyncParts } from '@/services/sync/parts';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
+import { createWatchService } from '@/services/watch';
+import { createOutboxDrainer } from '@/services/watch/drainer';
 
 import { plugins } from './plugins';
 import { createStorage } from './storage';
@@ -82,19 +84,22 @@ export function createServices(): AppServices {
     ids,
     onChanged: (id) => pool.forgetConnection(id),
   });
+  const activity = createAppActivity();
+  const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log });
+  const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
   const media = createMediaService({
     sources,
     pool,
     probeSecrets: connections.probeSecrets,
     network,
     cache: db.mediaCache,
+    watch,
     clock,
     log,
   });
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
 
-  const activity = createAppActivity();
   const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity });
   const account = createAccountService({
     db,
@@ -158,7 +163,14 @@ export function createServices(): AppServices {
       connections,
       sources,
       homeLayout,
-      media,
+      // Pull to refresh tries parked sources again: the outbox's reports too.
+      media: {
+        ...media,
+        unpark: () => {
+          media.unpark();
+          drainer.kick();
+        },
+      },
       account,
       owner,
       sync: { status: engine.status, subscribe: engine.subscribe, onApplied: engine.onApplied, now: scheduler.now },
@@ -166,6 +178,7 @@ export function createServices(): AppServices {
       backupTargets,
       files: createFileExchange(log),
       players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
+      watch,
     },
     start: async () => {
       // Before anything reads the journal: another phone's, restored here, is never sent.
@@ -178,8 +191,10 @@ export function createServices(): AppServices {
       // A storage failure lands on the boot screen's "could not start", never on an endless splash.
       await session.start();
       void media.prune();
+      void watch.prune().catch((error: unknown) => log.warn('storage', 'Old watch state could not be pruned', { error: String(error) }));
       scheduler.start();
       backupTargets.start();
+      drainer.start();
     },
   };
 }

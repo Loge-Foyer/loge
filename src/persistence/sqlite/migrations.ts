@@ -149,7 +149,39 @@ export const MIGRATIONS: readonly SqlMigration[] = [
     },
   },
   { version: 4, up: accountModel },
+  { version: 5, up: (tx) => tx.exec(V5) },
 ];
+
+// Watch status, for sources that master it (Phase 7): a cache per profile,
+// and the outbox that carries this device's changes to the source. Both are
+// the device's: never journaled, never in a backup.
+const V5 = `
+CREATE TABLE watch_status (
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  item TEXT,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, connection_id, external_id)
+) STRICT;
+CREATE INDEX watch_status_connection ON watch_status (connection_id);
+CREATE INDEX watch_status_updated_at ON watch_status (updated_at);
+
+CREATE TABLE outbox (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  report TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL,
+  not_before INTEGER
+) STRICT;
+CREATE INDEX outbox_item ON outbox (user_id, connection_id, external_id);
+CREATE INDEX outbox_connection ON outbox (connection_id);
+`;
 
 // One account per device, local or on your own server (Phase 6). Phase 4's
 // account — every sync-category connection — goes with every secret it held:

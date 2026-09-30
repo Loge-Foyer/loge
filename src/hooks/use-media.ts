@@ -158,9 +158,14 @@ export function useArtworkHeaders(connectionId: ConnectionId, ref: HeadersRef | 
   });
 }
 
-/** Mounted once for the signed-in app: a changed network means parked sources may answer now. */
+/**
+ * Mounted once for the signed-in app. A changed network means parked sources
+ * may answer now. A stop or a watched state changes Continue Watching, the
+ * item and its season at once; rows and grids only go stale — refetching
+ * every server for one film would be out of all proportion.
+ */
 export function useMediaEffects() {
-  const { media } = useServices();
+  const { media, watch } = useServices();
   const client = useQueryClient();
   useEffect(
     () =>
@@ -168,6 +173,16 @@ export function useMediaEffects() {
         void client.invalidateQueries({ predicate: (query) => isRemoteKey(query.queryKey) });
       }),
     [client, media],
+  );
+  useEffect(
+    () =>
+      watch.subscribe(({ userId, key }) => {
+        for (const part of ['continue', 'children'] as const) void client.invalidateQueries({ queryKey: remoteKey(userId, part) });
+        void client.invalidateQueries({ queryKey: remoteKey(userId, 'saved', 'continue') });
+        void client.invalidateQueries({ queryKey: remoteKey(userId, 'item', key.connectionId, key.externalId) });
+        for (const part of ['row', 'grid'] as const) void client.invalidateQueries({ queryKey: remoteKey(userId, part), refetchType: 'none' });
+      }),
+    [client, watch],
   );
 }
 

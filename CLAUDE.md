@@ -73,6 +73,9 @@ What runs today:
 - Players' switches and which plays first, per device. The built-in
   player's engine is in the build — expo-video on phones, `<video>` with
   hls.js on the web — and nothing opens it yet; Videos still shows skeletons.
+- Watch status (database v5): the cache and the outbox written together,
+  a drainer carrying them to the source, and this device's state shown until
+  the source has heard — ready for the player screen.
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

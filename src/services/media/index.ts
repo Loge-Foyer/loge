@@ -1,6 +1,5 @@
 import {
   AppError,
-  mergeSorted,
   type CancelSignal,
   type ConnectedMediaProvider,
   type ConnectionId,
@@ -27,6 +26,8 @@ import type { ConnectionService, SecretScope, ValuesDraft } from '../connections
 import type { Clock, Logger, MediaCacheRepository, NetworkMonitor, SavedList } from '../ports';
 import type { Source, SourceService } from '../sources';
 import { showsOn } from '../tab-content';
+import { inProgress, type WatchService } from '../watch';
+import { itemKeyOf } from '../watch/item-key';
 import { isAborted, sourceError, toAppError, type SourceError } from './errors';
 import { byLastPlayed, isExhausted, mergeRows, takeMerged, type MergeState, type SourceCursor } from './merge';
 import { fingerprintOf, type ProviderPool } from './pool';
@@ -140,10 +141,12 @@ export function createMediaService(deps: {
   probeSecrets: ConnectionService['probeSecrets'];
   network: NetworkMonitor;
   cache: MediaCacheRepository;
+  /** This device's watch state, laid over what sources answer until they have heard it. */
+  watch: Pick<WatchService, 'overlay' | 'waiting'>;
   clock: Clock;
   log: Logger;
 }): MediaService {
-  const { sources, pool, probeSecrets, network, cache, clock, log } = deps;
+  const { sources, pool, probeSecrets, network, cache, watch, clock, log } = deps;
   const listeners = new Set<() => void>();
   // The sources each profile last used, for work that cannot wait on a lookup.
   const live = new Map<UserId, ReadonlyMap<ConnectionId, Source>>();
@@ -278,6 +281,27 @@ export function createMediaService(deps: {
     return found.filter((entry) => entry !== undefined);
   };
 
+  /**
+   * Continue Watching: the sources' resume lists with this device's state laid
+   * over them — marked watched here, gone from it — and what was watched here
+   * that a source has not heard of yet.
+   */
+  const resumeRow = async (userId: UserId, lists: readonly (readonly MediaItem[])[], from: readonly Source[], limit: number) => {
+    const listed = await watch.overlay(userId, lists.flat());
+    const known = new Set(listed.map((item) => itemKeyOf(item.key)));
+    const connections = new Set(from.map((source) => source.connection.id));
+    const added = (await watch.waiting(userId)).filter((item) => connections.has(item.key.connectionId) && !known.has(itemKeyOf(item.key)));
+    return [...listed, ...added]
+      .filter((item) => inProgress(item.watch))
+      .sort(byLastPlayed)
+      .slice(0, limit);
+  };
+
+  const withWatch = async (userId: UserId, detail: MediaDetail): Promise<MediaDetail> => {
+    const [item] = await watch.overlay(userId, [detail.item]);
+    return item === detail.item || !item ? detail : { ...detail, item };
+  };
+
   const probe = async <T>(target: ProbeTarget, run: (provider: ConnectedMediaProvider) => Promise<T>): Promise<T> => {
     const credentials = await probeSecrets(target.pluginId, target.connectionId, target.scope, target.secrets);
     const provider = await pool.probe({ pluginId: target.pluginId, fields: target.fields, settings: target.settings, credentials });
@@ -294,14 +318,13 @@ export function createMediaService(deps: {
     row: async (userId, spec, limit) => {
       const found = await savedLists(userId, await listing(userId, spec.kind), listKey.row(spec));
       if (found.length === 0) return null;
-      return { items: mergeRows(found.map(({ saved: list }) => list.items), spec.sort, limit), sourceErrors: [] };
+      return { items: await watch.overlay(userId, mergeRows(found.map(({ saved: list }) => list.items), spec.sort, limit)), sourceErrors: [] };
     },
     continueWatching: async (userId, limit = CONTINUE_LIMIT) => {
       const list = (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead'));
       const found = await savedLists(userId, list, listKey.resume);
-      if (found.length === 0) return null;
-      const lists = found.map(({ saved: entry }) => [...entry.items].sort(byLastPlayed));
-      return { items: mergeSorted(lists, byLastPlayed, limit).map((entry) => entry.value), sourceErrors: [] };
+      const items = await resumeRow(userId, found.map(({ saved: entry }) => entry.items), list, limit);
+      return found.length === 0 && items.length === 0 ? null : { items, sourceErrors: [] };
     },
     gridFirstPage: async (userId, spec, pageSize) => {
       const found = await savedLists(userId, await listing(userId, spec.kind), listKey.grid(spec));
@@ -311,7 +334,7 @@ export function createMediaService(deps: {
         buffer: list.items,
         state: 'done',
       }));
-      return { items: takeMerged(cursors, spec.sort, pageSize).items, sourceErrors: [] };
+      return { items: await watch.overlay(userId, takeMerged(cursors, spec.sort, pageSize).items), sourceErrors: [] };
     },
   };
 
@@ -320,7 +343,7 @@ export function createMediaService(deps: {
       const { lists, sourceErrors } = await fanOut(userId, await listing(userId, spec.kind), listKey.row(spec), async (provider) =>
         (await listItems(provider, { kind: spec.kind, sort: spec.sort, limit }, signal)).items,
       );
-      return { items: mergeRows(lists, spec.sort, limit), sourceErrors };
+      return { items: await watch.overlay(userId, mergeRows(lists, spec.sort, limit)), sourceErrors };
     },
 
     continueWatching: async (userId, limit = CONTINUE_LIMIT, signal) => {
@@ -329,9 +352,7 @@ export function createMediaService(deps: {
         if (!provider.getResume) throw missing('getResume');
         return provider.getResume(limit, signal);
       });
-      // A few items per source: cheap to put in order here rather than trust every plugin to.
-      const ordered = lists.map((items) => [...items].sort(byLastPlayed));
-      return { items: mergeSorted(ordered, byLastPlayed, limit).map((entry) => entry.value), sourceErrors };
+      return { items: await resumeRow(userId, lists, list, limit), sourceErrors };
     },
 
     gridPage: async (userId, spec, state, pageSize, signal) => {
@@ -382,7 +403,7 @@ export function createMediaService(deps: {
       const { items, cursors } = takeMerged(refilled, spec.sort, pageSize);
       const totals = cursors.map((cursor) => cursor.total);
       return {
-        items,
+        items: await watch.overlay(userId, items),
         sourceErrors,
         ...(isExhausted(cursors) ? {} : { next: { sources: cursors } }),
         ...(totals.every((total) => total !== undefined)
@@ -399,7 +420,7 @@ export function createMediaService(deps: {
           return provider.getItem(key.externalId, signal);
         });
         if (keeps(source)) await quietly(cache.putDetail(userId, fingerprintOf(source), { detail, savedAt: clock.now() }));
-        return { detail };
+        return { detail: await withWatch(userId, detail) };
       } catch (error) {
         if (isAborted(error) || !keeps(source)) throw error;
         const failure = toAppError(error, log);
@@ -409,7 +430,7 @@ export function createMediaService(deps: {
         }
         const stand = await quietly(cache.detail(userId, key, fingerprintOf(source)));
         if (!stand) throw failure;
-        return { detail: stand.detail, sourceError: sourceError(source, failure, stand.savedAt) };
+        return { detail: await withWatch(userId, stand.detail), sourceError: sourceError(source, failure, stand.savedAt) };
       }
     },
 
@@ -422,13 +443,13 @@ export function createMediaService(deps: {
           return provider.getChildren(parent, signal);
         });
         await saveList(userId, source, key, page.items);
-        return { items: page.items };
+        return { items: await watch.overlay(userId, page.items) };
       } catch (error) {
         if (isAborted(error)) throw error;
         const failure = toAppError(error, log);
         const stand = await savedFor(userId, source, key, failure);
         if (!stand) throw failure;
-        return { items: stand.items, sourceError: sourceError(source, failure, stand.savedAt) };
+        return { items: await watch.overlay(userId, stand.items), sourceError: sourceError(source, failure, stand.savedAt) };
       }
     },
 

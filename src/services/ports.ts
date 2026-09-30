@@ -9,8 +9,10 @@ import type {
   MediaDetail,
   MediaItem,
   NetworkKind,
+  PlaybackReport,
   PluginId,
   UserId,
+  WatchStatus,
 } from '@sc/api';
 
 import type { HomeLayout } from './home-layout';
@@ -115,6 +117,62 @@ export interface MediaCacheRepository {
   purge(connectionId: ConnectionId, userId?: UserId): Promise<void>;
   /** Details, and lists whose key starts with `listPrefix`, not saved since `before`. */
   prune(before: number, listPrefix: string): Promise<void>;
+}
+
+/**
+ * What this device knows of a profile's watch state for one item of a source
+ * that masters it (v5). A local change lands here and in the outbox together;
+ * the source wins again once nothing for the item waits in the outbox.
+ */
+export interface WatchEntry {
+  readonly key: GlobalMediaKey;
+  readonly status: WatchStatus;
+  /** The item as last seen — for Continue Watching while the source is away. Kept only where its metadata may be. */
+  readonly item?: MediaItem;
+  readonly updatedAt: number;
+}
+
+export interface WatchStatusRepository {
+  get(userId: UserId, key: GlobalMediaKey): Promise<WatchEntry | undefined>;
+  /** A profile's entries, the most recently updated first. */
+  list(userId: UserId): Promise<readonly WatchEntry[]>;
+  /** Skipped when the profile or the connection is gone. */
+  put(userId: UserId, entry: WatchEntry): Promise<void>;
+  /** Entries not updated since `before`, for which nothing waits in the outbox. */
+  prune(before: number): Promise<void>;
+}
+
+/** One report waiting for the source that masters the item's watch state. */
+export interface OutboxEntry {
+  readonly seq: number;
+  readonly userId: UserId;
+  readonly report: PlaybackReport;
+  readonly createdAt: number;
+  readonly attempts: number;
+  /** Backing off: not tried again before this. */
+  readonly notBefore?: number;
+}
+
+/**
+ * What this device has to tell sources, oldest first. Device state: never
+ * journaled, never on your server, never in a backup. Its rows go with their
+ * profile and their connection.
+ */
+export interface OutboxRepository {
+  /**
+   * Queues a report. An item's newest progress replaces the progress waiting
+   * before it, a stop takes that progress along, and the newest watched state
+   * replaces the one before it — so a long evening offline stays a short queue.
+   * Skipped when the profile or the connection is gone.
+   */
+  add(userId: UserId, report: PlaybackReport): Promise<void>;
+  list(): Promise<readonly OutboxEntry[]>;
+  /** The items of a profile with something waiting, as `connectionId/externalId`. */
+  pendingKeys(userId: UserId): Promise<ReadonlySet<string>>;
+  remove(seq: number): Promise<void>;
+  defer(seq: number, attempts: number, notBefore: number): Promise<void>;
+  /** Everything: a phone restored from another's backup must not report that phone's evenings. */
+  clear(): Promise<void>;
 }
 
 /**
@@ -234,6 +292,8 @@ export interface Repositories {
   readonly staleSecrets: StaleSecretQueue;
   readonly account: AccountRepository;
   readonly backupState: BackupStateRepository;
+  readonly watchStatus: WatchStatusRepository;
+  readonly outbox: OutboxRepository;
   readonly journal: JournalRepository;
 }
 

@@ -132,10 +132,11 @@ it is never inlined, logged or persisted. A Stalker link is made with
 An item from a source that keeps watch status (`watchStateRead`,
 `watchStateWrite`) is mastered by that source: Jellyfin knows what was watched,
 and the app never masters the same thing a second time. Migration v5 adds two
-tables for it (Phase 7):
+tables for it (`docs/data`), and `services/watch/` works them:
 
-- **`watch_status`** — a cache per profile, keyed `(user_id, connection_id,
-  external_id)`, filled from the source.
+- **`watch_status`** — per profile, keyed `(user_id, connection_id,
+  external_id)`: this device's state for the items it played or marked, and
+  the item as last seen where its metadata may be kept.
 - **`outbox`** — what this device has to tell the source.
 
 ```
@@ -148,13 +149,30 @@ refresh  the source wins, except over entries still in the outbox
 
 - **Writes are local-first**, like every other write: marking something
   watched, or the position when playback stops, lands in the cache and the
-  outbox in one transaction. Airplane mode works.
-- **The drainer** delivers each entry to the source, every report idempotent,
-  following retry hints: `backoff` tries again later, `network-change` waits for a new
-  network, and a refused sign-in parks the source until the user acts — never
-  a loop against a server that locks accounts.
-- **Continue Watching** reads the cache, merged with the source's own resume
-  list.
+  outbox in one transaction (`WatchService.report`, `setPlayed`). Airplane
+  mode works. A source without `watchStateWrite` in effect is told nothing,
+  and nothing is queued. A stop past 90% counts as watched here too, until
+  the source says otherwise.
+- **Until the source has heard, this device's state is shown:** rows, grids,
+  seasons and detail pages get it laid over what the source answered,
+  wherever something for the item still waits in the outbox. Once nothing
+  does, the source wins again.
+- **The drainer** (`services/watch/drainer.ts`) delivers the outbox oldest
+  first, one lane per profile and connection, reading the outbox afresh before
+  each report so a replaced one is never sent. It follows the retry hints:
+  `backoff` tries again later, doubling from 30 s to 30 min;
+  `network-change` parks the source until the network changes; a refused
+  sign-in parks it until the user acts — pull to refresh — never a loop
+  against a server that locks accounts. A report about an item the source no
+  longer has, or one it refuses for good, is dropped. It runs at launch, a
+  moment after something is queued, on a new network, on coming to the
+  foreground, and when a retry is due.
+- **Continue Watching** is the sources' resume lists with this device's state
+  laid over them — an item marked watched here leaves it — plus what was
+  watched here that a source has not heard of yet, most recent first.
+- **Screens hear of a stop or a watched state** (`WatchService.subscribe`):
+  Continue Watching, the item and its season refetch; rows and grids only go
+  stale. Progress along the way is not news.
 
 Sources that cannot keep watch status — files, web video, IPTV movies and
 series — get app-owned watch state on the account later. It will be resolved

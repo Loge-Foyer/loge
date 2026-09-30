@@ -170,7 +170,7 @@ globals. A declared capability means the provider implements its members:
 | `channels` | `listChannelGroups`, `listChannels` |
 | `epg` | `getGuide` |
 | `playback` | `getPlaybackDescriptor` (Phase 7) |
-| `watchStateWrite` | reporting playback and played state, through the outbox (Phase 7) |
+| `watchStateWrite` | reporting playback and played state, through the outbox (`services/watch/`) — never called from anywhere else |
 
 The plugins repository's conformance test enforces it, and the media service
 reports a missing member as `INVALID_STATE`.

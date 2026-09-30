@@ -37,9 +37,11 @@ describe('SQLite migrations', () => {
       'device_settings',
       'media_details',
       'media_lists',
+      'outbox',
       'preferences',
       'stale_secrets',
       'users',
+      'watch_status',
     ]);
     expect((await db.get<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(MIGRATIONS.length);
     expect((await db.get<{ foreign_keys: number }>('PRAGMA foreign_keys'))?.foreign_keys).toBe(1);
@@ -215,7 +217,28 @@ describe('SQLite migrations', () => {
     // Sequence numbers carry on: one the old log saw is never handed out again.
     await db.users.update({ id: userId('u-alex'), name: 'Alexandra' });
     expect((await db.journal.entries()).map((entry) => entry.seq)).toEqual([3]);
-    expect(await versionOf(path)).toBe(4);
+    expect(await versionOf(path)).toBe(MIGRATIONS.length);
+  });
+
+  it('carry a v4 database over to v5: every row kept, and watch status and its outbox going with their profile', async () => {
+    const path = tempFile();
+    const v4 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 4));
+    await v4.exec(`
+      INSERT INTO users (id, name, pin_credential_ref, position, version) VALUES ('u-alex', 'Alex', NULL, 1, 1);
+      INSERT INTO connections (id, plugin_id, label, per_profile, fields, settings, credentials_ref, secret_keys, position, version, enabled)
+        VALUES ('c-home', 'sources/jellyfin', 'Home', 'none', '{}', '{}', NULL, NULL, 1, 1, 1);
+    `);
+    await v4.close();
+
+    const db = openTestDatabase('sqlite', { clock: fakeClock(), path });
+    expect((await db.users.list()).map((user) => user.name)).toEqual(['Alex']);
+    const key = { connectionId: connectionId('c-home'), externalId: 'm1' };
+    await db.watchStatus.put(userId('u-alex'), { key, status: { played: true }, updatedAt: 1 });
+    await db.outbox.add(userId('u-alex'), { kind: 'played', key, played: true });
+    expect(await db.outbox.list()).toHaveLength(1);
+    await db.users.delete(userId('u-alex'));
+    expect(await db.outbox.list()).toEqual([]);
+    expect(await versionOf(path)).toBe(5);
   });
 
   it('insist on steps numbered one after another', async () => {
@@ -243,7 +266,7 @@ describe('IndexedDB upgrades', () => {
     db.close();
   });
 
-  it('carry a v1 database to v4 one version at a time, each step reading what the one before it wrote', async () => {
+  it('carry a v1 database to the newest one version at a time, each step reading what the one before it wrote', async () => {
     const indexedDB = new IDBFactory();
     const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
       const opening = indexedDB.open('streaming-center', 1);

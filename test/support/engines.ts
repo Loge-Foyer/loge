@@ -91,6 +91,8 @@ export function guarded(db: SyncDatabase): SyncDatabase {
     staleSecrets: wrap(db.staleSecrets),
     account: wrap(db.account),
     backupState: wrap(db.backupState),
+    watchStatus: wrap(db.watchStatus),
+    outbox: wrap(db.outbox),
     journal: wrap(db.journal),
   };
   return {

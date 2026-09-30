@@ -498,6 +498,108 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
     });
   });
 
+  describe('watch status and its outbox', () => {
+    const key = (id: string, connection = 'c-home') => ({ connectionId: connectionId(connection), externalId: id });
+    const played = (id: string, value = true) => ({ kind: 'played' as const, key: key(id), played: value });
+    const kinds = async (db: LocalDatabase) => (await db.outbox.list()).map((entry) => `${entry.report.key.externalId} ${entry.report.kind}`);
+
+    it('keeps a profile’s watch state per item, the most recent first', async () => {
+      const { db } = open();
+      await household(db);
+      await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: true }, updatedAt: 1 });
+      await db.watchStatus.put(alex.id, { key: key('m2'), status: { played: false, positionMs: 60_000 }, item: movie(connectionId('c-home'), 'm2', 2020), updatedAt: 2 });
+      await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: false }, updatedAt: 3 });
+      expect((await db.watchStatus.list(alex.id)).map((entry) => [entry.key.externalId, entry.status.played])).toEqual([
+        ['m1', false],
+        ['m2', false],
+      ]);
+      expect((await db.watchStatus.get(alex.id, key('m2')))?.item?.title).toBe('m2');
+      expect(await db.watchStatus.list(kids.id)).toEqual([]);
+    });
+
+    it('queues reports in order, and keeps a long evening short', async () => {
+      const { db } = open();
+      await household(db);
+      const at = (kind: 'started' | 'progress' | 'stopped', positionMs: number, id = 'm1') =>
+        kind === 'progress' ? { kind, key: key(id), positionMs, paused: false } : { kind, key: key(id), positionMs };
+      await db.outbox.add(alex.id, at('started', 0));
+      await db.outbox.add(alex.id, at('progress', 10_000));
+      await db.outbox.add(alex.id, at('progress', 20_000, 'm2'));
+      await db.outbox.add(alex.id, at('progress', 30_000));
+      expect(await kinds(db)).toEqual(['m1 started', 'm2 progress', 'm1 progress']);
+      await db.outbox.add(alex.id, at('stopped', 40_000));
+      await db.outbox.add(alex.id, played('m1'));
+      await db.outbox.add(alex.id, played('m1', false));
+      // The newest progress replaced the older, the stop took it along, the last word on watched stands.
+      expect(await kinds(db)).toEqual(['m1 started', 'm2 progress', 'm1 stopped', 'm1 played']);
+      expect((await db.outbox.list()).at(-1)?.report).toMatchObject({ played: false });
+      expect([...(await db.outbox.pendingKeys(alex.id))].sort()).toEqual(['c-home/m1', 'c-home/m2']);
+      expect((await db.outbox.pendingKeys(kids.id)).size).toBe(0);
+    });
+
+    it('backs an entry off, and removes it once delivered', async () => {
+      const { db } = open();
+      await household(db);
+      await db.outbox.add(alex.id, played('m1'));
+      const [entry] = await db.outbox.list();
+      if (!entry) throw new Error('nothing queued');
+      expect(entry).toMatchObject({ userId: alex.id, attempts: 0 });
+      await db.outbox.defer(entry.seq, 2, 5_000);
+      expect(await db.outbox.list()).toEqual([{ ...entry, attempts: 2, notBefore: 5_000 }]);
+      await db.outbox.remove(entry.seq);
+      expect(await db.outbox.list()).toEqual([]);
+    });
+
+    it('prunes old watch state only where nothing waits in the outbox', async () => {
+      const { db } = open();
+      await household(db);
+      await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: true }, updatedAt: 1 });
+      await db.watchStatus.put(alex.id, { key: key('m2'), status: { played: true }, updatedAt: 1 });
+      await db.watchStatus.put(alex.id, { key: key('m3'), status: { played: true }, updatedAt: 9 });
+      await db.outbox.add(alex.id, played('m2'));
+      await db.watchStatus.prune(5);
+      expect((await db.watchStatus.list(alex.id)).map((entry) => entry.key.externalId).sort()).toEqual(['m2', 'm3']);
+    });
+
+    it('writes nothing for a profile or a connection that is gone', async () => {
+      const { db } = open();
+      await household(db);
+      await db.watchStatus.put(alex.id, { key: key('m1', 'c-gone'), status: { played: true }, updatedAt: 1 });
+      await db.outbox.add(userId('u-gone'), played('m1'));
+      await db.outbox.add(alex.id, { kind: 'played', key: key('m1', 'c-gone'), played: true });
+      expect(await db.watchStatus.list(alex.id)).toEqual([]);
+      expect(await db.outbox.list()).toEqual([]);
+    });
+
+    it('go with their profile, and with their connection', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.connections.insert(connection('c-other'));
+      for (const user of [alex.id, kids.id]) {
+        await db.watchStatus.put(user, { key: key('m1'), status: { played: true }, updatedAt: 1 });
+        await db.outbox.add(user, played('m1'));
+      }
+      await db.watchStatus.put(alex.id, { key: key('m1', 'c-other'), status: { played: true }, updatedAt: 1 });
+      await db.outbox.add(alex.id, { kind: 'played', key: key('m1', 'c-other'), played: true });
+      await db.users.delete(kids.id);
+      expect((await db.outbox.list()).map((entry) => entry.userId)).toEqual([alex.id, alex.id]);
+      await db.connections.delete(home.id);
+      expect((await db.outbox.list()).map((entry) => entry.report.key.connectionId)).toEqual(['c-other']);
+      expect((await db.watchStatus.list(alex.id)).map((entry) => entry.key.connectionId)).toEqual(['c-other']);
+      await db.outbox.clear();
+      expect(await db.outbox.list()).toEqual([]);
+    });
+
+    it('is never journaled', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: true }, updatedAt: 1 });
+      await db.outbox.add(alex.id, played('m1'));
+      expect(await db.journal.head()).toBe(head);
+    });
+  });
+
   describe('stale secrets', () => {
     it('are queued once each, and removed when deleted', async () => {
       const { db } = open();

@@ -10,7 +10,9 @@ import {
   type MediaDetail,
   type MediaItem,
   type PerProfile,
+  type PlaybackReport,
   type UserId,
+  type WatchStatus,
 } from '@sc/api';
 
 import type {
@@ -25,6 +27,8 @@ import type {
   JournalEntry,
   JournalRepository,
   MediaCacheRepository,
+  OutboxEntry,
+  OutboxRepository,
   PreferencesRepository,
   ProfileValues,
   Repositories,
@@ -33,11 +37,15 @@ import type {
   StoredUser,
   UserPreferences,
   UserRepository,
+  WatchEntry,
+  WatchStatusRepository,
 } from '@/services/ports';
 import { accountWide } from '@/services/scope';
+import { itemKeyOf } from '@/services/watch/item-key';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
+import { SUPERSEDES } from '../outbox';
 import type { WriteOptions } from '../writes';
 import type { SqlExecutor, SqlValue } from './sql';
 
@@ -443,6 +451,70 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  const watchStatus: WatchStatusRepository = {
+    get: async (user, key) => {
+      const row = await sql.get<WatchRow>('SELECT * FROM watch_status WHERE user_id = ? AND connection_id = ? AND external_id = ?', [
+        user,
+        key.connectionId,
+        key.externalId,
+      ]);
+      return row && toWatchEntry(row);
+    },
+    list: async (user) =>
+      (await sql.all<WatchRow>('SELECT * FROM watch_status WHERE user_id = ? ORDER BY updated_at DESC', [user])).map(toWatchEntry),
+    put: async (user, entry) => {
+      if (!(await parentsExist(user, entry.key.connectionId))) return;
+      await sql.run(
+        `INSERT INTO watch_status (user_id, connection_id, external_id, status, item, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, connection_id, external_id) DO UPDATE SET
+           status = excluded.status, item = excluded.item, updated_at = excluded.updated_at`,
+        [user, entry.key.connectionId, entry.key.externalId, JSON.stringify(entry.status), entry.item ? JSON.stringify(entry.item) : null, entry.updatedAt],
+      );
+    },
+    prune: async (before) => {
+      await sql.run(
+        `DELETE FROM watch_status WHERE updated_at < ? AND NOT EXISTS (
+           SELECT 1 FROM outbox WHERE outbox.user_id = watch_status.user_id
+             AND outbox.connection_id = watch_status.connection_id AND outbox.external_id = watch_status.external_id)`,
+        [before],
+      );
+    },
+  };
+
+  const outbox: OutboxRepository = {
+    add: async (user, report) => {
+      const { connectionId: connection, externalId } = report.key;
+      if (!(await parentsExist(user, connection))) return;
+      const superseded = SUPERSEDES[report.kind];
+      if (superseded.length > 0) {
+        await sql.run(
+          `DELETE FROM outbox WHERE user_id = ? AND connection_id = ? AND external_id = ? AND kind IN (${superseded.map(() => '?').join(', ')})`,
+          [user, connection, externalId, ...superseded],
+        );
+      }
+      await sql.run(
+        'INSERT INTO outbox (user_id, connection_id, external_id, kind, report, created_at, attempts, not_before) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)',
+        [user, connection, externalId, report.kind, JSON.stringify(report), clock.now()],
+      );
+    },
+    list: async () => (await sql.all<OutboxRow>('SELECT * FROM outbox ORDER BY seq')).map(toOutboxEntry),
+    pendingKeys: async (user) =>
+      new Set(
+        (await sql.all<{ connection_id: string; external_id: string }>('SELECT DISTINCT connection_id, external_id FROM outbox WHERE user_id = ?', [user])).map(
+          (row) => itemKeyOf({ connectionId: connectionId(row.connection_id), externalId: row.external_id }),
+        ),
+      ),
+    remove: async (seq) => {
+      await sql.run('DELETE FROM outbox WHERE seq = ?', [seq]);
+    },
+    defer: async (seq, attempts, notBefore) => {
+      await sql.run('UPDATE outbox SET attempts = ?, not_before = ? WHERE seq = ?', [attempts, notBefore, seq]);
+    },
+    clear: async () => {
+      await sql.run('DELETE FROM outbox');
+    },
+  };
+
   const staleSecrets: StaleSecretQueue = {
     add: async (refs) => {
       for (const ref of refs) await sql.run('INSERT INTO stale_secrets (ref) VALUES (?) ON CONFLICT (ref) DO NOTHING', [ref]);
@@ -530,7 +602,45 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, journal };
+}
+
+interface WatchRow {
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly status: string;
+  readonly item: string | null;
+  readonly updated_at: number;
+}
+
+function toWatchEntry(row: WatchRow): WatchEntry {
+  return {
+    key: { connectionId: connectionId(row.connection_id), externalId: row.external_id },
+    status: parse<WatchStatus>(row.status),
+    ...(row.item === null ? {} : { item: parse<MediaItem>(row.item) }),
+    updatedAt: row.updated_at,
+  };
+}
+
+interface OutboxRow {
+  readonly seq: number;
+  readonly user_id: string;
+  readonly report: string;
+  readonly created_at: number;
+  readonly attempts: number;
+  readonly not_before: number | null;
+}
+
+function toOutboxEntry(row: OutboxRow): OutboxEntry {
+  return {
+    seq: row.seq,
+    userId: userId(row.user_id),
+    report: parse<PlaybackReport>(row.report),
+    createdAt: row.created_at,
+    attempts: row.attempts,
+    ...(row.not_before === null ? {} : { notBefore: row.not_before }),
+  };
 }
 
 async function readDeviceSettings(sql: SqlExecutor): Promise<DeviceSettings> {

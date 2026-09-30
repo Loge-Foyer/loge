@@ -127,7 +127,7 @@ These are specific to Streaming Center and matter more than anything above.
    interaction path — favouriting must work in airplane mode. Local queries and
    mutations run with `networkMode: 'always'`: a browser saying "offline" must
    not pause them. State a source masters, like watch status on Jellyfin, is
-   cached locally and written through an outbox (Phase 7).
+   cached locally and written through an outbox (`services/watch/`).
 
 6. **Profile separation is enforced twice.** Every user-owned table carries
    `user_id` with a cascade from `users`, *and* every query cache key is
@@ -178,7 +178,7 @@ These are specific to Streaming Center and matter more than anything above.
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
   newer database is refused. A table rebuild is a `foreignKeysOff` step. The
-  next three: v3 qualifies stored plugin ids by category and v4 brings the
+  latest three: v3 qualifies stored plugin ids by category and v4 brings the
   account model (both Phase 6); v5 adds watch status and its outbox (Phase 7).
   `docs/data` has what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
@@ -374,7 +374,14 @@ The built-in player is in the build — expo-video on phones, the browser's
   cache, never logged; redaction covers URLs and MAC addresses. `headersRef` is
   resolved by the engine at load time, never inlined.
 - **Progress goes through the outbox,** never straight from the player to the
-  source: the `watch_status` cache and an outbox entry in one transaction (v5).
+  source: the `watch_status` cache and an outbox entry in one transaction (v5),
+  through `WatchService` — which tells a source without `watchStateWrite`
+  nothing. The drainer carries it; never call `reportPlayback` or `setPlayed`
+  from anywhere else.
+- **Until the source has heard, this device's watch state is shown** — laid
+  over what the source answered, wherever the outbox still holds something
+  for the item. After that the source wins. Never keep an item's watch state
+  anywhere else, and never master it a second time.
 - **The null engine fails loudly.** A silent no-op turns "playback not
   implemented" into a mystery bug.
 
@@ -601,6 +608,11 @@ the target; what runs today:
   settings. The built-in player's engine is in the build — expo-video on
   phones, `<video>` with hls.js on the web — with a profile per platform;
   nothing opens it until the player screen.
+- **Watch status (database v5):** marking something watched and where
+  playback stopped land in `watch_status` and the outbox together; the
+  drainer carries them to the source, and until it has, rows, detail pages
+  and Continue Watching show this device's state. Nothing plays yet, so
+  nothing calls it but the tests.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they
