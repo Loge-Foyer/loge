@@ -84,6 +84,24 @@ iOS and Android. Portals send no CORS headers, and a browser will not send the
 cookie a portal needs, so it does not run on the web until something proxies
 it.
 
+Two things the host has to be right about, both of them the app's and neither
+this plugin's:
+
+- **Cleartext.** A portal is almost always plain `http` on a non-standard
+  port, so the host must allow it. The app does, for both phones — iOS through
+  `NSAllowsArbitraryLoads` and Android through `usesCleartextTraffic`. A host
+  that does not will see the handshake fail as `PROVIDER_UNAVAILABLE` before
+  anything reaches the portal, which reads as "the portal cannot be reached"
+  and looks nothing like a policy.
+- **No ambient cookies.** This plugin sets its own `Cookie` header on every
+  request and never reads `Set-Cookie`; its session keeps only the endpoint and
+  the token. A host HTTP client with a cookie jar can merge a stored cookie
+  into that header — on iOS `URLSession` seeds the header from the shared
+  store and then *appends* the caller's with a comma, which stops the portal
+  parsing past the first `;`, and the portal then refuses the MAC it never
+  saw. The plugin must never come to rely on a jar, and a host should not give
+  it one.
+
 ## Status
 
 The media role is implemented, tested against a fake portal built from
