@@ -105,6 +105,9 @@ under way.
   and `iptv/mock` with live TV — groups, channels, a guide, a few films and
   series, public test streams to play; `sync/mock` plays at being your own
   server in memory, and `sync/mock-backup` at being a backup target.
+- **Stalker:** implements the media role against a Stalker portal —
+  handshake and profile, live TV with its guide, links made when playing,
+  films and series — tested against a fake portal, not yet a real one.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
 - **Every other plugin:** a manifest — the other IPTV plugins, the other
@@ -121,6 +124,7 @@ under way.
   - the built-in player's engines, against fakes (`vitest.config.ts` aliases
     expo-video; the web engine takes its `<video>` and hls.js from its host)
   - the custom server against a fake of PocketBase's routes and rules
+  - Stalker against a fake portal
   - the conformance check that each declared capability is implemented
 
 ## Git

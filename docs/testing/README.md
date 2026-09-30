@@ -62,6 +62,13 @@ Vitest, run over `test/` at the repository root.
     the server's own address, each subtitle's delivery, a refusal, reports
     with and without a play session, watched state, and one more sign-in
     when a report finds the session ended
+- `stalker.test.ts` — Stalker against a fake Ministra portal: finding the API
+  behind an address, the handshake and profile as a MAG box, a refused MAC
+  remembered, a run-out token renewed once and no more, genres and paged
+  channels, now and next and a longer guide, links made when playing (the
+  hint stripped, MPEG-TS said as such, a busy subscription), films and series
+  from mixed pages, seasons and episodes, and an old portal's numbered
+  episodes.
 - `system-player.test.ts` — the built-in player's two engines against fakes.
   On a phone (expo-video, aliased to `support/fake-expo-video.ts` in
   `vitest.config.ts`): the stream's type and headers, the start position once

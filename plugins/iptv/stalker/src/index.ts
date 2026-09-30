@@ -1,9 +1,15 @@
+/**
+ * Stalker — live TV, films and series from a Stalker (Ministra) portal, the
+ * middleware behind many IPTV subscriptions for MAG boxes. A portal signs a
+ * device in by its MAC address, so that address is kept like a password.
+ *
+ * IPTV runs on phones: portals send no CORS headers, and a browser will not
+ * send the cookie a portal needs.
+ */
 import { pluginId, type Plugin } from '@sc/api';
 
-/**
- * Manifest only: no media role yet, so no capability is declared. IPTV runs on
- * phones: providers rarely send CORS headers, so a browser cannot reach them.
- */
+import { createProvider } from './provider';
+
 export const plugin: Plugin = {
   manifest: {
     id: pluginId('iptv/stalker'),
@@ -11,7 +17,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android'],
     displayName: 'Stalker portal',
     description: 'Live TV, films and series from a Stalker portal, signed in with its MAC address.',
-    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: [] },
+    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'channels', 'epg', 'playback', 'remoteImages'] },
     connectionFields: [
       { key: 'portalUrl', label: 'Portal address', type: 'url', required: true, placeholder: 'http://portal.example.com/c/' },
       // The MAC address is what signs in: anyone with it and the portal's address can use the subscription.
@@ -25,7 +31,11 @@ export const plugin: Plugin = {
       },
       { key: 'serialNumber', label: 'Serial number', type: 'password', description: 'Only if your provider asks for one.' },
       { key: 'deviceId', label: 'Device id', type: 'password', description: 'Only if your provider asks for one.' },
+      { key: 'signature', label: 'Signature', type: 'password', description: 'Only if your provider asks for one.' },
     ],
     settings: [],
+  },
+  media: {
+    connect: async (target, context) => createProvider(target, context),
   },
 };

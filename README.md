@@ -107,6 +107,8 @@ What is real today:
   by record, and creates an account with an invite.
 - **The mock account** plays at being your own server, in memory, and **the
   mock backup target** at being a cloud folder.
+- **Stalker** reaches a portal as a MAG box does: live channels with their
+  guide, films and series, and a link made when something plays.
 - **The built-in player** plays through expo-video on phones and the
   browser's `<video>` on the web, with hls.js fetched only when a browser has
   no HLS of its own. Its profile per platform says what each plays.
