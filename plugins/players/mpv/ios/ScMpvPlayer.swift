@@ -28,6 +28,13 @@ public final class ScMpvPlayer: SharedObject {
   private var mpv: OpaquePointer?
   private let work = DispatchQueue(label: "sc-mpv", qos: .userInitiated)
   private var events: Thread?
+  // The event thread must be out of `mpv_wait_event` before the core goes, or
+  // it waits on a handle that has been destroyed. `exiting` is read on that
+  // thread and written on another, so it is behind a lock; `stopped` is how
+  // the teardown waits for it, as Android's `pthread_join` does.
+  private let leaving = NSLock()
+  private var exiting = false
+  private let stopped = DispatchSemaphore(value: 0)
 
   // Read and written on `work` alone, except where marked.
   private var loading = false
@@ -179,9 +186,19 @@ public final class ScMpvPlayer: SharedObject {
 
   // MARK: - What mpv says, from its own thread
 
+  private func isExiting() -> Bool {
+    leaving.lock()
+    defer { leaving.unlock() }
+    return exiting
+  }
+
   private func pump() {
-    guard let mpv else { return }
-    while !released {
+    guard let mpv else {
+      stopped.signal()
+      return
+    }
+    defer { stopped.signal() }
+    while !isExiting() {
       guard let event = mpv_wait_event(mpv, -1.0) else { continue }
       let id = event.pointee.event_id
       if id == MPV_EVENT_SHUTDOWN { break }
@@ -417,9 +434,15 @@ public final class ScMpvPlayer: SharedObject {
     cancelStall()
     guard let handle = mpv else { return }
     mpv = nil
+    leaving.lock()
+    exiting = true
+    leaving.unlock()
+    // Out of `mpv_wait_event`, so the loop sees `exiting` and leaves.
+    mpv_wakeup(handle)
     // Behind whatever was already asked of mpv, so nothing is in the core when
-    // it goes. `mpv_terminate_destroy` wakes the event thread, which then ends.
-    work.async {
+    // it goes — and behind the event thread, which must be gone first.
+    work.async { [stopped] in
+      stopped.wait()
       mpv_terminate_destroy(handle)
     }
   }
