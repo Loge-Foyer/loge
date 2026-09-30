@@ -61,7 +61,16 @@
         {
           "initialOrientation": "PORTRAIT_UP"
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "./config-plugins/with-newest-libcxx"
     ],
     "experiments": {
       "typedRoutes": true,

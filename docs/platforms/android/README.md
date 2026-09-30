@@ -3,8 +3,10 @@
 Building and running on emulator and device, native modules, and Android-specific configuration.
 
 The app runs in a **development build**, not Expo Go. The built-in player is
-expo-video on Media3 / ExoPlayer (Phase 7), and mpv (libmpv) and VLC (libVLC)
+expo-video on Media3 / ExoPlayer (Phase 7), and VLC (libVLC) and mpv (libmpv)
 are Expo modules in their own plugins (Phase 8), autolinked into the build.
+**Android 8 is the floor** (`minSdkVersion` 26, through
+`expo-build-properties`): libmpv's binaries ask for it.
 The app has no native module of its own: Phase 4's key derivation went with
 its vault, so a build made before Phase 6 still carries it, and should be made
 again.
@@ -46,7 +48,7 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
 
 - **ExoPlayer**, the built-in player through expo-video (Phase 7), plays HLS
   and MPEG-TS, so IPTV channels play on it.
-- **mpv and VLC** (Phase 8) are for what it cannot: some containers, codecs and
+- **VLC and mpv** are for what it cannot: some containers, codecs and
   subtitle formats.
 - Which players are on, and the default, are this device's settings.
 

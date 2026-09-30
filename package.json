@@ -2,6 +2,7 @@
   "name": "streaming_center_app",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "@expo/ui": "~57.0.20",
     "@noble/hashes": "^2.4.0",
@@ -39,6 +40,7 @@
     "expo": "~57.0.25",
     "expo-application": "~57.0.3",
     "expo-asset": "~57.0.18",
+    "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.19",
     "expo-crypto": "~57.0.3",
     "expo-dev-client": "~57.0.19",

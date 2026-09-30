@@ -56,4 +56,4 @@ export const plugins: readonly Plugin[] = [
 ];
 
 /** The players with an engine, and the view that draws it — what the player screen is handed. */
-export const players: readonly PlayerPlugin[] = [systemPlayer, vlc];
+export const players: readonly PlayerPlugin[] = [systemPlayer, vlc, mpv];

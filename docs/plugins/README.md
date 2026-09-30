@@ -102,9 +102,15 @@ plugins repository's copies, which the app never uses.
 
 A player's engine is native code. expo-video, a published package, is
 installed by the app and autolinked from its `node_modules`. An Expo module in
-a player's own folder — VLC's `android/` — is found through the `file:` link
-and built from the plugins repository; the players list in
+a player's own folder — VLC's and mpv's `android/` — is found through the
+`file:` link and built from the plugins repository; the players list in
 `composition/plugins.ts` names only players whose engine this build has.
+
+Where two engines carry the same native library, the app decides which one
+ships: `config-plugins/with-newest-libcxx.js` puts the newest
+`libc++_shared.so` — libmpv's — in a source set of the app's own, which wins
+the merge. That is the app's to settle, because no plugin can see what
+another plugin's engine brought.
 
 ## Registering a plugin
 

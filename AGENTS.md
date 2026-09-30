@@ -505,7 +505,7 @@ config.resolver.blockList = [...blockList, /^<plugins>\/node_modules\/.*/];
   - **vitest** dedupes React, React Native, expo, expo-video, hls.js and
     mpegts.js, and
     stubs expo-video and expo (`test/support/`): the shipped list includes the
-    built-in player and VLC, and Node has no native module.
+    built-in player, VLC and mpv, and Node has no native module.
   - **Autolinking** searches this app's `node_modules` first
     (`expo.autolinking.searchPaths` in `package.json`). Followed from a linked
     player's peers, it walks into the plugins repository, and its choice
@@ -514,6 +514,14 @@ config.resolver.blockList = [...blockList, /^<plugins>\/node_modules\/.*/];
     57.0.19 JavaScript. After adding a player, check
     `npx expo-modules-autolinking resolve --platform android --json`: nothing
     may come from `streaming_center_plugins/node_modules`.
+  - **One copy of a native library, and the newest.** React Native, libVLC and
+    libmpv each carry a `libc++_shared.so`, and an APK holds one: the first
+    the merge sees, which is React Native's — and which libmpv cannot load. A
+    source set of the app's own wins the merge, so
+    `config-plugins/with-newest-libcxx.js` points one at what mpv's module
+    unpacks. **Packaging is the app's**: no plugin can see what another
+    plugin's engine put in the same APK. libmpv also asks for Android 8, so
+    `expo-build-properties` sets `minSdkVersion` to 26.
 - Install the plugins repository first: its own tests and typecheck need it.
 - Plugins take `@sc/api` — and players `@sc/player-kit`, React, React Native
   and their engine — as **peers**: the app supplies the one copy.
@@ -599,7 +607,7 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brings more players: VLC on Android is in.**
+**Phase 7 — it plays. Phase 8 brings more players: VLC and mpv on Android are in.**
 Everything above describes the target; what runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
@@ -632,9 +640,9 @@ Everything above describes the target; what runs today:
   screen chooses the player (`PlaybackService`), draws its view under the
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
-  transcode — on phones and in a browser; VLC plays on Android, from an Expo
-  module in its plugin's package. Each player has its switch, "Play with it
-  first" and first on a tab, as device settings; "Play with…" on a detail
+  transcode — on phones and in a browser; VLC and mpv play on Android, from
+  Expo modules in their plugins' packages. Each player has its switch, "Play
+  with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the

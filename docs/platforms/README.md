@@ -16,7 +16,7 @@ device", and is kept for the devices that can.
 | Storage | SQLite, the keychain | SQLite, the keystore | IndexedDB, secrets encrypted with WebCrypto |
 | Build | a development build | a development build | none; a secure page |
 | The built-in player, `players/system` (Phase 7) | expo-video: AVPlayer | expo-video: Media3 / ExoPlayer | `<video>`, with hls.js where HLS is not native |
-| More players (Phase 8) | KSPlayer, mpv (MPVKit), VLC (VLCKit) | mpv (libmpv), VLC (libVLC) | mpegts.js, inside the built-in player |
+| More players (Phase 8) | KSPlayer, mpv (MPVKit), VLC (VLCKit) | mpv (libmpv) and VLC (libVLC), both in | mpegts.js, inside the built-in player |
 | IPTV | yes | yes | hidden until a proxy exists |
 | Backup targets (later phases) | iCloud, Google Drive, OneDrive | Google Drive, OneDrive | Google Drive, OneDrive |
 | The backup file | share sheet, document picker | share sheet, document picker | download, file input; sql.js loaded for it |

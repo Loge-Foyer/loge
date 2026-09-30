@@ -149,13 +149,13 @@ the design, and most of it runs today, built with
   turns the player with the device, or in a browser — and pick up where you
   left off. Progress and "watched" go back to the server, offline too: they
   are written on the device first and delivered when it can. On Android, VLC
-  plays too — the files the built-in player cannot, like Matroska with DTS,
-  as they are — and each device chooses which player goes first, on each tab
-  if you like; "Play with…" on a film or an episode picks one for it.
+  and mpv play too — the files the built-in player cannot, like Matroska with
+  DTS, as they are — and each device chooses which player goes first, on each
+  tab if you like; "Play with…" on a film or an episode picks one for it.
 - **Live TV** on the TV tab, from a Stalker portal: channels in their groups
   with what is on now and next, a day's guide, channel up and down, and the
   provider's films and series.
-- **Not yet:** mpv and KSPlayer, VLC on iPhone; M3U and Xtream.
+- **Not yet:** KSPlayer, and VLC and mpv on iPhone; M3U and Xtream.
 
 Development builds also have a pretend account, for trying things offline.
 
@@ -169,3 +169,11 @@ The full architecture, with the reasoning, is in
 
 `CLAUDE.md` and `AGENTS.md` are written for AI coding assistants — denser, and
 full of rules. This file is the one written for you.
+
+---
+
+## Licence
+
+**GPL-3.0-or-later.** The app is free software, and it links players built
+from FFmpeg and mpv that are GPL themselves. That means anyone you give a
+build to may have its source, and the same freedoms.
