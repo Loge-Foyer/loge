@@ -13,7 +13,7 @@ import { createEngine as createNativeEngine, engineOf } from '../plugins/players
 import { createEngine as createWebEngine } from '../plugins/players/system/src/engine.web';
 import { PROFILES } from '../plugins/players/system/src/profiles';
 import { created, type FakeVideoPlayer } from './support/fake-expo-video';
-import { fakeHls, FakeVideoElement } from './support/fake-video';
+import { fakeHls, fakeMpegts, FakeVideoElement } from './support/fake-video';
 
 const context: PlayerContext = {
   resolveHeaders: async (ref) => (ref === headersRef('token') ? { Authorization: 'MediaBrowser Token="t"' } : undefined),
@@ -171,18 +171,24 @@ describe('the built-in player on a phone (expo-video)', () => {
   });
 });
 
-describe('the built-in player in a browser (<video>, hls.js)', () => {
-  function web(options: { nativeHls?: boolean; supported?: boolean; hlsFails?: boolean } = {}) {
+describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => {
+  function web(options: { nativeHls?: boolean; supported?: boolean; hlsFails?: boolean; mse?: boolean; mpegtsFails?: boolean } = {}) {
     const video = new FakeVideoElement();
     video.nativeHls = options.nativeHls ?? false;
     const hls = fakeHls({ supported: options.supported ?? true });
+    const transport = fakeMpegts({ supported: options.mse ?? true });
     const loadHls = vi.fn(async () => {
       if (options.hlsFails) throw new Error('chunk failed');
       return hls.Hls;
     });
-    const player = createWebEngine(context, { createVideo: () => video as unknown as HTMLVideoElement, loadHls });
-    return { player, video, hls, loadHls, log: record(player) };
+    const loadMpegts = vi.fn(async () => {
+      if (options.mpegtsFails) throw new Error('chunk failed');
+      return transport.Mpegts;
+    });
+    const player = createWebEngine(context, { createVideo: () => video as unknown as HTMLVideoElement, loadHls, loadMpegts });
+    return { player, video, hls, transport, loadHls, loadMpegts, log: record(player) };
   }
+  const liveTs = (overrides: Partial<PlaybackSource> = {}) => source({ uri: 'https://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true, ...overrides });
 
   it('plays HLS through hls.js, without a worker, from where it is asked to start', async () => {
     const { player, video, hls, loadHls, log } = web();
@@ -212,14 +218,54 @@ describe('the built-in player in a browser (<video>, hls.js)', () => {
     expect(xhr.setRequestHeader).toHaveBeenCalledWith('Authorization', 'MediaBrowser Token="t"');
   });
 
-  it('refuses what a <video> cannot do, loudly: a header on a file, raw MPEG-TS, HLS without MSE', async () => {
+  it('refuses what a <video> cannot do, loudly: a header on a file, DASH, HLS or MPEG-TS without MSE', async () => {
     const withHeader = web();
     await expect(withHeader.player.load({ source: source({ protocol: 'progressive', uri: 'https://server/film.mp4', headersRef: headersRef('token') }) })).rejects.toMatchObject({ code: 'INVALID_STATE' });
     expect(withHeader.log.errors()).toHaveLength(1);
     expect(withHeader.log.states().at(-1)).toBe('failed');
-    await expect(web().player.load({ source: source({ protocol: 'mpegts' }) })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    await expect(web().player.load({ source: source({ protocol: 'dash' }) })).rejects.toMatchObject({ code: 'INVALID_STATE' });
     await expect(web({ supported: false }).player.load({ source: source() })).rejects.toMatchObject({ code: 'INVALID_STATE' });
     await expect(web({ hlsFails: true }).player.load({ source: source() })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    await expect(web({ mse: false }).player.load({ source: liveTs() })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    await expect(web({ mpegtsFails: true }).player.load({ source: liveTs() })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+  });
+
+  it('plays raw MPEG-TS through mpegts.js, fetched when first needed, with its headers', async () => {
+    const { player, video, transport, loadMpegts, loadHls, log } = web();
+    await player.load({ source: liveTs({ headersRef: headersRef('token') }) });
+    const [instance] = transport.instances;
+    expect(loadMpegts).toHaveBeenCalledOnce();
+    expect(loadHls).not.toHaveBeenCalled();
+    expect(instance?.source).toEqual({ type: 'mpegts', isLive: true, url: 'https://portal/live.ts' });
+    expect(instance?.config).toEqual({ enableWorker: false, headers: { Authorization: 'MediaBrowser Token="t"' } });
+    expect(instance?.media).toBe(video);
+    expect(instance?.loaded).toBe(true);
+    video.fire('loadedmetadata');
+    video.fire('canplay');
+    expect(log.states()).toEqual(['idle', 'loading', 'paused']);
+
+    const film = web();
+    await film.player.load({ source: liveTs({ live: false }) });
+    expect(film.transport.instances[0]?.source).toMatchObject({ isLive: false });
+  });
+
+  it('maps mpegts.js’s errors — a refusal, a missing stream, what the browser cannot decode — and reads none from the element', async () => {
+    const cases: readonly [readonly unknown[], string][] = [
+      [['NetworkError', 'HttpStatusCodeInvalid', { code: 403 }], 'UNAUTHORIZED'],
+      [['NetworkError', 'HttpStatusCodeInvalid', { code: 404 }], 'NOT_FOUND'],
+      [['MediaError', 'MediaMSEError', {}], 'INVALID_STATE'],
+      [['NetworkError', 'Exception', {}], 'PROVIDER_UNAVAILABLE'],
+    ];
+    for (const [args, code] of cases) {
+      const { player, video, transport, log } = web();
+      await player.load({ source: liveTs() });
+      // The element's own error follows mpegts.js's, and says less.
+      video.failWith(4);
+      expect(log.errors()).toEqual([]);
+      transport.instances[0]?.emit('error', ...args);
+      expect(log.errors().map((error) => error.code)).toEqual([code]);
+      expect(log.states().at(-1)).toBe('failed');
+    }
   });
 
   it('maps hls.js’s fatal errors — a refusal, a missing stream — and recovers a media error once', async () => {
@@ -298,9 +344,11 @@ describe('the built-in player in a browser (<video>, hls.js)', () => {
     expect(log.errors()).toEqual([]);
   });
 
-  it('lets go of hls.js and the element, and refuses everything after', async () => {
-    const { player, video, hls } = web();
+  it('lets go of hls.js, mpegts.js and the element, and refuses everything after', async () => {
+    const { player, video, hls, transport } = web();
+    await player.load({ source: liveTs() });
     await player.load({ source: source() });
+    expect(transport.instances[0]?.destroyed).toBe(true);
     await player.dispose();
     expect(hls.instances[0]?.destroyed).toBe(true);
     expect(video.src).toBe('');
@@ -314,11 +362,11 @@ describe('the built-in player’s profiles', () => {
   const film = source({ uri: 'https://server/film.mkv', protocol: 'progressive', container: 'mkv', videoCodec: 'hevc', audioCodecs: ['eac3', 'aac'] });
   const hls = source({ videoCodec: 'h264', audioCodecs: ['aac'] });
 
-  it('say what each platform plays: HLS everywhere, MPEG-TS and Matroska on Android only', () => {
+  it('say what each platform plays: HLS everywhere, raw MPEG-TS but on iOS, Matroska on Android only', () => {
     const { ios, android, web } = PROFILES;
     if (!ios || !android || !web) throw new Error('a platform has no profile');
     expect([ios, android, web].map((profile) => canPlay(profile, hls))).toEqual([true, true, true]);
-    expect([ios, android, web].map((profile) => canPlay(profile, transportStream))).toEqual([false, true, false]);
+    expect([ios, android, web].map((profile) => canPlay(profile, transportStream))).toEqual([false, true, true]);
     expect([ios, android, web].map((profile) => canPlay(profile, film))).toEqual([false, true, false]);
   });
 });

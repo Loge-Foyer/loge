@@ -26,9 +26,10 @@ export const PROFILES: Readonly<Partial<Record<PlatformId, PlayerProfile>>> = {
     subtitleFormats: ['vtt', 'srt'],
     maxHeight: 2160,
   },
-  // A browser's <video>, with hls.js where it has no HLS of its own. HEVC plays in some browsers only.
+  // A browser's <video>, with hls.js where it has no HLS of its own and
+  // mpegts.js for raw MPEG-TS. HEVC plays in some browsers only.
   web: {
-    protocols: ['progressive', 'hls'],
+    protocols: ['progressive', 'hls', 'mpegts'],
     containers: ['mp4', 'm4v', 'webm'],
     videoCodecs: ['h264', 'vp9'],
     audioCodecs: ['aac', 'mp3', 'opus', 'vorbis', 'flac'],

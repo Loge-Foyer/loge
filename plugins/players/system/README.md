@@ -2,7 +2,8 @@
 
 The device's own player, through expo-video: AVPlayer on iPhone and iPad,
 Media3 (ExoPlayer) on Android, and the browser's `<video>` on the web, with
-hls.js where the browser cannot play HLS itself.
+hls.js where the browser cannot play HLS itself and mpegts.js for raw
+MPEG-TS.
 
 ## Category
 
@@ -18,7 +19,7 @@ that transcodes, such as Jellyfin, shapes its answer to it:
 | --- | --- | --- | --- | --- |
 | iOS — AVPlayer | HLS, progressive | MP4, M4V, MOV | H.264, HEVC | AAC, MP3, AC-3, E-AC-3, ALAC, FLAC |
 | Android — Media3 | HLS, DASH, MPEG-TS, progressive | MP4, M4V, MOV, MKV, WebM, TS | H.264, HEVC, VP9 | AAC, MP3, Opus, Vorbis, FLAC |
-| Web — `<video>` | HLS, progressive | MP4, M4V, WebM | H.264, VP9 | AAC, MP3, Opus, Vorbis, FLAC |
+| Web — `<video>` | HLS, MPEG-TS, progressive | MP4, M4V, WebM | H.264, VP9 | AAC, MP3, Opus, Vorbis, FLAC |
 
 A codec only some devices decode — AV1, AC-3 on Android, HEVC in a browser —
 is left out: claiming it would send someone to a black screen instead of the
@@ -36,9 +37,12 @@ that offers nothing else needs another player on iOS.
   view only places it, so a remount never restarts the stream. HLS plays
   natively where the browser can (Safari, Chrome from 143) and through hls.js
   elsewhere, or whenever the stream needs a header — only hls.js's own
-  requests can carry one. hls.js is fetched through `import()`, a chunk of its
+  requests can carry one. Raw MPEG-TS — a channel, mostly — goes through
+  mpegts.js, which remuxes it for Media Source Extensions. Chrome on a Mac decodes H.264 with VideoToolbox,
+  which refuses some streams as mpegts.js remuxes them — Apple's 2009 bipbop
+  test segments among them — and says so as a decoding failure. Each is fetched through `import()`, a chunk of its
   own, and runs without a worker. A file that needs a header, or a protocol a
-  browser lacks, is refused loudly.
+  browser lacks (DASH), is refused loudly.
 - **`src/view.tsx`, `src/view.web.tsx`** — the `PlayerView`: expo-video's
   `VideoView` with its own controls hidden (the app draws the controls, the
   same for every engine), or a box the `<video>` goes into. The view finds its
@@ -63,8 +67,8 @@ What it tells, as `PlayerEvent`s:
 
 ## Dependencies
 
-`@sc/api`, `@sc/player-kit`, React, React Native, expo-video and hls.js, all
-peers: the app installs them, so autolinking builds expo-video and there is one
+`@sc/api`, `@sc/player-kit`, React, React Native, expo-video, hls.js and
+mpegts.js, all peers: the app installs them, so autolinking builds expo-video and there is one
 copy of each. This repository has them as development dependencies, for the
 players' TypeScript program and the tests.
 
@@ -75,7 +79,7 @@ iOS, Android and the web.
 ## Status
 
 The player role is implemented, with a profile per platform, and tested
-against fakes of expo-video, the `<video>` element and hls.js. On the Android
-emulator its view played HLS, live HLS, raw MPEG-TS and MP4, and in Chrome HLS
-(native, and through hls.js) and MP4. iOS waits for the workspace path to lose
-its space. The app does not open it yet: the player screen comes next.
+against fakes of expo-video, the `<video>` element, hls.js and mpegts.js. On
+the Android emulator it played HLS, live HLS, raw MPEG-TS and MP4; in Chrome,
+HLS (native, and through hls.js), MP4, and raw MPEG-TS through mpegts.js. iOS
+waits for the workspace path to lose its space.

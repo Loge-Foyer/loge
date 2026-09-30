@@ -10,6 +10,7 @@ import {
 } from '@sc/api';
 import type Hls from 'hls.js';
 import type { ErrorData } from 'hls.js';
+import type Mpegts from 'mpegts.js';
 
 /** What the engine takes from the page, so a test can hand it fakes. */
 export interface WebEngineHost {
@@ -17,11 +18,14 @@ export interface WebEngineHost {
   createVideo(): HTMLVideoElement;
   /** hls.js, fetched the first time a browser with no HLS of its own needs it. */
   loadHls(): Promise<typeof Hls>;
+  /** mpegts.js, fetched the first time a raw MPEG-TS stream needs it. */
+  loadMpegts(): Promise<typeof Mpegts>;
 }
 
 const page: WebEngineHost = {
   createVideo: () => document.createElement('video'),
   loadHls: async () => (await import('hls.js')).default,
+  loadMpegts: async () => (await import('mpegts.js')).default,
 };
 
 /** The `<video>` behind each controller. This package's view places it; nothing else touches it. */
@@ -34,7 +38,8 @@ export function engineOf(player: MediaPlayer): HTMLVideoElement | undefined {
 /**
  * A browser's `<video>`. HLS plays natively where the browser can (Safari),
  * and through hls.js elsewhere — or whenever the stream needs a header, which
- * only hls.js's requests can carry. hls.js runs without a worker, so the page
+ * only hls.js's requests can carry. Raw MPEG-TS goes through mpegts.js, which
+ * remuxes it for Media Source Extensions. Neither runs a worker, so the page
  * needs no `blob:` in its Content-Security-Policy for scripts.
  */
 export function createEngine(context: PlayerContext, host: WebEngineHost = page): MediaPlayer {
@@ -43,6 +48,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
   video.preload = 'auto';
   const events = createPlayerEvents();
   let hls: Hls | undefined;
+  let transport: Mpegts.Player | undefined;
   let pendingStartMs: number | undefined;
   let ready = false;
   let recovered = false;
@@ -99,6 +105,8 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
   const detach = () => {
     hls?.destroy();
     hls = undefined;
+    transport?.destroy();
+    transport = undefined;
     video.removeAttribute('src');
     video.load();
   };
@@ -116,6 +124,14 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
     else if (status === 404) fail(new AppError('NOT_FOUND', 'The server has no such stream.'));
     else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) fail(new AppError('INVALID_STATE', 'This browser could not decode the stream.'));
     else fail(playbackFailed(undefined, data.error));
+  };
+
+  const onTransportError = (MpegtsClass: typeof Mpegts, type: string, detail: string, info: { code?: number } | undefined) => {
+    const status = info?.code;
+    if (type === MpegtsClass.ErrorTypes.NETWORK_ERROR && (status === 401 || status === 403)) fail(new AppError('UNAUTHORIZED', 'The server refused the stream.'));
+    else if (type === MpegtsClass.ErrorTypes.NETWORK_ERROR && status === 404) fail(new AppError('NOT_FOUND', 'The server has no such stream.'));
+    else if (type === MpegtsClass.ErrorTypes.MEDIA_ERROR) fail(new AppError('INVALID_STATE', 'This browser could not decode the stream.'));
+    else fail(playbackFailed(undefined, new Error(detail)));
   };
 
   const listeners: Readonly<Partial<Record<keyof HTMLMediaElementEventMap, () => void>>> = {
@@ -150,7 +166,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       const error = video.error;
       // A load that replaced this one aborted it: nothing failed.
       if (!error || error.code === error.MEDIA_ERR_ABORTED) return;
-      if (hls) return; // hls.js reports its own
+      if (hls || transport) return; // hls.js and mpegts.js report their own
       if (error.code === error.MEDIA_ERR_NETWORK) fail(playbackFailed('The stream stopped arriving.'));
       else if (error.code === error.MEDIA_ERR_DECODE) fail(new AppError('INVALID_STATE', 'This browser could not decode the stream.'));
       else fail(new AppError('PROVIDER_UNAVAILABLE', 'This browser could not open the stream.', { retry: 'never' }));
@@ -201,6 +217,25 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
         instance.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, tellTracks);
         instance.loadSource(source.uri);
         instance.attachMedia(video);
+        return;
+      }
+      if (source.protocol === 'mpegts') {
+        let MpegtsClass: typeof Mpegts;
+        try {
+          MpegtsClass = await host.loadMpegts();
+        } catch (error) {
+          throw fail(playbackFailed('The MPEG-TS player could not be loaded.', error));
+        }
+        if (disposed) throw playerReleased();
+        if (!MpegtsClass.getFeatureList().mseLivePlayback) throw fail(new AppError('INVALID_STATE', 'This browser cannot play MPEG-TS.'));
+        const instance = MpegtsClass.createPlayer(
+          { type: 'mpegts', isLive: source.live, url: source.uri },
+          { enableWorker: false, ...(headers ? { headers: { ...headers } } : {}) },
+        );
+        transport = instance;
+        instance.on(MpegtsClass.Events.ERROR, (type: string, detail: string, info?: { code?: number }) => onTransportError(MpegtsClass, type, detail, info));
+        instance.attachMediaElement(video);
+        instance.load();
         return;
       }
       if (source.protocol !== 'progressive') throw fail(new AppError('INVALID_STATE', `A browser cannot play ${source.protocol} streams.`));

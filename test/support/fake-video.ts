@@ -1,7 +1,8 @@
-// A browser's <video> and hls.js, as the built-in player's web engine sees
-// them: an EventTarget with the members it touches, and an hls.js whose
-// events the test sends.
+// A browser's <video>, hls.js and mpegts.js, as the built-in player's web
+// engine sees them: an EventTarget with the members it touches, and players
+// whose events the test sends.
 import type Hls from 'hls.js';
+import type Mpegts from 'mpegts.js';
 
 export class FakeVideoElement extends EventTarget {
   playsInline = false;
@@ -102,4 +103,50 @@ export function fakeHls(options: { supported?: boolean } = {}) {
     }
   }
   return { Hls: FakeHls as unknown as typeof Hls, instances };
+}
+
+type TransportHandler = (...args: never[]) => void;
+
+export function fakeMpegts(options: { supported?: boolean } = {}) {
+  const instances: FakeTransport[] = [];
+  class FakeTransport {
+    readonly handlers = new Map<string, TransportHandler[]>();
+    media: unknown;
+    loaded = false;
+    destroyed = false;
+
+    constructor(
+      readonly source: Record<string, unknown>,
+      readonly config: Record<string, unknown>,
+    ) {
+      instances.push(this);
+    }
+
+    on(event: string, handler: TransportHandler) {
+      this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+    }
+
+    emit(event: string, ...args: unknown[]) {
+      for (const handler of this.handlers.get(event) ?? []) (handler as (...args: unknown[]) => void)(...args);
+    }
+
+    attachMediaElement(media: unknown) {
+      this.media = media;
+    }
+
+    load() {
+      this.loaded = true;
+    }
+
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+  const FakeMpegts = {
+    createPlayer: (source: Record<string, unknown>, config?: Record<string, unknown>) => new FakeTransport(source, config ?? {}),
+    getFeatureList: () => ({ mseLivePlayback: options.supported ?? true }),
+    Events: { ERROR: 'error' },
+    ErrorTypes: { NETWORK_ERROR: 'NetworkError', MEDIA_ERROR: 'MediaError', OTHER_ERROR: 'OtherError' },
+  };
+  return { Mpegts: FakeMpegts as unknown as typeof Mpegts, instances };
 }

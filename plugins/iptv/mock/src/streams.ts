@@ -11,8 +11,11 @@ const LOOPED_HLS: Choices = [
   'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
   'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
 ];
-// Ten seconds of raw MPEG-TS over HTTP: what AVPlayer and a browser cannot play, and ExoPlayer can.
-const TRANSPORT_STREAM = 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear1/fileSequence0.ts';
+// Ten seconds of raw MPEG-TS over HTTP, with CORS headers: what AVPlayer cannot
+// play, and Media3, VLC and a browser with mpegts.js can. Not Apple's bipbop
+// segments: remuxed by mpegts.js, Chrome's VideoToolbox decoder on a Mac
+// refuses their H.264.
+const TRANSPORT_STREAM = 'https://test-streams.mux.dev/x36xhzz/url_0/url_462/193039199_mp4_h264_aac_hd_7.ts';
 // Short files a browser opens as well as a phone. W3C's trailers are not among them: Chrome calls them a "format error".
 const FILES: readonly [FileStream, ...FileStream[]] = [
   { uri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', sound: true },

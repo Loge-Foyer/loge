@@ -28,9 +28,10 @@ browsing works offline and playing needs the network:
 
 - most channels loop an HLS test stream as if it were live; the first of
   every four is a real live one
-- the last channel of each group offers only raw MPEG-TS, which AVPlayer and a
-  browser cannot play — that is how the app's "needs another player" gets
-  exercised
+- the last channel of each group offers only raw MPEG-TS, which AVPlayer
+  cannot play — so on an iPhone without another player the app's "needs
+  another player" gets exercised; Media3, VLC and a browser (mpegts.js) play
+  it
 - films are MP4 files, and episodes HLS
 
 ## Connection
