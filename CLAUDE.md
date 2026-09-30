@@ -82,8 +82,8 @@ handling stays genuinely tested. Jellyfin is the first real media source.
 
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, categories and platforms, and the account
-is kept record by record on your own server, PocketBase. Phase 7, playback, is
-under way.
+is kept record by record on your own server, PocketBase. Phase 7 made it play;
+Phase 8 adds players — VLC on Android is in.
 
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and
@@ -97,6 +97,9 @@ under way.
   expo-video on phones, `<video>` with a lazily loaded hls.js on the web, a
   profile per platform — tested against fakes of expo-video, the element and
   hls.js.
+- **VLC:** `players/vlc` implements it on Android — libVLC behind an Expo
+  module in its own `android/` folder, reached through `expo` — tested against
+  a fake of that module, and played on the Android emulator.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads — playback through `PlaybackInfo` with a
   `DeviceProfile` from the player's profile, and progress and watched state
@@ -110,8 +113,8 @@ under way.
   films and series — tested against a fake portal, not yet a real one.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
-- **Every other plugin:** a manifest — the other IPTV plugins, the other
-  players and the backup targets included.
+- **Every other plugin:** a manifest — the other IPTV plugins, mpv and
+  KSPlayer, and the backup targets included.
 - **`npm run typecheck`:** three programs — `api` and the non-player plugins
   with no host types at all; `player-kit` and the players with React Native's
   and the DOM's; the tests with Node's.
@@ -122,7 +125,8 @@ under way.
     `DeviceProfile`, direct play and transcodes, reports and watched state
   - the mock, as a source, an IPTV portal, an account and a backup target
   - the built-in player's engines, against fakes (`vitest.config.ts` aliases
-    expo-video; the web engine takes its `<video>` and hls.js from its host)
+    expo-video; the web engine takes its `<video>` and hls.js from its host),
+    and VLC's, against a fake of its Expo module (aliased `expo`)
   - the custom server against a fake of PocketBase's routes and rules
   - Stalker against a fake portal
   - the conformance check that each declared capability is implemented

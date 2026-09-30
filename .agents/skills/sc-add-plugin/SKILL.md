@@ -172,6 +172,8 @@ format and encryption are the app's.
 - **A `MediaPlayer`:** framework-free, reporting `PlayerEvent`s — a state
   once, what was asked for rather than an engine's lagging flag, nothing
   before a load, every failure a `failed` state and an `AppError`.
+  `createPlayerEvents` in `@sc/api` keeps the listeners' promise;
+  `playbackFailed` and `playerReleased` are the errors.
 - **A `PlayerView`**, from `@sc/player-kit`, that draws it. It finds its
   engine behind the controller (a `WeakMap` in the package).
 - **A profile per platform** that states only what the engine really plays.
@@ -182,8 +184,21 @@ format and encryption are the app's.
   `view.web.tsx` — exporting the same names.
 - **Tests against a fake engine:** alias a native one in `vitest.config.ts`,
   hand a web one its host. `plugins/players/system` shows both.
-- **Native code,** if any: an Expo module in the package's own folder,
-  compiled into the app's development build (Phase 8 proves how).
+- **Native code,** if any: an Expo module in the package's own folder —
+  `expo-module.config.json` beside `package.json`, naming its platforms, and
+  `android/` built with `expo-module-gradle-plugin`: the player a shared
+  object, its picture an `ExpoView`. `plugins/players/vlc` shows it.
+  - Reach it through `expo` (a peer), lazily: `requireNativeModule` when the
+    first controller is made, never at import. The package is imported on
+    every platform, and the module exists only where it was built.
+  - Hand the native view the player's `__expo_shared_object_id__`, never the
+    object: React Native's development renderer deep-freezes every prop a
+    native view mounts with, and a frozen shared object cannot be released.
+  - Keep every call to the engine on one thread, and stream addresses in
+    memory only. An engine whose own log quotes them is kept quiet.
+  - `platforms` says where the module is built — no more.
+  - In the app, check autolinking takes nothing from this repository's
+    `node_modules` (the app's `docs/plugins`).
 
 ## Boundaries lint will not catch yet
 
@@ -208,7 +223,7 @@ npm test
 
 - categories, platforms and qualified ids
 - the media contract, with live TV and playback members
-- the player contract and `choosePlayer`
+- the player contract, `choosePlayer` and `createPlayerEvents`
 - the account role (`AccountRecord`, `isAccountRecord`, with fixtures shared
   with the server)
 - the backup role
@@ -224,5 +239,7 @@ npm test
 - `plugins/players/system` — the reference player: expo-video on phones, the
   browser's `<video>` and a lazily loaded hls.js on the web, a profile per
   platform
+- `plugins/players/vlc` — the reference native player: libVLC behind an Expo
+  module of its own, on Android
 - `plugins/iptv/mock` — live TV at its simplest: groups, channels, a guide
   worked out from the time

@@ -56,7 +56,7 @@ create `plugins/sync/jellyfin`.
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
 | `player-kit` | `@sc/api`, `react`, `react-native` (peers) | any plugin, the app |
 | a sources, IPTV or sync plugin | `@sc/api` | any framework, the app, another plugin |
-| a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder) | the app, another plugin |
+| a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder, reached through `expo`) | the app, another plugin |
 
 A player's React, React Native and published engine are **peers**, which the
 app installs; this repository has them as development dependencies, for the
@@ -314,7 +314,8 @@ the test of whether this architecture is real.
 
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, and the account is kept record by record
-on your own server, PocketBase. Phase 7, playback, is under way.
+on your own server, PocketBase. Phase 7 made it play; Phase 8 adds players —
+VLC on Android is in.
 
 **`api` holds:**
 
@@ -326,7 +327,8 @@ on your own server, PocketBase. Phase 7, playback, is under way.
   `isSetUpFor`)
 - `AppError` with retry hints, and `HttpClient`
 - playback: `PlaybackDescriptor`, `PlayerProfile`, `MediaPlayer`,
-  `choosePlayer`, and watch state written back (`reportPlayback`, `setPlayed`)
+  `choosePlayer`, `createPlayerEvents` (how every engine keeps `subscribe`'s
+  promise), and watch state written back (`reportPlayback`, `setPlayed`)
 - the account role, record by record (`AccountRecord`, `isAccountRecord`), and
   the backup role
 - the host's crypto port (`PluginCrypto`: random bytes, SHA-256, HKDF,
@@ -350,13 +352,17 @@ TypeScript program of its own with React Native's types.
   browser's `<video>` with a lazily loaded hls.js on the web, a profile per
   platform. Its engines are tested against fakes (`vitest.config.ts` aliases
   expo-video), and it has played on the Android emulator and in Chrome.
+- **`players/vlc`** implements it on Android: libVLC behind an Expo module in
+  its own `android/` folder, reached through `expo` — tested against a fake of
+  that module (`vitest.config.ts` aliases `expo`), and played on the Android
+  emulator: raw MPEG-TS, Matroska with E-AC-3 as the file, its subtitles.
 - **`sync/custom-server`** implements the account role on PocketBase: one
   sign-in, latched refusals, the whole account read, batches written, sign-up
   with an invite, the password typed again as the owner check.
 - **`sync/mock`** plays at being your own server in memory, and
   **`sync/mock-backup`** at being a backup target.
 - **Every other plugin** is a manifest that declares no capability: the other
-  IPTV plugins, the other players, with no profile, backup targets with no
+  IPTV plugins, mpv and KSPlayer, with no profile, backup targets with no
   role.
 
 Phase 4's roles (`effectiveRoles`, `defaultRoles`), its log-based sync role,

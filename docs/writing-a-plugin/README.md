@@ -109,7 +109,15 @@ Everything above, plus:
   - The view — the part that draws — is a `PlayerView` from `@sc/player-kit`,
     exported beside it.
   - Native code, when the engine needs it, is an Expo module in the package's
-    own folder.
+    own folder: `expo-module.config.json` beside `package.json`, naming the
+    platforms it has code for, and `android/` or `ios/`. The app's autolinking
+    finds it through the `file:` link and compiles it into the development
+    build.
+- **Reach a native module lazily.** The package is imported on every
+  platform, the web included, and its module exists only where it was built:
+  call `requireNativeModule` from `expo-modules-core` (a peer) when the first
+  controller is made, never at import. The native player is a shared object;
+  its events arrive through `addListener`.
 - **The engine is a peer.** A published engine — expo-video, hls.js — is a
   peer dependency with React and React Native: the app installs it, so
   autolinking builds it and there is one copy. This repository installs it
@@ -128,6 +136,14 @@ Everything above, plus:
   it. State only what really plays.
 - **Report through events.** State, position, tracks and errors go out as
   `PlayerEvent`s. An error is an `AppError`, never a silent stop.
+  `createPlayerEvents` in `@sc/api` keeps `subscribe`'s promise — a state told
+  once, the current one to a new listener, a failure as a state and an error —
+  and `playbackFailed` and `playerReleased` are the errors every engine
+  throws.
+- **Test against a fake of the engine.** Node has no native module:
+  `vitest.config.ts` aliases expo-video and `expo-modules-core` to fakes in
+  `test/support/`, which record what the engine asked and send what the
+  native side would.
   - Tell a state once, and tell a new listener the current one.
   - Follow what was asked for, not an engine's flag that lags behind it: a
     stream turns ready before it starts, and Media3 is not "playing" while it
