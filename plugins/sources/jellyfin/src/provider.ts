@@ -16,18 +16,22 @@ import {
 } from '@sc/api';
 
 import { createClient } from './client';
-import { readItem, readItemsPage, readPublicInfo } from './dto';
+import { readItem, readItemsPage, readPlaybackInfo, readPublicInfo } from './dto';
 import { unreadable } from './errors';
 import { resolveItemImage } from './images';
 import { isLimited, scopeFor } from './libraries';
 import { toDetail, toLibrary, toMediaItem } from './map';
 import { pageAcross, readCursor, writeCursor } from './merge';
+import { deviceProfile, TICKS_PER_MS, toDescriptor, type PlaySession } from './playback';
 import { IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
 import { normalizeBaseUrl } from './url';
 
 // Libraries change rarely; a limited selection needs them on every page.
 const LIBRARIES_TTL_MS = 5 * 60_000;
 const AUTH_HEADERS = headersRef('auth');
+// What a transcode may use: anything at home, a modest stream on mobile data.
+const HOME_BITRATE = 120_000_000;
+const CELLULAR_BITRATE = 8_000_000;
 
 export function createProvider(target: MediaTarget, context: MediaContext): ConnectedMediaProvider {
   const { connectionId, fields, settings } = target;
@@ -40,6 +44,30 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   });
   const selection = settings.libraries;
   let libraries: { readonly at: number; readonly value: Promise<readonly Library[]> } | undefined;
+  // What each item's reports name, from the descriptor that began its playback.
+  const plays = new Map<string, PlaySession>();
+
+  const report = (path: string, itemId: string, positionMs: number, extra: Readonly<Record<string, unknown>>, signal?: CancelSignal) => {
+    const play = plays.get(itemId);
+    return client.post(
+      path,
+      {},
+      {
+        ItemId: itemId,
+        PositionTicks: Math.round(positionMs * TICKS_PER_MS),
+        ...(play
+          ? {
+              MediaSourceId: play.mediaSourceId,
+              ...(play.playSessionId ? { PlaySessionId: play.playSessionId } : {}),
+              ...(play.audioStreamIndex === undefined ? {} : { AudioStreamIndex: play.audioStreamIndex }),
+              ...(play.subtitleStreamIndex === undefined ? {} : { SubtitleStreamIndex: play.subtitleStreamIndex }),
+            }
+          : {}),
+        ...extra,
+      },
+      signal,
+    );
+  };
 
   const fetchLibraries = async (signal?: CancelSignal): Promise<readonly Library[]> => {
     const userId = await client.userId(signal);
@@ -178,6 +206,66 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       return mergeSorted(lists, byLastPlayed, limit).map((entry) => entry.value);
     },
 
+    getPlaybackDescriptor: async (request, signal) => {
+      const itemId = request.key.externalId;
+      const userId = await client.userId(signal);
+      const maxBitrate = context.network.current() === 'cellular' ? CELLULAR_BITRATE : HOME_BITRATE;
+      const audioStreamIndex = request.audioTrackId === undefined ? undefined : Number(request.audioTrackId);
+      const subtitleStreamIndex = request.subtitleTrackId === undefined ? undefined : Number(request.subtitleTrackId);
+      const json = await client.post(
+        `/Items/${encodeURIComponent(itemId)}/PlaybackInfo`,
+        { userId },
+        {
+          UserId: userId,
+          DeviceProfile: deviceProfile(request.profile, maxBitrate),
+          MaxStreamingBitrate: maxBitrate,
+          ...(request.startMs ? { StartTimeTicks: Math.round(request.startMs * TICKS_PER_MS) } : {}),
+          ...(audioStreamIndex === undefined || Number.isNaN(audioStreamIndex) ? {} : { AudioStreamIndex: audioStreamIndex }),
+          ...(subtitleStreamIndex === undefined || Number.isNaN(subtitleStreamIndex) ? {} : { SubtitleStreamIndex: subtitleStreamIndex }),
+          EnableDirectPlay: true,
+          EnableDirectStream: true,
+          EnableTranscoding: true,
+          AllowVideoStreamCopy: true,
+          AllowAudioStreamCopy: true,
+          AutoOpenLiveStream: true,
+        },
+        signal,
+      );
+      const info = readPlaybackInfo(json);
+      const token = client.token();
+      if (!info || !token) throw unreadable();
+      const { descriptor, session } = toDescriptor({ info, request, baseUrl, token });
+      plays.set(itemId, session);
+      return descriptor;
+    },
+
+    // Reports are safe to repeat: the outbox may deliver one twice. After a
+    // restart the play session is gone, and a report names the item alone —
+    // which is all Jellyfin needs to keep the position.
+    reportPlayback: async (playback, signal) => {
+      const itemId = playback.key.externalId;
+      const method = { PlayMethod: plays.get(itemId)?.playMethod ?? 'DirectPlay', CanSeek: true };
+      switch (playback.kind) {
+        case 'started':
+          await report('/Sessions/Playing', itemId, playback.positionMs, { ...method, IsPaused: false }, signal);
+          return;
+        case 'progress':
+          await report('/Sessions/Playing/Progress', itemId, playback.positionMs, { ...method, IsPaused: playback.paused, EventName: playback.paused ? 'Pause' : 'TimeUpdate' }, signal);
+          return;
+        case 'stopped':
+          await report('/Sessions/Playing/Stopped', itemId, playback.positionMs, {}, signal);
+          plays.delete(itemId);
+          return;
+      }
+    },
+
+    setPlayed: async (key, played, signal) => {
+      const userId = await client.userId(signal);
+      const path = `/UserPlayedItems/${encodeURIComponent(key.externalId)}`;
+      if (played) await client.post(path, { userId }, undefined, signal);
+      else await client.delete(path, { userId }, signal);
+    },
+
     resolveImage: (ref, size) => resolveItemImage(baseUrl, ref, size),
 
     resolveHeaders: async (ref) => {
@@ -188,6 +276,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     dispose: async () => {
       libraries = undefined;
+      plays.clear();
     },
   };
 }

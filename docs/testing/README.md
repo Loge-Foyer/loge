@@ -57,6 +57,11 @@ Vitest, run over `test/` at the repository root.
   - paging across libraries with no duplicates or gaps
   - mapping every item type
   - artwork addresses
+  - playing: the `DeviceProfile` built from a player's profile, a file played
+    as it is (its container named as the player names it), a transcode from
+    the server's own address, each subtitle's delivery, a refusal, reports
+    with and without a play session, watched state, and one more sign-in
+    when a report finds the session ended
 - `system-player.test.ts` — the built-in player's two engines against fakes.
   On a phone (expo-video, aliased to `support/fake-expo-video.ts` in
   `vitest.config.ts`): the stream's type and headers, the start position once

@@ -337,7 +337,9 @@ TypeScript program of its own with React Native's types.
 
 **The plugins:**
 
-- **`sources/jellyfin`** implements the media role.
+- **`sources/jellyfin`** implements the media role — playback through
+  `PlaybackInfo` and a `DeviceProfile` from the player's profile, and progress
+  and watched state back.
 - **`sources/mock`** implements it with a fixed catalogue.
 - **`iptv/mock`** implements it with live TV: groups, channels, a guide, a
   few films and series, and public test streams to play.

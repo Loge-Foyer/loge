@@ -1,5 +1,7 @@
 import {
   AppError,
+  canPlay,
+  connectionId,
   imageRef,
   headersRef,
   TransportError,
@@ -9,6 +11,9 @@ import {
   type FieldValues,
   type ItemPage,
   type NetworkKind,
+  type PlaybackRequest,
+  type PlaybackSource,
+  type PlayerProfile,
   type Season,
   type Show,
 } from '@sc/api';
@@ -439,5 +444,171 @@ describe('Jellyfin — artwork', () => {
     await provider.getLibraries?.();
     const headers = await provider.resolveHeaders?.(headersRef('auth'));
     expect(headers?.Authorization).toContain('Token="token-1"');
+  });
+});
+
+describe('Jellyfin — playing', () => {
+  const key = { connectionId: connectionId('connection-1'), externalId: 'm-arrival' };
+  // Rough shapes of two engines: a phone's, which plays HDR and MP4 files, and a browser's.
+  const phone: PlayerProfile = {
+    protocols: ['progressive', 'hls'],
+    containers: ['mp4', 'm4v', 'mov'],
+    videoCodecs: ['h264', 'hevc'],
+    audioCodecs: ['aac', 'ac3', 'eac3'],
+    subtitleFormats: ['vtt'],
+    hdr: ['hdr10', 'dolby-vision'],
+    maxHeight: 2160,
+  };
+  const browser: PlayerProfile = { protocols: ['progressive', 'hls'], containers: ['mp4', 'm4v', 'webm'], videoCodecs: ['h264', 'vp9'], audioCodecs: ['aac', 'opus'], subtitleFormats: ['vtt'] };
+  const playbackRoute = (json: unknown): Readonly<Record<string, Route>> => ({ 'POST /Items/m-arrival/PlaybackInfo': { status: 200, json } });
+
+  async function describePlayback(json: unknown, request: Partial<PlaybackRequest> = {}, options: { network?: NetworkKind; fields?: FieldValues } = {}) {
+    const connected = await connect({ routes: { ...playbackRoute(json), ...REPORTS }, ...options });
+    const getPlaybackDescriptor = connected.provider.getPlaybackDescriptor;
+    if (!getPlaybackDescriptor) throw new Error('getPlaybackDescriptor is missing');
+    const descriptor = await getPlaybackDescriptor({ key, profile: phone, ...request });
+    const [asked] = connected.http.to('POST /Items/m-arrival/PlaybackInfo');
+    return { ...connected, descriptor, asked, body: JSON.parse(asked?.body ?? '{}') as Record<string, unknown> };
+  }
+  const REPORTS: Readonly<Record<string, Route>> = {
+    'POST /Sessions/Playing': { status: 204 },
+    'POST /Sessions/Playing/Progress': { status: 204 },
+    'POST /Sessions/Playing/Stopped': { status: 204 },
+    'POST /UserPlayedItems/m-arrival': { status: 200, json: { Played: true } },
+    'DELETE /UserPlayedItems/m-arrival': { status: 200, json: { Played: false } },
+  };
+
+  it('asks for a stream with the player’s profile as a DeviceProfile', async () => {
+    const { asked, body } = await describePlayback(fixtures.directPlayInfo, { startMs: 90_000, audioTrackId: '2', subtitleTrackId: '3' });
+    expect(asked?.query).toEqual({ userId: 'user-1' });
+    expect(body).toMatchObject({ UserId: 'user-1', StartTimeTicks: 900_000_000, AudioStreamIndex: 2, SubtitleStreamIndex: 3, MaxStreamingBitrate: 120_000_000, EnableTranscoding: true });
+    const profile = body.DeviceProfile as Record<string, unknown>;
+    expect(profile.DirectPlayProfiles).toEqual(
+      ['mp4', 'm4v', 'mov'].map((container) => ({ Container: container, Type: 'Video', VideoCodec: 'h264,hevc', AudioCodec: 'aac,ac3,eac3' })),
+    );
+    expect(profile.TranscodingProfiles).toEqual([
+      expect.objectContaining({ Container: 'ts', VideoCodec: 'h264', AudioCodec: 'aac', Protocol: 'hls', Context: 'Streaming' }),
+    ]);
+    expect(profile.CodecProfiles).toEqual([
+      {
+        Type: 'Video',
+        Conditions: [
+          expect.objectContaining({ Condition: 'EqualsAny', Property: 'VideoRangeType', Value: expect.stringMatching(/^SDR\|DOVIWithSDR\|HDR10\|.*DOVI\b/) }),
+          { Condition: 'LessThanEqual', Property: 'Height', Value: '2160', IsRequired: false },
+        ],
+      },
+    ]);
+    expect(profile.SubtitleProfiles).toEqual([
+      { Format: 'vtt', Method: 'Embed' },
+      { Format: 'webvtt', Method: 'Embed' },
+      { Format: 'vtt', Method: 'Hls' },
+    ]);
+  });
+
+  it('asks for a modest stream on mobile data', async () => {
+    const { body } = await describePlayback(fixtures.directPlayInfo, {}, { network: 'cellular', fields: { localOnly: false } });
+    expect(body.MaxStreamingBitrate).toBe(8_000_000);
+  });
+
+  it('plays a file as it is: its own address with the token, named as the player names it', async () => {
+    const { descriptor } = await describePlayback(fixtures.directPlayInfo, { profile: browser });
+    expect(descriptor.sources).toEqual([
+      {
+        uri: `${SERVER}/Videos/m-arrival/stream.mp4?static=true&mediaSourceId=ms-arrival&playSessionId=play-1&Tag=etag-1&api_key=token-1`,
+        protocol: 'progressive',
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodecs: ['aac', 'ac3'],
+        height: 1080,
+        transcoded: false,
+        live: false,
+      },
+    ]);
+    expect(descriptor.durationMs).toBe(6_960_000);
+    expect(descriptor.audioTracks).toEqual([
+      { id: '1', label: 'English - AAC - Stereo - Default', language: 'en', codec: 'aac', channels: 2, default: true },
+      { id: '2', label: 'German - Dolby Digital - 5.1', language: 'de', codec: 'ac3', channels: 6 },
+    ]);
+    expect(descriptor.subtitleTracks).toEqual([{ id: '3', label: 'English - MOV_TEXT', language: 'en', format: 'mov_text', delivery: 'embedded' }]);
+    // The browser plays what the server chose for it.
+    expect(canPlay(browser, descriptor.sources[0] as PlaybackSource)).toBe(true);
+  });
+
+  it('plays a transcode from the server’s own address, and says how each subtitle arrives', async () => {
+    const { descriptor } = await describePlayback(fixtures.transcodeInfo, { startMs: 60_000 });
+    expect(descriptor.sources).toEqual([
+      {
+        uri: `${SERVER}/videos/m-arrival/master.m3u8?DeviceId=device&MediaSourceId=ms-arrival&VideoCodec=h264&AudioCodec=aac&AudioStreamIndex=1&SubtitleStreamIndex=2&SegmentContainer=ts&PlaySessionId=play-2&ApiKey=token-1&SubtitleMethod=Hls`,
+        protocol: 'hls',
+        videoCodec: 'h264',
+        audioCodecs: ['aac'],
+        transcoded: true,
+        live: false,
+      },
+    ]);
+    expect(descriptor.startMs).toBe(60_000);
+    expect(descriptor.subtitleTracks).toEqual([
+      { id: '2', label: 'Forced - Turkish - Default - SUBRIP', language: 'tr', format: 'srt', delivery: 'embedded', forced: true, default: true },
+      { id: '3', label: 'English - PGSSUB', language: 'en', format: 'pgs', delivery: 'burned' },
+      {
+        id: '4',
+        label: 'French - WEBVTT',
+        language: 'fr',
+        format: 'vtt',
+        delivery: 'external',
+        uri: `${SERVER}/Videos/m-arrival/ms-arrival/Subtitles/4/0/Stream.vtt?api_key=token-1`,
+      },
+    ]);
+  });
+
+  it('says plainly when the server has no stream for this player', async () => {
+    const connected = await connect({ routes: playbackRoute(fixtures.noStreamInfo) });
+    await expect(connected.provider.getPlaybackDescriptor?.({ key, profile: phone })).rejects.toMatchObject({ code: 'INVALID_STATE', retry: 'never' });
+  });
+
+  it('reports start, progress and stop with the play session its descriptor began', async () => {
+    const { provider, http } = await describePlayback(fixtures.transcodeInfo);
+    await provider.reportPlayback?.({ kind: 'started', key, positionMs: 0 });
+    await provider.reportPlayback?.({ kind: 'progress', key, positionMs: 12_345, paused: true });
+    await provider.reportPlayback?.({ kind: 'stopped', key, positionMs: 60_000 });
+    const body = (route: string) => JSON.parse(http.to(route)[0]?.body ?? '{}') as Record<string, unknown>;
+    const session = { ItemId: 'm-arrival', MediaSourceId: 'ms-arrival', PlaySessionId: 'play-2', AudioStreamIndex: 1, SubtitleStreamIndex: 2 };
+    expect(body('POST /Sessions/Playing')).toEqual({ ...session, PositionTicks: 0, PlayMethod: 'Transcode', CanSeek: true, IsPaused: false });
+    expect(body('POST /Sessions/Playing/Progress')).toEqual({ ...session, PositionTicks: 123_450_000, PlayMethod: 'Transcode', CanSeek: true, IsPaused: true, EventName: 'Pause' });
+    expect(body('POST /Sessions/Playing/Stopped')).toEqual({ ...session, PositionTicks: 600_000_000 });
+  });
+
+  it('reports with the item alone after a restart — safe to deliver twice', async () => {
+    const { provider, http } = await connect({ routes: REPORTS });
+    await provider.reportPlayback?.({ kind: 'stopped', key, positionMs: 30_000 });
+    await provider.reportPlayback?.({ kind: 'stopped', key, positionMs: 30_000 });
+    const stops = http.to('POST /Sessions/Playing/Stopped').map((request) => JSON.parse(request.body ?? '{}') as unknown);
+    expect(stops).toEqual([
+      { ItemId: 'm-arrival', PositionTicks: 300_000_000 },
+      { ItemId: 'm-arrival', PositionTicks: 300_000_000 },
+    ]);
+  });
+
+  it('marks an item watched, and not', async () => {
+    const { provider, http } = await connect({ routes: REPORTS });
+    await provider.setPlayed?.(key, true);
+    await provider.setPlayed?.(key, false);
+    expect(http.to('POST /UserPlayedItems/m-arrival')[0]?.query).toEqual({ userId: 'user-1' });
+    expect(http.to('DELETE /UserPlayedItems/m-arrival')[0]?.query).toEqual({ userId: 'user-1' });
+  });
+
+  it('signs in once more when a report finds the session ended, then never again', async () => {
+    let calls = 0;
+    const { provider, http } = await connect({
+      routes: {
+        'POST /Sessions/Playing/Progress': () => {
+          calls += 1;
+          return { status: calls === 1 ? 401 : 204 };
+        },
+      },
+    });
+    await provider.reportPlayback?.({ kind: 'progress', key, positionMs: 1_000, paused: false });
+    expect(http.to('POST /Users/AuthenticateByName')).toHaveLength(2);
+    expect(calls).toBe(2);
   });
 });

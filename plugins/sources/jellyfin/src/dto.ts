@@ -272,3 +272,97 @@ export function readPublicInfo(value: unknown): PublicInfoDto | undefined {
 export function readUserId(value: unknown): string | undefined {
   return text(record(value)?.Id);
 }
+
+export interface MediaStreamDto {
+  readonly index: number;
+  /** `Video`, `Audio`, `Subtitle`, … */
+  readonly type: string;
+  readonly codec?: string;
+  readonly language?: string;
+  readonly displayTitle?: string;
+  readonly title?: string;
+  readonly isDefault: boolean;
+  readonly isForced: boolean;
+  readonly channels?: number;
+  readonly height?: number;
+  readonly videoRangeType?: string;
+  /** How a subtitle reaches the player: `Embed`, `Hls`, `External`, `Encode` or `Drop`. */
+  readonly deliveryMethod?: string;
+  readonly deliveryUrl?: string;
+}
+
+export interface MediaSourceDto {
+  readonly id: string;
+  /** ffprobe's names, sometimes several: `mov,mp4,m4a,3gp,3g2,mj2`. */
+  readonly container?: string;
+  readonly eTag?: string;
+  readonly supportsDirectPlay: boolean;
+  readonly supportsDirectStream: boolean;
+  /** The server's own address for a transcode, token and play session included. */
+  readonly transcodingUrl?: string;
+  readonly transcodingSubProtocol?: string;
+  readonly transcodingContainer?: string;
+  readonly runTimeTicks?: number;
+  readonly defaultAudioStreamIndex?: number;
+  readonly defaultSubtitleStreamIndex?: number;
+  readonly mediaStreams: readonly MediaStreamDto[];
+}
+
+export interface PlaybackInfoDto {
+  readonly playSessionId?: string;
+  /** `NotAllowed`, `NoCompatibleStream` or `RateLimitExceeded`. */
+  readonly errorCode?: string;
+  readonly mediaSources: readonly MediaSourceDto[];
+}
+
+export function readPlaybackInfo(value: unknown): PlaybackInfoDto | undefined {
+  const info = record(value);
+  if (!info) return undefined;
+  return {
+    ...present('playSessionId', text(info.PlaySessionId)),
+    ...present('errorCode', text(info.ErrorCode)),
+    mediaSources: list(info.MediaSources).flatMap((source) => readMediaSource(source) ?? []),
+  };
+}
+
+function readMediaSource(value: unknown): MediaSourceDto | undefined {
+  const source = record(value);
+  const id = text(source?.Id);
+  if (!source || !id) return undefined;
+  return {
+    id,
+    ...present('container', text(source.Container)),
+    ...present('eTag', text(source.ETag)),
+    supportsDirectPlay: source.SupportsDirectPlay === true,
+    supportsDirectStream: source.SupportsDirectStream === true,
+    ...present('transcodingUrl', text(source.TranscodingUrl)),
+    ...present('transcodingSubProtocol', text(source.TranscodingSubProtocol)),
+    ...present('transcodingContainer', text(source.TranscodingContainer)),
+    ...present('runTimeTicks', number(source.RunTimeTicks)),
+    ...present('defaultAudioStreamIndex', number(source.DefaultAudioStreamIndex)),
+    ...present('defaultSubtitleStreamIndex', number(source.DefaultSubtitleStreamIndex)),
+    mediaStreams: list(source.MediaStreams).flatMap((stream) => readMediaStream(stream) ?? []),
+  };
+}
+
+function readMediaStream(value: unknown): MediaStreamDto | undefined {
+  const stream = record(value);
+  const index = number(stream?.Index);
+  const type = text(stream?.Type);
+  if (!stream || index === undefined || !type) return undefined;
+  return {
+    index,
+    type,
+    ...present('codec', text(stream.Codec)),
+    ...present('language', text(stream.Language)),
+    ...present('displayTitle', text(stream.DisplayTitle)),
+    ...present('title', text(stream.Title)),
+    isDefault: stream.IsDefault === true,
+    isForced: stream.IsForced === true,
+    ...present('channels', number(stream.Channels)),
+    ...present('height', number(stream.Height)),
+    ...present('videoRangeType', text(stream.VideoRangeType)),
+    ...present('deliveryMethod', text(stream.DeliveryMethod)),
+    ...present('deliveryUrl', text(stream.DeliveryUrl)),
+  };
+}

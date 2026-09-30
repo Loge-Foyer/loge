@@ -1,7 +1,8 @@
 /**
- * Jellyfin — a media source for films and series. It reads what each server
- * user has watched; the server stays the master of that, so the plugin has no
- * sync role.
+ * Jellyfin — a media source for films and series. It plays them, as a stream
+ * the server chooses for the player, and reads and writes what each server user
+ * has watched; the server stays the master of that, so it never goes through
+ * the account.
  */
 import { pluginId, type Plugin } from '@sc/api';
 
@@ -16,7 +17,7 @@ export const plugin: Plugin = {
     description: 'Self-hosted film and TV server.',
     media: {
       contentKinds: ['movies', 'shows'],
-      capabilities: ['browse', 'libraries', 'watchStateRead', 'remoteImages', 'offlineMetadata'],
+      capabilities: ['browse', 'libraries', 'watchStateRead', 'watchStateWrite', 'remoteImages', 'offlineMetadata', 'playback'],
     },
     connectionFields: [
       {

@@ -98,7 +98,9 @@ under way.
   profile per platform — tested against fakes of expo-video, the element and
   hls.js.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
-  recorded 12.x payloads.
+  recorded 12.x payloads — playback through `PlaybackInfo` with a
+  `DeviceProfile` from the player's profile, and progress and watched state
+  back; run against a real Jellyfin 12.
 - **Mock:** `sources/mock` implements the media role with a fixed catalogue,
   and `iptv/mock` with live TV — groups, channels, a guide, a few films and
   series, public test streams to play; `sync/mock` plays at being your own
@@ -113,7 +115,8 @@ under way.
 - **`npm test`:** runs everything.
   - the api rules, bytes as text, and the contracts: categories, account
     records against their shared fixtures, choosing a player
-  - Jellyfin's behaviour: sign-in, local-only, paging, mapping
+  - Jellyfin's behaviour: sign-in, local-only, paging, mapping, the
+    `DeviceProfile`, direct play and transcodes, reports and watched state
   - the mock, as a source, an IPTV portal, an account and a backup target
   - the built-in player's engines, against fakes (`vitest.config.ts` aliases
     expo-video; the web engine takes its `<video>` and hls.js from its host)

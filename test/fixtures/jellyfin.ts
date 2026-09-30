@@ -156,3 +156,58 @@ export function film(id: string, year: number) {
 export function page(items: readonly unknown[], total = items.length) {
   return { Items: items, TotalRecordCount: total, StartIndex: 0 };
 }
+
+// PlaybackInfo, shaped like Jellyfin 12.0's answers (recorded, then trimmed):
+// an MP4 the player plays as it is, and an HDR Matroska it cannot.
+export const directPlayInfo = {
+  MediaSources: [
+    {
+      Protocol: 'File',
+      Id: 'ms-arrival',
+      Container: 'mov,mp4,m4a,3gp,3g2,mj2',
+      ETag: 'etag-1',
+      SupportsTranscoding: true,
+      SupportsDirectStream: true,
+      SupportsDirectPlay: true,
+      RunTimeTicks: 69_600_000_000,
+      DefaultAudioStreamIndex: 1,
+      MediaStreams: [
+        { Index: 0, Type: 'Video', Codec: 'h264', Height: 1080, Width: 1920, VideoRangeType: 'SDR', DisplayTitle: '1080p H264 SDR', IsDefault: true },
+        { Index: 1, Type: 'Audio', Codec: 'aac', Language: 'eng', DisplayTitle: 'English - AAC - Stereo - Default', Channels: 2, IsDefault: true },
+        { Index: 2, Type: 'Audio', Codec: 'ac3', Language: 'ger', DisplayTitle: 'German - Dolby Digital - 5.1', Channels: 6, IsDefault: false },
+        { Index: 3, Type: 'Subtitle', Codec: 'mov_text', Language: 'eng', DisplayTitle: 'English - MOV_TEXT', IsDefault: false, IsForced: false, DeliveryMethod: 'Embed' },
+      ],
+    },
+  ],
+  PlaySessionId: 'play-1',
+};
+
+export const transcodeInfo = {
+  MediaSources: [
+    {
+      Protocol: 'File',
+      Id: 'ms-arrival',
+      Container: 'mkv',
+      SupportsTranscoding: true,
+      SupportsDirectStream: false,
+      SupportsDirectPlay: false,
+      RunTimeTicks: 69_600_000_000,
+      DefaultAudioStreamIndex: 1,
+      DefaultSubtitleStreamIndex: 2,
+      TranscodingUrl:
+        '/videos/m-arrival/master.m3u8?DeviceId=device&MediaSourceId=ms-arrival&VideoCodec=h264&AudioCodec=aac&AudioStreamIndex=1&SubtitleStreamIndex=2&SegmentContainer=ts&PlaySessionId=play-2&ApiKey=token-1&SubtitleMethod=Hls',
+      TranscodingSubProtocol: 'hls',
+      TranscodingContainer: 'ts',
+      MediaStreams: [
+        { Index: 0, Type: 'Video', Codec: 'hevc', Height: 2160, VideoRangeType: 'HDR10', IsDefault: true },
+        { Index: 1, Type: 'Audio', Codec: 'eac3', Language: 'tur', DisplayTitle: 'Turkish - Dolby Digital+ - 5.1 - Default', Channels: 6, IsDefault: true },
+        { Index: 2, Type: 'Subtitle', Codec: 'subrip', Language: 'tur', DisplayTitle: 'Forced - Turkish - Default - SUBRIP', IsDefault: true, IsForced: true, DeliveryMethod: 'Hls' },
+        { Index: 3, Type: 'Subtitle', Codec: 'PGSSUB', Language: 'eng', DisplayTitle: 'English - PGSSUB', IsDefault: false, IsForced: false, DeliveryMethod: 'Encode' },
+        { Index: 4, Type: 'Subtitle', Codec: 'webvtt', Language: 'fre', DisplayTitle: 'French - WEBVTT', IsDefault: false, IsForced: false, DeliveryMethod: 'External', DeliveryUrl: '/Videos/m-arrival/ms-arrival/Subtitles/4/0/Stream.vtt' },
+      ],
+    },
+  ],
+  PlaySessionId: 'play-2',
+};
+
+export const noStreamInfo = { MediaSources: [], ErrorCode: 'NoCompatibleStream' };

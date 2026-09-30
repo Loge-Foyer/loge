@@ -95,6 +95,8 @@ What is real today:
     them.
   - It opens detail pages with cast and studios, lists seasons and episodes,
     knows what each user watched, and builds artwork addresses.
+  - It plays: the server picks the file itself or a transcode for the chosen
+    player, and progress and watched go back to it.
   - It is tested against recorded server answers, and has been run against a
     real Jellyfin 12 server.
 - **The mock source** has a fixed catalogue behind the same contract, so the

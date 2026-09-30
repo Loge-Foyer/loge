@@ -27,10 +27,19 @@ export interface JellyfinClient {
   userId(signal?: CancelSignal): Promise<string>;
   /** An authenticated GET, parsed as JSON. */
   get(path: string, params: Readonly<Record<string, QueryValue>>, signal?: CancelSignal): Promise<unknown>;
+  /** An authenticated POST with a JSON body; the answer parsed, or `undefined` when there is none. */
+  post(path: string, params: Readonly<Record<string, QueryValue>>, body: unknown, signal?: CancelSignal): Promise<unknown>;
+  /** An authenticated DELETE; the answer parsed, or `undefined` when there is none. */
+  delete(path: string, params: Readonly<Record<string, QueryValue>>, signal?: CancelSignal): Promise<unknown>;
   /** A GET that needs no sign-in. */
   getPublic(path: string, signal?: CancelSignal): Promise<unknown>;
   /** The authorization header for the current session, for images that need one. */
   authorization(): string | undefined;
+  /**
+   * The current session's token, for a stream address a player fetches itself
+   * — a `<video>` element can send no header. Never stored, never logged.
+   */
+  token(): string | undefined;
 }
 
 export interface ClientOptions {
@@ -152,16 +161,23 @@ export function createClient({ baseUrl, username, localOnly, context }: ClientOp
     path: string,
     params: Readonly<Record<string, QueryValue>>,
     signal: CancelSignal | undefined,
+    body?: unknown,
   ): Promise<unknown> => {
     const first = (await current()) ?? (await signIn());
-    let response = await send(method, path, { params, token: first.token, ...(signal ? { signal } : {}) });
+    const request = (token: string) => ({
+      params,
+      token,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal ? { signal } : {}),
+    });
+    let response = await send(method, path, request(first.token));
     if (response.status === 401) {
       // Another client on this device may have signed in since: try its token
       // before signing in once more ourselves.
       const stored = await readStored();
       const next = stored && stored.token !== first.token ? stored : await signIn();
       session = next;
-      response = await send(method, path, { params, token: next.token, ...(signal ? { signal } : {}) });
+      response = await send(method, path, request(next.token));
       if (response.status === 401) {
         session = undefined;
         loadingStored = undefined;
@@ -170,17 +186,21 @@ export function createClient({ baseUrl, username, localOnly, context }: ClientOp
       }
     }
     if (response.status >= 400) throw statusError(response.status);
-    return parse(response);
+    // Reports answer 204, with nothing to read.
+    return response.text.trim() === '' ? undefined : parse(response);
   };
 
   return {
     userId: async () => ((await current()) ?? (await signIn())).userId,
     get: (path, params, signal) => authorized('GET', path, params, signal),
+    post: (path, params, body, signal) => authorized('POST', path, params, signal, body),
+    delete: (path, params, signal) => authorized('DELETE', path, params, signal),
     getPublic: async (path, signal) => {
       const response = await send('GET', path, signal ? { signal } : {});
       if (response.status >= 400) throw statusError(response.status);
       return parse(response);
     },
     authorization: () => (session ? header(session.token) : undefined),
+    token: () => session?.token,
   };
 }
