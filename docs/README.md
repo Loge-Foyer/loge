@@ -3,9 +3,9 @@
 Everything about the client itself: how to run it, how it is put together, and
 how each platform differs.
 
-These pages describe the target architecture, which Phase 6 is moving the
-code to. Where a page describes something that is not built yet, it says which
-phase brings it.
+These pages describe the target architecture, which Phase 6 moved the code to.
+Where a page describes something that is not built yet — playback, above all —
+it says which phase brings it.
 
 | Topic | What it covers |
 | --- | --- |

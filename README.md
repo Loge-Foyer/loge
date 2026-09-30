@@ -114,8 +114,9 @@ screens rather than a new app.
 
 ## Current state
 
-**Phase 6 — the code is moving to the new architecture.** Everything above is
-the design. What runs today, built with [Tamagui](https://tamagui.dev):
+**Phase 6 — the code is on the new architecture.** Everything above is the
+design, and all but playback runs today, built with
+[Tamagui](https://tamagui.dev):
 
 - **Four tabs.** TV shows the way to add an IPTV source; its channels arrive
   with Phase 7.

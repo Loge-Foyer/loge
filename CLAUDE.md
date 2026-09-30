@@ -44,9 +44,9 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-**Phase 6 — the code is moving to the new architecture.**
+**Phase 6 — the code is on the new architecture. Phase 7 brings playback.**
 
-The target: four tabs — Media, Videos, TV, Settings. Plugins come in four
+The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
 categories, and Settings → Plugins shows one list per category for this
 platform. A device holds one account, local or on your own server
 (PocketBase), with up to ten profiles. Source and IPTV connections are

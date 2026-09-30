@@ -8,8 +8,8 @@ description: Wire a Streaming Center plugin from the plugins repository into the
 Plugins live in a **separate repository** (`../streaming_center_plugins`), so
 npm workspaces cannot reach them. This is the fiddliest seam in the project.
 
-**Phase 6 — the code is moving to the new architecture.** This skill describes
-the target. Where today differs, it says so; "Current state" at the end has
+**Phase 6 — the code is on the new architecture; players arrive in Phases 7
+and 8.** This skill describes the target. Where today differs, it says so; "Current state" at the end has
 the rest.
 
 ## 0. Install the plugins repository first

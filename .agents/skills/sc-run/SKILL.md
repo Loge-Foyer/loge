@@ -12,8 +12,8 @@ npm run web        # browser — no build
 npm start          # Metro alone, for a development client already installed
 ```
 
-**Phase 6 — the code is moving to the new architecture.** This skill describes
-the target, and says where today differs. "What you will see" at the end has
+**Phase 6 — the code is on the new architecture; nothing plays until Phase 7.**
+This skill describes the target, and says where today differs. "What you will see" at the end has
 both.
 
 ## Which runtime you need
@@ -189,8 +189,17 @@ Typing on Android with `adb shell input text` has traps:
 - **Only into a field that has focus.** Tap it, then check `focused="true"` in
   a dump first. Keys that reach no field go to the development build itself:
   `r` twice reloads the app, `d` opens its menu.
-- **The emulator has a hardware keyboard**, so no soft keyboard shows: never
-  press Back to close one — it navigates back.
+- **Whether a soft keyboard shows depends on the emulator's settings** — on
+  `shinie-a36` it does, and it covers the buttons under a form. A dump still
+  lists the nodes beneath it, so a tap there types a key into the field
+  instead (a password gains a character, and the server rightly refuses it).
+  Close the keyboard first, and only when one is showing: `adb shell dumpsys
+  input_method | grep mInputShown=true`, then Back. Pressed with no keyboard
+  up, Back navigates back.
+- **`autoFocus` does not focus a field on Android:** tap it, and check
+  `focused="true"`, before typing.
+- **Dumps carry no hints:** find a form's fields as the `EditText` nodes from
+  top to bottom.
 - **Give the app a moment** before tapping the button after it: React takes in
   the typed text a little later, and a button that is disabled until then
   ignores the tap. A dump's `enabled` is no guide for Tamagui buttons.

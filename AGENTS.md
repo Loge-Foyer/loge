@@ -9,8 +9,8 @@ database, the backup file's format, platform access and composition. It does
 not own domain types or any plugin — those live in `streaming_center_plugins`.
 
 **This file describes the target.** Phase 5 wrote the new architecture down,
-and Phase 6 is moving the code to it. "Current state", at the end, says what
-runs today.
+and Phase 6 moved the code to it; what is still to come — playback above all —
+says which phase brings it. "Current state", at the end, says what runs today.
 
 ---
 
@@ -544,8 +544,8 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 6 — the code is moving to the new architecture.** Everything above
-describes the target. What runs today:
+**Phase 6 — the code is on the new architecture.** Everything above describes
+the target; what runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings — with TV showing the way to add
   an IPTV source. Settings → Plugins is four lists, by category, of the

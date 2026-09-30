@@ -161,9 +161,8 @@ PocketBase binary.
 
 ## Current state — read this before trusting a failure
 
-**Phase 6 — the code is moving to the new architecture.** The checks marked
-with a phase apply once that phase has built what they check; the rest apply
-today.
+**Phase 6 — the code is on the new architecture.** The checks marked with a
+phase apply once that phase has built what they check; the rest apply today.
 
 - Storage is **real**: SQLite and the keychain on native, IndexedDB and
   encrypted secrets on the web. Data persists between runs, so a flow that
