@@ -86,8 +86,13 @@ else is real, including the database engine:
   byte, a stranger, a file over 64 MiB, a newer format or schema and a row the
   contract refuses are all refused before anything changes; the key is shown
   only to the owner; a device on your server signs out before it imports.
-  With backup targets (next): a changed generation or etag asks rather than
-  overwrites.
+- **Backup targets** (`test/backup-targets.test.ts`), two devices on one fake
+  target (`support/backup-target.ts`): a save and a save over it; a file
+  another device changed stands in conflict instead of being overwritten, and
+  each answer — theirs, mine, both — does what it says; saving after a change
+  and on going to the background; an account on your server saving over its
+  file. `test/players.test.ts`: players per platform, on and off, which plays
+  first, and nothing journaled.
 
 The real account plugin meets the real server in the sync repository's
 harness (Phase 6's S4). The scheduler runs on

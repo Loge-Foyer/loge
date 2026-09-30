@@ -27,6 +27,7 @@
     "@sc/sync-google-drive": "file:../streaming_center_plugins/plugins/sync/google-drive",
     "@sc/sync-icloud": "file:../streaming_center_plugins/plugins/sync/icloud",
     "@sc/sync-mock": "file:../streaming_center_plugins/plugins/sync/mock",
+    "@sc/sync-mock-backup": "file:../streaming_center_plugins/plugins/sync/mock-backup",
     "@sc/sync-onedrive": "file:../streaming_center_plugins/plugins/sync/onedrive",
     "@shopify/flash-list": "2.0.2",
     "@tamagui/config": "2.7.7",

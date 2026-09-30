@@ -54,7 +54,7 @@ With `--source-maps` on the web export, also check the vocabulary is bundled
 once: the `sources` of the web map should list each
 `streaming_center_plugins/api/src/*` file exactly once.
 
-## sql.js only for backups, only on the web (Phase 6)
+## sql.js only for backups, only on the web
 
 The backup file is built with expo-sqlite on native and with sql.js on the
 web, loaded through `import()` when a backup is written or opened. So sql.js
@@ -69,9 +69,11 @@ grep -l sql-wasm /tmp/sc-web/_expo/static/js/web/*.js                # must prin
 find /tmp/sc-web -name '*.wasm'                                      # the one sql.js file, fetched only by that chunk
 ```
 
-`"sql-wasm.wasm"` is a string literal in sql.js's loader, so it survives
-minification. If the build falls back to `sql-asm.js`, grep for `sql-asm`
-instead. A web page that loads WebAssembly needs `'wasm-unsafe-eval'` in its
+`"sql-wasm-browser.wasm"` is a string literal in sql.js's browser build — the
+one the package's `browser` condition picks on the web — so it survives
+minification, and the `sql-wasm` greps above match it. The chunk is
+`sql-js-web-*.js`; the `.wasm` sits under `assets/node_modules/sql.js/dist/`.
+If the build ever falls back to `sql-asm.js`, grep for `sql-asm` instead. A web page that loads WebAssembly needs `'wasm-unsafe-eval'` in its
 Content-Security-Policy — and nothing more than that.
 
 ## No secret in the database
@@ -101,6 +103,8 @@ log either.
 | `@/composition/*` | `src/app/_layout.tsx` |
 | `expo-local-authentication` | `src/platform/**` — everything else asks `OwnerCheck` |
 | `@noble/*` | `src/platform/**` — cryptography is the platform's |
+| `sql.js` | `src/persistence/backup/sql-js*.ts` — a backup's database, nothing else |
+| `…/sql-js-web`, statically | nowhere — only `sql.web.ts`'s `import()`, which the rule does not see, so it stays a chunk of its own |
 
 The rows marked with a phase are the target: add them to `eslint.config.js`
 when the packages they name exist, in the same commit.
@@ -173,7 +177,9 @@ today.
   included — not screens. Screens are proven by driving the app on each
   platform (`sc-run`). The real account plugin against the real PocketBase is
   `../streaming_center_sync`'s harness, from Phase 6's S4.
-- There is no `player-kit`, sql.js or backup file yet, and nothing plays.
+- There is no `player-kit` yet, and nothing plays. The backup file, its
+  import and export and backup targets are in place; the only backup target
+  with a role is the dev-only mock.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

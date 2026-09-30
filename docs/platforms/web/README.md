@@ -43,9 +43,12 @@ This is weaker than a keychain: any script running on the page can use the
 key, so a deployed page needs a strict Content-Security-Policy.
 
 **WebAssembly, only for backups.** The data never lives in SQLite compiled to
-WebAssembly. From Phase 6, writing or opening a backup file loads sql.js — its
-own chunk, fetched through `import()`, with its `.wasm` beside it — builds the
-file in memory, and lets it go. So the CSP allows `'wasm-unsafe-eval'`, for
+WebAssembly. Writing or opening a backup file loads sql.js — its own chunk
+(`sql-js-web-*.js`), fetched through `import()` — and its `.wasm`, an asset
+Metro serves (`metro.config.js`) at an absolute `/assets/…` path that
+expo-asset resolves, so a deep route finds it too. It builds the file in
+memory, and lets it go. Lint allows sql.js in `persistence/backup/sql-js*.ts`
+alone, and no static import of the chunk anywhere. So the CSP allows `'wasm-unsafe-eval'`, for
 sql.js, and nothing more.
 
 A browser may clear a site's storage when space runs low. The app asks for

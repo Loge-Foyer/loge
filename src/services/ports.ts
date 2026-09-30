@@ -9,6 +9,7 @@ import type {
   MediaDetail,
   MediaItem,
   NetworkKind,
+  PluginId,
   UserId,
 } from '@sc/api';
 
@@ -65,6 +66,8 @@ export interface DeviceSettings {
   readonly defaultUserId?: UserId;
   /** A fingerprint of the device key, never the key: it spots a phone restored from another's backup. */
   readonly deviceKeyPrint?: string;
+  /** This device's players: the ones switched off, and the one that plays first. Never journaled, never backed up. */
+  readonly players?: { readonly off?: readonly PluginId[]; readonly preferred?: PluginId };
 }
 
 export interface DeviceSettingsRepository {
@@ -314,7 +317,7 @@ export interface RunLock {
   run<T>(name: string, work: () => Promise<T>): Promise<T>;
 }
 
-export type LogCategory = 'app.boot' | 'user.session' | 'provider' | 'sync' | 'storage' | 'player';
+export type LogCategory = 'app.boot' | 'user.session' | 'provider' | 'sync' | 'backup' | 'storage' | 'player';
 
 export type LogFields = Readonly<Record<string, unknown>>;
 

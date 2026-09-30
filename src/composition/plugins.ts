@@ -20,6 +20,7 @@ import { plugin as customServer } from '@sc/sync-custom-server';
 import { plugin as googleDriveBackup } from '@sc/sync-google-drive';
 import { plugin as icloudBackup } from '@sc/sync-icloud';
 import { plugin as mockAccount } from '@sc/sync-mock';
+import { plugin as mockBackups } from '@sc/sync-mock-backup';
 import { plugin as onedriveBackup } from '@sc/sync-onedrive';
 
 /**
@@ -49,5 +50,5 @@ export const plugins: readonly Plugin[] = [
   googleDriveBackup,
   onedriveBackup,
   // Test doubles — offline, deliberately partial. Development builds only.
-  ...(__DEV__ ? [mockSource, mockAccount] : []),
+  ...(__DEV__ ? [mockSource, mockAccount, mockBackups] : []),
 ];

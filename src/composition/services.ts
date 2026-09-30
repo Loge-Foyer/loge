@@ -1,5 +1,7 @@
+import { backupSql } from '@/persistence/backup/sql';
 import { createAppActivity } from '@/platform/app-activity';
 import { createClientIdentitySource } from '@/platform/client-identity';
+import { createFileExchange } from '@/platform/file-exchange';
 import { systemClock } from '@/platform/clock';
 import { hostCrypto } from '@/platform/crypto';
 import { createPlatformHttpClient } from '@/platform/http';
@@ -10,6 +12,8 @@ import { createOwnerAuthentication } from '@/platform/owner-authentication';
 import { currentPlatform } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
 import { createAccountService } from '@/services/account';
+import { createBackupService } from '@/services/backup';
+import { createBackupTargets } from '@/services/backup/targets';
 import { createConnectionService } from '@/services/connections';
 import { createHomeLayoutService } from '@/services/home-layout';
 import type { Services } from '@/services';
@@ -17,6 +21,7 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
+import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
 import { checkRestoredDevice } from '@/services/restored-device';
@@ -89,7 +94,8 @@ export function createServices(): AppServices {
   const profiles = createProfileService({ db, janitor, session, ids, onRemoved: (id) => media.forgetUser(id) });
   const homeLayout = createHomeLayoutService(db.preferences);
 
-  const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity: createAppActivity() });
+  const activity = createAppActivity();
+  const scheduler = createSyncScheduler({ engine, journal: db.journal, network, activity });
   const account = createAccountService({
     db,
     catalog,
@@ -103,6 +109,38 @@ export function createServices(): AppServices {
     parts,
     sessions,
     ids,
+  });
+  const backup = createBackupService({
+    db,
+    deviceBound,
+    crypto,
+    sql: backupSql,
+    parts,
+    catalog,
+    owner,
+    account,
+    engine,
+    scheduler,
+    lock,
+    janitor,
+    clock,
+    identity: () => identity.identity(),
+  });
+  const backupTargets = createBackupTargets({
+    http,
+    network,
+    identity,
+    clock,
+    crypto,
+    db,
+    catalog,
+    credentials,
+    sessions,
+    backup,
+    journal: db.journal,
+    activity,
+    ids,
+    log,
   });
   // What the account brought: running providers let changed connections and removed profiles go, and the gate looks again.
   engine.onApplied((applied) => {
@@ -124,6 +162,10 @@ export function createServices(): AppServices {
       account,
       owner,
       sync: { status: engine.status, subscribe: engine.subscribe, onApplied: engine.onApplied, now: scheduler.now },
+      backup,
+      backupTargets,
+      files: createFileExchange(log),
+      players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
     },
     start: async () => {
       // Before anything reads the journal: another phone's, restored here, is never sent.
@@ -137,6 +179,7 @@ export function createServices(): AppServices {
       await session.start();
       void media.prune();
       scheduler.start();
+      backupTargets.start();
     },
   };
 }

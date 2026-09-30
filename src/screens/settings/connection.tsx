@@ -71,7 +71,8 @@ export function NewConnectionScreen({ pluginId }: { pluginId: PluginId }) {
   const { create } = useConnectionActions();
   if (!manifest || !existing) return <Missing loading={!!manifest} />;
   // Only sources and IPTV are connected here: an account is chosen in Settings → Account.
-  if (!manifest.media) return <NotHere manifest={manifest} />;
+  // Sources and IPTV, and the places backups go; an account is chosen in Settings → Account.
+  if (!manifest.media && !manifest.backup) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={`New ${manifest.displayName} connection`}
@@ -92,7 +93,8 @@ export function EditConnectionScreen({ connectionId }: { connectionId: Connectio
   if (data === null) return <Missing loading={false} />;
   // Kept for the devices that can run it — IPTV on the web.
   if (!manifest) return <Unavailable label={data.connection.label} />;
-  if (!manifest.media) return <NotHere manifest={manifest} />;
+  // Sources and IPTV, and the places backups go; an account is chosen in Settings → Account.
+  if (!manifest.media && !manifest.backup) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={data.connection.label}
@@ -429,13 +431,15 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         <Paragraph color="$color10">Nothing to fill in — this plugin needs no details to connect.</Paragraph>
       )}
 
-      <FormSection title="Use this connection">
-        <FieldInput
-          field={enabledField(manifest)}
-          value={draft.enabled}
-          onChange={(on) => edit((current) => ({ ...current, enabled: on === true }))}
-        />
-      </FormSection>
+      {manifest.media ? (
+        <FormSection title="Use this connection">
+          <FieldInput
+            field={enabledField(manifest)}
+            value={draft.enabled}
+            onChange={(on) => edit((current) => ({ ...current, enabled: on === true }))}
+          />
+        </FormSection>
+      ) : null}
 
       {settingsOnlyPerProfile ? profileSwitcher : null}
       {settingsOnlyPerProfile ? (pinGate ?? offNotice) : null}
@@ -459,7 +463,9 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
       <Paragraph size="$2" color="$color10">
         {separate
           ? `${setUpCount} of ${profiles.length} ${profiles.length === 1 ? 'profile is' : 'profiles are'} set up${offNames.length > 0 ? `, and ${listAll(offNames)} ${offNames.length === 1 ? 'doesn’t' : 'don’t'} use it` : ''}. A profile that is not set up is asked to finish on its Media tab.`
-          : 'Shared by every profile of your account.'}{' '}
+          : manifest.media
+            ? 'Shared by every profile of your account.'
+            : 'Kept on this device only: another device chooses its own.'}{' '}
         Passwords are kept in secure storage and never shown again.
       </Paragraph>
       {losing > 0 ? (
@@ -478,7 +484,11 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
             label="Remove connection"
             icon={<Trash2 size={16} />}
             title={`Remove ${draft.label}?`}
-            description="Its details, and every profile's saved password, are deleted from your account."
+            description={
+              manifest.media
+                ? 'Its details, and every profile’s saved password, are deleted from your account.'
+                : 'Its details and saved password are deleted from this device. The backup already there stays.'
+            }
             confirmLabel="Remove"
             onConfirm={onRemove}
           />

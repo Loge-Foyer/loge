@@ -1,18 +1,24 @@
-import type { PluginId, PluginManifest } from '@sc/api';
+import type { ConnectionId, PluginId, PluginManifest } from '@sc/api';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
+import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { Stack } from 'expo-router';
-import { Paragraph, SizableText, YStack } from 'tamagui';
+import { Button, Paragraph, SizableText, YStack } from 'tamagui';
 
-import { CONTENT_KIND_LABELS, PER_PROFILE_SUMMARY } from '@/components/labels';
+import { AppSwitch } from '@/components/app-switch';
+import { ConfirmButton } from '@/components/confirm-button';
+import { CONTENT_KIND_LABELS, describeBackupProblem, describeTargetStatus, PER_PROFILE_SUMMARY } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
+import { useBackupTargetActions, useBackupTargets } from '@/hooks/use-backup';
+import { usePlayerActions, usePlayers } from '@/hooks/use-players';
 import { usePluginConnections } from '@/hooks/use-connections';
 import { usePluginManifest } from '@/hooks/use-plugins';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
+import { BackupError } from '@/services/backup';
 
 import { newConnectionHref } from './plugin-route';
 import { PluginChips } from './plugins';
@@ -37,7 +43,8 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
 
   if (!manifest) return <UnknownPlugin />;
   // A player, or a place for backups: nothing to connect until its engine or its role exists.
-  if (manifest.player || manifest.backup) return <NotYet manifest={manifest} />;
+  if (manifest.backup) return <BackupTargetScreen manifest={manifest} />;
+  if (manifest.player) return <PlayerScreen manifest={manifest} />;
 
   const header = (
     <YStack gap="$3">
@@ -116,20 +123,122 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
   );
 }
 
-function NotYet({ manifest }: { manifest: PluginManifest }) {
+/**
+ * A place for the account's backup file, on this device: where it is, how the
+ * last save went, Save now — and, when another device changed the file since,
+ * the choice of what to keep. Nothing is ever overwritten without asking.
+ */
+function BackupTargetScreen({ manifest }: { manifest: PluginManifest }) {
+  const { data: connections = [] } = usePluginConnections(manifest.id);
+  const statuses = useBackupTargets(connections.map(({ connection }) => connection.id));
+  const { saveNow, resolve } = useBackupTargetActions();
+  const ours = statuses.filter((status) => connections.some(({ connection }) => connection.id === status.connectionId));
+  const resolveError = resolve.error
+    ? resolve.error instanceof BackupError
+      ? resolve.error.problem === 'wrong-key'
+        ? 'The backup there was saved with another key. Import it from Settings → Plugins → Sync, with its key.'
+        : describeBackupProblem(resolve.error.problem)
+      : resolve.error.message
+    : undefined;
+
+  const choose = (id: ConnectionId, choice: 'theirs' | 'mine' | 'both') => resolve.mutate({ id, choice });
+
   return (
     <Screen>
       <Stack.Screen options={{ title: manifest.displayName }} />
-      <YStack gap="$3">
-        <Paragraph size="$5" color="$color11">
-          {manifest.description}
-        </Paragraph>
-        <Paragraph size="$3" color="$color10">
-          {manifest.player
-            ? 'Nothing plays yet: playback arrives in a later version of the app.'
-            : 'Backups arrive in a later version of the app.'}
-        </Paragraph>
-      </YStack>
+      <Paragraph size="$5" color="$color11">
+        {manifest.description}
+      </Paragraph>
+      <SettingsSection
+        title="Backups here"
+        footer={`${manifest.backup?.location ?? manifest.displayName}. The backup file is saved here as your account changes — the same encrypted file Export makes, which opens only with your backup key.`}
+      >
+        {connections.map(({ connection }) => {
+          const status = ours.find((candidate) => candidate.connectionId === connection.id);
+          return (
+            <SettingsRow
+              key={connection.id}
+              title={connection.label}
+              {...(status ? { subtitle: describeTargetStatus(status) } : {})}
+              href={{ pathname: '/settings/connections/[connectionId]', params: { connectionId: connection.id } }}
+            />
+          );
+        })}
+        {connections.length === 0 ? (
+          <SettingsRow title={`Save backups to ${manifest.displayName}`} icon={<Plus size={18} color="$accent10" />} href={newConnectionHref(manifest.id)} />
+        ) : (
+          <SettingsRow title="Save now" icon={<RefreshCw size={18} color="$accent10" />} disabled={saveNow.isPending} onPress={() => saveNow.mutate()} />
+        )}
+      </SettingsSection>
+      {ours
+        .filter((status) => status.phase === 'conflict')
+        .map((status) => (
+          <SettingsSection
+            key={status.connectionId}
+            title="Changed on another device"
+            footer="Another device saved the backup here since this one last did. Nothing was overwritten: choose what to keep."
+          >
+            <YStack p="$4" gap="$3" items="flex-start" bg="$color2">
+              <ConfirmButton
+                label="Open the one there"
+                title="Open the backup there?"
+                description="It replaces this device’s account — its profiles, settings and sources — with the one in the backup."
+                confirmLabel="Replace"
+                disabled={resolve.isPending}
+                onConfirm={() => choose(status.connectionId, 'theirs')}
+              />
+              <Button disabled={resolve.isPending} onPress={() => choose(status.connectionId, 'mine')}>
+                Keep this device’s
+              </Button>
+              <Button disabled={resolve.isPending} onPress={() => choose(status.connectionId, 'both')}>
+                Keep both
+              </Button>
+              <SizableText size="$2" color="$color10">
+                Keep both: this device’s account becomes one of its own, and its backup is saved beside the other.
+              </SizableText>
+            </YStack>
+          </SettingsSection>
+        ))}
+      {resolveError ? <SizableText color="$red10">{resolveError}</SizableText> : null}
+    </Screen>
+  );
+}
+
+/** A player, on this device: on or off, and whether it plays first. Another device chooses its own. */
+function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
+  const { data: players = [] } = usePlayers();
+  const { setEnabled, setPreferred } = usePlayerActions();
+  const player = players.find((candidate) => candidate.manifest.id === manifest.id);
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: manifest.displayName }} />
+      <Paragraph size="$5" color="$color11">
+        {manifest.description}
+      </Paragraph>
+      {player ? (
+        <SettingsSection title="On this device" footer="Players are chosen on each device. The one that plays first is asked first; when it can’t play something, the next one that can does.">
+          <SettingsRow
+            title="On"
+            trailing={
+              <AppSwitch
+                label={`${manifest.displayName} on`}
+                checked={player.enabled}
+                disabled={setEnabled.isPending}
+                onCheckedChange={(enabled) => setEnabled.mutate({ id: manifest.id, enabled })}
+              />
+            }
+          />
+          <SettingsRow
+            title="Play with it first"
+            {...(player.preferred ? { subtitle: 'It plays first on this device' } : {})}
+            disabled={player.preferred || setPreferred.isPending}
+            onPress={() => setPreferred.mutate(manifest.id)}
+          />
+        </SettingsSection>
+      ) : null}
+      <Paragraph size="$3" color="$color10">
+        Nothing plays yet: playback arrives in a later version of the app.
+      </Paragraph>
     </Screen>
   );
 }

@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 import { createSqlJsBackup } from '@/persistence/backup/sql-js';
 import { OwnerNotVerifiedError } from '@/services/account';
-import { createBackupService } from '@/services/backup';
 import { deriveBackupKeys, HEADER_BYTES, MAX_BACKUP_BYTES, openBackup, sealBackup } from '@/services/backup/container';
 import { readBackupDatabase, writeBackupDatabase } from '@/services/backup/database';
 import { decodeBase32, encodeBase32, formatBackupKey, parseBackupKey } from '@/services/backup/key';
@@ -19,30 +18,6 @@ import { ACCOUNT_PASSWORD, fakeAccountServer, fakeOwnerAuthentication } from './
 const sql = createSqlJsBackup(() => initSqlJs());
 const crypto = testCrypto();
 const layout = { version: 1 as const, rows: [{ id: 'continue', type: 'continue' as const, hidden: true }] };
-
-type Device = ReturnType<typeof buildServices>;
-
-function backupOf(device: Device) {
-  return createBackupService({
-    db: device.db,
-    deviceBound: device.deviceBound,
-    crypto,
-    sql,
-    parts: device.parts,
-    catalog: device.services.catalog,
-    owner: device.services.owner,
-    account: device.services.account,
-    engine: device.engine,
-    scheduler: device.scheduler,
-    lock: device.lock,
-    janitor: device.janitor,
-    clock: device.clock,
-    identity: async () => {
-      const { appVersion, deviceKey } = await device.identity.identity();
-      return { appVersion, deviceKey };
-    },
-  });
-}
 
 describe('the backup key', () => {
   it('is 20 bytes shown as nine groups of four, the last a checksum, and reads back however it is typed', async () => {
@@ -179,16 +154,16 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
 
   it('carry the whole account to another device — every password into its keychain, never its database', async () => {
     const { a, b, where, smiths, kim, home, theirs } = await twoDevices();
-    const file = await backupOf(a).exportFile();
+    const file = await a.services.backup.exportFile();
     expect(file.name).toMatch(/^streaming-center-the-smiths-\d{4}-\d{2}-\d{2}\.scbackup$/);
     expect(Buffer.from(file.bytes).toString('latin1')).not.toContain('family-secret');
-    const key = await backupOf(a).showKey();
+    const key = await a.services.backup.showKey();
 
-    const prepared = await backupOf(b).prepareImport(file.bytes, key);
+    const prepared = await b.services.backup.prepareImport(file.bytes, key);
     expect(prepared).toMatchObject({ accountName: 'The Smiths', profiles: ['The Smiths', 'Kim'], connections: 1 });
     // Nothing is replaced until the import is completed.
     expect(await b.services.account.current()).toMatchObject({ name: 'Someone else' });
-    await backupOf(b).completeImport(prepared);
+    await b.services.backup.completeImport(prepared);
 
     expect(await b.services.account.current()).toMatchObject({ kind: 'local', name: 'The Smiths', id: (await a.services.account.current())?.id });
     expect((await b.services.profiles.list()).map((profile) => profile.id)).toEqual([smiths, kim]);
@@ -200,19 +175,19 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     const dump = await dumpDatabase(engine, where);
     for (const secret of ['family-secret', '9731']) expect(dump).not.toContain(secret);
     // The key that opened it is this device's now: one key for the account.
-    expect(await backupOf(b).showKey()).toBe(key);
+    expect(await b.services.backup.showKey()).toBe(key);
   });
 
   it('refuse — before anything changes — another key, a mistyped one, and a file too large to read', async () => {
     const { a, b } = await twoDevices();
-    const file = await backupOf(a).exportFile();
-    const key = await backupOf(a).showKey();
+    const file = await a.services.backup.exportFile();
+    const key = await a.services.backup.showKey();
     const another = await formatBackupKey(new Uint8Array(20).fill(9), crypto.sha256);
-    await expect(backupOf(b).prepareImport(file.bytes, another)).rejects.toMatchObject({ problem: 'wrong-key' });
-    await expect(backupOf(b).prepareImport(file.bytes, `${key.slice(0, -1)}${key.endsWith('0') ? '1' : '0'}`)).rejects.toMatchObject({ problem: 'mistyped' });
+    await expect(b.services.backup.prepareImport(file.bytes, another)).rejects.toMatchObject({ problem: 'wrong-key' });
+    await expect(b.services.backup.prepareImport(file.bytes, `${key.slice(0, -1)}${key.endsWith('0') ? '1' : '0'}`)).rejects.toMatchObject({ problem: 'mistyped' });
     let read = false;
     const huge = { name: 'huge.scbackup', size: MAX_BACKUP_BYTES + 1, read: async () => ((read = true), file.bytes) };
-    await expect(backupOf(b).prepareImport(huge, key)).rejects.toMatchObject({ problem: 'too-large' });
+    await expect(b.services.backup.prepareImport(huge, key)).rejects.toMatchObject({ problem: 'too-large' });
     expect(read).toBe(false);
     expect(await b.services.account.current()).toMatchObject({ name: 'Someone else' });
   });
@@ -221,12 +196,12 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     const owner = fakeOwnerAuthentication({ available: true, answer: 'refused' });
     const device = buildServices({ plugins: [], engine, owner });
     await device.services.account.createLocal('Lee');
-    await expect(backupOf(device).showKey()).rejects.toBeInstanceOf(OwnerNotVerifiedError);
-    expect(await backupOf(device).hasKey()).toBe(false);
+    await expect(device.services.backup.showKey()).rejects.toBeInstanceOf(OwnerNotVerifiedError);
+    expect(await device.services.backup.hasKey()).toBe(false);
     owner.set({ available: true, answer: 'verified' });
-    const key = await backupOf(device).showKey();
-    expect(await backupOf(device).showKey()).toBe(key);
-    expect(await backupOf(device).hasKey()).toBe(true);
+    const key = await device.services.backup.showKey();
+    expect(await device.services.backup.showKey()).toBe(key);
+    expect(await device.services.backup.hasKey()).toBe(true);
   });
 
   it('sign out of your server first, then replace the account with a local one', async () => {
@@ -234,13 +209,13 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     const a = buildServices({ plugins: [server.plugin, media.plugin], engine, device: 'a' });
     await a.services.account.createLocal('The Smiths');
     await signIn(a, server, { signUp: 'GOOD-INVITE' });
-    const file = await backupOf(a).exportFile();
-    const key = await backupOf(a).showKey({ password: ACCOUNT_PASSWORD });
+    const file = await a.services.backup.exportFile();
+    const key = await a.services.backup.showKey({ password: ACCOUNT_PASSWORD });
 
     const b = buildServices({ plugins: [server.plugin, media.plugin], engine, device: 'b' });
     await signIn(b, server);
-    const prepared = await backupOf(b).prepareImport(file.bytes, key);
-    await backupOf(b).completeImport(prepared, { password: ACCOUNT_PASSWORD });
+    const prepared = await b.services.backup.prepareImport(file.bytes, key);
+    await b.services.backup.completeImport(prepared, { password: ACCOUNT_PASSWORD });
     expect(server.calls.signOuts).toBe(1);
     // A backup of an account on your server keeps its name, as signing out does.
     expect(await b.services.account.current()).toMatchObject({ kind: 'local', name: 'sam on the fake server' });

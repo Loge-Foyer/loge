@@ -248,7 +248,7 @@ media role — browse, libraries, watch status read, and (Jellyfin) remote
 images and offline metadata. Your own server (`sync/custom-server`) and
 `sync/mock` implement the account role: records read whole and written in
 batches, the password typed again as the owner check, and sign-up with an
-invite (open, on the mock). `sync/mock-backup` is written, and linked with the
-backup file. The rest export manifests only — IPTV, the players, the backup targets
+invite (open, on the mock). `sync/mock-backup` implements the backup role,
+in development builds. The rest export manifests only — IPTV, the players, the backup targets
 and the other sources: the app lists them in their category, and says plainly
 that they cannot list titles, play or keep backups yet. Nothing plays.

@@ -68,8 +68,10 @@ What runs today:
   across restarts where the source allows it.
 - SQLite and the keychain on phones, which run development builds; IndexedDB
   with WebCrypto-encrypted secrets on the web.
-- Nothing plays, Videos still shows skeletons, and there is no backup file
-  yet.
+- The encrypted backup file: export, import, its key behind the owner check,
+  Welcome's Restore, and backup targets that ask before overwriting.
+- Players' switches and which plays first, per device. Nothing plays, and
+  Videos still shows skeletons.
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

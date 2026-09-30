@@ -15,15 +15,22 @@ import {
   type ConnectionId,
 } from '@sc/api';
 
+import initSqlJs from 'sql.js';
+
+import { createSqlJsBackup } from '@/persistence/backup/sql-js';
 import { createInProcessLock } from '@/platform/in-process-lock';
 import { createAccountService } from '@/services/account';
+import { createBackupService } from '@/services/backup';
+import { createBackupTargets } from '@/services/backup/targets';
 import { createConnectionService } from '@/services/connections';
 import { createHomeLayoutService } from '@/services/home-layout';
 import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
+import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
+import type { FileExchange } from '@/services/ports';
 import { createProfileService } from '@/services/profiles';
 import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
@@ -40,6 +47,16 @@ import { counterIds, fakeClock, fakeNetwork, memoryCredentialStore, silentLog } 
 import { fakeActivity, fakeOwnerAuthentication } from './sync';
 
 export { counterIds, fakeClock, fakeNetwork, silentLog } from './fakes';
+
+// sql.js on Node stands in for expo-sqlite and for the browser alike: a backup is the same SQLite file.
+const backupSql = createSqlJsBackup(() => initSqlJs());
+
+const unusedFiles: FileExchange = {
+  save: async () => {
+    throw new Error('This test moves no files.');
+  },
+  pick: async () => undefined,
+};
 
 const unusedHttp: HttpClient = {
   request: async () => {
@@ -177,6 +194,10 @@ export function buildServices(options: {
   /** Names the device: its ids and its device key. Two devices in one test need two names. */
   device?: string;
   owner?: ReturnType<typeof fakeOwnerAuthentication>;
+  /** The share sheet and the document picker, as a test plays them. */
+  files?: FileExchange;
+  /** How long backup targets wait after a change before saving. */
+  backupDebounceMs?: number;
 }) {
   const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
@@ -239,6 +260,39 @@ export function buildServices(options: {
     sessions,
     ids,
   });
+  const backup = createBackupService({
+    db,
+    deviceBound,
+    crypto,
+    sql: backupSql,
+    parts,
+    catalog,
+    owner,
+    account,
+    engine,
+    scheduler,
+    lock,
+    janitor,
+    clock,
+    identity: () => identity.identity(),
+  });
+  const backupTargets = createBackupTargets({
+    http: unusedHttp,
+    network,
+    identity,
+    clock,
+    crypto,
+    db,
+    catalog,
+    credentials,
+    sessions,
+    backup,
+    journal: db.journal,
+    activity,
+    ids,
+    log: silentLog,
+    debounceMs: options.backupDebounceMs ?? 0,
+  });
   engine.onApplied((applied) => {
     for (const id of applied.connections) pool.forgetConnection(id);
     for (const id of applied.removedProfiles) media.forgetUser(id);
@@ -255,10 +309,8 @@ export function buildServices(options: {
     scheduler,
     activity,
     ownerAuthentication,
-    // What the backup service is built from, until the composition root builds it too.
     parts,
     lock,
-    identity,
     services: {
       catalog,
       session,
@@ -271,6 +323,10 @@ export function buildServices(options: {
       account,
       owner,
       sync: { status: engine.status, subscribe: engine.subscribe, onApplied: engine.onApplied, now: scheduler.now },
+      backup,
+      backupTargets,
+      files: options.files ?? unusedFiles,
+      players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
     },
   };
 }

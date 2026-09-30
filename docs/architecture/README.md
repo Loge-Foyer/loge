@@ -334,8 +334,8 @@ protect.
 
 ## Backups
 
-`services/backup/` (Phase 6) writes and reads the account as one encrypted
-file, `.scbackup`. `docs/data` has its format.
+`services/backup/` writes and reads the account as one encrypted file,
+`.scbackup`. `docs/data` has its format.
 
 - **Writing:** the account's rows, mapped to the backup's own schema by the
   same mapper that makes the server's records, with passwords and PINs read
@@ -348,13 +348,23 @@ file, `.scbackup`. `docs/data` has its format.
   decryption, `quick_check`, schema version, every row — then writes the
   secrets under fresh refs, the rows in one transaction, and runs the janitor.
   The result is always a local account.
-- **Backup targets** — iCloud, Google Drive and OneDrive, in later phases —
-  save the same file after journaled commits, debounced, and when the app goes
-  to the background, staged in the cache directory, which OS backups skip.
-  Writes are conditional: the service remembers `{ lineage, generation, etag }`
-  per target, and when the file changed elsewhere it asks — open theirs, keep
-  this device's, or keep both — and never overwrites silently. The target only
-  stores bytes.
+- **Backup targets** (`services/backup/targets.ts`) — iCloud, Google Drive
+  and OneDrive as their roles arrive, the mock in development — save the same
+  file ten seconds after the last journaled commit, when the app goes to the
+  background with something changed, and on "Save now". A target only stores
+  bytes, and the file never touches the disk unencrypted.
+  - **One file per account** on a target, named after its lineage: two
+    accounts never share one, and only devices holding the same account can
+    clash.
+  - **Writes are conditional.** The service remembers `{ lineage, generation,
+    etag }` per target (`backup_state`). A file this device has not seen, or
+    one changed since, stands the target in conflict, and nothing is
+    overwritten until the user chooses: *open theirs* (it replaces this
+    device's account, after the owner check), *keep this device's*, or *keep
+    both* — this device's account takes a new lineage and saves beside it.
+  - **An account on your server** is the same on every device signed in to
+    it, so its file is simply the last one saved: there is no conflict to ask
+    about.
 
 ## Choosing a player
 

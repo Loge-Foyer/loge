@@ -26,7 +26,7 @@ ways in:
 - **Sign in to your server.** The account arrives — profiles, PINs, settings
   and sources, with their passwords — and the app asks "Who's watching?".
 - **Restore a backup.** Pick a `.scbackup` file and type its key. It becomes a
-  local account. (It arrives with the backup file, later in Phase 6.)
+  local account.
 
 ## Set up once
 
@@ -85,11 +85,15 @@ endpoint names the account.
 
 ## Backups
 
-Later in Phase 6, Settings → Plugins → Sync gets the backup file. Export it through
-the share sheet on a phone, or as a download in a browser; its backup key is
-shown after the app asks it's you. Restore it at a first launch, or import it
-from the same place, with the key. Importing replaces this device's account
-with the file's, as a local account.
+Settings → Plugins → Sync has the backup file. Export it through the share
+sheet on a phone, or as a download in a browser; its backup key is shown after
+the app asks it's you. Restore it at a first launch, or import it from the same
+place, with the key. Importing replaces this device's account with the file's,
+as a local account.
+
+To keep backups saved as the account changes, set up a backup target on the
+same page. In development builds, **Mock backups** is one, kept in memory: two
+browser tabs that imported the same backup can try a conflict against it.
 
 The file holds every password and PIN of the account, encrypted. Without its
 key it cannot be opened — by anyone, the app included.

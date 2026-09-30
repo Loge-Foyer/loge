@@ -1,9 +1,13 @@
 import type { AccountService } from './account';
+import type { BackupService } from './backup';
+import type { BackupTargets } from './backup/targets';
 import type { ConnectionService } from './connections';
 import type { HomeLayoutService } from './home-layout';
 import type { MediaService } from './media';
 import type { OwnerCheck } from './owner-check';
 import type { PinService } from './pins';
+import type { PlayerService } from './players';
+import type { FileExchange } from './ports';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
 import type { SessionService } from './session';
@@ -32,4 +36,11 @@ export interface Services {
   readonly account: AccountService;
   readonly owner: OwnerCheck;
   readonly sync: SyncService;
+  readonly backup: BackupService;
+  /** The account's backup file, kept on this device's backup targets as it changes. */
+  readonly backupTargets: BackupTargets;
+  /** Files the user moves in and out: a backup exported or imported. */
+  readonly files: FileExchange;
+  /** This device's players: which are on, and which plays first. */
+  readonly players: PlayerService;
 }

@@ -43,6 +43,8 @@ export interface PreparedImport {
   readonly lineage: string;
   readonly accountName: string;
   readonly createdAt: number;
+  /** +1 each save to a backup target; 0 for a file exported by hand. */
+  readonly generation: number;
   readonly profiles: readonly string[];
   readonly connections: number;
   readonly records: readonly AccountRecord[];
@@ -155,6 +157,7 @@ export function createBackupService(deps: {
       lineage: contents.lineage,
       accountName: contents.accountName,
       createdAt: opened.header.createdAt,
+      generation: opened.header.generation,
       profiles: contents.records.flatMap((record) => (record.kind === 'profile' && !record.deleted ? [record.data.name] : [])),
       connections: contents.records.filter((record) => record.kind === 'connection').length,
       records: contents.records,

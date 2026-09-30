@@ -9,6 +9,8 @@ import type {
   PluginCategory,
 } from '@sc/api';
 
+import type { BackupProblem } from '@/services/backup';
+import type { TargetStatus } from '@/services/backup/targets';
 import type { HomeRow } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import type { OwnerVerdict } from '@/services/owner-check';
@@ -220,6 +222,42 @@ export function describeOwnerVerdict(verdict: OwnerVerdict): string | undefined 
     case 'cancelled':
     case 'verified':
       return undefined;
+  }
+}
+
+/** One line for a backup target: "Saved 5 min ago", or what stands in the way. */
+export function describeTargetStatus(status: TargetStatus, now = Date.now()): string {
+  switch (status.phase) {
+    case 'saving':
+      return 'Saving…';
+    case 'conflict':
+      return 'Changed on another device since this one saved it';
+    case 'failed':
+      return status.problem?.message ?? 'Couldn’t save';
+    case 'saved':
+      return status.savedAt === undefined ? 'Saved' : `Saved ${timeAgo(status.savedAt, now)}`;
+    case 'idle':
+      return status.savedAt === undefined ? 'Nothing saved here yet' : `Saved ${timeAgo(status.savedAt, now)}`;
+  }
+}
+
+/** Why a backup did not open. A lost key is said plainly: there is no way round it. */
+export function describeBackupProblem(problem: BackupProblem): string {
+  switch (problem) {
+    case 'malformed':
+      return 'A backup key is nine groups of four letters and digits.';
+    case 'mistyped':
+      return 'Part of that key is mistyped. Check each group against where you wrote it down.';
+    case 'wrong-key':
+      return 'That key doesn’t open this backup. Without the key it was saved with, it can’t be opened — by anyone, this app included.';
+    case 'too-large':
+      return 'This file is far too large to be a Streaming Center backup.';
+    case 'not-a-backup':
+      return 'This isn’t a Streaming Center backup.';
+    case 'newer':
+      return 'This backup was saved by a newer version of Streaming Center. Update the app, then open it again.';
+    case 'damaged':
+      return 'This backup is damaged, and can’t be opened.';
   }
 }
 

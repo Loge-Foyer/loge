@@ -4,9 +4,8 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Database v4 — the account model — is in
-place; the backup file arrives later in Phase 6, and watch status (v5) in
-Phase 7. Phase 4's model — the account as one of the device's connections,
+This page describes the target. Database v4 — the account model — and the
+backup file are in place; watch status (v5) comes in Phase 7. Phase 4's model — the account as one of the device's connections,
 synced through a log, with passwords sealed on the device — is in this page's
 history in git.
 
@@ -182,9 +181,7 @@ logged — never its payload.
 ## The backup file
 
 A backup is one encrypted SQLite file, `.scbackup`, written by
-`services/backup/`. The format, the key, export and import are built and
-tested; the screens, the file picker and share sheet, and backup targets come
-next in Phase 6. It holds the account: its name, its profiles and
+`services/backup/`. It holds the account: its name, its profiles and
 their PINs, preferences, and source and IPTV connections with each profile's
 values — and their passwords, so nobody types a Jellyfin password again on a
 new device. It never holds caches, device settings, players, sync settings,
@@ -228,10 +225,13 @@ tokens, the device key, the journal or sync state.
   written in one transaction, and the janitor runs. The result is always a
   local account.
 - **Backup targets** save the same file after changes, debounced, and when the
-  app goes to the background. Writes are conditional on the etag last seen;
+  app goes to the background — one file per account, named after its lineage.
+  Writes are conditional on the etag last seen (`backup_state`, device state);
   when the file changed elsewhere the app asks — open theirs, keep this
-  device's, or keep both — and never overwrites. To move from iCloud to Google,
-  copy the file and import it with the key.
+  device's, or keep both, which gives this device's account a lineage of its
+  own — and never overwrites. An account on your server just saves over its
+  file: its devices hold the same account. To move from iCloud to Google, copy
+  the file and import it with the key.
 
 A backup target is not live sync between devices. Your own server is.
 

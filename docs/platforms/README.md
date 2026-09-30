@@ -19,7 +19,7 @@ device", and is kept for the devices that can.
 | More players (Phase 8) | KSPlayer, mpv (MPVKit), VLC (VLCKit) | mpv (libmpv), VLC (libVLC) | mpegts.js, inside the built-in player |
 | IPTV | yes | yes | hidden until a proxy exists |
 | Backup targets (later phases) | iCloud, Google Drive, OneDrive | Google Drive, OneDrive | Google Drive, OneDrive |
-| The backup file (Phase 6) | share sheet, document picker | share sheet, document picker | download, file input; sql.js loaded for it |
+| The backup file | share sheet, document picker | share sheet, document picker | download, file input; sql.js loaded for it |
 | Forgot PIN, on a local account | Face ID, Touch ID or the passcode | a fingerprint or the screen lock | not offered: a PIN stays until it is typed |
 
 ## Development builds

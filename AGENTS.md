@@ -317,8 +317,9 @@ silently:
 
 ## Backups
 
-`services/backup/` (Phase 6) writes and reads the account as one encrypted
-`.scbackup` file. `docs/data` has the format. These break silently:
+`services/backup/` writes and reads the account as one encrypted `.scbackup`
+file, and `services/backup/targets.ts` keeps it on backup targets. `docs/data`
+has the format. These break silently:
 
 - **It holds every password and PIN of the account,** so it is encrypted as a
   whole, and its key lives in the device-bound store, shown only after the
@@ -337,8 +338,15 @@ silently:
   around it.
 - **A backup target never overwrites a file changed elsewhere.** Writes are
   conditional on the etag; `backup_state` remembers `{ lineage, generation,
-  etag }` per target, and a clash asks — open theirs, keep this device's, or
-  keep both. A target only stores bytes, and is not live sync.
+  etag }` per target, and a file this device has not seen, or one changed
+  since, asks — open theirs, keep this device's, or keep both (a new lineage
+  for this device's account). A target only stores bytes, and is not live
+  sync. An account on your server saves over its file: its devices hold the
+  same account.
+- **One file per account on a target,** named from its lineage. Never name it
+  after the account's name or a device: two accounts must never share a file.
+- **The import flow and Welcome's Restore use no profile's hook,** and never
+  navigate after importing: the gate moves (`session.refresh()`).
 
 ---
 
@@ -557,10 +565,14 @@ describes the target. What runs today:
   from every live source, merged, and kept per profile where the source allows
   it. Jellyfin and the mock implement the media role. Nothing plays, and
   Videos still shows skeletons.
-- **The backup file's core** (`services/backup/`) — the key, the container,
-  the database inside, export and import — is built and tested, and not yet
-  wired: no screen, file picker or share sheet uses it, the composition root
-  does not build it, and there are no backup targets yet.
+- **The backup file:** Settings → Plugins → Sync exports it — the share sheet
+  on a phone, a download in a browser — imports it, and shows its key behind
+  the owner check; Welcome restores one. Backup targets keep it saved, asking
+  before they overwrite a file another device changed; the dev-only mock
+  target is the only one with a role so far. sql.js is its own lazily loaded
+  chunk on the web.
+- **Players:** each one's switch and "Play with it first", as device
+  settings. Nothing plays yet.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they

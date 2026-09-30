@@ -50,6 +50,12 @@ A player plugin is in the `players` category, and has three parts:
 On the web there is only the built-in player; Phase 8 adds mpegts.js to it for
 MPEG-TS live streams.
 
+**Which players are on, and which plays first, are device settings**
+(`DeviceSettings.players: { off, preferred }`, `services/players.ts`): never
+journaled, never on your server, never in a backup. With none chosen, the
+first one on plays first, in the catalogue's order — never by name.
+`choosePlayer` takes these as they stand.
+
 **Only the composition root imports a player** — its package, its view, and
 `@sc/player-kit` (a lint rule, added with them in Phase 6 or 7). The player screen gets the
 chosen player's controller and view from the service graph, through

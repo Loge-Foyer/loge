@@ -9,7 +9,9 @@ import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
+import { usePlayers } from '@/hooks/use-players';
 
+import { BackupSection } from './backup';
 import { pluginHref } from './plugin-route';
 
 /** What each list holds, and where what is set up in it applies. */
@@ -33,6 +35,7 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
   const { catalog } = useServices();
   const { data: connected } = useConnectedPlugins();
   const { data: account } = useAccount();
+  const { data: players = [] } = usePlayers();
 
   if (!category) {
     return (
@@ -59,6 +62,8 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
                   <Chip label="Your account" tone="accent" />
                 ) : connected?.has(manifest.id) ? (
                   <Chip label="Connected" tone="accent" />
+                ) : manifest.player ? (
+                  <PlayerChip state={players.find((player) => player.manifest.id === manifest.id)} />
                 ) : null
               }
               href={pluginHref(manifest.id)}
@@ -68,8 +73,16 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
       ) : (
         <Paragraph color="$color10">{NONE_HERE[category]}</Paragraph>
       )}
+      {category === 'sync' ? <BackupSection /> : null}
     </Screen>
   );
+}
+
+/** Plays first, or is switched off, on this device. */
+function PlayerChip({ state }: { state: { readonly enabled: boolean; readonly preferred: boolean } | undefined }) {
+  if (!state) return null;
+  if (!state.enabled) return <Chip label="Off" />;
+  return state.preferred ? <Chip label="Plays first" tone="accent" /> : null;
 }
 
 /** What a plugin brings, from its manifest. */

@@ -47,7 +47,6 @@ what a flow needs once and it is there on every later launch.
   `adb shell pm clear com.fakg.streaming_center_app`. Welcome then offers three
   ways in: **Create an account on this device** (a name, which the first
   profile takes too), **Sign in to your server**, or **Restore a backup**.
-  Restore arrives with the backup file, later in Phase 6.
 - **A real Jellyfin server**: Settings → Plugins → Sources → Jellyfin → Add
   connection, filled in from the workspace's gitignored `jellyfin.env`
   (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
@@ -88,7 +87,7 @@ what a flow needs once and it is there on every later launch.
   endpoint is empty. It lives in the JavaScript runtime's memory: a reload
   forgets it, and the next run puts back what the device holds, as for a
   server restored from an old backup. Nothing local is lost.
-- **A backup** (Phase 6): Settings → Plugins → Sync → Export — the share sheet
+- **A backup**: Settings → Plugins → Sync → Export — the share sheet
   on a phone, a download in a browser — and Show the backup key, after the
   owner check. Import it on another device with the key: at first launch
   through Restore a backup, or from the same Sync page. Importing replaces
@@ -262,11 +261,11 @@ The target, once Phase 6 has landed:
   Players, Sync — each opening this platform's list. iCloud shows on iOS only.
   Nothing plays.
 
-**Today (no backup file, and nothing plays):**
+**Today (nothing plays):**
 
-- Welcome offers "Create an account on this device" or "Sign in to your
-  server" (the mock too, in development). An account with profiles lands on
-  "Who's watching?".
+- Welcome offers "Create an account on this device", "Sign in to your server"
+  (the mock too, in development) and "Restore a backup". An account with
+  profiles lands on "Who's watching?".
 - Four tabs — Media, Videos, TV, Settings; TV shows its empty state.
 - Settings → Plugins is four lists — Sources, IPTV, Players, Sync — of what
   runs on this platform. Add a connection through a form built from its
@@ -274,3 +273,10 @@ The target, once Phase 6 has landed:
 - Settings → Account shows a local account, or your server's with Sync now,
   what it keeps in step, Sign in again, Switch account and Sign out. Profiles
   stop at ten, or at the server's limit.
+- Settings → Plugins → Sync has the backup file — Export, Import, Show the
+  backup key — and, in development, Mock backups as a target. Players each
+  have a switch and "Play with it first".
+- Headless Chrome drives the backup flows: `Page.setInterceptFileChooserDialog`
+  and `DOM.setFileInputFiles` answer the picker, `Browser.setDownloadBehavior`
+  catches the export, and `Target.createBrowserContext` is a second device
+  with an IndexedDB of its own.

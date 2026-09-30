@@ -4,8 +4,9 @@ The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
 This page describes the target. Today the four tabs, Settings → Plugins' four
-lists, Welcome, the sign-in flow and Settings → Account are in place; backups
-and players are not.
+lists, Welcome with its three ways in, the sign-in and import flows, Settings →
+Account, the backup file, backup targets and the players' switches are in
+place; nothing plays.
 
 ## Tamagui
 
@@ -129,9 +130,9 @@ only what sources bring as `live`.
   plugin has its page (`settings/plugins/[category]/[name]`). There is no
   global list.
   - **Sources** and **IPTV** list their connections and add new ones.
-  - **Players** list this device's engines: each one's switch and settings,
-    and which is the default. Until Phase 7, the built-in player says it is
-    not there yet.
+  - **Players** list this device's engines, with "Plays first" or "Off": each
+    one's page has its switch and "Play with it first" (`services/players.ts`,
+    device settings). Until Phase 7 each says nothing plays yet.
   - **Sync** has your own server, the backup targets — iCloud on iOS only,
     Google Drive and OneDrive, as they arrive — and the backup file: Export,
     Import, and Show the backup key, behind the owner check. When a save finds
@@ -157,7 +158,10 @@ for the devices that can.
 - **Sign in to your server** — its connection fields and nothing else, tried
   once. When the account brings profiles, a spinner holds while the gate moves
   to "Who's watching?".
-- **Restore a backup** — a `.scbackup` file and its key.
+- **Restore a backup** — a `.scbackup` file and its key, through the import
+  flow (`screens/import-flow.tsx`), which Settings shares: pick, type the key,
+  see what it holds and what it replaces, the owner check, done. It never
+  navigates afterwards; the gate moves.
 
 **Settings → Account** (`screens/settings/account.tsx`) shows the account and how
 it stands. On your server: "Synced 5 min ago · 2 changes waiting", Sync now,

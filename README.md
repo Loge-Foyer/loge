@@ -141,7 +141,11 @@ the design. What runs today, built with [Tamagui](https://tamagui.dev):
   the servers answered is kept too, where they allow it, so the home shows up
   at once when the app opens, and still shows — saying how old it is — when a
   server cannot be reached.
-- **Not yet:** nothing plays, and there is no backup file.
+- **A backup file** carries the account between devices — exported through
+  the share sheet or as a download, and imported with its key — and backup
+  targets keep it saved as the account changes, asking before they overwrite
+  a file another device changed.
+- **Not yet:** nothing plays.
 
 Development builds also have a pretend account, for trying things offline.
 

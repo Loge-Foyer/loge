@@ -80,6 +80,19 @@ const ownerAuthentication = {
   message: 'Only src/platform/ asks for the device owner. Use the owner check from useServices().',
 };
 
+// sql.js is for backups on the web and nothing else: a backup's database, in
+// memory. It comes in through import(), so the entry bundle never carries it.
+// The rule sees static imports only, which is exactly what it should forbid:
+// sql.web.ts's import() of sql-js-web passes, and a static one anywhere fails.
+const sqlJs = {
+  name: 'sql.js',
+  message: 'Only src/persistence/backup/sql-js*.ts uses sql.js — a backup’s database, nothing else.',
+};
+const sqlJsChunk = {
+  group: ['**/sql-js-web'],
+  message: 'Load sql-js-web through import(), as sql.web.ts does, so sql.js stays out of the entry bundle.',
+};
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -93,25 +106,34 @@ module.exports = defineConfig([
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/composition/**', 'src/platform/**'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot, cryptography] }],
+      'no-restricted-imports': [
+        'error',
+        { paths: [ownerAuthentication, sqlJs], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] },
+      ],
     },
   },
   {
     files: ['src/platform/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [...implementations, compositionRoot] }],
+      'no-restricted-imports': ['error', { paths: [sqlJs], patterns: [...implementations, compositionRoot, sqlJsChunk] }],
     },
   },
   {
     files: ['src/composition/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [cryptography] }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication, sqlJs], patterns: [cryptography, sqlJsChunk] }],
     },
   },
   {
     files: ['src/app/_layout.tsx'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, cryptography] }],
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication, sqlJs], patterns: [...implementations, cryptography, sqlJsChunk] }],
+    },
+  },
+  {
+    files: ['src/persistence/backup/sql-js.ts', 'src/persistence/backup/sql-js-web.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] }],
     },
   },
 ]);

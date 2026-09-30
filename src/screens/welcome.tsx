@@ -1,4 +1,5 @@
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
+import { Upload } from '@tamagui/lucide-icons-2/icons/Upload';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { ScrollView } from 'react-native';
@@ -9,9 +10,10 @@ import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useGate } from '@/hooks/use-session';
+import { ImportFlow } from '@/screens/import-flow';
 import { SignInFlow } from '@/screens/sign-in-flow';
 
-type Step = 'choose' | 'local' | 'sign-in' | 'arriving';
+type Step = 'choose' | 'local' | 'sign-in' | 'restore' | 'arriving';
 
 /**
  * The first launch on a device: an account kept here, with a first profile
@@ -32,7 +34,7 @@ export function WelcomeScreen() {
         <Page>
           <Heading
             title="Welcome"
-            body="Your profiles, their PINs and settings, and your sources live in an account. Keep it on this device, or on your own server to share it with every device you sign in on."
+            body="Your profiles, their PINs and settings, and your sources live in an account. Keep it on this device, or on your own server to share it with every device you sign in on — or bring one back from a backup."
           />
           <YStack gap="$3">
             <PrimaryButton size="$5" onPress={() => setStep('local')}>
@@ -43,6 +45,9 @@ export function WelcomeScreen() {
                 Sign in to your server
               </Button>
             ) : null}
+            <Button size="$5" icon={<Upload size={18} />} onPress={() => setStep('restore')}>
+              Restore a backup
+            </Button>
           </YStack>
         </Page>
       );
@@ -57,6 +62,20 @@ export function WelcomeScreen() {
             onCancel={() => setStep('choose')}
             onDone={async () => {
               // The gate moves by itself — to "Who's watching?", or to a first profile; this only waits for it.
+              setStep('arriving');
+              await session.refresh();
+            }}
+          />
+        </Page>
+      );
+    case 'restore':
+      return (
+        <Page>
+          <Eyebrow />
+          <ImportFlow
+            onCancel={() => setStep('choose')}
+            onDone={async () => {
+              // As after a sign-in: the gate moves to "Who's watching?", and this only waits for it.
               setStep('arriving');
               await session.refresh();
             }}
