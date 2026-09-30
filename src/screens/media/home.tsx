@@ -206,8 +206,8 @@ function MediaEmptyState() {
         </Link>
       </EmptyState>
       <SizableText size="$2" color="$color9">
-        Sources belong to this device and every profile sees them — unless a connection keeps a separate sign-in for
-        each profile.
+        Sources belong to your account, and every profile sees them — unless a connection keeps a separate sign-in
+        for each profile.
       </SizableText>
     </Screen>
   );

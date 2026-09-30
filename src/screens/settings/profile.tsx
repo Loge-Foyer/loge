@@ -95,7 +95,7 @@ export function ProfileScreen({ userId }: { userId: UserId }) {
           label="Delete profile"
           icon={<Trash2 size={16} />}
           title={`Delete ${profile.name}?`}
-          description="Its history, favourites and its own sign-ins are deleted from this device. Connections stay for the other profiles."
+          description="It goes from your account, on every device, with its history, favourites and its own sign-ins. Connections stay for the other profiles."
           confirmLabel="Delete"
           disabled={profiles.length === 1 || remove.isPending}
           onConfirm={() => remove.mutate(profile.id, { onSuccess: () => router.back() })}
