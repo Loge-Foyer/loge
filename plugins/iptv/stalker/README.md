@@ -57,6 +57,14 @@ series.
   it is the stream's address, sign-in and all. The session keeps only the
   endpoint and the token.
 
+## Settings
+
+- **Keep channels and the guide on this device** — on by default. Gates
+  `offlineMetadata`: channel ids and a portal's films keep their ids, so the
+  app may keep the channel list, each channel's day of guide, and the first
+  page of films and series, per profile, and show them while the portal is
+  away. Links are never kept.
+
 ## Platforms
 
 iOS and Android. Portals send no CORS headers, and a browser will not send the

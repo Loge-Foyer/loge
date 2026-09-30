@@ -17,7 +17,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android'],
     displayName: 'Stalker portal',
     description: 'Live TV, films and series from a Stalker portal, signed in with its MAC address.',
-    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'channels', 'epg', 'playback', 'remoteImages'] },
+    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'channels', 'epg', 'playback', 'remoteImages', 'offlineMetadata'] },
     connectionFields: [
       { key: 'portalUrl', label: 'Portal address', type: 'url', required: true, placeholder: 'http://portal.example.com/c/' },
       // The MAC address is what signs in: anyone with it and the portal's address can use the subscription.
@@ -33,7 +33,16 @@ export const plugin: Plugin = {
       { key: 'deviceId', label: 'Device id', type: 'password', description: 'Only if your provider asks for one.' },
       { key: 'signature', label: 'Signature', type: 'password', description: 'Only if your provider asks for one.' },
     ],
-    settings: [],
+    settings: [
+      {
+        key: 'cacheMetadata',
+        label: 'Keep channels and the guide on this device',
+        type: 'boolean',
+        default: true,
+        description: 'So the channel list opens at once, and shows — saying how old it is — while the portal is away.',
+        gates: ['media.offlineMetadata'],
+      },
+    ],
   },
   media: {
     connect: async (target, context) => createProvider(target, context),
