@@ -176,9 +176,12 @@ phase apply once that phase has built what they check; the rest apply today.
   included — not screens. Screens are proven by driving the app on each
   platform (`sc-run`). The real account plugin against the real PocketBase is
   `../streaming_center_sync`'s harness, from Phase 6's S4.
-- There is no `player-kit` yet, and nothing plays. The backup file, its
-  import and export and backup targets are in place; the only backup target
-  with a role is the dev-only mock.
+- The built-in player's engine is in the build, and nothing opens it yet.
+  The backup file, its import and export and backup targets are in place; the
+  only backup target with a role is the dev-only mock.
+- `expo-doctor` reports "multiple copies" of React, React Native and
+  expo-video: it sees the plugins repository's own, which Metro blocks and the
+  app never uses (`docs/plugins`). A bundle's source maps are the real check.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

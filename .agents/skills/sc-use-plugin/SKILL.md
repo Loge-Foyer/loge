@@ -57,23 +57,40 @@ Then `npm install`. npm links the folders and never looks inside link targets
 outside the project, so it never reaches for a registry.
 
 Every plugin declares `@sc/api` as a **peer** dependency — players
-`@sc/player-kit` too — so the app supplies the one copy, and a `PluginId` from a
-plugin and one from the app are the same type. `npm ls --all` still prints
-`UNMET DEPENDENCY @sc/api@*` under each linked plugin — npm does not resolve
-dependencies of links outside the root. That line is cosmetic; `npm ls @sc/api`
-should show the single top-level link.
+`@sc/player-kit`, React, React Native and their engine too — so the app
+supplies the one copy, and a `PluginId` from a plugin and one from the app are
+the same type. **A player's peers are installed in the app**:
+`npx expo install expo-video`, and `npm install` for a non-Expo one such as
+hls.js, at the version the plugins repository uses. `npm ls --all` still
+prints `UNMET DEPENDENCY @sc/api@*` under each linked plugin, and lists the
+plugins repository's own React under `@sc/player-kit`; `expo-doctor` calls
+those "multiple copies". npm resolves a link's dependencies from the link's
+folder. Both are cosmetic; `npm ls @sc/api` should show the single top-level
+link.
 
 ## 3. Let Metro see it
 
-```js
-// metro.config.js — the whole of it
-config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../streaming_center_plugins')];
-```
+`metro.config.js` watches the plugins folder — Metro only serves files under
+the project root or a watch folder — and makes sure there is **one copy of
+everything a plugin imports**:
 
-Metro only serves files under the project root or a watch folder. Nothing else
-is needed: babel-preset-expo imports its runtime helpers by absolute path, so
-plugin files never have to resolve `@babel/runtime` themselves (checked in dev
-and production bundles for iOS and web).
+- A plugin file's bare imports resolve **from the app**, as a published
+  package's would (`resolver.resolveRequest`).
+- The plugins repository's `node_modules` are **blocked**. It installs React,
+  React Native, expo and expo-video for its own typecheck and tests; a second
+  React breaks every hook, a second expo-video its views. With the block, a
+  request that slips past fails the build instead.
+
+TypeScript does the same with `preserveSymlinks`, and vitest with `dedupe`
+(and a stub for expo-video). Never map `react` in tsconfig `paths`: Expo's
+Metro applies those paths too, and React's types are not something it can
+bundle. babel-preset-expo imports its runtime helpers by absolute path, so
+plugin files never have to resolve `@babel/runtime` themselves.
+
+**Check a bundle, not a typecheck:** `npx expo export --platform web
+--source-maps`, then look through the maps' `sources` — nothing under
+`streaming_center_plugins/node_modules`, one `react/index.js`, and a player's
+`.web` files on the web, its native ones in an iOS export.
 
 ## 4. Register it — one line
 
@@ -177,14 +194,15 @@ at load time, in memory only.
   platform that can, else none — and the app says what would. The candidates
   are the enabled players whose manifest runs here, each with its
   `PlayerProfile` for this platform.
-- **Native code.** A player's engine — expo-video, or an Expo module in its own
-  package — has to be autolinked into the development build from its
-  `file:`-linked package. That is unproven: Phases 7 and 8 open with a spike,
-  and whatever it settles (the engine as the app's own dependency, or linked
-  from the plugin) goes here. Registering or changing a player means
-  `npm run android` / `npm run ios` again.
-- **The app never imports an engine itself.** expo-video belongs to
-  `players/system`.
+- **Native code.** expo-video is a published package: it is the built-in
+  player's peer, the app installs it, and autolinking builds it from the app's
+  `node_modules` — proven on Android in Phase 7. An Expo module in a player's
+  own package (KSPlayer, mpv, VLC) is Phase 8's spike, and what it settles goes
+  here. Registering or changing a player means `npm run android` /
+  `npm run ios` again.
+- **The app never imports an engine itself.** expo-video and hls.js belong to
+  `players/system`; lint refuses them everywhere in `src/`, the composition
+  root included.
 
 ## 9. How the account role is called — your own server
 

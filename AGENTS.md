@@ -352,16 +352,19 @@ has the format. These break silently:
 
 ## Players
 
-Nothing plays until Phase 7. `docs/playback` has the design; these are the
-rules:
+The built-in player is in the build — expo-video on phones, the browser's
+`<video>` with hls.js on the web — and nothing opens it until the player screen
+(Phase 7). `docs/playback` has the design; these are the rules:
 
 - **Players are device-wide plugins.** Which are on, the default and their
   settings are device settings — never journaled, never on the server, never
   in a backup.
 - **Only the composition root imports a player package or `@sc/player-kit`.**
   Screens get the chosen player's controller and view from it through
-  `useServices()`. The app never imports an engine — expo-video, an Expo
-  module — itself: that is the player plugin's.
+  `useServices()`. The app never imports an engine — expo-video, hls.js, an
+  Expo module — itself: that is the player plugin's (lint). It installs them,
+  as the player's peers, so that autolinking builds them and Metro bundles one
+  copy of each.
 - **Choosing is `choosePlayer` from `@sc/api`, and pure:** the device's
   default if it can play one of the item's sources, else the first enabled
   player on this platform that can, else none — and the app says what would
@@ -457,26 +460,49 @@ package per plugin, at its category path — and Metro watches the folder:
 ```
 
 ```js
-// metro.config.js — this is all of it
-config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../streaming_center_plugins')];
+// metro.config.js, in short
+config.watchFolders = [...config.watchFolders, plugins];
+// A plugin file's bare imports resolve from the app, as a published package's would.
+config.resolver.resolveRequest = (context, name, platform) =>
+  isBare(name) && context.originModulePath.startsWith(plugins + path.sep)
+    ? context.resolveRequest({ ...context, originModulePath: appOrigin }, name, platform)
+    : context.resolveRequest(context, name, platform);
+// …and the plugins repository's own node_modules are blocked outright.
+config.resolver.blockList = [...blockList, /^<plugins>\/node_modules\/.*/];
 ```
 
-There is no `player-kit` yet: it arrives with the first player (Phase 7).
-
-- Install the plugins repository first; plugin files resolve `@sc/api` from it.
-- Plugins take `@sc/api` — and players `@sc/player-kit` — as a **peer**
-  dependency: one copy, one set of brands.
-- `npm ls --all` shows `UNMET DEPENDENCY @sc/api@*` under each linked plugin.
-  Cosmetic — npm does not resolve deps of links outside the root.
+- **One copy of everything a plugin imports.** The plugins repository installs
+  React, React Native, expo and expo-video for its own typecheck and tests.
+  Resolved from there, a second React breaks every hook and a second
+  expo-video its native views. So:
+  - **Metro** resolves a plugin file's bare imports from the app, and blocks
+    the plugins repository's `node_modules`: a request that slips past fails
+    the build instead of bundling a second copy.
+  - **TypeScript** has `preserveSymlinks`: a plugin is seen where it is
+    linked, in this app's `node_modules`, so its imports find this app's
+    types. Never map `react` in `paths` — Expo's Metro applies tsconfig paths
+    too, and React's types are not a module it can bundle.
+  - **vitest** dedupes React, React Native, expo-video and hls.js, and stubs
+    expo-video (`test/support/expo-video.ts`): the shipped list includes the
+    built-in player, and Node has no native module.
+- Install the plugins repository first: its own tests and typecheck need it.
+- Plugins take `@sc/api` — and players `@sc/player-kit`, React, React Native
+  and their engine — as **peers**: the app supplies the one copy.
+- `npm ls --all` shows `UNMET DEPENDENCY @sc/api@*` under each linked plugin,
+  and `expo-doctor` reports "multiple copies" of React, React Native and
+  expo-video. Both see the plugins repository's own copies, which the app
+  never uses; npm resolves a link's peers from the link's folder.
 - No `resolver.nodeModulesPaths` is needed: babel-preset-expo imports its
   runtime helpers by absolute path (verified in dev and production bundles).
 - Register a plugin in `src/composition/plugins.ts` — the only file that may
   import one; lint enforces it. Every plugin exports `plugin`: its manifest,
   and the one role its category's block promises.
-- **A player's native code** — expo-video, or an Expo module in its own
-  package — has to reach the development build by autolinking from a
-  `file:`-linked package. That is unproven: Phases 7 and 8 open with a spike.
-  A new or changed player means building again.
+- **A player's native code.** expo-video is a published package: the app
+  installs it and autolinking builds it from the app's `node_modules` —
+  proven in Phase 7 on Android, where the built-in player's view drew HLS,
+  live HLS, MPEG-TS and MP4 from the linked package. An Expo module in a
+  player's own folder (Phase 8) reaches the build some other way, and Phase 8
+  opens with that spike. A new or changed player means building again.
 
 **This is the main technical risk in the repository split.** Verify with a
 real export, not a typecheck.
@@ -572,7 +598,9 @@ the target; what runs today:
   target is the only one with a role so far. sql.js is its own lazily loaded
   chunk on the web.
 - **Players:** each one's switch and "Play with it first", as device
-  settings. Nothing plays yet.
+  settings. The built-in player's engine is in the build — expo-video on
+  phones, `<video>` with hls.js on the web — with a profile per platform;
+  nothing opens it until the player screen.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they

@@ -55,7 +55,8 @@ what a flow needs once and it is there on every later launch.
 - **Offline work**: the mock plugins (development builds only) need no
   network. `sources/mock` is a pretend library, and `iptv/mock` pretend
   channels, a guide and a little VOD for the TV tab (Phase 7). Add a
-  connection like any other. `iptv/mock` is not built yet.
+  connection like any other. `iptv/mock` is written, and joins the app with
+  the TV tab.
 - **A real account: your own server** — PocketBase. Give it a data directory
   of its own:
 

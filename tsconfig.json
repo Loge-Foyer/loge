@@ -4,6 +4,11 @@
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
+    // A plugin is seen where it is linked, in this app's node_modules, so what
+    // it imports is this app's copy — as Metro resolves it (metro.config.js).
+    // Followed to the plugins repository, its imports would find that
+    // repository's own React.
+    "preserveSymlinks": true,
     "paths": {
       "@/*": [
         "./src/*"

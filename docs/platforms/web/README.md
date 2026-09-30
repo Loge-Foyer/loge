@@ -110,10 +110,16 @@ stream traffic, so it would be off by default.
 
 ## Players in a browser
 
-The built-in player (Phase 7) is a `<video>` element. Safari plays HLS
-natively; elsewhere hls.js is loaded, lazily, when an HLS stream is played.
-mpegts.js joins it in Phase 8, for MPEG-TS live streams. KSPlayer, mpv and VLC
-have no web build.
+The built-in player is a `<video>` element. Safari plays HLS natively, and so
+does Chrome from version 143; elsewhere — and for any stream that needs a
+header, which only hls.js's own requests can carry — hls.js is loaded, as its
+own chunk, the first time an HLS stream is played. mpegts.js joins it in
+Phase 8, for MPEG-TS live streams. KSPlayer, mpv and VLC have no web build.
+
+For a deployed page's Content-Security-Policy, playing adds `media-src` for
+the servers and `blob:` (hls.js plays through a MediaSource), and
+`connect-src` for the servers hls.js fetches from. hls.js runs without a
+worker, so `worker-src` stays shut.
 
 A `<video>` element cannot send headers, so a source that needs one puts its
 token in the stream's URL instead — Jellyfin as `api_key`. That is one reason a

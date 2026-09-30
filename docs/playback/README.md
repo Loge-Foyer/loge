@@ -4,9 +4,9 @@ How the app plays what a source offers: descriptors and players, choosing an
 engine, where each player is switched on, and how watch status gets back to the
 source that masters it.
 
-Nothing plays yet. Phase 7 brings the built-in player, with Jellyfin and
-Stalker playing on it; Phase 8 brings KSPlayer, mpv and VLC. This page is the
-design they build to.
+The built-in player's engine is in the build; the player screen that opens
+it comes later in Phase 7, with Jellyfin and Stalker playing on it. Phase 8
+brings KSPlayer, mpv and VLC. This page is the design they build to.
 
 ## What to play, and how to play it
 
@@ -42,7 +42,7 @@ A player plugin is in the `players` category, and has three parts:
 
 | Plugin | Engine | Platforms | Arrives |
 | --- | --- | --- | --- |
-| `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js on the web | all | Phase 7 |
+| `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js on the web | all | Phase 7 — the engine is in |
 | `players/ksplayer` | KSPlayer | iOS | Phase 8 |
 | `players/mpv` | MPVKit on iOS, libmpv on Android | iOS, Android | Phase 8 |
 | `players/vlc` | VLCKit on iOS, libVLC on Android | iOS, Android | Phase 8 |
@@ -57,15 +57,26 @@ first one on plays first, in the catalogue's order — never by name.
 `choosePlayer` takes these as they stand.
 
 **Only the composition root imports a player** — its package, its view, and
-`@sc/player-kit` (a lint rule, added with them in Phase 6 or 7). The player screen gets the
-chosen player's controller and view from the service graph, through
-`useServices()`. The app never imports an engine itself: expo-video, and each
-Expo module, belong to their player plugin.
+`@sc/player-kit` (lint). The player screen gets the chosen player's controller
+and view from the service graph, through `useServices()`. The app never
+imports an engine itself — expo-video, hls.js, each Expo module belong to
+their player plugin, and lint says so — but it installs them: they are the
+player's peers.
 
-**Players are native code.** A player plugin's engine — expo-video, or an Expo
-module in the plugin's own package — has to reach the development build by
-autolinking from a `file:`-linked package. That is unproven, so Phases 7 and 8
-each open with a spike. A new or changed player means building again.
+**Players are native code.** expo-video is a published package, so the app
+installs it and autolinking builds it from the app's `node_modules`. Phase 7's
+spike proved the rest on Android: the built-in player's view, from the linked
+package, drew HLS, live HLS, raw MPEG-TS and MP4, with one copy of React and
+of expo-video in the bundle (`docs/plugins`). An Expo module in a player's own
+package — KSPlayer, mpv, VLC — has not been tried, so Phase 8 opens with that
+spike. A new or changed player means building again.
+
+**What the built-in player tells.** A state is told once, and a new listener
+hears the current one at once. On a phone, "playing" follows what was asked
+for, not the engine's flag — Media3 is not playing while it buffers, and a
+stream turns ready before it starts — so a screen never flashes a pause. A
+track is named by its place (`audio-0`, `subtitle-1`): iOS gives expo-video's
+tracks no id. Every failure is a `failed` state and an `AppError` both.
 
 ## Players are device-wide
 

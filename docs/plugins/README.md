@@ -63,18 +63,39 @@ are linked in with `file:` dependencies: `@sc/api`, `@sc/player-kit`, and one
 package per plugin at its category path —
 `file:../streaming_center_plugins/plugins/<category>/<name>`, named
 `@sc/source-<name>`, `@sc/iptv-<name>`, `@sc/player-<name>` or
-`@sc/sync-<name>`. Install that repository first; plugin files resolve `@sc/api` from its
-`node_modules`.
+`@sc/sync-<name>`. Install that repository first: its own typecheck and tests
+need it.
 
-Metro only needs to be told to watch the folder (`metro.config.js`). Each
-plugin takes `@sc/api` as a peer dependency — players `@sc/player-kit` too —
-so there is exactly one copy of the vocabulary in the app. `npm ls --all`
-reports `UNMET DEPENDENCY @sc/api@*` under each linked plugin; that is how npm
-reports links outside the project, not a missing package.
+**One copy of everything.** Each plugin takes `@sc/api` as a peer dependency —
+a player `@sc/player-kit`, React, React Native and its engine too — so the app
+supplies the one copy. The plugins repository installs its own React, React
+Native, expo and expo-video, for its typecheck and tests, and a plugin file's
+imports would find those first. Three things keep them out:
 
-A player's engine is native code, and has to be autolinked into the
-development build from its linked package. Phases 7 and 8 prove that works
-before a player depends on it.
+- **Metro** (`metro.config.js`) watches the plugins folder, resolves a plugin
+  file's bare imports from the app, and blocks that repository's
+  `node_modules` — so a request that slips past fails the build, rather than
+  bundling a second React (every hook breaks) or a second expo-video (its
+  views do).
+- **TypeScript** has `preserveSymlinks`: it sees a plugin where it is linked,
+  in the app's `node_modules`, and resolves its imports from there. Mapping
+  `react` in `paths` instead breaks the bundle: Expo's Metro applies tsconfig
+  paths too.
+- **vitest** dedupes the same packages, and stubs expo-video, which needs a
+  native module Node lacks.
+
+A bundle can be checked: export with `--source-maps` and look for any source
+under `streaming_center_plugins/node_modules` — there must be none.
+
+`npm ls --all` reports `UNMET DEPENDENCY @sc/api@*` under each linked plugin,
+and `expo-doctor` "multiple copies" of React, React Native and expo-video:
+npm resolves a link's peers from the link's own folder, so both see the
+plugins repository's copies, which the app never uses.
+
+A player's engine is native code. expo-video, a published package, is
+installed by the app and autolinked from its `node_modules` — proven on
+Android in Phase 7. An Expo module in a player's own folder is Phase 8's to
+prove.
 
 ## Registering a plugin
 

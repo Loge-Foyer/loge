@@ -93,6 +93,15 @@ const sqlJsChunk = {
   message: 'Load sql-js-web through import(), as sql.web.ts does, so sql.js stays out of the entry bundle.',
 };
 
+// An engine is its player plugin's business (spec §9). The app installs
+// expo-video and hls.js only so that autolinking builds the one and Metro
+// bundles one copy of each; nothing here imports them, the composition root
+// included — it imports the player plugin.
+const playerEngines = [
+  { name: 'expo-video', message: 'The app never imports an engine. The player plugin drives it; take its controller and view from useServices().' },
+  { name: 'hls.js', message: 'The app never imports an engine. The built-in player loads hls.js itself, on the web, when it needs it.' },
+];
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -108,32 +117,32 @@ module.exports = defineConfig([
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [ownerAuthentication, sqlJs], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] },
+        { paths: [...playerEngines, ownerAuthentication, sqlJs], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] },
       ],
     },
   },
   {
     files: ['src/platform/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [sqlJs], patterns: [...implementations, compositionRoot, sqlJsChunk] }],
+      'no-restricted-imports': ['error', { paths: [...playerEngines, sqlJs], patterns: [...implementations, compositionRoot, sqlJsChunk] }],
     },
   },
   {
     files: ['src/composition/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication, sqlJs], patterns: [cryptography, sqlJsChunk] }],
+      'no-restricted-imports': ['error', { paths: [...playerEngines, ownerAuthentication, sqlJs], patterns: [cryptography, sqlJsChunk] }],
     },
   },
   {
     files: ['src/app/_layout.tsx'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication, sqlJs], patterns: [...implementations, cryptography, sqlJsChunk] }],
+      'no-restricted-imports': ['error', { paths: [...playerEngines, ownerAuthentication, sqlJs], patterns: [...implementations, cryptography, sqlJsChunk] }],
     },
   },
   {
     files: ['src/persistence/backup/sql-js.ts', 'src/persistence/backup/sql-js-web.ts'],
     rules: {
-      'no-restricted-imports': ['error', { paths: [ownerAuthentication], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] }],
+      'no-restricted-imports': ['error', { paths: [...playerEngines, ownerAuthentication], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] }],
     },
   },
 ]);

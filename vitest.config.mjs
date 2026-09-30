@@ -9,7 +9,11 @@ export default defineConfig({
     alias: [
       { find: /^@\/assets\//, replacement: fileURLToPath(new URL('./assets/', import.meta.url)) },
       { find: /^@\//, replacement: fileURLToPath(new URL('./src/', import.meta.url)) },
+      // The shipped plugins include the built-in player, whose engine is native.
+      { find: /^expo-video$/, replacement: fileURLToPath(new URL('./test/support/expo-video.ts', import.meta.url)) },
     ],
+    // As in metro.config.js: what a plugin file imports is the app's copy, never the plugins repository's.
+    dedupe: ['react', 'react-native', 'expo-video', 'hls.js'],
   },
   define: { __DEV__: 'true' },
   test: {
