@@ -41,8 +41,8 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
   accounts after failed logins. Instead it says it needs its password again.
   A profile whose PIN is missing opens for its owner. The backup key is gone
   too, so opening a `.scbackup` takes the key, typed in.
-- `adb shell pm clear com.fakg.streaming_center_app` starts the app from
-  scratch.
+- `adb shell pm clear com.fkg.streamingcenter` starts the app from scratch
+  (the package is `android.package` in `app.json`).
 
 ## Players
 

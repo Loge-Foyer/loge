@@ -44,7 +44,7 @@ what a flow needs once and it is there on every later launch.
 - **A first launch** needs a fresh start: a new browser profile (a fresh
   `--user-data-dir`), `xcrun simctl uninstall booted <bundle id>` plus
   `xcrun simctl keychain booted reset`, or
-  `adb shell pm clear com.fakg.streaming_center_app`. Welcome then offers three
+  `adb shell pm clear com.fkg.streamingcenter`. Welcome then offers three
   ways in: **Create an account on this device** (a name, which the first
   profile takes too), **Sign in to your server**, or **Restore a backup**.
 - **A real Jellyfin server**: Settings → Plugins → Sources → Jellyfin → Add

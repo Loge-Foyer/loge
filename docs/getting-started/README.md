@@ -106,7 +106,7 @@ The data is only on the device, so starting fresh means clearing it there:
 | --- | --- |
 | Web | a new browser profile, or DevTools → Application → Clear site data |
 | iOS simulator | `xcrun simctl uninstall booted <bundle id>`, and `xcrun simctl keychain booted reset` for the secrets, which iOS keeps across an uninstall |
-| Android emulator | `adb shell pm clear com.fakg.streaming_center_app` |
+| Android emulator | `adb shell pm clear com.fkg.streamingcenter` |
 | Your own server | stop it and delete its data folder (`pb_data`) |
 
 ## In a browser
