@@ -3,6 +3,7 @@
 // client. Every service is the real one, on the real database engine.
 import {
   AppError,
+  categoryOfPluginId,
   compareItems,
   pluginId,
   type ConnectedMediaProvider,
@@ -356,7 +357,17 @@ export function buildServices(options: {
     void session.refresh();
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
-  const playback = createPlaybackService({ players: options.players ?? [], choosing: players.choosing, media, watch, clock });
+  const playback = createPlaybackService({
+    players: options.players ?? [],
+    choosing: players.choosing,
+    categoryOf: async (id) => {
+      const connection = await db.connections.get(id);
+      return connection ? categoryOfPluginId(connection.pluginId) : undefined;
+    },
+    media,
+    watch,
+    clock,
+  });
   const orientation = { turns: [] as string[], upright: async () => void orientation.turns.push('upright'), free: async () => void orientation.turns.push('free') };
   return {
     db,

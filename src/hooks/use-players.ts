@@ -2,6 +2,7 @@ import type { PluginId } from '@sc/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { deviceKey } from '@/services/query-keys';
+import type { ContentTab } from '@/services/tab-content';
 
 import { useServices } from './services-context';
 import { useRefreshLocalState } from './use-local-state';
@@ -21,5 +22,9 @@ export function usePlayerActions() {
       onSuccess: () => refresh(),
     }),
     setPreferred: useMutation({ mutationFn: (id: PluginId) => players.setPreferred(id), onSuccess: () => refresh() }),
+    setFirstOn: useMutation({
+      mutationFn: ({ id, tab, first }: { id: PluginId; tab: ContentTab; first: boolean }) => players.setFirstOn(id, tab, first),
+      onSuccess: () => refresh(),
+    }),
   };
 }

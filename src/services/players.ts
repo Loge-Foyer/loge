@@ -2,12 +2,17 @@ import type { PlatformId, PlayerCandidate, PluginId, PluginManifest } from '@sc/
 
 import type { PluginCatalog } from './plugin-catalog';
 import type { DeviceSettingsRepository } from './ports';
+import { CONTENT_TABS, type ContentTab } from './tab-content';
 
 export interface PlayerSummary {
   readonly manifest: PluginManifest;
   readonly enabled: boolean;
   /** The one that plays first, when it can play what is asked. */
   readonly preferred: boolean;
+  /** The tabs it plays first on, before the device's first — while it is on. */
+  readonly firstOn: readonly ContentTab[];
+  /** It has an engine on this platform: a profile for it. One without never plays. */
+  readonly playsHere: boolean;
 }
 
 /**
@@ -24,11 +29,17 @@ export interface PlayerChoice {
 
 export interface PlayerService {
   list(): Promise<readonly PlayerSummary[]>;
-  /** The enabled players with a profile for this platform, in the catalogue's order — never by name. */
-  choosing(): Promise<PlayerChoice>;
+  /**
+   * The enabled players with a profile for this platform, in the catalogue's
+   * order — never by name — and the one to try first: the tab's own, when it
+   * has one that is on, else the device's.
+   */
+  choosing(tab?: ContentTab): Promise<PlayerChoice>;
   setEnabled(id: PluginId, enabled: boolean): Promise<void>;
   /** Also switches it on: a player that plays first is on. */
   setPreferred(id: PluginId): Promise<void>;
+  /** Makes it, or stops it being, the one that plays first on a tab. Making it switches it on. */
+  setFirstOn(id: PluginId, tab: ContentTab, first: boolean): Promise<void>;
 }
 
 export function createPlayerService(deps: {
@@ -45,22 +56,29 @@ export function createPlayerService(deps: {
     const enabled = players().filter((manifest) => !off.has(manifest.id));
     // The chosen one while it is on; otherwise the first that is — in the catalogue's order, never by name.
     const preferred = enabled.find((manifest) => manifest.id === settings.preferred) ?? enabled[0];
-    return { off, enabled, preferred };
+    return { off, enabled, preferred, tabs: settings.tabs ?? {} };
   };
 
   return {
     list: async () => {
-      const { off, preferred } = await standing();
-      return players().map((manifest) => ({ manifest, enabled: !off.has(manifest.id), preferred: manifest.id === preferred?.id }));
+      const { off, preferred, tabs } = await standing();
+      return players().map((manifest) => ({
+        manifest,
+        enabled: !off.has(manifest.id),
+        preferred: manifest.id === preferred?.id,
+        firstOn: off.has(manifest.id) ? [] : CONTENT_TABS.filter((tab) => tabs[tab] === manifest.id),
+        playsHere: manifest.player?.profiles[platform] !== undefined,
+      }));
     },
-    choosing: async () => {
-      const { enabled, preferred } = await standing();
+    choosing: async (tab) => {
+      const { enabled, preferred, tabs } = await standing();
       const candidates = enabled.flatMap((manifest) => {
         const profile = manifest.player?.profiles[platform];
         return profile ? [{ id: manifest.id, profile }] : [];
       });
-      // A player with no engine here states no profile, so it never plays first.
-      const first = candidates.find((candidate) => candidate.id === preferred?.id);
+      // A player with no engine here states no profile, so it never plays first — on a tab or anywhere.
+      const onTab = tab === undefined ? undefined : candidates.find((candidate) => candidate.id === tabs[tab]);
+      const first = onTab ?? candidates.find((candidate) => candidate.id === preferred?.id);
       return { candidates, ...(first ? { preferred: first.id } : {}) };
     },
     setEnabled: async (id, enabled) => {
@@ -74,8 +92,23 @@ export function createPlayerService(deps: {
     setPreferred: async (id) => {
       await deviceSettings.update((current) => ({
         ...current,
-        players: { off: (current.players?.off ?? []).filter((other) => other !== id), preferred: id },
+        players: { ...current.players, off: (current.players?.off ?? []).filter((other) => other !== id), preferred: id },
       }));
+    },
+    setFirstOn: async (id, tab, first) => {
+      await deviceSettings.update((current) => {
+        const { [tab]: now, ...others } = current.players?.tabs ?? {};
+        if (!first && now !== id) return current;
+        const tabs = first ? { ...others, [tab]: id } : others;
+        return {
+          ...current,
+          players: {
+            ...current.players,
+            ...(first ? { off: (current.players?.off ?? []).filter((other) => other !== id) } : {}),
+            tabs,
+          },
+        };
+      });
     },
   };
 }

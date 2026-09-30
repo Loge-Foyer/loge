@@ -3,13 +3,14 @@ import { Stack } from 'expo-router';
 import { Paragraph, SizableText } from 'tamagui';
 
 import { Chip, ChipRow } from '@/components/chip';
-import { CATEGORY_LABELS, CONTENT_KIND_LABELS } from '@/components/labels';
+import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
 import { usePlayers } from '@/hooks/use-players';
+import type { PlayerSummary } from '@/services/players';
 
 import { BackupSection } from './backup';
 import { pluginHref } from './plugin-route';
@@ -78,11 +79,13 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
   );
 }
 
-/** Plays first, or is switched off, on this device. */
-function PlayerChip({ state }: { state: { readonly enabled: boolean; readonly preferred: boolean } | undefined }) {
+/** Plays first, or first on a tab, is switched off, or cannot play here yet. */
+function PlayerChip({ state }: { state: PlayerSummary | undefined }) {
   if (!state) return null;
+  if (!state.playsHere) return <Chip label="Not here yet" />;
   if (!state.enabled) return <Chip label="Off" />;
-  return state.preferred ? <Chip label="Plays first" tone="accent" /> : null;
+  if (state.preferred) return <Chip label="Plays first" tone="accent" />;
+  return state.firstOn.length > 0 ? <Chip label={`First on ${state.firstOn.map((tab) => TAB_LABELS[tab]).join(', ')}`} tone="accent" /> : null;
 }
 
 /** What a plugin brings, from its manifest. */

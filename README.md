@@ -150,7 +150,8 @@ the design, and most of it runs today, built with
   left off. Progress and "watched" go back to the server, offline too: they
   are written on the device first and delivered when it can. On Android, VLC
   plays too — the files the built-in player cannot, like Matroska with DTS,
-  as they are — and each device chooses which player goes first.
+  as they are — and each device chooses which player goes first, on each tab
+  if you like; "Play with…" on a film or an episode picks one for it.
 - **Live TV** on the TV tab, from a Stalker portal: channels in their groups
   with what is on now and next, a day's guide, channel up and down, and the
   provider's films and series.

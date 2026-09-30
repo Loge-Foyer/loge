@@ -16,6 +16,7 @@ import type {
 } from '@sc/api';
 
 import type { HomeLayout } from './home-layout';
+import type { ContentTab } from './tab-content';
 
 // What the services need from storage and the device. The database is SQLite
 // on native and IndexedDB on web; the services cannot tell which.
@@ -68,8 +69,16 @@ export interface DeviceSettings {
   readonly defaultUserId?: UserId;
   /** A fingerprint of the device key, never the key: it spots a phone restored from another's backup. */
   readonly deviceKeyPrint?: string;
-  /** This device's players: the ones switched off, and the one that plays first. Never journaled, never backed up. */
-  readonly players?: { readonly off?: readonly PluginId[]; readonly preferred?: PluginId };
+  /**
+   * This device's players: the ones switched off, the one that plays first,
+   * and the one that plays first on a tab, before it. Never journaled, never
+   * backed up.
+   */
+  readonly players?: {
+    readonly off?: readonly PluginId[];
+    readonly preferred?: PluginId;
+    readonly tabs?: Readonly<Partial<Record<ContentTab, PluginId>>>;
+  };
 }
 
 export interface DeviceSettingsRepository {

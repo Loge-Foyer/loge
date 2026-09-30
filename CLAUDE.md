@@ -76,9 +76,10 @@ What runs today:
   expo-video on phones, which turn it with the device, `<video>` with hls.js
   in a browser — with Resume, Mark watched, the tracks and Next episode. On
   Android VLC plays too, an Expo module in its plugin's package: Matroska, DTS
-  and TrueHD as the file, raw MPEG-TS, a file's own subtitles. Players'
-  switches and which plays first are per device. Videos still shows
-  skeletons.
+  and TrueHD as the file, raw MPEG-TS, a file's own subtitles. A browser plays
+  raw MPEG-TS through mpegts.js. Players' switches, which plays first — on the
+  device and per tab — are per device, and "Play with…" picks one for an
+  item. Videos still shows skeletons.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.

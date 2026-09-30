@@ -20,13 +20,15 @@ export function AppSwitch({
   const theme = useTheme();
   const accent = String(theme.accentBackground.val);
   // iOS keeps its white thumb; Material colours the thumb as well as the track.
-  const nativeProps =
+  const colours =
     process.env.EXPO_OS === 'android'
       ? {
           trackColor: { false: String(theme.color6.val), true: String(theme.accent7.val) },
           thumbColor: checked ? accent : String(theme.color11.val),
         }
       : { trackColor: { true: accent } };
+  // The platform's switch takes no aria-label: a screen reader hears this instead.
+  const nativeProps = { ...colours, ...(label ? { accessibilityLabel: label } : {}) };
   return (
     <Switch
       size="$3"

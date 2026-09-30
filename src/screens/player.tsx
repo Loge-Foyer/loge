@@ -1,4 +1,4 @@
-import type { AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, SubtitleTrack } from '@sc/api';
+import type { AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PluginId, SubtitleTrack } from '@sc/api';
 import type { PlayerView } from '@sc/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
@@ -36,18 +36,25 @@ export function PlayerScreen({
   itemId,
   startMs,
   live,
+  player,
 }: {
   connectionId: ConnectionId;
   itemId: string;
   startMs?: number;
   /** A channel: no item to read, nothing to report, and the channels of its group either side. */
   live?: { readonly title: string; readonly group?: string };
+  /** "Play with…": the player the user picked, for this item and the episodes after it. */
+  player?: PluginId;
 }) {
   useFreeOrientation();
   const key = { connectionId, externalId: itemId };
   const detail = useItem(key, !live);
   const item = live ? undefined : detail.data?.detail.item;
-  const { plan, error: planError, retry } = usePlaybackPlan(live ? key : item?.key, startMs);
+  const { plan, error: planError, retry } = usePlaybackPlan(live ? key : item?.key, {
+    ...(startMs === undefined ? {} : { startMs }),
+    ...(live ? { live: true } : {}),
+    ...(player ? { player } : {}),
+  });
   const report = usePlaybackReports(item, live !== undefined);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
   const { playback } = useServices();
@@ -82,6 +89,7 @@ export function PlayerScreen({
           snapshot={snapshot}
           starting={!plan || !controller}
           {...(next.data ? { next: next.data } : {})}
+          {...(player ? { player } : {})}
           {...(live ? { live: <LiveBar channel={key} title={live.title} {...(live.group ? { group: live.group } : {})} /> } : {})}
         />
       )}
@@ -105,6 +113,7 @@ function Controls({
   snapshot,
   starting,
   next,
+  player,
   live,
 }: {
   item: MediaItem | undefined;
@@ -112,6 +121,8 @@ function Controls({
   snapshot: PlayerSnapshot;
   starting: boolean;
   next?: Episode;
+  /** The player the user picked, which the next episode keeps. */
+  player?: PluginId;
   /** For a channel: its name, now and next, and the channels either side. */
   live?: ReactNode;
 }) {
@@ -146,7 +157,10 @@ function Controls({
   };
   const playNext = () => {
     if (!next) return;
-    router.replace({ pathname: '/play/[connectionId]/[itemId]', params: { connectionId: next.key.connectionId, itemId: next.key.externalId } });
+    router.replace({
+      pathname: '/play/[connectionId]/[itemId]',
+      params: { connectionId: next.key.connectionId, itemId: next.key.externalId, ...(player ? { player } : {}) },
+    });
   };
 
   return (

@@ -17,6 +17,14 @@ import type { HomeRow } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import type { OwnerVerdict } from '@/services/owner-check';
 import type { SyncStatus } from '@/services/sync/engine';
+import type { ContentTab } from '@/services/tab-content';
+
+/** The tabs that show content, by the names on the tab bar. */
+export const TAB_LABELS: Readonly<Record<ContentTab, string>> = {
+  media: 'Media',
+  videos: 'Videos',
+  tv: 'TV',
+};
 
 export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
   movies: 'Movies',

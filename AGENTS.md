@@ -633,8 +633,9 @@ Everything above describes the target; what runs today:
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
   transcode — on phones and in a browser; VLC plays on Android, from an Expo
-  module in its plugin's package. Each player has its switch and "Play with it
-  first", as device settings.
+  module in its plugin's package. Each player has its switch, "Play with it
+  first" and first on a tab, as device settings; "Play with…" on a detail
+  page picks one for an item, and never falls back to another.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages

@@ -1,3 +1,5 @@
+import { categoryOfPluginId } from '@sc/api';
+
 import { backupSql } from '@/persistence/backup/sql';
 import { createAppActivity } from '@/platform/app-activity';
 import { createClientIdentitySource } from '@/platform/client-identity';
@@ -150,7 +152,17 @@ export function createServices(): AppServices {
     log,
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: currentPlatform() });
-  const playback = createPlaybackService({ players: playerPlugins, choosing: players.choosing, media, watch, clock });
+  const playback = createPlaybackService({
+    players: playerPlugins,
+    choosing: players.choosing,
+    categoryOf: async (id) => {
+      const connection = await db.connections.get(id);
+      return connection ? categoryOfPluginId(connection.pluginId) : undefined;
+    },
+    media,
+    watch,
+    clock,
+  });
   // What the account brought: running providers let changed connections and removed profiles go, and the gate looks again.
   engine.onApplied((applied) => {
     for (const id of applied.connections) pool.forgetConnection(id);

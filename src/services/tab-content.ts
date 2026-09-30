@@ -2,6 +2,8 @@ import type { ContentKind, PluginCategory } from '@sc/api';
 
 export type ContentTab = 'media' | 'videos' | 'tv';
 
+export const CONTENT_TABS: readonly ContentTab[] = ['media', 'videos', 'tv'];
+
 type ShowingCategory = Extract<PluginCategory, 'sources' | 'iptv'>;
 
 /**
@@ -35,4 +37,13 @@ export function kindsForTab(tab: ContentTab, category: PluginCategory | undefine
 /** Whether a plugin of `category` bringing `kinds` shows anything on `tab`. */
 export function showsOn(tab: ContentTab, category: PluginCategory | undefined, kinds: readonly ContentKind[]): boolean {
   return kindsForTab(tab, category, kinds).length > 0;
+}
+
+/**
+ * The tab something plays from, for choosing its player: a channel is on TV,
+ * and so is everything an IPTV provider brings; a source's films and series
+ * are on Media. (Videos joins when a source brings videos or files to play.)
+ */
+export function tabOfPlaying(category: PluginCategory | undefined, live: boolean): ContentTab {
+  return live || category === 'iptv' ? 'tv' : 'media';
 }

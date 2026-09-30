@@ -1,4 +1,4 @@
-import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, Person, Show } from '@sc/api';
+import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
@@ -20,6 +20,7 @@ import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
+import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import type { SourceError } from '@/services/media';
@@ -179,34 +180,59 @@ function Meta({ item }: { item: MediaItem }) {
 function Actions({ item, canPlay, canMarkWatched }: { item: MediaItem; canPlay: boolean; canMarkWatched: boolean }) {
   const userId = useActiveUserId();
   const { watch } = useServices();
+  const { data: players = [] } = usePlayers();
+  const [choosing, setChoosing] = useState(false);
   const mark = useMutation({ mutationFn: (played: boolean) => watch.setPlayed(userId, item, played), networkMode: 'always' });
   const playable = canPlay && (item.type === 'movie' || item.type === 'episode');
   const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
+  // "Play with…" offers the players that are on and can play here — and only when there is a choice.
+  const here = players.filter((player) => player.enabled && player.playsHere);
   if (!playable && !canMarkWatched) return null;
-  const play = (startMs?: number) =>
+  const play = (startMs?: number, player?: PluginId) =>
     router.push({
       pathname: '/play/[connectionId]/[itemId]',
-      params: { connectionId: item.key.connectionId, itemId: item.key.externalId, ...(startMs ? { start: String(startMs) } : {}) },
+      params: {
+        connectionId: item.key.connectionId,
+        itemId: item.key.externalId,
+        ...(startMs ? { start: String(startMs) } : {}),
+        ...(player ? { player } : {}),
+      },
     });
   const played = item.watch?.played ?? false;
   return (
-    <XStack gap="$3" flexWrap="wrap" items="center">
-      {playable ? (
-        <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)}>
-          {resumeAt ? 'Resume' : 'Play'}
-        </PrimaryButton>
+    <YStack gap="$3">
+      <XStack gap="$3" flexWrap="wrap" items="center">
+        {playable ? (
+          <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)}>
+            {resumeAt ? 'Resume' : 'Play'}
+          </PrimaryButton>
+        ) : null}
+        {playable && resumeAt ? (
+          <Button size="$4" onPress={() => play()}>
+            From the beginning
+          </Button>
+        ) : null}
+        {playable && here.length > 1 ? (
+          <Button size="$4" aria-expanded={choosing} onPress={() => setChoosing(!choosing)}>
+            Play with…
+          </Button>
+        ) : null}
+        {canMarkWatched ? (
+          <Button size="$4" {...(played ? {} : { icon: <Check size={18} /> })} disabled={mark.isPending} onPress={() => mark.mutate(!played)}>
+            {played ? 'Mark unwatched' : 'Mark watched'}
+          </Button>
+        ) : null}
+      </XStack>
+      {playable && choosing ? (
+        <XStack gap="$2" flexWrap="wrap" items="center">
+          {here.map((player) => (
+            <Button key={player.manifest.id} size="$3" onPress={() => play(resumeAt, player.manifest.id)} aria-label={`Play with ${player.manifest.displayName}`}>
+              {player.manifest.displayName}
+            </Button>
+          ))}
+        </XStack>
       ) : null}
-      {playable && resumeAt ? (
-        <Button size="$4" onPress={() => play()}>
-          From the beginning
-        </Button>
-      ) : null}
-      {canMarkWatched ? (
-        <Button size="$4" {...(played ? {} : { icon: <Check size={18} /> })} disabled={mark.isPending} onPress={() => mark.mutate(!played)}>
-          {played ? 'Mark unwatched' : 'Mark watched'}
-        </Button>
-      ) : null}
-    </XStack>
+    </YStack>
   );
 }
 

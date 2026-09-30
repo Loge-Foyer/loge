@@ -7,7 +7,7 @@ import { Button, Paragraph, SizableText, YStack } from 'tamagui';
 
 import { AppSwitch } from '@/components/app-switch';
 import { ConfirmButton } from '@/components/confirm-button';
-import { CONTENT_KIND_LABELS, describeBackupProblem, describeTargetStatus, PER_PROFILE_SUMMARY } from '@/components/labels';
+import { CONTENT_KIND_LABELS, describeBackupProblem, describeTargetStatus, PER_PROFILE_SUMMARY, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
@@ -19,6 +19,7 @@ import { usePluginManifest } from '@/hooks/use-plugins';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { BackupError } from '@/services/backup';
+import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
 import { newConnectionHref } from './plugin-route';
 import { PluginChips } from './plugins';
@@ -204,11 +205,12 @@ function BackupTargetScreen({ manifest }: { manifest: PluginManifest }) {
   );
 }
 
-/** A player, on this device: on or off, and whether it plays first. Another device chooses its own. */
+/** A player, on this device: on or off, whether it plays first, and where. Another device chooses its own. */
 function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
   const { data: players = [] } = usePlayers();
-  const { setEnabled, setPreferred } = usePlayerActions();
+  const { setEnabled, setPreferred, setFirstOn } = usePlayerActions();
   const player = players.find((candidate) => candidate.manifest.id === manifest.id);
+  const firstOn = (tab: ContentTab) => players.find((candidate) => candidate.firstOn.includes(tab));
   return (
     <Screen>
       <Stack.Screen options={{ title: manifest.displayName }} />
@@ -235,6 +237,32 @@ function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
             onPress={() => setPreferred.mutate(manifest.id)}
           />
         </SettingsSection>
+      ) : null}
+      {player?.playsHere ? (
+        <SettingsSection title="First on a tab" footer="A tab’s choice goes before the device’s. Channels, and a provider’s films and series, play from TV.">
+          {CONTENT_TABS.map((tab) => {
+            const other = firstOn(tab);
+            return (
+              <SettingsRow
+                key={tab}
+                title={TAB_LABELS[tab]}
+                {...(other && other.manifest.id !== manifest.id ? { subtitle: `${other.manifest.displayName} plays first here` } : {})}
+                trailing={
+                  <AppSwitch
+                    label={`${manifest.displayName} first on ${TAB_LABELS[tab]}`}
+                    checked={player.firstOn.includes(tab)}
+                    disabled={setFirstOn.isPending}
+                    onCheckedChange={(first) => setFirstOn.mutate({ id: manifest.id, tab, first })}
+                  />
+                }
+              />
+            );
+          })}
+        </SettingsSection>
+      ) : player ? (
+        <Paragraph size="$3" color="$color10">
+          It has no engine on this device yet, so it never plays here.
+        </Paragraph>
       ) : null}
     </Screen>
   );

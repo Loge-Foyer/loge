@@ -92,15 +92,24 @@ server, never in a backup. A phone and a browser on the same account choose
 their players apart.
 
 Settings → Plugins → Players lists this platform's players, each with its
-switch and settings, and the default. Phase 8 adds an override per tab —
-Media, Videos, TV — and "Play with…" on an item.
+switch and settings, and which plays first. A player's page also makes it
+first on a tab — Media, Videos, TV — which goes before the device's choice
+there (`DeviceSettings.players.tabs`). Channels, and everything an IPTV
+provider brings, play from TV (`tabOfPlaying` in `services/tab-content.ts`).
+A player with no engine on this platform says so, and never plays.
+
+**"Play with…"** on a detail page lists the players that are on and can play
+here, when there is more than one. The one picked is asked for by the source
+with its own profile, and plays or nothing does — never another in its place.
+The next episode keeps it.
 
 ## Choosing a player
 
 `choosePlayer(sources, candidates, preferred?)` in `@sc/api` decides, and it is
 pure:
 
-1. The device's default, when it can play one of the item's sources.
+1. The one first on the item's tab, else the device's default, when it can
+   play one of the item's sources.
 2. Otherwise the first enabled player on this platform that can, in the order
    the app ranks them.
 3. Otherwise none. `missingFor` says what was lacking — the protocol, the

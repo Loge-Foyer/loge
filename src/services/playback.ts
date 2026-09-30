@@ -1,4 +1,5 @@
 import {
+  AppError,
   choosePlayer,
   missingFor,
   type CancelSignal,
@@ -10,6 +11,7 @@ import {
   type PlaybackDescriptor,
   type PlaybackSource,
   type PlayerRequirement,
+  type PluginCategory,
   type PluginId,
   type Show,
   type UserId,
@@ -20,6 +22,7 @@ import type { MediaService } from './media';
 import { playbackReports, type PlaybackReports } from './playback-reports';
 import type { PlayerService } from './players';
 import type { Clock } from './ports';
+import { tabOfPlaying } from './tab-content';
 import type { WatchService } from './watch';
 
 /** What pressing Play comes to, on this device. */
@@ -40,14 +43,19 @@ export interface PlaybackOptions {
   readonly startMs?: number;
   readonly audioTrackId?: string;
   readonly subtitleTrackId?: string;
+  /** A channel, played live: it plays from TV, whoever brings it. */
+  readonly live?: boolean;
+  /** "Play with…": this player and no other, asked for by the user. */
+  readonly player?: PluginId;
 }
 
 export interface PlaybackService {
   /**
    * The player that plays this item, and what it plays: the source is asked
-   * for a stream fit for the player that plays first — a server that
-   * transcodes shapes its answer to that player's profile — and
-   * `choosePlayer` confirms it, or finds the player that can.
+   * for a stream fit for the player that plays first on the item's tab — a
+   * server that transcodes shapes its answer to that player's profile — and
+   * `choosePlayer` confirms it, or finds the player that can. A player the
+   * user picked plays, or nothing does: it is never swapped for another.
    */
   plan(userId: UserId, key: GlobalMediaKey, options?: PlaybackOptions, signal?: CancelSignal): Promise<PlaybackPlan>;
   /** A controller for a chosen player. Whoever creates it disposes it. */
@@ -63,6 +71,8 @@ export interface PlaybackService {
 export function createPlaybackService(deps: {
   readonly players: readonly PlayerPlugin[];
   readonly choosing: PlayerService['choosing'];
+  /** The category of a connection's plugin, which decides the tab its items play from. */
+  readonly categoryOf: (connectionId: ConnectionId) => Promise<PluginCategory | undefined>;
   readonly media: Pick<MediaService, 'playbackDescriptor' | 'children' | 'artworkHeaders'>;
   readonly watch: Pick<WatchService, 'report'>;
   readonly clock: Pick<Clock, 'now'>;
@@ -72,10 +82,16 @@ export function createPlaybackService(deps: {
 
   return {
     plan: async (userId, key, options = {}, signal) => {
-      const { candidates, preferred } = await deps.choosing();
+      const { live = false, player, ...wanted } = options;
+      const tab = tabOfPlaying(await deps.categoryOf(key.connectionId), live);
+      const choosing = await deps.choosing(tab);
+      const picked = player === undefined ? undefined : choosing.candidates.find((candidate) => candidate.id === player);
+      if (player !== undefined && !picked) throw new AppError('NOT_FOUND', 'That player is switched off, or cannot play on this device.', { retry: 'never' });
+      const candidates = picked ? [picked] : choosing.candidates;
+      const preferred = picked?.id ?? choosing.preferred;
       const first = candidates.find((candidate) => candidate.id === preferred) ?? candidates[0];
       if (!first) return { kind: 'no-player' };
-      const descriptor = await media.playbackDescriptor(userId, { key, profile: first.profile, ...options }, signal);
+      const descriptor = await media.playbackDescriptor(userId, { key, profile: first.profile, ...wanted }, signal);
       const choice = choosePlayer(descriptor.sources, candidates, preferred);
       if (choice.kind === 'play') return { kind: 'play', player: choice.player, source: choice.source, descriptor };
       const best = descriptor.sources[0];

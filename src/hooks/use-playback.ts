@@ -1,4 +1,4 @@
-import type { AppError, AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PlayerEvent, PlayerState, SubtitleTrack } from '@sc/api';
+import type { AppError, AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PlayerEvent, PlayerState, PluginId, SubtitleTrack } from '@sc/api';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
@@ -14,15 +14,18 @@ import { useActiveUserId } from './use-session';
  * nowhere else — never in the query cache: a descriptor's addresses can
  * carry credentials. Asked afresh each time the screen opens.
  */
-export function usePlaybackPlan(key: GlobalMediaKey | undefined, startMs: number | undefined) {
+export function usePlaybackPlan(key: GlobalMediaKey | undefined, options: { readonly startMs?: number; readonly live?: boolean; readonly player?: PluginId } = {}) {
   const userId = useActiveUserId();
   const { playback } = useServices();
   const [result, setResult] = useState<{ readonly request: string; readonly plan?: PlaybackPlan; readonly error?: Error }>();
   const [attempt, setAttempt] = useState(0);
+  const { startMs, live = false, player } = options;
   // The item's identity, not the object: a refetched detail page must not ask again.
-  const request = key ? `${key.connectionId}/${key.externalId}/${startMs ?? 0}/${attempt}` : undefined;
+  const request = key ? `${key.connectionId}/${key.externalId}/${startMs ?? 0}/${live ? 'live' : ''}/${player ?? ''}/${attempt}` : undefined;
   const ask = useEffectEvent((signal: AbortSignal) =>
-    key ? playback.plan(userId, key, startMs === undefined ? {} : { startMs }, signal) : Promise.resolve(undefined),
+    key
+      ? playback.plan(userId, key, { ...(startMs === undefined ? {} : { startMs }), ...(live ? { live } : {}), ...(player ? { player } : {}) }, signal)
+      : Promise.resolve(undefined),
   );
 
   useEffect(() => {

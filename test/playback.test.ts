@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';
 import { playbackReports } from '@/services/playback-reports';
+import { tabOfPlaying } from '@/services/tab-content';
 
 import { fakeClock } from './support/fakes';
 import { buildServices, fakeMediaPlugin, fakePlayerPlugin, movie } from './support/services';
@@ -70,6 +71,28 @@ describe('choosing a player', () => {
     await t.services.players.setEnabled(t.players[2]?.plugin.manifest.id ?? ('' as never), false);
     expect(await t.services.players.choosing()).toEqual({ candidates: [expect.objectContaining({ id: 'players/first' })], preferred: 'players/first' });
   });
+
+  it('puts a tab’s own first before the device’s — while it is on, and only on that tab', async () => {
+    const t = await setUp();
+    const second = t.players[1]?.plugin.manifest.id ?? ('' as never);
+    await t.services.players.setFirstOn(second, 'tv', true);
+    expect((await t.services.players.choosing('tv')).preferred).toBe('players/second');
+    expect((await t.services.players.choosing('media')).preferred).toBe('players/first');
+    expect((await t.services.players.choosing()).preferred).toBe('players/first');
+    await t.services.players.setEnabled(second, false);
+    expect((await t.services.players.choosing('tv')).preferred).toBe('players/first');
+    // Chosen for a tab again, it is switched on again.
+    await t.services.players.setFirstOn(second, 'tv', true);
+    expect((await t.services.players.choosing('tv')).preferred).toBe('players/second');
+  });
+});
+
+describe('the tab something plays from', () => {
+  it('is TV for a channel and for everything IPTV brings, and Media for a source’s films and series', () => {
+    expect(tabOfPlaying('sources', true)).toBe('tv');
+    expect(tabOfPlaying('iptv', false)).toBe('tv');
+    expect(tabOfPlaying('sources', false)).toBe('media');
+  });
 });
 
 describe('pressing Play', () => {
@@ -78,6 +101,30 @@ describe('pressing Play', () => {
     const plan = await t.services.playback.plan(t.kids, t.item.key, { startMs: 90_000 });
     expect(t.source.stats.playbackRequests).toEqual([{ key: t.item.key, profile: hlsOnly, startMs: 90_000 }]);
     expect(plan).toMatchObject({ kind: 'play', player: 'players/first', source: hls });
+  });
+
+  it('asks with the profile of the player first on the item’s tab: a channel plays from TV', async () => {
+    const t = await setUp();
+    await t.services.players.setFirstOn(t.players[1]?.plugin.manifest.id ?? ('' as never), 'tv', true);
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play', player: 'players/first' });
+    expect(await t.services.playback.plan(t.kids, t.item.key, { live: true })).toMatchObject({ kind: 'play', player: 'players/second' });
+    expect(t.source.stats.playbackRequests.map((request) => request.profile)).toEqual([hlsOnly, everything]);
+    // The tab is the app's business, not the source's.
+    expect(t.source.stats.playbackRequests.every((request) => !('live' in request))).toBe(true);
+  });
+
+  it('plays with the player the user picked, asked with its profile — or not at all, never with another', async () => {
+    const t = await setUp();
+    const second = t.players[1]?.plugin.manifest.id ?? ('' as never);
+    expect(await t.services.playback.plan(t.kids, t.item.key, { player: second })).toMatchObject({ kind: 'play', player: 'players/second', source: hls });
+    expect(t.source.stats.playbackRequests.at(-1)?.profile).toEqual(everything);
+
+    const first = t.players[0]?.plugin.manifest.id ?? ('' as never);
+    const onlyTs = await setUp({ describe: (request) => ({ key: request.key, sources: [ts], audioTracks: [], subtitleTracks: [] }) });
+    expect(await onlyTs.services.playback.plan(onlyTs.kids, onlyTs.item.key, { player: first })).toEqual({ kind: 'none', needs: ['protocol'], source: ts });
+
+    await t.services.players.setEnabled(second, false);
+    await expect(t.services.playback.plan(t.kids, t.item.key, { player: second })).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('finds the player that can, when the first cannot', async () => {
