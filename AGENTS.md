@@ -502,15 +502,23 @@ config.resolver.blockList = [...blockList, /^<plugins>\/node_modules\/.*/];
     linked, in this app's `node_modules`, so its imports find this app's
     types. Never map `react` in `paths` — Expo's Metro applies tsconfig paths
     too, and React's types are not a module it can bundle.
-  - **vitest** dedupes React, React Native, expo-video and hls.js, and stubs
-    expo-video (`test/support/expo-video.ts`): the shipped list includes the
-    built-in player, and Node has no native module.
+  - **vitest** dedupes React, React Native, expo, expo-video and hls.js, and
+    stubs expo-video and expo (`test/support/`): the shipped list includes the
+    built-in player and VLC, and Node has no native module.
+  - **Autolinking** searches this app's `node_modules` first
+    (`expo.autolinking.searchPaths` in `package.json`). Followed from a linked
+    player's peers, it walks into the plugins repository, and its choice
+    between two equally deep copies depends on the order it visits them: it
+    once built that repository's `expo-modules-core` 57.0.20 under this app's
+    57.0.19 JavaScript. After adding a player, check
+    `npx expo-modules-autolinking resolve --platform android --json`: nothing
+    may come from `streaming_center_plugins/node_modules`.
 - Install the plugins repository first: its own tests and typecheck need it.
 - Plugins take `@sc/api` — and players `@sc/player-kit`, React, React Native
   and their engine — as **peers**: the app supplies the one copy.
 - `npm ls --all` shows `UNMET DEPENDENCY @sc/api@*` under each linked plugin,
-  and `expo-doctor` reports "multiple copies" of React, React Native and
-  expo-video. Both see the plugins repository's own copies, which the app
+  and `expo-doctor` reports "multiple copies" of React, React Native, expo
+  and expo-video. Both see the plugins repository's own copies, which the app
   never uses; npm resolves a link's peers from the link's folder.
 - No `resolver.nodeModulesPaths` is needed: babel-preset-expo imports its
   runtime helpers by absolute path (verified in dev and production bundles).
@@ -590,8 +598,8 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 6 — the code is on the new architecture.** Everything above describes
-the target; what runs today:
+**Phase 7 — it plays. Phase 8 brings more players: VLC on Android is in.**
+Everything above describes the target; what runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
   a time: Live with group chips, channels with now and next, a day guide per
@@ -623,8 +631,9 @@ the target; what runs today:
   screen chooses the player (`PlaybackService`), draws its view under the
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
-  transcode — on phones and in a browser. Each player has its switch and
-  "Play with it first", as device settings.
+  transcode — on phones and in a browser; VLC plays on Android, from an Expo
+  module in its plugin's package. Each player has its switch and "Play with it
+  first", as device settings.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages

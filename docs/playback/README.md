@@ -4,9 +4,9 @@ How the app plays what a source offers: descriptors and players, choosing an
 engine, where each player is switched on, and how watch status gets back to the
 source that masters it.
 
-Jellyfin plays on the built-in player, on phones and in a browser; Stalker
-comes later in Phase 7, and Phase 8 brings KSPlayer, mpv and VLC. This page is
-the design they build to, and says where today differs.
+Jellyfin and Stalker play on the built-in player, on phones and in a
+browser, and on VLC on Android; Phase 8 brings mpv and KSPlayer too. This page
+is the design they build to, and says where today differs.
 
 ## What to play, and how to play it
 
@@ -45,7 +45,7 @@ A player plugin is in the `players` category, and has three parts:
 | `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js on the web | all | Phase 7 — the engine is in |
 | `players/ksplayer` | KSPlayer | iOS | Phase 8 |
 | `players/mpv` | MPVKit on iOS, libmpv on Android | iOS, Android | Phase 8 |
-| `players/vlc` | VLCKit on iOS, libVLC on Android | iOS, Android | Phase 8 |
+| `players/vlc` | libVLC on Android, through an Expo module in its package; VLCKit on iOS later | Android | Phase 8 — Android is in |
 
 On the web there is only the built-in player; Phase 8 adds mpegts.js to it for
 MPEG-TS live streams.
@@ -64,19 +64,24 @@ their player plugin, and lint says so — but it installs them: they are the
 player's peers.
 
 **Players are native code.** expo-video is a published package, so the app
-installs it and autolinking builds it from the app's `node_modules`. Phase 7's
-spike proved the rest on Android: the built-in player's view, from the linked
-package, drew HLS, live HLS, raw MPEG-TS and MP4, with one copy of React and
-of expo-video in the bundle (`docs/plugins`). An Expo module in a player's own
-package — KSPlayer, mpv, VLC — has not been tried, so Phase 8 opens with that
-spike. A new or changed player means building again.
+installs it and autolinking builds it from the app's `node_modules`. An Expo
+module in a player's own package — VLC's, and later mpv's and KSPlayer's — is
+found through the `file:` link and built into the development build from the
+plugins repository, while every package it depends on comes from the app's
+`node_modules` (`docs/plugins`). On the Android emulator VLC played the mock
+portal's raw MPEG-TS and a Jellyfin film in Matroska with E-AC-3 as the file
+itself, from where it was left, with the file's own subtitles, turning with
+the device. A new or changed player means building again.
 
-**What the built-in player tells.** A state is told once, and a new listener
-hears the current one at once. On a phone, "playing" follows what was asked
-for, not the engine's flag — Media3 is not playing while it buffers, and a
-stream turns ready before it starts — so a screen never flashes a pause. A
-track is named by its place (`audio-0`, `subtitle-1`): iOS gives expo-video's
-tracks no id. Every failure is a `failed` state and an `AppError` both.
+**What a player tells.** A state is told once, and a new listener hears the
+current one at once — `createPlayerEvents` in `@sc/api` keeps that promise for
+every engine — and every failure is a `failed` state and an `AppError` both.
+On a phone the built-in player's "playing" follows what was asked for, not the
+engine's flag — Media3 is not playing while it buffers, and a stream turns
+ready before it starts — so a screen never flashes a pause; it names a track by
+its place (`audio-0`, `subtitle-1`), because iOS gives expo-video's tracks no
+id. VLC says "playing" once libVLC's buffer is full, and names tracks by
+libVLC's own ids (`audio-1`, `subtitle-3`).
 
 ## Players are device-wide
 

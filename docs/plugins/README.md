@@ -70,7 +70,7 @@ need it.
 a player `@sc/player-kit`, React, React Native and its engine too — so the app
 supplies the one copy. The plugins repository installs its own React, React
 Native, expo and expo-video, for its typecheck and tests, and a plugin file's
-imports would find those first. Three things keep them out:
+imports would find those first. Four things keep them out:
 
 - **Metro** (`metro.config.js`) watches the plugins folder, resolves a plugin
   file's bare imports from the app, and blocks that repository's
@@ -81,21 +81,30 @@ imports would find those first. Three things keep them out:
   in the app's `node_modules`, and resolves its imports from there. Mapping
   `react` in `paths` instead breaks the bundle: Expo's Metro applies tsconfig
   paths too.
-- **vitest** dedupes the same packages, and stubs expo-video, which needs a
-  native module Node lacks.
+- **vitest** dedupes the same packages, and stubs expo-video and expo, which
+  need a native runtime Node lacks.
+- **Autolinking** searches the app's `node_modules` first
+  (`expo.autolinking.searchPaths` in `package.json`). Left to follow a linked
+  player's peers, it walks into the plugins repository, and which of two
+  equally deep copies it builds depends on the order it happens to visit
+  them: it once built that repository's `expo-modules-core` under the app's
+  JavaScript. A player's own Expo module still comes from the plugins
+  repository — it lives nowhere else.
 
 A bundle can be checked: export with `--source-maps` and look for any source
 under `streaming_center_plugins/node_modules` — there must be none.
 
 `npm ls --all` reports `UNMET DEPENDENCY @sc/api@*` under each linked plugin,
-and `expo-doctor` "multiple copies" of React, React Native and expo-video:
+and `expo-doctor` "multiple copies" of React, React Native, expo and
+expo-video:
 npm resolves a link's peers from the link's own folder, so both see the
 plugins repository's copies, which the app never uses.
 
 A player's engine is native code. expo-video, a published package, is
-installed by the app and autolinked from its `node_modules` — proven on
-Android in Phase 7. An Expo module in a player's own folder is Phase 8's to
-prove.
+installed by the app and autolinked from its `node_modules`. An Expo module in
+a player's own folder — VLC's `android/` — is found through the `file:` link
+and built from the plugins repository; the players list in
+`composition/plugins.ts` names only players whose engine this build has.
 
 ## Registering a plugin
 

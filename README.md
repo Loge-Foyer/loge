@@ -114,12 +114,11 @@ screens rather than a new app.
 
 ## Current state
 
-**Phase 6 — the code is on the new architecture.** Everything above is the
-design, and all but playback runs today, built with
+**Phase 7 — it plays. Phase 8 brings more players.** Everything above is
+the design, and most of it runs today, built with
 [Tamagui](https://tamagui.dev):
 
-- **Four tabs.** TV shows the way to add an IPTV source; its channels arrive
-  with Phase 7.
+- **Four tabs.**
   - **Media** — films and series from every source, as one library: what you
     are in the middle of, then a row per kind in the order and sort you choose,
     a full-screen grid behind each row, and a page for every film, series,
@@ -149,11 +148,13 @@ design, and all but playback runs today, built with
 - **Press Play** on a film or an episode from Jellyfin — on a phone, which
   turns the player with the device, or in a browser — and pick up where you
   left off. Progress and "watched" go back to the server, offline too: they
-  are written on the device first and delivered when it can.
+  are written on the device first and delivered when it can. On Android, VLC
+  plays too — the files the built-in player cannot, like Matroska with DTS,
+  as they are — and each device chooses which player goes first.
 - **Live TV** on the TV tab, from a Stalker portal: channels in their groups
   with what is on now and next, a day's guide, channel up and down, and the
   provider's films and series.
-- **Not yet:** players other than the built-in one; M3U and Xtream.
+- **Not yet:** mpv and KSPlayer, VLC on iPhone; M3U and Xtream.
 
 Development builds also have a pretend account, for trying things offline.
 

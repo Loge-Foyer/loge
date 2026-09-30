@@ -44,7 +44,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-**Phase 6 — the code is on the new architecture. Phase 7 brings playback.**
+**Phase 7 — it plays. Phase 8 brings more players: VLC on Android is in.**
 
 The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
 categories, and Settings → Plugins shows one list per category for this
@@ -74,8 +74,10 @@ What runs today:
   Welcome's Restore, and backup targets that ask before overwriting.
 - Press Play: Jellyfin films and episodes play on the built-in player —
   expo-video on phones, which turn it with the device, `<video>` with hls.js
-  in a browser — with Resume, Mark watched, the tracks and Next episode.
-  Players' switches and which plays first are per device. Videos still shows
+  in a browser — with Resume, Mark watched, the tracks and Next episode. On
+  Android VLC plays too, an Expo module in its plugin's package: Matroska, DTS
+  and TrueHD as the file, raw MPEG-TS, a file's own subtitles. Players'
+  switches and which plays first are per device. Videos still shows
   skeletons.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until

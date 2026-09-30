@@ -18,7 +18,7 @@ import { pluginHref } from './plugin-route';
 const FOOTERS: Readonly<Record<PluginCategory, string>> = {
   sources: 'Films, series and anime appear on Media; videos and files on Videos. A connection can keep a separate sign-in, or everything, for each profile.',
   iptv: 'Live TV, and a provider’s films and series, appear on TV — never in your library.',
-  players: 'Players are set up on each device. Nothing plays yet: playback arrives in a later version of the app.',
+  players: 'Players are set up on each device: which are on, and which plays first.',
   sync: 'Where your account lives — on this device, or on your own server — and where its backups go. Each device chooses its own.',
 };
 

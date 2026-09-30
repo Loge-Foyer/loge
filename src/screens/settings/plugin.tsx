@@ -236,9 +236,6 @@ function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
           />
         </SettingsSection>
       ) : null}
-      <Paragraph size="$3" color="$color10">
-        Nothing plays yet: playback arrives in a later version of the app.
-      </Paragraph>
     </Screen>
   );
 }

@@ -94,5 +94,12 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "searchPaths": [
+        "./node_modules"
+      ]
+    }
+  }
 }
