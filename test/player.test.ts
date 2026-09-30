@@ -60,6 +60,15 @@ describe('canPlay', () => {
   });
 });
 
+describe('a stream’s container', () => {
+  it('is judged for a progressive file only: a stream’s protocol says what it is', () => {
+    const browser: PlayerProfile = { ...avplayer, protocols: ['progressive', 'hls', 'mpegts'], containers: ['mp4'] };
+    const live: PlaybackSource = { uri: 'http://portal/live.ts', protocol: 'mpegts', container: 'ts', transcoded: false, live: true };
+    expect(missingFor(browser, live)).toEqual([]);
+    expect(missingFor(browser, { ...live, protocol: 'progressive', live: false })).toEqual(['container']);
+  });
+});
+
 describe('choosePlayer', () => {
   const mkv = source({ container: 'mkv', videoCodec: 'hevc', audioCodecs: ['dts'] });
   const hls = source({ protocol: 'hls', container: 'ts', videoCodec: 'h264', audioCodecs: ['aac'], transcoded: true });

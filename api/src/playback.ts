@@ -21,7 +21,11 @@ export interface PlaybackSource {
   /** Headers the stream needs, resolved by the engine at load time. */
   readonly headersRef?: HeadersRef;
   readonly protocol: StreamProtocol;
-  /** Lower-case — `mp4`, `mkv`, `webm`, `ts` — or absent when the source cannot say. */
+  /**
+   * A progressive file's container, lower-case — `mp4`, `mkv`, `webm`, `ts` —
+   * or absent when the source cannot say. A stream's protocol already says
+   * what it is, and no engine is judged by the container a stream names.
+   */
   readonly container?: string;
   /** Lower-case — `h264`, `hevc`, `av1`, `vp9`. */
   readonly videoCodec?: string;

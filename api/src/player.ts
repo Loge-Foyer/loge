@@ -107,7 +107,7 @@ export type PlayerRequirement = 'protocol' | 'container' | 'videoCodec' | 'audio
 export function missingFor(profile: PlayerProfile, source: PlaybackSource): readonly PlayerRequirement[] {
   const missing: PlayerRequirement[] = [];
   if (!profile.protocols.includes(source.protocol)) missing.push('protocol');
-  if (source.container !== undefined && !profile.containers.includes(source.container)) missing.push('container');
+  if (source.protocol === 'progressive' && source.container !== undefined && !profile.containers.includes(source.container)) missing.push('container');
   if (source.videoCodec !== undefined && !profile.videoCodecs.includes(source.videoCodec)) missing.push('videoCodec');
   // One playable audio track is enough; the rest can stay unchosen.
   if (source.audioCodecs !== undefined && source.audioCodecs.length > 0 && !source.audioCodecs.some((codec) => profile.audioCodecs.includes(codec))) {
