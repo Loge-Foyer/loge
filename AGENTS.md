@@ -362,13 +362,18 @@ TypeScript program of its own with React Native's types.
   unchanged. VLCKit's delegate is an Objective-C protocol and `SharedObject`
   is no `NSObject`, so a small forwarder stands between them. The iOS half
   compiles and links; it has not played yet.
-- **`players/mpv`** implements it on Android: libmpv behind an Expo module
-  in its own `android/` folder, with this package's own JNI — the engine's
-  published wrapper prints every stream address it opens to the device log,
-  and nothing turns that off. Tested against a fake of that module, and played
-  on the Android emulator: a portal's raw MPEG-TS channel, and a Jellyfin film
-  as the file, with libass drawing its subtitles. It decodes in software for
-  now, so its profile stops at 1080p.
+- **`players/mpv`** implements it on iOS and Android: libmpv's own C API
+  behind one Expo module in this package — this package's JNI on Android,
+  and straight from Swift on iOS, where `import MPVKit` exposes the same
+  entry points. Neither half ever calls `mpv_request_log_messages`, because
+  the engine's published Android wrapper does and prints every stream address
+  it opens, and nothing turns that off. Tested against a fake of that module,
+  and played on the Android emulator: a portal's raw MPEG-TS channel, and a
+  Jellyfin film as the file, with libass drawing its subtitles. Android
+  decodes in software for now, so its profile stops at 1080p; iOS uses
+  VideoToolbox with a software fallback and claims 4K. On iOS the engine is
+  asked for by the app, through `ios.extraPods`, because MPVKit is not usably
+  on CocoaPods trunk and autolinking reads podspecs only.
 - **`sync/custom-server`** implements the account role on PocketBase: one
   sign-in, latched refusals, the whole account read, batches written, sign-up
   with an invite, the password typed again as the owner check.

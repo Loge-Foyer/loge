@@ -1,6 +1,16 @@
 {
-  "platforms": ["android"],
+  "platforms": [
+    "apple",
+    "android"
+  ],
+  "apple": {
+    "modules": [
+      "ScMpvModule"
+    ]
+  },
   "android": {
-    "modules": ["expo.modules.scmpv.ScMpvModule"]
+    "modules": [
+      "expo.modules.scmpv.ScMpvModule"
+    ]
   }
 }

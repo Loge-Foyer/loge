@@ -3,9 +3,10 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { requireNativeModule, requireNativeView, SharedObject } from 'expo';
 
 /**
- * The Expo module in `android/`: an mpv core as a shared object, and the
- * surface it draws into. Reached lazily — the module exists in an Android
- * build only, and merely importing this package must not fail anywhere else.
+ * The Expo module in `android/` and `ios/`: an mpv core as a shared object,
+ * and the surface it draws into. Reached lazily — the module exists in a
+ * native build only, and merely importing this package must not fail anywhere
+ * else.
  */
 
 /** A track as mpv lists it: its own id, and what the file says about it. */

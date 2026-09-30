@@ -176,19 +176,30 @@ describe('mpv on Android (libmpv)', () => {
     await expect(player.load({ source: source() })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
-  it('plays what the built-in player on Android cannot: Matroska with DTS or TrueHD, AV1, raw MPEG-TS', () => {
-    const android = PROFILES.android;
-    if (!android) throw new Error('no Android profile');
-    expect(canPlay(android, source({ videoCodec: 'hevc', audioCodecs: ['dts'], height: 1080 }))).toBe(true);
-    expect(canPlay(android, source({ videoCodec: 'h264', audioCodecs: ['truehd'] }))).toBe(true);
-    expect(canPlay(android, source({ container: 'webm', videoCodec: 'av1', audioCodecs: ['opus'] }))).toBe(true);
-    expect(canPlay(android, source({ uri: 'http://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true }))).toBe(true);
-    // Stated no wider than it is: mpv decodes in software here, so 4K goes to
-    // another player or comes back from the source as 1080p; iOS waits for
-    // MPVKit, and HDR for a screen to judge it on.
-    expect(canPlay(android, source({ videoCodec: 'hevc', height: 2160 }))).toBe(false);
-    expect(android.hdr).toBeUndefined();
-    expect(PROFILES.ios).toBeUndefined();
+  it('plays what the built-in player cannot: Matroska with DTS or TrueHD, AV1, raw MPEG-TS', () => {
+    for (const [platform, profile] of Object.entries(PROFILES)) {
+      if (!profile) throw new Error(`no ${platform} profile`);
+      expect(canPlay(profile, source({ videoCodec: 'hevc', audioCodecs: ['dts'], height: 1080 }))).toBe(true);
+      expect(canPlay(profile, source({ videoCodec: 'h264', audioCodecs: ['truehd'] }))).toBe(true);
+      expect(canPlay(profile, source({ container: 'webm', videoCodec: 'av1', audioCodecs: ['opus'] }))).toBe(true);
+      expect(canPlay(profile, source({ uri: 'http://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true }))).toBe(true);
+      // HDR waits for a screen to judge it on, on either phone.
+      expect(profile.hdr).toBeUndefined();
+    }
+    // There is no mpv for a browser.
     expect(PROFILES.web).toBeUndefined();
+  });
+
+  it('claims 4K where the decoder earns it, and not where it does not', () => {
+    const { ios, android } = PROFILES;
+    if (!ios || !android) throw new Error('both phones');
+    // Android decodes in software (see android/), so 4K goes to another player
+    // or comes back from the source as 1080p.
+    expect(canPlay(android, source({ videoCodec: 'hevc', height: 2160 }))).toBe(false);
+    // VideoToolbox does H.264 and HEVC in hardware on every iPhone this app
+    // runs on, and mpv falls back to software for the rest.
+    expect(canPlay(ios, source({ videoCodec: 'hevc', height: 2160 }))).toBe(true);
+    // The height is the only thing the two differ on.
+    expect({ ...ios, maxHeight: 0 }).toEqual({ ...android, maxHeight: 0 });
   });
 });

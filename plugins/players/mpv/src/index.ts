@@ -1,7 +1,8 @@
 /**
  * The mpv engine, for nearly any file — Matroska, HEVC, DTS, TrueHD — with
- * libass subtitles and any header a stream needs. Android for now, through the
- * Expo module in `android/`; MPVKit on iPhone and iPad comes later.
+ * libass subtitles and any header a stream needs. Through the Expo module in
+ * this package: `android/` on Android, `ios/` on iPhone, libmpv's own C API
+ * behind both.
  */
 import { pluginId } from '@sc/api';
 import type { PlayerPlugin } from '@sc/player-kit';
@@ -14,7 +15,7 @@ export const plugin: PlayerPlugin = {
   manifest: {
     id: pluginId('players/mpv'),
     category: 'players',
-    platforms: ['android'],
+    platforms: ['ios', 'android'],
     displayName: 'mpv',
     description: 'The mpv engine: plays nearly any file, with subtitles drawn as the file styles them.',
     player: { profiles: PROFILES },

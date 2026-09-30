@@ -102,11 +102,13 @@ Phase 8 adds players — VLC and mpv on Android are in.
   against MobileVLCKit, both reached through `expo`. Everything in `src/` is
   shared between them. Tested against a fake of that module, and played on the
   Android emulator; the iOS half compiles and links but has not played yet.
-- **mpv:** `players/mpv` implements it on Android — libmpv behind an Expo
-  module with this project's own JNI, because the engine's published wrapper
-  logs every stream address it opens. It decodes in software for now, and so
-  stops at 1080p; libass draws the subtitles, and it is the one engine here
-  that sends any header a stream needs.
+- **mpv:** `players/mpv` implements it on both phones — libmpv's own C API
+  behind one Expo module, through this project's JNI on Android and straight
+  from Swift on iOS, because neither may ask mpv for a log message: the
+  engine's published Android wrapper does, and prints every stream address it
+  opens. Android decodes in software for now and so stops at 1080p; iOS uses
+  VideoToolbox and claims 4K. libass draws the subtitles, and it is the one
+  engine here that sends any header a stream needs.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads — playback through `PlaybackInfo` with a
   `DeviceProfile` from the player's profile, and progress and watched state
