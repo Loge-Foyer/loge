@@ -58,6 +58,12 @@ create `plugins/sync/jellyfin`.
 | a sources, IPTV or sync plugin | `@sc/api` | any framework, the app, another plugin |
 | a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder) | the app, another plugin |
 
+A player's React, React Native and published engine are **peers**, which the
+app installs; this repository has them as development dependencies, for the
+players' TypeScript program and the tests only. The app resolves every import
+of a plugin file from its own `node_modules` and blocks this repository's —
+never rely on a copy here being the one that runs.
+
 `lib: ["esnext"]` gives `api` and every non-player plugin **no host globals**:
 no `fetch`, `URL`, `console`, `setTimeout`, `btoa`, `AbortSignal`. The compiler
 rejects them.
@@ -335,13 +341,18 @@ TypeScript program of its own with React Native's types.
 - **`sources/mock`** implements it with a fixed catalogue.
 - **`iptv/mock`** implements it with live TV: groups, channels, a guide, a
   few films and series, and public test streams to play.
+- **`players/system`** implements the player role: expo-video on phones, the
+  browser's `<video>` with a lazily loaded hls.js on the web, a profile per
+  platform. Its engines are tested against fakes (`vitest.config.ts` aliases
+  expo-video), and it has played on the Android emulator and in Chrome.
 - **`sync/custom-server`** implements the account role on PocketBase: one
   sign-in, latched refusals, the whole account read, batches written, sign-up
   with an invite, the password typed again as the owner check.
 - **`sync/mock`** plays at being your own server in memory, and
   **`sync/mock-backup`** at being a backup target.
 - **Every other plugin** is a manifest that declares no capability: the other
-  IPTV plugins, players with no profile, backup targets with no role.
+  IPTV plugins, the other players, with no profile, backup targets with no
+  role.
 
 Phase 4's roles (`effectiveRoles`, `defaultRoles`), its log-based sync role,
 sealed passwords and the derived owner proof are retired, with PBKDF2 in the

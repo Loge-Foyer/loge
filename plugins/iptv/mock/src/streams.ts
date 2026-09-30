@@ -3,8 +3,8 @@ import type { PlaybackSource } from '@sc/api';
 /**
  * What the mock plays: public test streams, since it has no server of its
  * own. Browsing works offline; playing needs the network. Each was probed —
- * H.264 and AAC throughout — and the HLS ones send CORS headers, which hls.js
- * needs in a browser.
+ * H.264 throughout, AAC where there is sound — and played in Chrome and on
+ * Android; the HLS ones send CORS headers, which hls.js needs in a browser.
  */
 const LIVE_HLS = 'https://demo.unified-streaming.com/k8s/live/stable/scte35.isml/.m3u8';
 const LOOPED_HLS: Choices = [
@@ -13,16 +13,22 @@ const LOOPED_HLS: Choices = [
 ];
 // Ten seconds of raw MPEG-TS over HTTP: what AVPlayer and a browser cannot play, and ExoPlayer can.
 const TRANSPORT_STREAM = 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear1/fileSequence0.ts';
-const FILES: Choices = [
-  'https://media.w3.org/2010/05/sintel/trailer.mp4',
-  'https://media.w3.org/2010/05/bunny/trailer.mp4',
-  'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+// Short files a browser opens as well as a phone. W3C's trailers are not among them: Chrome calls them a "format error".
+const FILES: readonly [FileStream, ...FileStream[]] = [
+  { uri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', sound: true },
+  { uri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4', sound: false },
+  { uri: 'https://test-videos.co.uk/vids/sintel/mp4/h264/360/Sintel_360_10s_1MB.mp4', sound: false },
 ];
+
+interface FileStream {
+  readonly uri: string;
+  readonly sound: boolean;
+}
 
 const CODECS = { videoCodec: 'h264', audioCodecs: ['aac'] } as const;
 
 type Choices = readonly [string, ...string[]];
-const pick = (choices: Choices, index: number) => choices[index % choices.length] ?? choices[0];
+const pick = <T>(choices: readonly [T, ...T[]], index: number): T => choices[index % choices.length] ?? choices[0];
 
 /** A channel's stream: most loop a test stream as if it were live; the first of every four is really live. */
 export function channelSource(number: number, transportStreamOnly: boolean): PlaybackSource {
@@ -33,7 +39,16 @@ export function channelSource(number: number, transportStreamOnly: boolean): Pla
 }
 
 export function movieSource(index: number): PlaybackSource {
-  return { uri: pick(FILES, index), protocol: 'progressive', container: 'mp4', ...CODECS, transcoded: false, live: false };
+  const file = pick(FILES, index);
+  return {
+    uri: file.uri,
+    protocol: 'progressive',
+    container: 'mp4',
+    videoCodec: 'h264',
+    ...(file.sound ? { audioCodecs: ['aac'] } : {}),
+    transcoded: false,
+    live: false,
+  };
 }
 
 export function episodeSource(index: number): PlaybackSource {

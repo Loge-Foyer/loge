@@ -15,7 +15,9 @@ Vitest, run over `test/` at the repository root.
    Native's types, and the DOM's for the browser's `<video>`, because an engine
    draws.
 3. **The tests** are a program of their own (`test/tsconfig.json`), with
-   Node's types, because the fake context's crypto runs on `node:crypto`.
+   Node's types, because the fake context's crypto runs on `node:crypto` —
+   and the DOM's and JSX, because they reach the built-in player's engines
+   and, through the conformance check, its views.
 
 **The rules in `api`:**
 
@@ -55,6 +57,16 @@ Vitest, run over `test/` at the repository root.
   - paging across libraries with no duplicates or gaps
   - mapping every item type
   - artwork addresses
+- `system-player.test.ts` — the built-in player's two engines against fakes.
+  On a phone (expo-video, aliased to `support/fake-expo-video.ts` in
+  `vitest.config.ts`): the stream's type and headers, the start position once
+  ready, states that follow what was asked for, nothing before a load,
+  position with a duration unless live, tracks by place and once per change,
+  typed failures, a released player refusing everything. In a browser
+  (`support/fake-video.ts`): hls.js without a worker, the browser's own HLS
+  unless a header is needed, what a `<video>` refuses, hls.js's and the
+  element's errors, a refused autoplay as a pause, the end without a pause.
+  And the profiles: HLS everywhere, MPEG-TS and Matroska on Android only.
 - `iptv-mock.test.ts` — the mock portal's lineup is the same every run and
   pages by group; its guide has no gaps and agrees with itself in any window,
   and its setting switches `epg` off; its films and series come in

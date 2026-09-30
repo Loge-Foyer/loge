@@ -110,12 +110,33 @@ Everything above, plus:
     exported beside it.
   - Native code, when the engine needs it, is an Expo module in the package's
     own folder.
+- **The engine is a peer.** A published engine — expo-video, hls.js — is a
+  peer dependency with React and React Native: the app installs it, so
+  autolinking builds it and there is one copy. This repository installs it
+  too, as a development dependency, for the typecheck and the tests only.
+- **The view finds its engine through the controller.** `create` keeps the
+  engine behind the `MediaPlayer` it returns (a `WeakMap` in the package), and
+  the view looks it up; given another player's controller, it throws.
+- **Platforms are files.** `engine.ts` and `engine.web.ts`, `view.tsx` and
+  `view.web.tsx`: Metro picks by platform, and `index.ts` imports `./engine`.
+  Both files export the same names.
+- **Load a web engine lazily.** Anything big that only some streams need —
+  hls.js — comes through `import()`, so it is a chunk of its own.
 - **The profile is the promise.** `player.profiles` says, per platform, which
   protocols, containers, codecs and subtitle formats the engine plays.
   `choosePlayer` trusts it, and a server that transcodes shapes its answer to
   it. State only what really plays.
 - **Report through events.** State, position, tracks and errors go out as
   `PlayerEvent`s. An error is an `AppError`, never a silent stop.
+  - Tell a state once, and tell a new listener the current one.
+  - Follow what was asked for, not an engine's flag that lags behind it: a
+    stream turns ready before it starts, and Media3 is not "playing" while it
+    buffers. A screen must never flash a pause.
+  - Ignore an engine's events until something is loaded.
+- **Test the engine against a fake of it.** Node has no native module: the
+  root `vitest.config.ts` aliases expo-video to `test/support/fake-expo-video.ts`,
+  and a web engine takes its `<video>` and hls.js from its host
+  (`WebEngineHost`), so a test hands it fakes (`test/support/fake-video.ts`).
 - **Headers are resolved at load time** (`context.resolveHeaders`) and held in
   memory only.
 

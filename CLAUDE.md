@@ -93,6 +93,10 @@ under way.
   - the player contract, the account role (records), the backup role
   - errors, the HTTP port and the host's crypto port
 - **`player-kit`:** `PlayerView`'s props and `PlayerPlugin`.
+- **Built-in player:** `players/system` implements the player role —
+  expo-video on phones, `<video>` with a lazily loaded hls.js on the web, a
+  profile per platform — tested against fakes of expo-video, the element and
+  hls.js.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
 - **Mock:** `sources/mock` implements the media role with a fixed catalogue,
@@ -101,8 +105,8 @@ under way.
   server in memory, and `sync/mock-backup` at being a backup target.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
-- **Every other plugin:** a manifest — the other IPTV plugins, the players
-  and the backup targets included.
+- **Every other plugin:** a manifest — the other IPTV plugins, the other
+  players and the backup targets included.
 - **`npm run typecheck`:** three programs — `api` and the non-player plugins
   with no host types at all; `player-kit` and the players with React Native's
   and the DOM's; the tests with Node's.
@@ -111,6 +115,8 @@ under way.
     records against their shared fixtures, choosing a player
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
   - the mock, as a source, an IPTV portal, an account and a backup target
+  - the built-in player's engines, against fakes (`vitest.config.ts` aliases
+    expo-video; the web engine takes its `<video>` and hls.js from its host)
   - the custom server against a fake of PocketBase's routes and rules
   - the conformance check that each declared capability is implemented
 

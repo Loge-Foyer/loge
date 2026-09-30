@@ -169,11 +169,21 @@ format and encryption are the app's.
 
 ## If it is a player
 
-- **A `MediaPlayer`:** framework-free, reporting `PlayerEvent`s.
-- **A `PlayerView`**, from `@sc/player-kit`, that draws it.
+- **A `MediaPlayer`:** framework-free, reporting `PlayerEvent`s — a state
+  once, what was asked for rather than an engine's lagging flag, nothing
+  before a load, every failure a `failed` state and an `AppError`.
+- **A `PlayerView`**, from `@sc/player-kit`, that draws it. It finds its
+  engine behind the controller (a `WeakMap` in the package).
 - **A profile per platform** that states only what the engine really plays.
+- **Its engine and React as peers,** installed by the app; here as
+  development dependencies, for the players' TypeScript program
+  (`tsconfig.players.json`) and the tests.
+- **Platform files** — `engine.ts` / `engine.web.ts`, `view.tsx` /
+  `view.web.tsx` — exporting the same names.
+- **Tests against a fake engine:** alias a native one in `vitest.config.ts`,
+  hand a web one its host. `plugins/players/system` shows both.
 - **Native code,** if any: an Expo module in the package's own folder,
-  compiled into the app's development build.
+  compiled into the app's development build (Phase 8 proves how).
 
 ## Boundaries lint will not catch yet
 
@@ -211,3 +221,8 @@ npm test
   sign-in and sessions, records read and written, sign-up and the owner check
 - `plugins/sync/mock-backup` — a backup target at its smallest: bytes and
   etags
+- `plugins/players/system` — the reference player: expo-video on phones, the
+  browser's `<video>` and a lazily loaded hls.js on the web, a profile per
+  platform
+- `plugins/iptv/mock` — live TV at its simplest: groups, channels, a guide
+  worked out from the time

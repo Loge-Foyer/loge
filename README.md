@@ -105,6 +105,9 @@ What is real today:
   by record, and creates an account with an invite.
 - **The mock account** plays at being your own server, in memory, and **the
   mock backup target** at being a cloud folder.
+- **The built-in player** plays through expo-video on phones and the
+  browser's `<video>` on the web, with hls.js fetched only when a browser has
+  no HLS of its own. Its profile per platform says what each plays.
 - **Every other plugin** still describes itself with a manifest, and declares
   nothing it cannot do yet.
 
