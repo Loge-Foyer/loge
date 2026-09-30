@@ -1,18 +1,18 @@
 import {
-  effectiveRoles,
+  effectiveCapabilities,
   isSetUpFor,
   resolveValues,
   type Connection,
   type ConnectionValues,
   type ContentKind,
-  type EffectiveRoles,
+  type EffectiveCapabilities,
   type PluginManifest,
   type UserId,
 } from '@sc/api';
 
-import { PLUGIN_OFF, type DevicePlugins } from './device-plugins';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ConnectionRepository, ProfileValues } from './ports';
+import { accountWide } from './scope';
 import type { CredentialScope } from './sessions';
 import { kindsForTab, type ContentTab } from './tab-content';
 
@@ -24,7 +24,7 @@ export interface Source {
   readonly scope: CredentialScope;
   /** Shared values, with the profile's own where the connection keeps them per profile. */
   readonly values: ConnectionValues;
-  readonly effective: EffectiveRoles;
+  readonly effective: EffectiveCapabilities;
 }
 
 export interface TabSource extends Source {
@@ -55,7 +55,7 @@ export function standingOf(
 }
 
 export interface SourceService {
-  /** Every connection of every plugin enabled on this device that this profile can use. */
+  /** Every source and IPTV connection of the account that this profile can use, on this platform. */
   forUser(userId: UserId): Promise<readonly Source[]>;
   /** Sources whose effective media role brings something to `tab`. */
   forTab(userId: UserId, tab: ContentTab): Promise<readonly TabSource[]>;
@@ -63,21 +63,19 @@ export interface SourceService {
   pendingFor(userId: UserId): Promise<readonly PendingSource[]>;
 }
 
-export function createSourceService(deps: {
-  catalog: PluginCatalog;
-  devicePlugins: DevicePlugins;
-  connections: ConnectionRepository;
-}): SourceService {
-  const { catalog, devicePlugins, connections } = deps;
+export function createSourceService(deps: { catalog: PluginCatalog; connections: ConnectionRepository }): SourceService {
+  const { catalog, connections } = deps;
 
   const resolve = async (userId: UserId) => {
-    const [all, own, plugins] = await Promise.all([connections.list(), connections.valuesOfProfile(userId), devicePlugins.states()]);
+    const [all, own] = await Promise.all([connections.list(), connections.valuesOfProfile(userId)]);
     const live: Source[] = [];
     const pending: PendingSource[] = [];
+    // A plugin that does not run here is not in the catalogue: its connections wait on the devices it runs on.
     for (const manifest of catalog.list()) {
-      if (!(plugins[manifest.id] ?? PLUGIN_OFF).enabled) continue;
+      if (!accountWide(manifest.id)) continue;
       for (const connection of all) {
-        if (connection.pluginId !== manifest.id) continue;
+        // Switched off, a connection has nothing in effect, for anyone: it is no source, and nothing to finish.
+        if (connection.pluginId !== manifest.id || !connection.enabled) continue;
         const profile = own.get(connection.id);
         const standing = standingOf(manifest, connection, profile);
         if (standing === 'off') continue;
@@ -91,7 +89,7 @@ export function createSourceService(deps: {
           manifest,
           scope: connection.perProfile === 'none' ? 'shared' : userId,
           values,
-          effective: effectiveRoles(manifest, { roles: connection.roles, settings: values.settings }),
+          effective: effectiveCapabilities(manifest, { enabled: connection.enabled, settings: values.settings }),
         });
       }
     }
@@ -108,6 +106,6 @@ export function createSourceService(deps: {
       }
       return tabSources;
     },
-    pendingFor: async (userId) => (await resolve(userId)).pending.filter(({ connection }) => connection.roles.media === true),
+    pendingFor: async (userId) => (await resolve(userId)).pending,
   };
 }

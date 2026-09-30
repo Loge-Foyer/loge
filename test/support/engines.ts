@@ -9,9 +9,9 @@ import { createIndexedDbDatabase } from '@/persistence/indexeddb/database';
 import type { SqlMigration } from '@/persistence/sqlite/migrations';
 import { createSqliteDatabase } from '@/persistence/sqlite/database';
 import { serializeSqlConnection } from '@/persistence/sqlite/sql';
-import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
+import type { Clock, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
-import { counterIds, silentLog } from './fakes';
+import { silentLog } from './fakes';
 import { nodeSqliteConnection } from './node-sqlite';
 
 export type Engine = 'sqlite' | 'indexeddb';
@@ -20,8 +20,6 @@ export const ENGINES: readonly Engine[] = ['sqlite', 'indexeddb'];
 
 export interface TestDatabaseOptions {
   readonly clock: Clock;
-  /** Change ids. Two devices in one test need different ones, as two phones would have. */
-  readonly ids?: IdGenerator;
   readonly log?: Logger;
   /** SQLite: a file, to open the same database twice. In memory otherwise. */
   readonly path?: string;
@@ -51,18 +49,16 @@ export function reopenable(engine: Engine): Pick<TestDatabaseOptions, 'path' | '
 /** A fresh database on the real engine, with the committed migrations. */
 export function openTestDatabase(engine: Engine, options: TestDatabaseOptions): SyncDatabase {
   const log = options.log ?? silentLog;
-  const ids = options.ids ?? counterIds('change-');
   if (engine === 'sqlite') {
     const db = createSqliteDatabase(async () => serializeSqlConnection(nodeSqliteConnection(options.path), { log }), {
       clock: options.clock,
-      ids,
       log,
       ...(options.migrations ? { migrations: options.migrations } : {}),
     });
     return guarded(db);
   }
   const env = { indexedDB: options.indexedDB ?? new IDBFactory(), IDBKeyRange };
-  return guarded(createIndexedDbDatabase(env, 'streaming-center', { clock: options.clock, ids, log }));
+  return guarded(createIndexedDbDatabase(env, 'streaming-center', { clock: options.clock, log }));
 }
 
 /**
@@ -93,7 +89,7 @@ export function guarded(db: SyncDatabase): SyncDatabase {
     preferences: wrap(db.preferences),
     mediaCache: wrap(db.mediaCache),
     staleSecrets: wrap(db.staleSecrets),
-    syncState: wrap(db.syncState),
+    account: wrap(db.account),
     journal: wrap(db.journal),
   };
   return {

@@ -59,19 +59,49 @@ export function walk(pending: IDBRequest<IDBCursorWithValue | null>, step: (curs
   });
 }
 
-export function openIndexedDb(
+/**
+ * Opens the database at `version`, upgrading it one version at a time. Each
+ * step runs in a version-change transaction of its own, so it reads what the
+ * steps before it committed — never a record an earlier step's cursor has yet
+ * to write back, as it could inside one shared transaction.
+ */
+export async function openIndexedDb(
   factory: IDBFactory,
   name: string,
   version: number,
   upgrade: (db: IDBDatabase, from: number, tx: IDBTransaction) => void,
   options: { readonly log: Logger; readonly onClose: () => void },
 ): Promise<IDBDatabase> {
+  // Where it stands. Opening without a version makes a missing database at 1, and that is the first step.
+  const probe = await openOnce(factory, name, undefined, upgrade, options);
+  const current = probe.version;
+  probe.close();
+  for (let next = current + 1; next <= version; next += 1) {
+    (await openOnce(factory, name, next, upgrade, options)).close();
+  }
+  const db = await openOnce(factory, name, version, undefined, options);
+  // Another tab is upgrading the schema: step aside, or it waits for ever.
+  db.onversionchange = () => {
+    db.close();
+    options.onClose();
+    options.log.warn('storage', 'Another tab updated the database. Reload this one to keep going.');
+  };
+  return db;
+}
+
+function openOnce(
+  factory: IDBFactory,
+  name: string,
+  version: number | undefined,
+  upgrade: ((db: IDBDatabase, from: number, tx: IDBTransaction) => void) | undefined,
+  options: { readonly log: Logger },
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const opening = factory.open(name, version);
+    const opening = version === undefined ? factory.open(name) : factory.open(name, version);
     opening.onupgradeneeded = (event) => {
       // Always there during an upgrade; the steps rewrite records through it.
       const tx = opening.transaction;
-      if (tx) upgrade(opening.result, event.oldVersion, tx);
+      if (tx && upgrade) upgrade(opening.result, event.oldVersion, tx);
     };
     opening.onblocked = () => options.log.warn('storage', 'Waiting for another tab to let go of the database.');
     opening.onerror = () => {
@@ -84,16 +114,7 @@ export function openIndexedDb(
           : engineError(opening.error),
       );
     };
-    opening.onsuccess = () => {
-      const db = opening.result;
-      // Another tab is upgrading the schema: step aside, or it waits for ever.
-      db.onversionchange = () => {
-        db.close();
-        options.onClose();
-        options.log.warn('storage', 'Another tab updated the database. Reload this one to keep going.');
-      };
-      resolve(db);
-    };
+    opening.onsuccess = () => resolve(opening.result);
   });
 }
 

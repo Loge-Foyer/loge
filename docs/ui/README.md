@@ -3,10 +3,9 @@
 The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
-This page describes the target. Today the four tabs and Settings → Plugins'
-four lists are in place, a source is still installed on the device before its
-first connection, and Welcome offers to sign in or to use the device on its
-own.
+This page describes the target. Today the four tabs, Settings → Plugins' four
+lists, Welcome, the sign-in flow and Settings → Account are in place; backups
+and players are not.
 
 ## Tamagui
 

@@ -1,4 +1,4 @@
-import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
+import type { Clock, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
 import { storageError } from '../errors';
 import { journalListeners, standaloneRepositories } from '../standalone';
@@ -14,7 +14,7 @@ import { indexedDbRepositories } from './repositories';
 export function createIndexedDbDatabase(
   env: IndexedDbEnvironment,
   name: string,
-  deps: { readonly clock: Clock; readonly ids: IdGenerator; readonly log: Logger },
+  deps: { readonly clock: Clock; readonly log: Logger },
 ): SyncDatabase {
   let ready: Promise<IDBDatabase> | undefined;
   const database = () => {
@@ -41,7 +41,7 @@ export function createIndexedDbDatabase(
         grew = true;
       };
       const result = await runTransaction(await database(), STORES, mode, (tx) =>
-        work(indexedDbRepositories(tx, { clock: deps.clock, ids: deps.ids, journaled, onJournaled, env })),
+        work(indexedDbRepositories(tx, { clock: deps.clock, journaled, onJournaled, env })),
       );
       // Resolved on `complete`, so the entries are committed.
       if (grew) listeners.notify();

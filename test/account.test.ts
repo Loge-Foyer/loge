@@ -1,469 +1,400 @@
 import { AppError, isAppError } from '@sc/api';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { AccountCreatedError, OwnerNotVerifiedError } from '@/services/account';
-import { draftOf, initialDraft } from '@/services/connection-draft';
 import { sessionRef } from '@/services/sessions';
 
-import { accountDraft, mediaDraft, signIn, sync, twoDevices } from './support/devices';
-import { ENGINES, type Engine } from './support/engines';
+import { againTarget, mediaDraft, signIn, sync, target, twoDevices } from './support/devices';
+import { dumpDatabase, ENGINES, type Engine } from './support/engines';
 import { buildServices, fakeMediaPlugin } from './support/services';
-import { fakeOwnerAuthentication, fakeSyncAccount } from './support/sync';
+import { ACCOUNT_PASSWORD, fakeAccountServer, fakeOwnerAuthentication } from './support/sync';
 
+const INVITE = 'GOOD-INVITE';
 const layout = { version: 1 as const, rows: [{ id: 'continue', type: 'continue' as const, hidden: true }] };
 
 describe.each(ENGINES)('the account on %s', (engine: Engine) => {
-  const pair = () => twoDevices([engine, engine]);
+  const pair = (options: { readonly maxProfiles?: number } = {}) => twoDevices([engine, engine], { server: { invite: INVITE, ...options } });
 
-  /** B brought Sam and Robin to the account; A has Lee, and a connection with a saved password. */
-  async function bothHaveProfiles() {
+  /** B made the account from Sam and Robin; A holds an account of its own on the device: Lee, and a source with a password. */
+  async function twoAccounts() {
     const devices = pair();
-    await devices.b.services.profiles.create('Sam');
+    await devices.b.services.account.createLocal('Sam');
     await devices.b.services.profiles.create('Robin');
-    await signIn(devices.b, devices.account);
-    const lee = (await devices.a.services.profiles.create('Lee')).id;
+    await signIn(devices.b, devices.server, { signUp: INVITE });
+    const lee = await devices.a.services.account.createLocal('Lee');
     const home = await devices.a.services.connections.create(devices.media.manifest.id, mediaDraft(devices.media, lee));
     return { ...devices, lee, home };
   }
 
-  describe('joining, when both sides have profiles', () => {
-    it('asks, and "Use the account’s profiles" leaves only those — keeping this device’s connections', async () => {
-      const { a, account, home } = await bothHaveProfiles();
-      const prepared = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
-      expect(prepared).toMatchObject({ ask: true, accountProfiles: ['Sam', 'Robin'], onlyHere: ['Lee'], switching: false });
-      await a.services.account.completeSignIn(prepared, 'account');
+  describe('on this device', () => {
+    it('is made at first launch with its first profile, named after it', async () => {
+      const { a } = pair();
+      const id = await a.services.account.createLocal('The Smiths');
+      expect(await a.services.account.current()).toMatchObject({ kind: 'local', name: 'The Smiths' });
+      expect((await a.services.profiles.list()).map((profile) => [profile.id, profile.name])).toEqual([[id, 'The Smiths']]);
+      expect(await a.services.profiles.defaultUserId()).toBe(id);
+      await a.services.session.start();
+      expect(a.services.session.getSnapshot()).toEqual({ kind: 'ready', userId: id });
+      await expect(a.services.account.createLocal('Again')).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    });
+
+    it('is what a device from an earlier version keeps its profiles as — and a new one is asked for', async () => {
+      const { a, b } = pair();
+      await a.services.account.ensureAccount();
+      expect(await a.services.account.current()).toBeUndefined();
+      await a.services.session.start();
+      expect(a.services.session.getSnapshot()).toEqual({ kind: 'needs-account' });
+
+      const kids = (await b.services.profiles.create('Kids')).id;
+      await b.services.profiles.create('Alex');
+      await b.services.account.ensureAccount();
+      await b.services.account.ensureAccount();
+      expect(await b.services.account.current()).toMatchObject({ kind: 'local', name: 'Kids' });
+      await b.services.session.start();
+      expect(b.services.session.getSnapshot()).toEqual({ kind: 'ready', userId: kids });
+    });
+
+    it('holds ten profiles, and says so', async () => {
+      const { a } = pair();
+      await a.services.account.createLocal('One');
+      for (let count = 2; count <= 10; count += 1) await a.services.profiles.create(`Profile ${count}`);
+      expect(await a.services.account.maxProfiles()).toBe(10);
+      await expect(a.services.profiles.create('Eleven')).rejects.toMatchObject({ code: 'INVALID_STATE' });
+      expect(await a.services.profiles.list()).toHaveLength(10);
+    });
+
+    it('journals nothing for a server to read', async () => {
+      const { a } = pair();
+      const id = await a.services.account.createLocal('Lee');
+      await a.services.profiles.rename(id, 'Lee, renamed');
+      await sync(a);
+      expect(a.engine.status()).toMatchObject({ phase: 'idle', pending: 0 });
+      expect(await a.db.journal.entries()).toEqual([]);
+    });
+  });
+
+  describe('signing in replaces', () => {
+    it('this device’s profiles and sources with the account’s, keeping nothing of them', async () => {
+      const { a, server, lee, home } = await twoAccounts();
+      const prepared = await a.services.account.prepare(target(server));
+      expect(prepared).toMatchObject({ kind: 'replace', accountProfiles: ['Sam', 'Robin'], deviceProfiles: ['Lee'] });
+      await a.services.account.complete(prepared);
 
       expect((await a.services.profiles.list()).map((profile) => profile.name).sort()).toEqual(['Robin', 'Sam']);
-      const kept = await a.services.connections.edit(home.id);
-      expect(kept?.saved.shared.has('password')).toBe(true);
-      expect(account.log.some((change) => change.entity === 'connection' && change.operation === 'upsert' && change.data.connectionId === home.id)).toBe(true);
+      expect(await a.services.profiles.get(lee)).toBeUndefined();
+      expect(await a.db.connections.get(home.id)).toBeUndefined();
+      expect(JSON.stringify([...a.credentials.entries.values()])).not.toContain('family-secret');
+      expect(await a.services.account.current()).toMatchObject({ kind: 'server', name: 'sam on the fake server', maxProfiles: 10 });
+      // Nothing of the device's own account reached the server.
+      expect(server.profileNames()).toEqual(['Robin', 'Sam']);
     });
 
-    it('asks, and "Keep both" keeps everyone, sending this device’s along', async () => {
-      const { a, b, account, lee } = await bothHaveProfiles();
-      await signIn(a, account, 'both');
-      expect((await a.services.profiles.list()).map((profile) => profile.name).sort()).toEqual(['Lee', 'Robin', 'Sam']);
-      await sync(b);
-      expect((await b.services.profiles.get(lee))?.name).toBe('Lee');
-    });
-
-    it('does not ask when there is nothing to choose between', async () => {
-      const { a, b, account } = pair();
-      await b.services.profiles.create('Sam');
-      await signIn(b, account);
-      // A has no profile at all: nothing of its own would be lost.
-      const prepared = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
-      expect(prepared.ask).toBe(false);
-    });
-  });
-
-  describe('joining again, after signing out', () => {
-    async function signedOutWhileRenamedElsewhere() {
-      const devices = pair();
-      const alex = (await devices.a.services.profiles.create('Alex')).id;
-      await devices.a.services.profiles.create('Kids');
-      await signIn(devices.a, devices.account);
-      await signIn(devices.b, devices.account);
-      await devices.a.services.account.signOut();
-      await devices.b.services.profiles.rename(alex, 'Renamed elsewhere');
-      await sync(devices.b);
-      return { ...devices, alex };
-    }
-
-    it('takes what changed in the account meanwhile', async () => {
-      const { a, account, alex } = await signedOutWhileRenamedElsewhere();
-      await signIn(a, account);
-      expect((await a.services.profiles.get(alex))?.name).toBe('Renamed elsewhere');
-    });
-
-    it('keeps what this device changed meanwhile, and sends it', async () => {
-      const { a, account, alex } = await signedOutWhileRenamedElsewhere();
-      await a.services.profiles.rename(alex, 'Mine');
-      await signIn(a, account);
-      expect((await a.services.profiles.get(alex))?.name).toBe('Mine');
-      expect(account.log.filter((change) => change.entity === 'profile').at(-1)).toMatchObject({ data: { name: 'Mine' } });
-    });
-
-    it('does not bring back what this device deleted meanwhile, and says so', async () => {
-      const { a, b, account } = await signedOutWhileRenamedElsewhere();
-      const kids = (await a.services.profiles.list()).find((profile) => profile.name === 'Kids');
-      if (!kids) throw new Error('setup');
-      await a.services.profiles.remove(kids.id);
-      await signIn(a, account);
-      expect(await a.services.profiles.get(kids.id)).toBeUndefined();
-      await sync(b);
-      expect(await b.services.profiles.get(kids.id)).toBeUndefined();
-    });
-  });
-
-  describe('a sign-in that does not go through', () => {
-    it('is tried once, refused for good, and leaves nothing behind', async () => {
-      const { a, account, media } = pair();
-      const lee = (await a.services.profiles.create('Lee')).id;
-      await a.services.connections.create(media.manifest.id, mediaDraft(media, lee));
-      const connections = await a.db.connections.list();
-      const secrets = a.credentials.entries.size;
-      account.refuseSignIn(true);
-      const failure = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) }).catch((error: unknown) => error);
-      expect(isAppError(failure) && failure.code).toBe('UNAUTHORIZED');
-      expect(account.calls.signIns).toBe(1);
-      expect(await a.db.connections.list()).toEqual(connections);
-      expect(a.credentials.entries.size).toBe(secrets);
-    });
-
-    it('saves nothing, PINs included, until it is completed', async () => {
-      const { a, b, account } = pair();
-      const sam = (await b.services.profiles.create('Sam')).id;
-      await b.services.pins.create(sam, '1234');
-      await signIn(b, account);
-      const prepared = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
+    it('saves nothing until it is completed, PINs included', async () => {
+      const { a, b, server } = pair();
+      const sam = await b.services.account.createLocal('Sam');
+      await b.services.pins.create(sam, '9731');
+      await signIn(b, server, { signUp: INVITE });
+      const prepared = await a.services.account.prepare(target(server));
       expect(await a.services.account.current()).toBeUndefined();
-      expect(JSON.stringify([...a.credentials.entries.values()])).not.toContain('1234');
-      await a.services.account.completeSignIn(prepared, 'both');
-      expect(await a.services.pins.verify(sam, '1234')).toEqual({ ok: true });
+      expect(await a.db.connections.list()).toEqual([]);
+      expect(JSON.stringify([...a.credentials.entries.values()])).not.toContain('9731');
+      await a.services.account.complete(prepared);
+      expect(await a.services.pins.verify(sam, '9731')).toEqual({ ok: true });
+      expect(await dumpDatabase(engine, a.where)).not.toContain('9731');
+    });
+
+    it('is tried once, refused for good, and leaves nothing behind', async () => {
+      const { a, server, home } = await twoAccounts();
+      const secrets = a.credentials.entries.size;
+      const failure = await a.services.account.prepare(target(server, { password: 'a wrong password' })).catch((error: unknown) => error);
+      expect(isAppError(failure) && failure.code).toBe('UNAUTHORIZED');
+      expect(server.calls.signIns).toBe(1);
+      expect((await a.db.connections.list()).map((connection) => connection.id)).toEqual([home.id]);
+      expect(a.credentials.entries.size).toBe(secrets);
+      expect(await a.services.account.current()).toMatchObject({ kind: 'local' });
+    });
+
+    it('signs in once: the sign-in’s session becomes the account’s, even with a run asked for meanwhile', async () => {
+      const { a, server } = await twoAccounts();
+      const signIns = server.calls.signIns;
+      const prepared = await a.services.account.prepare(target(server));
+      await Promise.all([a.services.account.complete(prepared), a.engine.run()]);
+      await sync(a);
+      await a.services.sync.now();
+      expect(a.engine.status().phase).toBe('synced');
+      expect(server.calls.signIns).toBe(signIns + 1);
+    });
+
+    it('moves the gate to “Who’s watching?”, never navigating: the profile in use may be gone', async () => {
+      const { a, server, lee } = await twoAccounts();
+      await a.services.session.start();
+      expect(a.services.session.getSnapshot()).toEqual({ kind: 'ready', userId: lee });
+      await signIn(a, server);
+      await vi.waitFor(() => expect(a.services.session.getSnapshot().kind).toBe('needs-user-selection'));
+    });
+
+    it('switches to another account: the old one gets what it had not yet, and hears that this device left', async () => {
+      const { a, server } = await twoAccounts();
+      server.account('alex');
+      await signIn(a, server, { proof: ACCOUNT_PASSWORD });
+      const [sam] = await a.services.profiles.list();
+      if (!sam) throw new Error('setup');
+      await a.services.profiles.rename(sam.id, 'Renamed before switching');
+      const signOuts = server.calls.signOuts;
+
+      await signIn(a, server, { username: 'alex', proof: ACCOUNT_PASSWORD });
+      expect(server.profileNames()).toContain('Renamed before switching');
+      expect(server.calls.signOuts).toBe(signOuts + 1);
+      expect(await a.services.profiles.list()).toEqual([]);
+      const current = await a.services.account.current();
+      expect(current).toMatchObject({ kind: 'server', name: 'alex on the fake server' });
+      expect((await a.db.connections.list()).map((connection) => connection.pluginId)).toEqual([server.plugin.manifest.id]);
     });
   });
 
-  describe('one account per device', () => {
-    it('names a connection made for the account after the account', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      expect((await a.services.account.current())?.connection.label).toBe('The fake account');
+  describe('signing up', () => {
+    it('uploads the account on this device: profiles, PINs, layouts, sources and their passwords', async () => {
+      const { a, b, server, media } = pair();
+      const lee = await a.services.account.createLocal('Lee');
+      await a.services.pins.create(lee, '2468');
+      await a.services.homeLayout.update(lee, () => layout.rows);
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, lee));
+      const done = await signIn(a, server, { signUp: INVITE });
+      expect(done).toMatchObject({ kind: 'upload', created: true });
+      expect(a.engine.status()).toMatchObject({ phase: 'synced', pending: 0 });
+
+      await signIn(b, server);
+      expect(await b.services.profiles.get(lee)).toMatchObject({ name: 'Lee', pinProtected: true });
+      expect(await b.services.pins.verify(lee, '2468')).toEqual({ ok: true });
+      expect(await b.services.homeLayout.rows(lee)).toEqual(layout.rows);
+      expect((await b.db.connections.get(home.id))?.label).toBe(home.label);
+      await expect(b.services.connections.probeSecrets(media.manifest.id, home.id, 'shared', {})).resolves.toEqual({ password: 'family-secret' });
     });
 
-    it('lets no connection form switch a sync role on', async () => {
-      const both = fakeSyncAccount({ id: 'both-roles', withMedia: true });
-      const device = buildServices({ plugins: [both.plugin], engine, device: 'solo' });
-      await device.services.profiles.create('Solo');
-      await device.services.devicePlugins.setEnabled(both.plugin.manifest.id, true);
-      const created = await device.services.connections.create(both.plugin.manifest.id, {
-        ...initialDraft(both.plugin.manifest, 0),
-        roles: { media: true, sync: true },
-      });
-      expect(created.roles).toEqual({ media: true, sync: false });
-      const edit = await device.services.connections.edit(created.id);
-      if (!edit) throw new Error('setup');
-      const updated = await device.services.connections.update(created.id, { ...draftOf(both.plugin.manifest, edit), roles: { media: true, sync: true } });
-      expect(updated.roles).toEqual({ media: true, sync: false });
-      expect(await device.services.account.current()).toBeUndefined();
+    it('refuses up front an upload the server has no room for, and creates nothing', async () => {
+      const { a, server } = pair({ maxProfiles: 1 });
+      await a.services.account.createLocal('Lee');
+      await a.services.profiles.create('Kim');
+      await expect(a.services.account.prepare(target(server, { signUp: INVITE }))).rejects.toMatchObject({ code: 'INVALID_STATE' });
+      expect(server.calls.creates).toBe(0);
     });
 
-    it('switches: the old account gets what it had not yet, then the new one holds everything', async () => {
-      const account = fakeSyncAccount();
-      const second = fakeSyncAccount({ id: 'second-account' });
-      const device = buildServices({ plugins: [account.plugin, second.plugin], engine, device: 'switcher' });
-      const lee = (await device.services.profiles.create('Lee')).id;
-      await signIn(device, account);
-      await device.services.profiles.rename(lee, 'Lee, renamed');
+    it('asks the server for a first profile on a device without one', async () => {
+      const { a, server } = pair();
+      const done = await signIn(a, server, { signUp: INVITE });
+      expect(done).toMatchObject({ kind: 'replace', profilesArrived: 1 });
+      expect((await a.services.profiles.list()).map((profile) => profile.name)).toEqual(['sam']);
+      expect(server.profileNames()).toEqual(['sam']);
+    });
 
-      const prepared = await device.services.account.prepareSignIn({ pluginId: second.plugin.manifest.id, draft: accountDraft(second) });
-      expect(prepared.switching).toBe(true);
-      await device.services.account.completeSignIn(prepared, 'both');
+    it('creates nothing for a refused invite, and does not try again', async () => {
+      const { a, server } = pair();
+      await a.services.account.createLocal('Lee');
+      const failure = await a.services.account.prepare(target(server, { signUp: 'USED-INVITE' })).catch((error: unknown) => error);
+      expect(failure).toMatchObject({ code: 'INVALID_STATE' });
+      expect(server.calls.creates).toBe(1);
+      expect(await a.db.connections.list()).toEqual([]);
+    });
 
-      expect(account.log.filter((change) => change.entity === 'profile').at(-1)).toMatchObject({ data: { name: 'Lee, renamed' } });
-      expect(second.log.some((change) => change.entity === 'profile' && change.operation === 'upsert' && change.data.name === 'Lee, renamed')).toBe(true);
-      const withSync = (await device.db.connections.list()).filter((connection) => connection.roles.sync === true);
-      expect(withSync.map((connection) => connection.pluginId)).toEqual([second.plugin.manifest.id]);
+    it('says so when it was created and what came after failed — and is signed in to, never created again', async () => {
+      const { a, server } = pair();
+      server.failNextPull(new AppError('PROVIDER_UNAVAILABLE', 'Down for a moment.', { retry: 'backoff' }));
+      expect(await a.services.account.prepare(target(server, { signUp: INVITE })).catch((error: unknown) => error)).toBeInstanceOf(AccountCreatedError);
+      await signIn(a, server);
+      expect(await a.services.account.current()).toMatchObject({ kind: 'server' });
+      expect(server.calls.creates).toBe(1);
+    });
+
+    it('signs in once: the account takes the sign-up’s session', async () => {
+      const { a, server } = pair();
+      await a.services.account.createLocal('Lee');
+      await signIn(a, server, { signUp: INVITE });
+      await sync(a);
+      expect(a.engine.status().phase).toBe('synced');
+      expect(server.calls).toMatchObject({ creates: 1, signIns: 0 });
+    });
+  });
+
+  describe('a sign-in that stops working', () => {
+    it('is parked when the password changed elsewhere, and “Sync now” does not try it again', async () => {
+      const { b, server } = await twoAccounts();
+      server.changePassword('a new password');
+      await sync(b);
+      expect(b.engine.status()).toMatchObject({ phase: 'needs-sign-in', problem: { code: 'UNAUTHORIZED' } });
+      const signIns = server.calls.signIns;
+      await b.services.sync.now();
+      await sync(b);
+      expect(server.calls.signIns).toBe(signIns);
+    });
+
+    it('is signed in to again with the new password alone, without the owner check, changing nothing else', async () => {
+      const { b, server } = await twoAccounts();
+      const before = await b.services.account.current();
+      if (before?.kind !== 'server') throw new Error('setup');
+      server.changePassword('a new password');
+      await sync(b);
+
+      const prepared = await b.services.account.prepare(againTarget(server, 'a new password'));
+      expect(prepared.kind).toBe('again');
+      await b.services.account.complete(prepared);
+      const after = await b.services.account.current();
+      expect(after).toMatchObject({ kind: 'server', id: before.id, name: before.name });
+      if (after?.kind !== 'server') throw new Error('setup');
+      expect(after.connection.values.fields).toEqual(before.connection.values.fields);
+      expect(b.engine.status().phase).toBe('synced');
+      expect((await b.services.profiles.list()).map((profile) => profile.name).sort()).toEqual(['Robin', 'Sam']);
+    });
+
+    it('signs itself in again once, with the saved password, after a session ended — thirty days offline', async () => {
+      const { b, server } = await twoAccounts();
+      const signIns = server.calls.signIns;
+      server.endSessions();
+      await sync(b);
+      expect(b.engine.status().phase).toBe('synced');
+      expect(server.calls.signIns).toBe(signIns + 1);
+    });
+
+    it('shows as unavailable in a build without its plugin, and can still be signed out of', async () => {
+      const { b } = await twoAccounts();
+      const withoutIt = buildServices({ plugins: [fakeMediaPlugin('fake').plugin], engine, device: 'b', where: b.where, credentials: b.credentials, deviceBound: b.deviceBound });
+      expect(await withoutIt.services.account.current()).toMatchObject({ kind: 'server', available: false });
+      await withoutIt.engine.run();
+      expect(withoutIt.engine.status().phase).toBe('unavailable');
+      await withoutIt.services.account.signOut();
+      expect(await withoutIt.services.account.current()).toMatchObject({ kind: 'local' });
     });
   });
 
   describe('signing out', () => {
-    it('keeps everything on the device, and lets a connection that was only the account go', async () => {
-      const { a, account } = pair();
-      const lee = (await a.services.profiles.create('Lee')).id;
-      await a.services.homeLayout.update(lee, () => layout.rows);
-      await signIn(a, account);
-      const id = (await a.services.account.current())?.connection.id;
-      if (!id) throw new Error('setup');
-      await a.services.account.signOut();
-      expect(await a.services.account.current()).toBeUndefined();
-      expect(await a.db.syncState.get(id)).toBeUndefined();
-      expect(await a.db.connections.get(id)).toBeUndefined();
-      expect(await a.services.homeLayout.rows(lee)).toEqual(layout.rows);
-      expect((await a.db.deviceSettings.get()).leftAccountAt).toBeGreaterThan(0);
+    it('keeps everything as an account on this device, and lets the server go', async () => {
+      const { b, server } = await twoAccounts();
+      const before = await b.services.account.current();
+      if (before?.kind !== 'server') throw new Error('setup');
+      const [sam] = await b.services.profiles.list();
+      if (!sam) throw new Error('setup');
+      await b.services.homeLayout.update(sam.id, () => layout.rows);
+      const session = sessionRef(before.connection.id, 'account');
+      expect(await b.deviceBound.read(session)).toBeDefined();
+
+      await b.services.account.signOut({ password: ACCOUNT_PASSWORD });
+      expect(await b.services.account.current()).toMatchObject({ kind: 'local', name: before.name });
+      expect(await b.db.connections.get(before.connection.id)).toBeUndefined();
+      expect(await b.deviceBound.read(session)).toBeUndefined();
+      expect(JSON.stringify([...b.credentials.entries.values()])).not.toContain(ACCOUNT_PASSWORD);
+      expect((await b.services.profiles.list()).map((profile) => profile.name).sort()).toEqual(['Robin', 'Sam']);
+      expect(await b.services.homeLayout.rows(sam.id)).toEqual(layout.rows);
+      expect(await b.db.journal.entries()).toEqual([]);
+      expect(server.calls.signOuts).toBe(1);
+      // What changed before signing out reached the account first.
+      expect(server.account().records.get(`preference/${sam.id}/homeLayout`)).toBeDefined();
     });
 
-    it('keeps a connection that also serves media, with its sync role off and its account session gone', async () => {
-      const account = fakeSyncAccount({ id: 'both-roles', withMedia: true });
-      const device = buildServices({ plugins: [account.plugin], engine, device: 'dual' });
-      await device.services.profiles.create('Lee');
-      await device.services.devicePlugins.setEnabled(account.plugin.manifest.id, true);
-      const existing = await device.services.connections.create(account.plugin.manifest.id, initialDraft(account.plugin.manifest, 0));
-      const edit = await device.services.connections.edit(existing.id);
-      if (!edit) throw new Error('setup');
-      const prepared = await device.services.account.prepareSignIn({ connectionId: existing.id, draft: draftOf(account.plugin.manifest, edit) });
-      await device.services.account.completeSignIn(prepared, 'both');
-      expect((await device.db.connections.get(existing.id))?.roles).toEqual({ media: true, sync: true });
-      // The account's session holds its vault key: it must not outlive the account.
-      const session = sessionRef(existing.id, 'account');
-      await device.deviceBound.write(session, { value: 'token and vault key', identity: 'x' });
-      await device.services.account.signOut();
-      expect((await device.db.connections.get(existing.id))?.roles).toEqual({ media: true, sync: false });
-      expect(await device.deviceBound.read(session)).toBeUndefined();
+    it('is refused a removal of the account’s connection: signing out comes first', async () => {
+      const { b } = await twoAccounts();
+      const current = await b.services.account.current();
+      if (current?.kind !== 'server') throw new Error('setup');
+      await expect(b.services.connections.remove(current.connection.id)).rejects.toMatchObject({ code: 'INVALID_STATE' });
     });
 
-    it('is refused a connection removal while it is the account', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      const id = (await a.services.account.current())?.connection.id;
-      if (!id) throw new Error('setup');
-      await expect(a.services.connections.remove(id)).rejects.toMatchObject({ code: 'INVALID_STATE' });
-    });
-  });
-
-  describe('an account that refuses', () => {
-    it('is parked, and "Sync now" does not try the same sign-in again', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      account.refuseSignIn(true);
+    it('keeps every profile of a local copy that holds more than ten, and takes no new one', async () => {
+      const { a, server } = pair({ maxProfiles: 12 });
+      await a.services.account.createLocal('One');
+      for (let count = 2; count <= 10; count += 1) await a.services.profiles.create(`Profile ${count}`);
+      await signIn(a, server, { signUp: INVITE });
+      await a.services.profiles.create('Eleven');
       await sync(a);
-      expect(a.engine.status()).toMatchObject({ phase: 'needs-sign-in', problem: { code: 'UNAUTHORIZED' } });
-      const pulls = account.calls.pulls;
-      await a.services.sync.now();
-      expect(account.calls.pulls).toBe(pulls);
-    });
-
-    it('is signed in to again with new details, and runs again', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      account.refuseSignIn(true);
-      await sync(a);
-      account.refuseSignIn(false);
-      const current = await a.services.account.current();
-      if (!current) throw new Error('setup');
-      const prepared = await a.services.account.prepareSignIn({ connectionId: current.connection.id });
-      expect(prepared.again).toBe(true);
-      await a.services.account.completeSignIn(prepared, 'both');
-      expect(a.engine.status().phase).toBe('synced');
-    });
-
-    it('is signed in to again without the owner check, and with nothing changed but its passwords', async () => {
-      const { a, account } = pair();
-      await a.services.profiles.create('Lee');
-      await signIn(a, account);
-      const current = await a.services.account.current();
-      if (!current) throw new Error('setup');
-      const before = current.connection.values.fields;
-      // Refused as a changed password is: the account cannot vouch for the owner either.
-      account.refuseSignIn(true);
-      account.refuseOwner(true);
-      await sync(a);
-      account.refuseSignIn(false);
-
-      const edit = await a.services.connections.edit(current.connection.id);
-      if (!edit) throw new Error('setup');
-      const stored = draftOf(account.plugin.manifest, edit);
-      const elsewhere = { ...stored, shared: { ...stored.shared, fields: { ...stored.shared.fields, server: 'https://elsewhere.example' } } };
-      const prepared = await a.services.account.prepareSignIn({ connectionId: current.connection.id, draft: elsewhere });
-      await a.services.account.completeSignIn(prepared, 'both');
-
-      expect((await a.services.account.current())?.connection.values.fields).toEqual(before);
-      expect(a.engine.status().phase).toBe('synced');
-    });
-
-    it('shows as unavailable in a build without its plugin, and can still be signed out of', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      const withoutIt = buildServices({ plugins: [fakeMediaPlugin('fake').plugin], engine, device: 'a', where: a.where, credentials: a.credentials, deviceBound: a.deviceBound });
-      expect((await withoutIt.services.account.current())?.available).toBe(false);
-      await withoutIt.engine.run();
-      expect(withoutIt.engine.status().phase).toBe('unavailable');
-      await withoutIt.services.account.signOut();
-      expect(await withoutIt.services.account.current()).toBeUndefined();
+      await a.services.account.signOut({ password: ACCOUNT_PASSWORD });
+      expect(await a.services.profiles.list()).toHaveLength(11);
+      await expect(a.services.profiles.create('Twelve')).rejects.toMatchObject({ code: 'INVALID_STATE' });
     });
   });
 
   describe('the owner check', () => {
-    it('guards signing in on a device with profiles', async () => {
-      const account = fakeSyncAccount();
+    it('asks for the account password again, and never takes the saved one', async () => {
+      const { b, server } = await twoAccounts();
+      expect(await b.services.owner.method()).toMatchObject({ via: 'account', asks: [{ key: 'password', type: 'password' }] });
+      await expect(b.services.account.signOut({ password: 'a guess' })).rejects.toMatchObject({ verdict: 'refused' });
+      await expect(b.services.account.signOut()).rejects.toMatchObject({ verdict: 'refused' });
+      expect(await b.services.account.current()).toMatchObject({ kind: 'server' });
+      await b.services.account.signOut({ password: ACCOUNT_PASSWORD });
+      expect(await b.services.account.current()).toMatchObject({ kind: 'local' });
+      expect(server.calls.owners).toBe(2);
+    });
+
+    it('asks the current account before switching away from it', async () => {
+      const { b, server } = await twoAccounts();
+      server.account('alex');
+      const signIns = server.calls.signIns;
+      await expect(b.services.account.prepare(target(server, { username: 'alex' }))).rejects.toBeInstanceOf(OwnerNotVerifiedError);
+      expect(server.calls.signIns).toBe(signIns);
+      await signIn(b, server, { username: 'alex', proof: ACCOUNT_PASSWORD });
+      expect(await b.services.account.current()).toMatchObject({ name: 'alex on the fake server' });
+    });
+
+    it('asks the device on an account kept here, before it is replaced', async () => {
+      const server = fakeAccountServer({ invite: INVITE });
+      server.account();
       const owner = fakeOwnerAuthentication({ available: true, answer: 'refused' });
-      const device = buildServices({ plugins: [account.plugin], engine, device: 'guarded', owner });
-      await device.services.profiles.create('Lee');
-      await expect(
-        device.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) }),
-      ).rejects.toBeInstanceOf(OwnerNotVerifiedError);
-      expect(account.calls.signIns).toBe(0);
+      const device = buildServices({ plugins: [server.plugin], engine, device: 'guarded', owner });
+      await device.services.account.createLocal('Lee');
+      await expect(device.services.account.prepare(target(server))).rejects.toBeInstanceOf(OwnerNotVerifiedError);
+      expect(server.calls.signIns).toBe(0);
       owner.set({ available: true, answer: 'cancelled' });
-      await expect(
-        device.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) }),
-      ).rejects.toMatchObject({ verdict: 'cancelled' });
+      await expect(device.services.account.prepare(target(server))).rejects.toMatchObject({ verdict: 'cancelled' });
     });
 
     it('is not asked at first launch, and goes ahead where no owner can be asked', async () => {
-      const account = fakeSyncAccount();
+      const server = fakeAccountServer({ invite: INVITE });
+      server.account();
       const owner = fakeOwnerAuthentication({ available: true, answer: 'refused' });
-      const first = buildServices({ plugins: [account.plugin], engine, device: 'fresh', owner });
-      await signIn(first, account);
+      const fresh = buildServices({ plugins: [server.plugin], engine, device: 'fresh', owner });
+      await signIn(fresh, server);
       expect(owner.asked).toEqual([]);
-      const open = buildServices({ plugins: [account.plugin], engine, device: 'open' });
-      await open.services.profiles.create('Lee');
-      await signIn(open, account);
-      expect(await open.services.account.current()).toBeDefined();
-    });
-
-    it('asks the account itself, when it can be asked, before signing out', async () => {
-      const { a, account } = pair();
-      await a.services.profiles.create('Lee');
-      await signIn(a, account);
-      account.refuseOwner(true);
-      await expect(a.services.account.signOut()).rejects.toMatchObject({ verdict: 'refused' });
-      expect(await a.services.account.current()).toBeDefined();
-      account.refuseOwner(false);
-      await a.services.account.signOut();
-      expect(await a.services.account.current()).toBeUndefined();
+      const open = buildServices({ plugins: [server.plugin], engine, device: 'open' });
+      await open.services.account.createLocal('Lee');
+      await signIn(open, server);
+      expect(await open.services.account.current()).toMatchObject({ kind: 'server' });
     });
 
     it('fails, rather than goes ahead, when the account cannot be reached to ask', async () => {
-      const { a, account } = pair();
-      await a.services.profiles.create('Lee');
-      await signIn(a, account);
-      expect(await a.services.owner.method()).toEqual({ via: 'account', asks: [] });
-      // A network failure is not a yes.
-      account.failNext(new AppError('OFFLINE', 'No network.'));
-      await expect(a.services.account.signOut()).rejects.toMatchObject({ verdict: 'failed' });
-      expect(await a.services.account.current()).toBeDefined();
-    });
-  });
-
-  describe('creating an account', () => {
-    const creating = () => {
-      const account = fakeSyncAccount({ id: 'own-server', invite: 'GOOD-INVITE' });
-      const device = buildServices({ plugins: [account.plugin], engine, device: 'creator' });
-      const start = (invite: string) =>
-        device.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account), signUp: { invite } });
-      return { account, device, start };
-    };
-
-    it('creates it with an invite, and signs in once: the account takes the sign-in’s session', async () => {
-      const { account, device, start } = creating();
-      const prepared = await start('GOOD-INVITE');
-      expect(prepared.created).toBe(true);
-      await device.services.account.completeSignIn(prepared, 'both');
-      expect(await device.services.account.current()).toBeDefined();
-      await sync(device);
-      expect(device.engine.status().phase).toBe('synced');
-      expect(account.calls).toMatchObject({ creates: 1, signIns: 0 });
+      const { b, server } = await twoAccounts();
+      server.failNext(new AppError('OFFLINE', 'No network.', { retry: 'network-change' }));
+      await expect(b.services.account.signOut({ password: ACCOUNT_PASSWORD })).rejects.toMatchObject({ verdict: 'failed' });
+      expect(await b.services.account.current()).toMatchObject({ kind: 'server' });
     });
 
-    it('creates nothing for a refused invite, and does not try again', async () => {
-      const { account, device, start } = creating();
-      const failure = await start('USED-INVITE').catch((error: unknown) => error);
-      expect(failure).toMatchObject({ code: 'INVALID_STATE' });
-      expect(account.calls.creates).toBe(1);
-      expect(await device.db.connections.list()).toEqual([]);
+    it('says when the account throttles, and goes no further', async () => {
+      const { b, server } = await twoAccounts();
+      server.throttleOwner(true);
+      await expect(b.services.account.signOut({ password: ACCOUNT_PASSWORD })).rejects.toMatchObject({ verdict: 'throttled' });
+      expect(await b.services.account.current()).toMatchObject({ kind: 'server' });
     });
 
-    it('says so when it was created and what came after failed — and is signed in to, never created again', async () => {
-      const { account, device, start } = creating();
-      account.failNextPull(new AppError('PROVIDER_UNAVAILABLE', 'Down for a moment.', { retry: 'backoff' }));
-      expect(await start('GOOD-INVITE').catch((error: unknown) => error)).toBeInstanceOf(AccountCreatedError);
-      const prepared = await device.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
-      await device.services.account.completeSignIn(prepared, 'both');
-      expect(await device.services.account.current()).toBeDefined();
-      expect(account.calls.creates).toBe(1);
-    });
-  });
-
-  describe('signing in once', () => {
-    it('hands the sign-in’s session to the account, even with a run asked for meanwhile', async () => {
-      const { a, account } = pair();
-      const prepared = await a.services.account.prepareSignIn({ pluginId: account.plugin.manifest.id, draft: accountDraft(account) });
-      await Promise.all([a.services.account.completeSignIn(prepared, 'both'), a.engine.run()]);
-      await sync(a);
-      await a.services.sync.now();
-      expect(a.engine.status().phase).toBe('synced');
-      expect(account.calls.signIns).toBe(1);
-    });
-
-    it('signs in again after being let go — the new session replacing what the revoke left', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      await sync(a);
-      account.revoke();
-      await sync(a);
-      expect(a.engine.status()).toMatchObject({ phase: 'needs-sign-in', problem: { code: 'UNAUTHORIZED' } });
-      const current = await a.services.account.current();
-      if (!current) throw new Error('setup');
-      const prepared = await a.services.account.prepareSignIn({ connectionId: current.connection.id });
-      await a.services.account.completeSignIn(prepared, 'both');
-      await sync(a);
-      expect(a.engine.status().phase).toBe('synced');
-      expect(account.calls.signIns).toBe(2);
-    });
-  });
-
-  describe('letting an account go', () => {
-    it('tells the server once when signing out, and lets go whatever it answers', async () => {
-      const { a, account } = pair();
-      await signIn(a, account);
-      await a.services.account.signOut();
-      expect(account.calls.signOuts).toBe(1);
-      expect(await a.services.account.current()).toBeUndefined();
-    });
-
-    it('tells the old account when switching to another', async () => {
-      const one = fakeSyncAccount({ id: 'account-one' });
-      const two = fakeSyncAccount({ id: 'account-two' });
-      const device = buildServices({ plugins: [one.plugin, two.plugin], engine, device: 'switcher' });
-      await signIn(device, one);
-      await signIn(device, two);
-      expect(one.calls.signOuts).toBe(1);
-      expect((await device.services.account.current())?.connection.pluginId).toBe(two.plugin.manifest.id);
-    });
-
-    it('asks the device instead of an account that let this device go, and still signs out', async () => {
-      const account = fakeSyncAccount({ ownerPassword: 'the owner’s password' });
+    it('asks the device instead of an account that no longer takes this device’s password', async () => {
+      const server = fakeAccountServer({ invite: INVITE });
       const owner = fakeOwnerAuthentication({ available: true, answer: 'verified' });
-      const device = buildServices({ plugins: [account.plugin], engine, device: 'revoked', owner });
-      await device.services.profiles.create('Lee');
-      await signIn(device, account);
-      account.revoke();
+      const device = buildServices({ plugins: [server.plugin], engine, device: 'refused', owner });
+      await device.services.account.createLocal('Lee');
+      await signIn(device, server, { signUp: INVITE });
+      server.changePassword('changed elsewhere');
       await sync(device);
       expect(await device.services.owner.method()).toEqual({ via: 'device' });
       const asked = owner.asked.length;
       await device.services.account.signOut();
       expect(owner.asked).toHaveLength(asked + 1);
-      expect(await device.services.account.current()).toBeUndefined();
+      expect(await device.services.account.current()).toMatchObject({ kind: 'local' });
     });
   });
 
-  describe('the account password as the owner check', () => {
-    const guarded = async () => {
-      const account = fakeSyncAccount({ id: 'own-server', ownerPassword: 'the owner’s password' });
-      const other = fakeSyncAccount({ id: 'elsewhere' });
-      const device = buildServices({ plugins: [account.plugin, other.plugin], engine, device: 'guarded' });
-      await device.services.profiles.create('Lee');
-      await signIn(device, account);
-      return { account, other, device };
-    };
-
-    it('asks for the password again, and never takes the saved one', async () => {
-      const { account, device } = await guarded();
-      const method = await device.services.owner.method();
-      expect(method).toMatchObject({ via: 'account', asks: [{ key: 'password', type: 'password' }] });
-      await expect(device.services.account.signOut({ password: 'a guess' })).rejects.toMatchObject({ verdict: 'refused' });
-      await expect(device.services.account.signOut()).rejects.toMatchObject({ verdict: 'refused' });
-      expect(await device.services.account.current()).toBeDefined();
-      await device.services.account.signOut({ password: 'the owner’s password' });
-      expect(await device.services.account.current()).toBeUndefined();
-      expect(account.calls.owners).toBe(2);
-    });
-
-    it('asks the current account before switching away from it', async () => {
-      const { other, device } = await guarded();
-      const target = { pluginId: other.plugin.manifest.id, draft: accountDraft(other) };
-      await expect(device.services.account.prepareSignIn(target)).rejects.toBeInstanceOf(OwnerNotVerifiedError);
-      expect(other.calls.signIns).toBe(0);
-      const prepared = await device.services.account.prepareSignIn(target, { password: 'the owner’s password' });
-      await device.services.account.completeSignIn(prepared, 'both');
-      expect((await device.services.account.current())?.connection.pluginId).toBe(other.plugin.manifest.id);
-    });
-
-    it('says when the account throttles, and goes no further', async () => {
-      const { account, device } = await guarded();
-      account.throttleOwner(true);
-      await expect(device.services.account.signOut({ password: 'the owner’s password' })).rejects.toMatchObject({ verdict: 'throttled' });
-      expect(await device.services.account.current()).toBeDefined();
+  describe('the profile limit', () => {
+    it('is your server’s, once signed in to it', async () => {
+      const { b, server } = pair({ maxProfiles: 3 });
+      await b.services.account.createLocal('Sam');
+      await signIn(b, server, { signUp: INVITE });
+      expect(await b.services.account.maxProfiles()).toBe(3);
+      await b.services.profiles.create('Two');
+      await b.services.profiles.create('Three');
+      await expect(b.services.profiles.create('Four')).rejects.toMatchObject({ code: 'INVALID_STATE' });
     });
   });
 });

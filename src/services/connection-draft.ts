@@ -1,5 +1,4 @@
 import {
-  defaultRoles,
   missingPerProfile,
   perProfileKeys,
   type FieldValue,
@@ -30,7 +29,7 @@ const EMPTY: ValuesDraft = { fields: {}, settings: {}, secrets: {} };
 export function initialDraft(manifest: PluginManifest, existing: number): ConnectionDraft {
   return {
     label: existing === 0 ? manifest.displayName : `${manifest.displayName} ${existing + 1}`,
-    roles: defaultRoles(manifest),
+    enabled: true,
     perProfile: 'none',
     shared: { fields: defaultValues(manifest.connectionFields), settings: defaultValues(manifest.settings), secrets: {} },
     profiles: {},
@@ -45,7 +44,7 @@ export function draftOf(manifest: PluginManifest, { connection, profileValues }:
   }
   return {
     label: connection.label,
-    roles: connection.roles,
+    enabled: connection.enabled,
     perProfile: connection.perProfile,
     shared: {
       fields: { ...defaultValues(manifest.connectionFields), ...connection.values.fields },

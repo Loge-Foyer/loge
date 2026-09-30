@@ -1,7 +1,6 @@
 import type { PluginCrypto } from '@sc/api';
 
 import { createPluginCrypto, type AesGcm } from '@/platform/plugin-crypto';
-import { webPbkdf2 } from '@/platform/web-pbkdf2';
 
 const NONCE = 12;
 // WebCrypto takes bytes backed by an ArrayBuffer of their own.
@@ -33,11 +32,10 @@ export const webCryptoAes: AesGcm = {
   },
 };
 
-/** The app's own crypto as a browser runs it — WebCrypto's PBKDF2 and AES, noble's HKDF — on Node's WebCrypto. */
+/** The app's own crypto as a browser runs it — WebCrypto's AES, noble's SHA-256 and HKDF — on Node's WebCrypto. */
 export function testCrypto(): PluginCrypto {
   return createPluginCrypto({
     randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
-    pbkdf2: webPbkdf2,
     aes: webCryptoAes,
   });
 }

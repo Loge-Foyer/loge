@@ -5,18 +5,17 @@ import {
   userId,
   type Connection,
   type ConnectionId,
-  type ConnectionRoles,
   type ConnectionValues,
   type GlobalMediaKey,
   type MediaDetail,
   type MediaItem,
   type PerProfile,
-  type SyncCapability,
-  type SyncCursor,
   type UserId,
 } from '@sc/api';
 
 import type {
+  AccountRepository,
+  AccountSync,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
@@ -28,12 +27,12 @@ import type {
   ProfileValues,
   Repositories,
   StaleSecretQueue,
+  StoredAccount,
   StoredUser,
-  SyncState,
-  SyncStateRepository,
   UserPreferences,
   UserRepository,
 } from '@/services/ports';
+import { accountWide } from '@/services/scope';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
@@ -58,7 +57,7 @@ interface ConnectionRow extends ValuesRow {
   readonly id: string;
   readonly plugin_id: string;
   readonly label: string;
-  readonly roles: string;
+  readonly enabled: number;
   readonly per_profile: string;
   readonly version: number;
 }
@@ -72,7 +71,6 @@ interface ProfileValuesRow extends ValuesRow {
 
 export interface JournalRow {
   readonly seq: number;
-  readonly change_id: string | null;
   readonly user_id: string | null;
   readonly entity: JournalEntry['entity'];
   readonly entity_id: string;
@@ -81,13 +79,18 @@ export interface JournalRow {
   readonly local_version: number;
 }
 
-interface SyncStateRow {
-  readonly connection_id: string;
-  readonly cursor: string | null;
+interface AccountRow {
+  readonly kind: StoredAccount['kind'];
+  readonly id: string;
+  readonly name: string;
+  readonly connection_id: string | null;
+  readonly max_profiles: number | null;
+}
+
+interface AccountSyncRow {
   readonly checkpoint: number;
-  readonly awaiting: string;
-  readonly carried: string;
   readonly last_synced_at: number | null;
+  readonly held_back: string;
 }
 
 const parse = <T>(text: string): T => JSON.parse(text) as T;
@@ -114,7 +117,7 @@ function toConnection(row: ConnectionRow): Connection {
     id: connectionId(row.id),
     pluginId: pluginId(row.plugin_id),
     label: row.label,
-    roles: parse<ConnectionRoles>(row.roles),
+    enabled: row.enabled === 1,
     perProfile: row.per_profile as PerProfile,
     values: toValues(row),
   };
@@ -127,7 +130,6 @@ function toProfileValues(row: ProfileValuesRow): ProfileValues {
 export function toJournalEntry(row: JournalRow): JournalEntry {
   return {
     seq: row.seq,
-    ...(row.change_id === null ? {} : { changeId: row.change_id }),
     ...(row.user_id === null ? {} : { userId: userId(row.user_id) }),
     entity: row.entity,
     entityId: row.entity_id,
@@ -146,29 +148,32 @@ function valueColumns(values: ConnectionValues): SqlValue[] {
   ];
 }
 
-function toSyncState(row: SyncStateRow): SyncState {
-  return {
-    connectionId: connectionId(row.connection_id),
-    ...(row.cursor === null ? {} : { cursor: row.cursor as SyncCursor }),
-    checkpoint: row.checkpoint,
-    awaiting: parse<Record<string, string>>(row.awaiting),
-    carried: parse<SyncCapability[]>(row.carried),
-    ...(row.last_synced_at === null ? {} : { lastSyncedAt: row.last_synced_at }),
-  };
+function toAccount(row: AccountRow): StoredAccount {
+  return row.kind === 'server' && row.connection_id !== null
+    ? { kind: 'server', id: row.id, name: row.name, connectionId: connectionId(row.connection_id), maxProfiles: row.max_profiles ?? 0 }
+    : { kind: 'local', id: row.id, name: row.name };
 }
 
 /** The repositories over one connection or one open transaction. */
 export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Repositories {
-  const { clock, ids } = options;
+  const { clock } = options;
   const append = async (change: JournalAnnouncement) => {
-    await sql.run(
-      'INSERT INTO change_journal (change_id, user_id, entity, entity_id, operation, changed_at, local_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [ids.next(), change.userId ?? null, change.entity, change.entityId, change.operation, clock.now(), change.localVersion],
-    );
+    await sql.run('INSERT INTO change_journal (user_id, entity, entity_id, operation, changed_at, local_version) VALUES (?, ?, ?, ?, ?, ?)', [
+      change.userId ?? null,
+      change.entity,
+      change.entityId,
+      change.operation,
+      clock.now(),
+      change.localVersion,
+    ]);
     options.onJournaled?.();
   };
   const record = async (change: JournalAnnouncement) => {
     if (options.journaled) await append(change);
+  };
+  // A sync plugin's connection is the device's own: it never travels, so it is never journaled.
+  const recordConnection = async (plugin: string, change: JournalAnnouncement) => {
+    if (accountWide(plugin)) await record(change);
   };
 
   const userRow = (id: UserId) => sql.get<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
@@ -226,18 +231,18 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
     insert: async (connection) => {
       await sql.run(
-        `INSERT INTO connections (id, plugin_id, label, roles, per_profile, fields, settings, credentials_ref, secret_keys, position, version)
+        `INSERT INTO connections (id, plugin_id, label, enabled, per_profile, fields, settings, credentials_ref, secret_keys, position, version)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM connections), 1)`,
         [
           connection.id,
           connection.pluginId,
           connection.label,
-          JSON.stringify(connection.roles),
+          connection.enabled ? 1 : 0,
           connection.perProfile,
           ...valueColumns(connection.values),
         ],
       );
-      await record({ entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: 1 });
+      await recordConnection(connection.pluginId, { entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: 1 });
     },
     update: async (connection) => {
       const row = await connectionRow(connection.id);
@@ -246,25 +251,25 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
       const version = row.version + 1;
       // An UPDATE, never INSERT OR REPLACE: replacing deletes the row first, and the cascade would take every profile's values with it.
       await sql.run(
-        `UPDATE connections SET plugin_id = ?, label = ?, roles = ?, per_profile = ?, fields = ?, settings = ?, credentials_ref = ?, secret_keys = ?, version = ?
+        `UPDATE connections SET plugin_id = ?, label = ?, enabled = ?, per_profile = ?, fields = ?, settings = ?, credentials_ref = ?, secret_keys = ?, version = ?
          WHERE id = ?`,
         [
           connection.pluginId,
           connection.label,
-          JSON.stringify(connection.roles),
+          connection.enabled ? 1 : 0,
           connection.perProfile,
           ...valueColumns(connection.values),
           version,
           connection.id,
         ],
       );
-      await record({ entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: version });
+      await recordConnection(connection.pluginId, { entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: version });
     },
     delete: async (id) => {
       const row = await connectionRow(id);
       if (!row) return;
       await sql.run('DELETE FROM connections WHERE id = ?', [id]);
-      await record({ entity: 'connection', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+      await recordConnection(row.plugin_id, { entity: 'connection', entityId: id, operation: 'delete', localVersion: row.version + 1 });
     },
     profileValues: async (id) =>
       new Map(
@@ -298,13 +303,19 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
            credentials_ref = excluded.credentials_ref, secret_keys = excluded.secret_keys, version = excluded.version`,
         [id, user, values.off ? 1 : 0, ...valueColumns(values), version],
       );
-      await record({ userId: user, entity: 'connectionProfileValues', entityId: `${id}/${user}`, operation: 'upsert', localVersion: version });
+      await recordConnection((await connectionRow(id))?.plugin_id ?? '', {
+        userId: user,
+        entity: 'connectionProfileValues',
+        entityId: `${id}/${user}`,
+        operation: 'upsert',
+        localVersion: version,
+      });
     },
     deleteProfileValues: async (id, user) => {
       const row = await profileRow(id, user);
       if (!row) return;
       await sql.run('DELETE FROM connection_profile_values WHERE connection_id = ? AND user_id = ?', [id, user]);
-      await record({
+      await recordConnection((await connectionRow(id))?.plugin_id ?? '', {
         userId: user,
         entity: 'connectionProfileValues',
         entityId: `${id}/${user}`,
@@ -432,30 +443,40 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  const syncState: SyncStateRepository = {
-    get: async (id) => {
-      const row = await sql.get<SyncStateRow>('SELECT * FROM sync_state WHERE connection_id = ?', [id]);
-      return row && toSyncState(row);
+  const account: AccountRepository = {
+    get: async () => {
+      const row = await sql.get<AccountRow>('SELECT * FROM account WHERE singleton = 1');
+      return row && toAccount(row);
     },
-    put: async (state) => {
-      if (!(await connectionRow(state.connectionId))) throw missingRow('connection', state.connectionId);
+    put: async (next) => {
       await sql.run(
-        `INSERT INTO sync_state (connection_id, cursor, checkpoint, awaiting, carried, last_synced_at) VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (connection_id) DO UPDATE SET
-           cursor = excluded.cursor, checkpoint = excluded.checkpoint, awaiting = excluded.awaiting,
-           carried = excluded.carried, last_synced_at = excluded.last_synced_at`,
-        [
-          state.connectionId,
-          state.cursor ?? null,
-          state.checkpoint,
-          JSON.stringify(state.awaiting),
-          JSON.stringify(state.carried),
-          state.lastSyncedAt ?? null,
-        ],
+        `INSERT INTO account (singleton, kind, id, name, connection_id, max_profiles) VALUES (1, ?, ?, ?, ?, ?)
+         ON CONFLICT (singleton) DO UPDATE SET
+           kind = excluded.kind, id = excluded.id, name = excluded.name,
+           connection_id = excluded.connection_id, max_profiles = excluded.max_profiles`,
+        [next.kind, next.id, next.name, next.kind === 'server' ? next.connectionId : null, next.kind === 'server' ? next.maxProfiles : null],
       );
     },
-    remove: async (id) => {
-      await sql.run('DELETE FROM sync_state WHERE connection_id = ?', [id]);
+    sync: async (): Promise<AccountSync> => {
+      const row = await sql.get<AccountSyncRow>('SELECT * FROM account_sync WHERE singleton = 1');
+      if (!row) return { checkpoint: 0, heldBack: [] };
+      return {
+        checkpoint: row.checkpoint,
+        ...(row.last_synced_at === null ? {} : { lastSyncedAt: row.last_synced_at }),
+        heldBack: parse<string[]>(row.held_back).map(userId),
+      };
+    },
+    putSync: async (state) => {
+      await sql.run(
+        `INSERT INTO account_sync (singleton, checkpoint, last_synced_at, held_back) VALUES (1, ?, ?, ?)
+         ON CONFLICT (singleton) DO UPDATE SET
+           checkpoint = excluded.checkpoint, last_synced_at = excluded.last_synced_at, held_back = excluded.held_back`,
+        [state.checkpoint, state.lastSyncedAt ?? null, JSON.stringify(state.heldBack)],
+      );
+    },
+    clear: async () => {
+      await sql.run('DELETE FROM account');
+      await sql.run('DELETE FROM account_sync');
     },
   };
 
@@ -469,17 +490,17 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     announce: async (changes) => {
       for (const change of changes) await append(change);
     },
+    prune: async (through) => {
+      await sql.run('DELETE FROM change_journal WHERE seq <= ?', [through]);
+    },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, syncState, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, journal };
 }
 
 async function readDeviceSettings(sql: SqlExecutor): Promise<DeviceSettings> {
   const rows = await sql.all<{ key: string; value: string }>('SELECT key, value FROM device_settings');
-  return documentOf<DeviceSettings>(
-    rows.map((row) => [row.key, JSON.parse(row.value) as unknown]),
-    { plugins: {} },
-  );
+  return documentOf<DeviceSettings>(rows.map((row) => [row.key, JSON.parse(row.value) as unknown]));
 }
 
 async function readPreferences(sql: SqlExecutor, user: UserId): Promise<UserPreferences> {

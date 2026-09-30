@@ -7,8 +7,6 @@ import type {
   MediaItem,
   PerProfile,
   PluginCategory,
-  PluginRole,
-  SyncCapability,
 } from '@sc/api';
 
 import type { HomeRow } from '@/services/home-layout';
@@ -41,24 +39,12 @@ export const CATEGORY_DESCRIPTIONS: Readonly<Record<PluginCategory, string>> = {
   sync: 'Where your account and its backups live',
 };
 
-export const ROLE_LABELS: Readonly<Record<PluginRole, string>> = {
-  media: 'Media',
-  sync: 'Account',
-};
-
-/** What an account keeps in step, in words. */
-export const SYNC_CAPABILITY_LABELS: Readonly<Record<SyncCapability, string>> = {
-  profile: 'Profiles and their PINs',
-  preferences: 'Each profile’s settings, like its home',
-  watchProgress: 'Where each profile stopped watching',
-  favorites: 'Favourites',
-  watchlist: 'Watchlists',
-  history: 'What each profile watched',
-  providerConnections: 'Connections',
-  sealedPasswords: 'Their passwords, sealed so only your devices can read them',
-  customLists: 'Lists',
-  fullBackup: 'A full backup',
-};
+/** What an account holds, in words: all of it, on every device of the account. */
+export const ACCOUNT_HOLDS: readonly string[] = [
+  'Profiles and their PINs',
+  'Each profile’s settings, like its home',
+  'Sources and IPTV, with their passwords',
+];
 
 export const PER_PROFILE_LABELS: Readonly<Record<PerProfile, string>> = {
   none: 'None',

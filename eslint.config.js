@@ -67,7 +67,7 @@ const compositionRoot = {
 // Cryptography is the platform's (spec §3): one implementation, which plugins
 // reach through their context and services through the crypto port.
 const cryptography = {
-  group: ['@noble/*', '**/modules/key-derivation/**'],
+  group: ['@noble/*'],
   message: 'Only src/platform/ does cryptography. Take the host crypto the composition root hands you.',
 };
 

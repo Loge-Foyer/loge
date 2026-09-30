@@ -1,4 +1,4 @@
-import { qualifiedIdOf, qualifiedPluginStates } from '../plugin-ids';
+import { qualifiedIdOf, qualifiedPluginStates, sessionRefOf } from '../plugin-ids';
 
 /**
  * The object stores, as IndexedDB's versioned upgrades. They mirror the SQLite
@@ -15,7 +15,8 @@ export const STORES = [
   'staleSecrets',
   'mediaLists',
   'mediaDetails',
-  'syncState',
+  'account',
+  'backupState',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -69,25 +70,63 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
       setting.key === 'plugins' ? { ...setting, value: qualifiedPluginStates(setting.value) } : undefined,
     );
   },
+  // One account per device, local or on your own server: as SQLite's v4.
+  (db, tx) => {
+    db.deleteObjectStore('syncState');
+    db.createObjectStore('account', { keyPath: 'key' });
+    db.createObjectStore('backupState', { keyPath: 'connectionId' });
+    const stale = tx.objectStore('staleSecrets');
+    const queue = (ref: unknown) => {
+      if (typeof ref === 'string') stale.put({ ref });
+    };
+    const reading = tx.objectStore('users').getAllKeys();
+    reading.onsuccess = () => {
+      const users = reading.result.map(String);
+      rewriteEach<{ readonly id: string; readonly pluginId: string; readonly roles?: Readonly<Record<string, unknown>>; readonly values?: { readonly credentialsRef?: string } }>(
+        tx,
+        'connections',
+        (connection) => {
+          if (connection.pluginId.startsWith('sync/')) {
+            // Phase 4's account goes, with its profile values, its saved media and every secret it held.
+            queue(connection.values?.credentialsRef);
+            for (const scope of ['shared', 'account', ...users]) queue(sessionRefOf(connection.id, scope));
+            for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails'] as const) {
+              rewriteEach<{ readonly values?: { readonly credentialsRef?: string } }>(tx, name, (row) => {
+                if (name === 'connectionProfileValues') queue(row.values?.credentialsRef);
+                return null;
+              }, connection.id);
+            }
+            return null;
+          }
+          const { roles, ...rest } = connection;
+          return { ...rest, enabled: roles?.media !== false };
+        },
+      );
+    };
+    rewriteEach<{ readonly key: string }>(tx, 'deviceSettings', (setting) => (setting.key === 'plugins' || setting.key === 'leftAccountAt' ? null : undefined));
+    tx.objectStore('journal').clear();
+  },
 ];
 
 /**
- * Rewrites a store's records, each read again just before it is written, and
- * left alone where `change` answers nothing. Every step runs in the one
- * version-change transaction, and an earlier step's cursor may still be
- * rewriting the same records: a value a cursor read can be stale by the time it
- * is written back, so it is never written back as read.
+ * Rewrites a store's records — or, given `onlyConnection`, the ones of that
+ * connection, through its `byConnection` index: each as `change` answers,
+ * deleted for `null`, left alone for `undefined`. Each record is read again
+ * just before it is written, so a value a cursor read is never written back
+ * stale.
  */
-function rewriteEach<T>(tx: IDBTransaction, name: StoreName, change: (record: T) => T | undefined): void {
+function rewriteEach<T>(tx: IDBTransaction, name: StoreName, change: (record: T) => T | null | undefined, onlyConnection?: string): void {
   const store = tx.objectStore(name);
-  const walking = store.openKeyCursor();
+  const walking = onlyConnection === undefined ? store.openKeyCursor() : store.index('byConnection').openKeyCursor(onlyConnection);
   walking.onsuccess = () => {
     const cursor = walking.result;
     if (!cursor) return;
-    const reading = store.get(cursor.primaryKey);
+    const key = cursor.primaryKey;
+    const reading = store.get(key);
     reading.onsuccess = () => {
       const next = change(reading.result as T);
-      if (next !== undefined) store.put(next);
+      if (next === null) store.delete(key);
+      else if (next !== undefined) store.put(next);
     };
     cursor.continue();
   };
@@ -95,12 +134,16 @@ function rewriteEach<T>(tx: IDBTransaction, name: StoreName, change: (record: T)
 
 export const INDEXEDDB_VERSION = INDEXEDDB_UPGRADES.length;
 
-/** Runs every upgrade after `from`, inside the version-change transaction the browser opened. */
+/**
+ * Runs the upgrades from `from` to the version being opened, inside the
+ * version-change transaction the browser opened — one step, as the app opens
+ * the database one version at a time.
+ */
 export function upgradeIndexedDb(
   db: IDBDatabase,
   from: number,
   tx: IDBTransaction,
   upgrades: readonly Upgrade[] = INDEXEDDB_UPGRADES,
 ): void {
-  for (const upgrade of upgrades.slice(from)) upgrade(db, tx);
+  for (const upgrade of upgrades.slice(from, db.version)) upgrade(db, tx);
 }

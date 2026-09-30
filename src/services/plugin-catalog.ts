@@ -1,13 +1,14 @@
 import {
   runsOn,
   validateManifest,
+  type AccountRole,
+  type BackupRole,
   type MediaRole,
   type PlatformId,
   type Plugin,
   type PluginCategory,
   type PluginId,
   type PluginManifest,
-  type SyncRole,
 } from '@sc/api';
 
 import { showsOn, type ContentTab } from './tab-content';
@@ -30,8 +31,10 @@ export interface PluginCatalog {
   showingOn(tab: ContentTab): readonly PluginManifest[];
   /** The media role's implementation, once the plugin has one. */
   mediaRole(id: PluginId): MediaRole | undefined;
-  /** The sync role's implementation: what can be the device's account. */
-  syncRole(id: PluginId): SyncRole | undefined;
+  /** The account role's implementation: where the device's account can live. */
+  accountRole(id: PluginId): AccountRole | undefined;
+  /** The backup role's implementation: where the account's backup file can go. */
+  backupRole(id: PluginId): BackupRole | undefined;
 }
 
 export interface CatalogOptions {
@@ -47,8 +50,9 @@ export function createPluginCatalog(
 ): PluginCatalog {
   const byId = new Map<PluginId, PluginManifest>();
   const roles = new Map<PluginId, MediaRole>();
-  const syncRoles = new Map<PluginId, SyncRole>();
-  for (const { manifest, media, sync } of plugins) {
+  const accountRoles = new Map<PluginId, AccountRole>();
+  const backupRoles = new Map<PluginId, BackupRole>();
+  for (const { manifest, media, account, backup } of plugins) {
     const problems = [
       ...validateManifest(manifest),
       ...(byId.has(manifest.id) ? ['its id is already registered'] : []),
@@ -66,7 +70,8 @@ export function createPluginCatalog(
     if (!runsOn(manifest, platform)) continue;
     byId.set(manifest.id, manifest);
     if (media) roles.set(manifest.id, media);
-    if (sync) syncRoles.set(manifest.id, sync);
+    if (account) accountRoles.set(manifest.id, account);
+    if (backup) backupRoles.set(manifest.id, backup);
   }
 
   const manifests = [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -77,6 +82,7 @@ export function createPluginCatalog(
     get: (id) => byId.get(id),
     showingOn: (tab) => manifests.filter((manifest) => showsOn(tab, manifest.category, manifest.media?.contentKinds ?? [])),
     mediaRole: (id) => roles.get(id),
-    syncRole: (id) => syncRoles.get(id),
+    accountRole: (id) => accountRoles.get(id),
+    backupRole: (id) => backupRoles.get(id),
   };
 }

@@ -19,7 +19,6 @@ describe.each(ENGINES)('secrets on %s', (engine: Engine) => {
     const built = buildServices({ plugins: [source.plugin], engine, where, ...options });
     const kids = await built.services.profiles.create('Kids');
     const alex = await built.services.profiles.create('Alex');
-    await built.services.devicePlugins.setEnabled(source.manifest.id, true);
     return { ...built, where, source, kids, alex };
   }
 

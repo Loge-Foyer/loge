@@ -16,6 +16,15 @@ export function usePluginConnections(pluginId: PluginId) {
   });
 }
 
+/** The plugins with at least one connection. */
+export function useConnectedPlugins() {
+  const { connections } = useServices();
+  return useQuery({
+    queryKey: deviceKey('connected-plugins'),
+    queryFn: () => connections.connected(),
+  });
+}
+
 /** A connection with every profile's own values — the editor shows a tab for each. */
 export function useConnection(id: ConnectionId) {
   const { connections } = useServices();

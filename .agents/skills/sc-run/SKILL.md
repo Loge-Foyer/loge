@@ -12,19 +12,18 @@ npm run web        # browser — no build
 npm start          # Metro alone, for a development client already installed
 ```
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.** This skill describes the target, and says where today
-differs. "What you will see" at the end has both.
+**Phase 6 — the code is moving to the new architecture.** This skill describes
+the target, and says where today differs. "What you will see" at the end has
+both.
 
 ## Which runtime you need
 
 **A development build, not Expo Go.** Expo Go carries only its bundled
 modules, and the app needs more: player engines are native code (expo-video
 from Phase 7, Expo modules for KSPlayer, mpv and VLC in Phase 8), and Face ID
-needs the app's usage text. Until Phase 6 there is also the app's own module,
-`modules/key-derivation` — PBKDF2 on CommonCrypto and `javax.crypto`.
-JavaScript on Hermes is far too slow to derive keys itself: scrypt took 22 s in
-Expo Go on the emulator, where the module takes a second at 600k iterations.
+needs the app's usage text. The app has no native module of its own any more:
+Phase 4's key derivation went with its vault, so a build made before Phase 6
+carries a module nothing uses — build again.
 
 `npm run android` / `npm run ios` build the client (the first Android build
 took about seven minutes), install it and start it against Metro. After that,
@@ -48,19 +47,18 @@ what a flow needs once and it is there on every later launch.
   `adb shell pm clear com.fakg.streaming_center_app`. Welcome then offers three
   ways in: **Create an account on this device** (a name, which the first
   profile takes too), **Sign in to your server**, or **Restore a backup**.
-  Today it offers "Sign in to sync your profiles" or "Use on this device only".
+  Restore arrives with the backup file, later in Phase 6.
 - **A real Jellyfin server**: Settings → Plugins → Sources → Jellyfin → Add
-  connection (today: Settings → Plugins → Jellyfin → Installed → Add
-  connection), filled in from the workspace's gitignored `jellyfin.env`
+  connection, filled in from the workspace's gitignored `jellyfin.env`
   (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
   type the values in; never echo them anywhere. A failed sign-in counts against
   the account's lockout: do not loop a wrong password.
 - **Offline work**: the mock plugins (development builds only) need no
   network. `sources/mock` is a pretend library, and `iptv/mock` pretend
   channels, a guide and a little VOD for the TV tab (Phase 7). Add a
-  connection like any other. Today there is one `mock`, installed first.
-- **A real account: your own server** — PocketBase, from Phase 6. Give it a
-  data directory of its own:
+  connection like any other. `iptv/mock` is not built yet.
+- **A real account: your own server** — PocketBase. Give it a data directory
+  of its own:
 
   ```bash
   cd ../streaming_center_sync
@@ -84,20 +82,7 @@ what a flow needs once and it is there on every later launch.
     from another device): the other device is refused once, then asks, and
     never tries again by itself.
   - `rm -rf /tmp/sc-pb` starts the server from scratch.
-- **Until Phase 6 the server is still the Node one**, on port 8730:
-
-  ```bash
-  cd ../streaming_center_sync && npm run build
-  SC_SYNC_DATA=/tmp/sc-data node --disable-warning=ExperimentalWarning dist/main.mjs &
-  SC_SYNC_DATA=/tmp/sc-data node --disable-warning=ExperimentalWarning dist/cli.mjs invite
-  ```
-
-  Then **Sign in → Your own server → New here? Create an account**, at
-  `http://localhost:8730`, or `http://10.0.2.2:8730` on the emulator. Its log
-  shows every request by route — a second `POST /v1/auth/login` for one
-  sign-in means the handover broke — and `dist/cli.mjs devices <user>` and
-  `revoke <id>` are the way to try a lost phone.
-- **A pretend account**: the mock is one too (`sync/mock` from Phase 6). Sign
+- **A pretend account**: `sync/mock`, in development builds. Sign
   in to it — at first launch, or in Settings → Account — and its endpoint names
   the account: `mock://household` holds Sam (PIN 1234) and Robin, any other
   endpoint is empty. It lives in the JavaScript runtime's memory: a reload
@@ -129,9 +114,9 @@ what a flow needs once and it is there on every later launch.
 
 - **Your own server** — "Forgot PIN?" opens a password form in place of the
   PIN pad. After too many wrong passwords the server throttles, and the form
-  says "Too many tries" (Phase 4's server: five, then 30 s). Once the server has
-  let the device go — its password changed elsewhere — the device asks itself
-  instead.
+  says "Too many tries" (your server takes five sign-ins a minute). Once the
+  server no longer takes the device's saved password — changed elsewhere —
+  the device asks itself instead.
 - **Web** — "Forgot PIN?" works with a server account, or with the mock (it
   vouches for its owner). On a local account the unlock screen shows a hint and
   no link.
@@ -277,15 +262,15 @@ The target, once Phase 6 has landed:
   Players, Sync — each opening this platform's list. iCloud shows on iOS only.
   Nothing plays.
 
-**Today (the account is still Phase 4's, until it moves to records):**
+**Today (no backup file, and nothing plays):**
 
-- Welcome offers "Sign in to sync your profiles" (the mock, in development) or
-  "Use on this device only", then "Who is this?". An account with profiles
-  lands on "Who's watching?" instead.
+- Welcome offers "Create an account on this device" or "Sign in to your
+  server" (the mock too, in development). An account with profiles lands on
+  "Who's watching?".
 - Four tabs — Media, Videos, TV, Settings; TV shows its empty state.
 - Settings → Plugins is four lists — Sources, IPTV, Players, Sync — of what
-  runs on this platform. Install a source on the device, then add connections
-  through forms built from its manifest, choosing what each profile keeps for
-  itself.
-- Settings → Account has Sync now, what it keeps in step, Switch account and
-  Sign out. There is no backup file and no profile limit.
+  runs on this platform. Add a connection through a form built from its
+  manifest, and choose what each profile keeps for itself.
+- Settings → Account shows a local account, or your server's with Sync now,
+  what it keeps in step, Sign in again, Switch account and Sign out. Profiles
+  stop at ten, or at the server's limit.

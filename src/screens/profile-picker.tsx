@@ -10,6 +10,7 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
+import { useMaxProfiles } from '@/hooks/use-account';
 import { useProfileActions, useProfiles } from '@/hooks/use-profiles';
 import { useGate } from '@/hooks/use-session';
 
@@ -23,6 +24,8 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
   const activeId = gate.kind === 'ready' ? gate.userId : undefined;
   const { data: profiles = [] } = useProfiles();
   const { create } = useProfileActions();
+  const { data: maxProfiles } = useMaxProfiles();
+  const full = maxProfiles !== undefined && profiles.length >= maxProfiles;
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
@@ -81,18 +84,20 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
             </YStack>
           </Button>
         ))}
-        <Button unstyled onPress={() => setAdding(true)} aria-label="Add a profile">
-          <YStack items="center" gap="$2" width={104}>
-            <Circle size={92} borderWidth={2} borderStyle="dashed" borderColor="$color7">
-              <Plus size={32} color="$color10" />
-            </Circle>
-            <SizableText size="$4" color="$color10">
-              Add profile
-            </SizableText>
-          </YStack>
-        </Button>
+        {full ? null : (
+          <Button unstyled onPress={() => setAdding(true)} aria-label="Add a profile">
+            <YStack items="center" gap="$2" width={104}>
+              <Circle size={92} borderWidth={2} borderStyle="dashed" borderColor="$color7">
+                <Plus size={32} color="$color10" />
+              </Circle>
+              <SizableText size="$4" color="$color10">
+                Add profile
+              </SizableText>
+            </YStack>
+          </Button>
+        )}
       </XStack>
-      {adding ? (
+      {adding && !full ? (
         <XStack gap="$2" width="100%" maxW={420}>
           <TextInput
             flex={1}

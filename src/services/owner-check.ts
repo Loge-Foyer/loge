@@ -77,7 +77,7 @@ export function createOwnerCheck(deps: {
 
 /** The password fields an account's owner proof asks for, as its manifest declares them. */
 export function proofFieldsOf(manifest: PluginManifest | undefined): readonly PasswordField[] {
-  const keys = manifest?.sync?.ownerProof?.fields ?? [];
+  const keys = manifest?.account?.ownerProof?.fields ?? [];
   return (manifest?.connectionFields ?? []).filter((field): field is PasswordField => field.type === 'password' && keys.includes(field.key));
 }
 
@@ -95,7 +95,7 @@ export function accountOwnerCheck(deps: {
 }): () => Promise<AccountOwnerCheck | undefined> {
   return async () => {
     const account = await currentAccount(deps.db, deps.catalog);
-    if (!account?.available || deps.status().phase === 'needs-sign-in') return undefined;
+    if (account?.kind !== 'server' || !account.available || deps.status().phase === 'needs-sign-in') return undefined;
     const provider = await deps.providers.provider(account.connection);
     const verify = provider.verifyOwner?.bind(provider);
     return verify && { asks: proofFieldsOf(account.manifest), verify };

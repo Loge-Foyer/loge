@@ -16,7 +16,7 @@ import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
-import { useAccount, useAccountProviders, useSyncStatus } from '@/hooks/use-account';
+import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
@@ -35,7 +35,7 @@ export function SettingsScreen() {
   const userId = useActiveUserId();
   const { catalog } = useServices();
   const { data: account } = useAccount();
-  const { data: providers = [] } = useAccountProviders();
+  const { data: maxProfiles } = useMaxProfiles();
   const status = useSyncStatus();
   const { data: profiles = [] } = useProfiles();
   const { data: sources = [] } = useSources();
@@ -43,7 +43,7 @@ export function SettingsScreen() {
 
   /** A list's line: what is set up in it, or what it is for. */
   const summaryOf = (category: PluginCategory) => {
-    if (category === 'sync') return account ? `Your account: ${account.connection.label}` : CATEGORY_DESCRIPTIONS.sync;
+    if (category === 'sync') return account?.kind === 'server' ? `Your account: ${account.name}` : CATEGORY_DESCRIPTIONS.sync;
     if (catalog.inCategory(category).length === 0) return 'None on this device';
     const connected = sources.filter((source) => source.manifest.category === category).length;
     if (connected === 0) return CATEGORY_DESCRIPTIONS[category];
@@ -54,15 +54,9 @@ export function SettingsScreen() {
     <Screen>
       <SettingsSection title="Account">
         <SettingsRow
-          title={account ? account.connection.label : 'This device only'}
-          subtitle={
-            account
-              ? describeSyncStatus(status)
-              : providers.length > 0
-                ? 'Sign in to keep your profiles on every device'
-                : 'Your profiles are kept on this device'
-          }
-          icon={account ? <Cloud size={20} color="$color11" /> : <CloudOff size={20} color="$color11" />}
+          title={account?.name ?? 'This device'}
+          subtitle={account?.kind === 'server' ? describeSyncStatus(status) : 'Kept on this device'}
+          icon={account?.kind === 'server' ? <Cloud size={20} color="$color11" /> : <CloudOff size={20} color="$color11" />}
           href="/settings/account"
         />
       </SettingsSection>
@@ -76,7 +70,7 @@ export function SettingsScreen() {
         />
         <SettingsRow
           title="Profiles"
-          subtitle={`${profiles.length} on this device`}
+          subtitle={`${profiles.length} of ${maxProfiles ?? profiles.length}`}
           icon={<Users size={20} color="$color11" />}
           href="/settings/profiles"
         />

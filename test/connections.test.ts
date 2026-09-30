@@ -15,7 +15,6 @@ describe.each(ENGINES)('on %s', (engine: Engine) => {
     const { services } = built;
     const kids = await services.profiles.create('Kids');
     const alex = await services.profiles.create('Alex');
-    await services.devicePlugins.setEnabled(source.manifest.id, true);
     return { ...built, source, services, kids, alex };
   }
 
@@ -172,11 +171,16 @@ describe.each(ENGINES)('on %s', (engine: Engine) => {
       expect(await services.sources.pendingFor(alex.id)).toEqual([]);
     });
 
-    it('hides every connection of a plugin that is not installed', async () => {
-      const { services, source, kids } = await setUp();
-      await services.connections.create(source.manifest.id, sharedDraft(source.manifest, kids.id));
-      await services.devicePlugins.setEnabled(source.manifest.id, false);
+    it('hides a connection switched off, from every profile', async () => {
+      const { services, source, kids, alex } = await setUp();
+      const created = await services.connections.create(source.manifest.id, sharedDraft(source.manifest, kids.id));
+      expect((await services.sources.forUser(kids.id)).map((live) => live.connection.id)).toEqual([created.id]);
+      const edit = await services.connections.edit(created.id);
+      if (!edit) throw new Error('setup');
+      await services.connections.update(created.id, { ...draftOf(source.manifest, edit), enabled: false });
       expect(await services.sources.forUser(kids.id)).toEqual([]);
+      expect(await services.sources.forUser(alex.id)).toEqual([]);
+      expect(await services.sources.pendingFor(kids.id)).toEqual([]);
     });
 
     it('deletes a profile’s own values and secrets with it', async () => {

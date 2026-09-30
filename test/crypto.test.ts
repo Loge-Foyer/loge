@@ -1,63 +1,38 @@
-import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { encodeUtf8, KDF_LIMITS, TransportError, type KdfParams } from '@sc/api';
+import { encodeUtf8, recordId, type RecordKind } from '@sc/api';
 import { describe, expect, it } from 'vitest';
-
-import { webPbkdf2 } from '@/platform/web-pbkdf2';
 
 import { testCrypto } from './support/crypto';
 
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
-const params = (overrides: Partial<KdfParams> = {}): KdfParams => ({
-  algorithm: 'pbkdf2-sha256',
-  iterations: KDF_LIMITS.minIterations,
-  salt: Uint8Array.from({ length: 16 }, (_, index) => index),
-  ...overrides,
-});
 
-describe('host crypto — deriving keys', () => {
-  // RFC 7914, section 11: the first 32 bytes of each 64-byte answer. What a
-  // browser runs; the native module is held to the same vector on a phone.
-  it('is PBKDF2-HMAC-SHA256, to the RFC’s vectors', async () => {
-    expect(hex(await webPbkdf2(encodeUtf8('passwd'), encodeUtf8('salt'), 1))).toBe(
-      '55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc',
-    );
-    expect(hex(await webPbkdf2(encodeUtf8('Password'), encodeUtf8('NaCl'), 80_000))).toBe(
-      '4ddcd8f60b98be21830cee5ef22701f9641a4418d04c0414aeff08876b34ab56',
-    );
+// The vectors both sides test against: a record's id is what the server derives too.
+const vectors = (
+  JSON.parse(readFileSync(join(process.cwd(), 'node_modules/@sc/api/fixtures/account-records.json'), 'utf8')) as {
+    recordIds: readonly { accountId: string; kind: RecordKind; key: string; id: string }[];
+  }
+).recordIds;
+
+describe('host crypto — hashing', () => {
+  // FIPS 180-2, appendix B.1, and the empty message.
+  it('is SHA-256, to the standard’s vectors', async () => {
+    expect(hex(await testCrypto().sha256(encodeUtf8('abc')))).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(hex(await testCrypto().sha256(new Uint8Array()))).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
   });
 
-  it('derives what Node derives, within the limits', async () => {
-    const key = await testCrypto().deriveKey('correct horse battery staple', params());
-    const node = pbkdf2Sync('correct horse battery staple', params().salt, KDF_LIMITS.minIterations, 32, 'sha256');
-    expect(hex(key)).toBe(node.toString('hex'));
+  it('hashes what Node hashes, whatever the text', async () => {
+    const text = 'profileValues/c1/u-é — 家族';
+    expect(hex(await testCrypto().sha256(encodeUtf8(text)))).toBe(createHash('sha256').update(text, 'utf8').digest('hex'));
   });
 
-  it('derives one key from a password however it was typed', async () => {
-    const composed = await testCrypto().deriveKey('caf\u00e9', params());
-    const decomposed = await testCrypto().deriveKey('cafe\u0301', params());
-    expect(hex(decomposed)).toBe(hex(composed));
-  });
-
-  it('derives nothing weaker or heavier than both sides allow', async () => {
-    for (const bad of [
-      params({ iterations: KDF_LIMITS.minIterations - 1 }),
-      params({ iterations: KDF_LIMITS.maxIterations + 1 }),
-      params({ salt: new Uint8Array(4) }),
-    ]) {
-      await expect(testCrypto().deriveKey('password', bad)).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  it('derives the record ids the shared vectors give', async () => {
+    expect(vectors.length).toBeGreaterThan(0);
+    for (const vector of vectors) {
+      expect(await recordId(testCrypto().sha256, vector.accountId, vector.kind, vector.key), `${vector.kind} ${vector.key}`).toBe(vector.id);
     }
-  });
-
-  it('stops when told to, and hands back nothing it was stopped during', async () => {
-    const before = new AbortController();
-    before.abort();
-    await expect(testCrypto().deriveKey('password', params(), before.signal)).rejects.toBeInstanceOf(TransportError);
-
-    const during = new AbortController();
-    const derivation = testCrypto().deriveKey('password', params({ iterations: KDF_LIMITS.maxIterations }), during.signal);
-    setTimeout(() => during.abort(), 5);
-    await expect(derivation).rejects.toBeInstanceOf(TransportError);
   });
 });
 

@@ -2,11 +2,9 @@ import {
   AppError,
   connectionId as toConnectionId,
   credentialsRef as toCredentialsRef,
-  declaredRoles,
   perProfileKeys,
   type Connection,
   type ConnectionId,
-  type ConnectionRoles,
   type ConnectionValues,
   type Credentials,
   type CredentialsRef,
@@ -14,19 +12,18 @@ import {
   type FieldValues,
   type PerProfile,
   type PluginId,
-  type PluginManifest,
   type UserId,
 } from '@sc/api';
 
 import { hasErrors, validateDraft, type DraftErrors } from './field-values';
 import { stableJson } from './hash';
 import type { PluginCatalog } from './plugin-catalog';
-import type { IdGenerator, JournalAnnouncement, LocalDatabase, ProfileValues, Repositories, SecureCredentialStore } from './ports';
+import type { IdGenerator, LocalDatabase, ProfileValues, Repositories, SecureCredentialStore } from './ports';
 import { removeConnectionIn } from './removal';
+import { accountWide } from './scope';
 import type { SecretJanitor } from './secrets';
 import { sessionRef, type CredentialScope } from './sessions';
 import { standingOf } from './sources';
-import { profileSignInOf } from './sync/sealed';
 
 export type SecretScope = 'shared' | UserId;
 
@@ -52,7 +49,8 @@ export interface ProfileDraft extends ValuesDraft {
 /** What the connection form submits. */
 export interface ConnectionDraft {
   readonly label: string;
-  readonly roles: ConnectionRoles;
+  /** Switched off, it stays configured and nothing of it is used — on any device of the account. */
+  readonly enabled: boolean;
   readonly perProfile: PerProfile;
   readonly shared: ValuesDraft;
   /** A profile left out keeps what it has stored. */
@@ -73,7 +71,7 @@ export interface ConnectionEditState {
 
 export interface ConnectionSummary {
   readonly connection: Connection;
-  /** The device's account: its sync role is on, and only the account service changes that. */
+  /** The device's account reaches its server through it, and only the account service changes that. */
   readonly isAccount: boolean;
   /** The profiles it is live for: every profile when nothing is kept per profile. */
   readonly setUp: ReadonlySet<UserId>;
@@ -92,6 +90,8 @@ export class InvalidDraftError extends Error {
 
 export interface ConnectionService {
   list(pluginId: PluginId): Promise<readonly ConnectionSummary[]>;
+  /** The plugins with at least one connection, for the lists in Settings → Plugins. */
+  connected(): Promise<ReadonlySet<PluginId>>;
   edit(id: ConnectionId): Promise<ConnectionEditState | undefined>;
   create(pluginId: PluginId, draft: ConnectionDraft): Promise<Connection>;
   update(id: ConnectionId, draft: ConnectionDraft): Promise<Connection>;
@@ -110,10 +110,9 @@ export interface ConnectionService {
   /**
    * A save, in the three steps every save takes, for a caller that commits it
    * inside a transaction of its own — the account service, which writes its
-   * connection together with everything a sign-in writes. `sync` switches the
-   * sync role, which nothing else ever does.
+   * connection together with everything a sign-in writes.
    */
-  plan(pluginId: PluginId, draft: ConnectionDraft, existing: Connection | undefined, options?: { readonly sync?: boolean }): Promise<SavePlan>;
+  plan(pluginId: PluginId, draft: ConnectionDraft, existing: Connection | undefined): Promise<SavePlan>;
   commit(tx: Repositories, plan: SavePlan): Promise<void>;
   /** After a commit that failed: the secrets the plan wrote are pointed at by nothing. */
   discard(plan: SavePlan): Promise<void>;
@@ -216,20 +215,15 @@ export function createConnectionService(deps: {
   // longer point at. Last, those are deleted. A crash leaves at worst an
   // orphaned secret, never a row pointing at nothing — and no await but the
   // database's own happens inside the transaction.
-  const plan = async (
-    pluginId: PluginId,
-    draft: ConnectionDraft,
-    existing: Connection | undefined,
-    options: { readonly sync?: boolean } = {},
-  ): Promise<SavePlan> => {
+  const plan = async (pluginId: PluginId, draft: ConnectionDraft, existing: Connection | undefined): Promise<SavePlan> => {
     const manifest = manifestOf(pluginId);
-    const sync = options.sync ?? existing?.roles.sync === true;
     const storedProfiles = existing ? await db.connections.profileValues(existing.id) : new Map<UserId, ProfileValues>();
     const stored: Stored = { ...(existing ? { connection: existing } : {}), profiles: storedProfiles };
     const errors = validateDraft(manifest, draft, savedSecretsOf(existing, storedProfiles));
     if (hasErrors(errors)) throw new InvalidDraftError(errors);
-    if (sync && draft.perProfile !== 'none') {
-      throw new InvalidDraftError({ shared: {}, profiles: {}, form: 'Your account belongs to this device, so it keeps nothing per profile.' });
+    // A sync plugin's connection is the device's: there is nothing of a profile's in it.
+    if (!accountWide(pluginId) && draft.perProfile !== 'none') {
+      throw new InvalidDraftError({ shared: {}, profiles: {}, form: 'This belongs to the device, so it keeps nothing per profile.' });
     }
 
     const keys = perProfileKeys(manifest, draft.perProfile);
@@ -275,7 +269,7 @@ export function createConnectionService(deps: {
         id,
         pluginId,
         label: draft.label.trim(),
-        roles: rolesOf(manifest, draft.roles, sync),
+        enabled: draft.enabled,
         perProfile: draft.perProfile,
         values: {
           fields: pick(plainFields.filter((key) => !keys.fields.has(key)), draft.shared.fields),
@@ -355,7 +349,6 @@ export function createConnectionService(deps: {
       if (row) await tx.connections.putProfileValues(connection.id, userId, row);
       else await tx.connections.deleteProfileValues(connection.id, userId);
     }
-    await tx.journal.announce(movedPasswords(planned, catalog.get(connection.pluginId)));
     // What the source answered under the old values may not hold under the new ones.
     await tx.mediaCache.purge(connection.id);
     await tx.staleSecrets.add([...stale, ...signedOut.map((scope) => sessionRef(connection.id, scope))]);
@@ -384,6 +377,7 @@ export function createConnectionService(deps: {
       const manifest = catalog.get(pluginId);
       if (!manifest) return [];
       const userIds = (await db.users.list()).map((user) => user.id);
+      const account = await db.account.get();
       const own = (await db.connections.list()).filter((connection) => connection.pluginId === pluginId);
       return Promise.all(
         own.map(async (connection) => {
@@ -391,13 +385,14 @@ export function createConnectionService(deps: {
           const standing = (userId: UserId) => standingOf(manifest, connection, profiles.get(userId));
           return {
             connection,
-            isAccount: connection.roles.sync === true,
+            isAccount: account?.kind === 'server' && account.connectionId === connection.id,
             setUp: new Set(userIds.filter((userId) => standing(userId) === 'live')),
             off: new Set(userIds.filter((userId) => standing(userId) === 'off')),
           };
         }),
       );
     },
+    connected: async () => new Set((await db.connections.list()).map((connection) => connection.pluginId)),
     edit: async (id) => {
       const connection = await db.connections.get(id);
       if (!connection) return undefined;
@@ -414,7 +409,8 @@ export function createConnectionService(deps: {
     },
     remove: async (id) => {
       const removed = await db.transaction(async (tx) => {
-        if ((await tx.connections.get(id))?.roles.sync === true) {
+        const account = await tx.account.get();
+        if (account?.kind === 'server' && account.connectionId === id) {
           throw new AppError('INVALID_STATE', 'This connection is your account. Sign out of it first.', { retry: 'never' });
         }
         return removeConnectionIn(tx, id);
@@ -439,25 +435,6 @@ export function createConnectionService(deps: {
   };
 }
 
-/**
- * The profiles whose saved passwords a save points somewhere else, through
- * the connection's address alone. Other devices drop a password whose sign-in
- * moves, so each of these goes out again, after the connection — sealed for
- * where it signs in now. A row the save changed is journaled already.
- */
-function movedPasswords(planned: SavePlan, manifest: PluginManifest | undefined): readonly JournalAnnouncement[] {
-  const { connection, existing, storedProfiles, rows } = planned;
-  if (!existing) return [];
-  const moved: JournalAnnouncement[] = [];
-  for (const [userId, row] of rows) {
-    const before = storedProfiles.get(userId);
-    if (!row || !before || !row.credentialsRef || stableJson(row) !== stableJson(before)) continue;
-    if (profileSignInOf(existing, manifest, before) === profileSignInOf(connection, manifest, row)) continue;
-    moved.push({ userId, entity: 'connectionProfileValues', entityId: `${connection.id}/${userId}`, operation: 'upsert', localVersion: 0 });
-  }
-  return moved;
-}
-
 /** Keeps only what the manifest declares, so nothing undeclared is ever stored. */
 function pick(keys: readonly string[], values: FieldValues): Record<string, FieldValue> {
   const picked: Record<string, FieldValue> = {};
@@ -466,13 +443,6 @@ function pick(keys: readonly string[], values: FieldValues): Record<string, Fiel
     if (value !== undefined) picked[key] = typeof value === 'string' ? value.trim() : value;
   }
   return picked;
-}
-
-/** The draft decides media; sync is the account service's alone, so it comes from what is stored. */
-function rolesOf(manifest: PluginManifest, roles: ConnectionRoles, sync: boolean): ConnectionRoles {
-  const next: Partial<Record<'media' | 'sync', boolean>> = {};
-  for (const role of declaredRoles(manifest)) next[role] = role === 'sync' ? sync : roles[role] === true;
-  return next;
 }
 
 function sameSecrets(a: Credentials, b: Credentials): boolean {

@@ -8,9 +8,9 @@ description: Wire a Streaming Center plugin from the plugins repository into the
 Plugins live in a **separate repository** (`../streaming_center_plugins`), so
 npm workspaces cannot reach them. This is the fiddliest seam in the project.
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.** This skill describes the target. Where today differs, it says
-so; "Current state" at the end has the rest.
+**Phase 6 — the code is moving to the new architecture.** This skill describes
+the target. Where today differs, it says so; "Current state" at the end has
+the rest.
 
 ## 0. Install the plugins repository first
 
@@ -110,8 +110,7 @@ Branching on declared alone calls features the user switched off — for
 to. Where content appears is category plus kind, in `services/tab-content.ts`
 alone: a source's movies, shows and anime on Media; its videos and files on
 Videos; everything IPTV brings, and a source's `live`, on TV. There is never an
-`if (pluginId === …)`. (Until Phase 6 the same job is done over Phase 4's
-roles.)
+`if (pluginId === …)`.
 
 ## 6. Know its scope
 
@@ -243,12 +242,13 @@ A player plugin is only proven by a development build on a phone, playing.
 
 Twenty-two plugins are linked by their category paths and registered
 (`sources/mock` and `sync/mock` in development builds only), with qualified
-ids, and the catalogue keeps those that run on this platform. Their roles are
-still Phase 4's until the account moves to records. `sources/jellyfin` and
-`sources/mock` implement the media role — browse, libraries, watch status
-read, and (Jellyfin) remote images and offline metadata. `sync/mock` and your
-own server (`sync/custom-server`) are Phase 4's accounts: synced through a log,
-with sealed passwords, the password as owner proof, and sign-up with an
-invite. The rest export manifests only — IPTV, the players, the backup targets
+ids, and the catalogue keeps those that run on this platform; each declares
+its category's one block. `sources/jellyfin` and `sources/mock` implement the
+media role — browse, libraries, watch status read, and (Jellyfin) remote
+images and offline metadata. Your own server (`sync/custom-server`) and
+`sync/mock` implement the account role: records read whole and written in
+batches, the password typed again as the owner check, and sign-up with an
+invite (open, on the mock). `sync/mock-backup` is written, and linked with the
+backup file. The rest export manifests only — IPTV, the players, the backup targets
 and the other sources: the app lists them in their category, and says plainly
 that they cannot list titles, play or keep backups yet. Nothing plays.

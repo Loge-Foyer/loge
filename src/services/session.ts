@@ -2,7 +2,7 @@ import type { UserId } from '@sc/api';
 
 import { decideInitialGate, type Gate } from './boot';
 import type { PinCheck, PinService } from './pins';
-import type { DeviceSettingsRepository, UserRepository } from './ports';
+import type { AccountRepository, DeviceSettingsRepository, UserRepository } from './ports';
 import { toAppUser } from './users';
 
 export interface SessionService {
@@ -32,9 +32,10 @@ export interface SessionService {
 export function createSessionService(deps: {
   users: UserRepository;
   deviceSettings: DeviceSettingsRepository;
+  account: AccountRepository;
   pins: PinService;
 }): SessionService {
-  const { users, deviceSettings, pins } = deps;
+  const { users, deviceSettings, account, pins } = deps;
   let gate: Gate = { kind: 'starting' };
   const listeners = new Set<() => void>();
   const move = (next: Gate) => {
@@ -57,8 +58,9 @@ export function createSessionService(deps: {
     },
     start: async () => {
       try {
-        const [stored, settings] = await Promise.all([users.list(), deviceSettings.get()]);
+        const [stored, settings, held] = await Promise.all([users.list(), deviceSettings.get(), account.get()]);
         const decision = decideInitialGate({
+          hasAccount: held !== undefined,
           users: stored.map(toAppUser),
           defaultUserId: settings.defaultUserId,
         });
@@ -93,12 +95,13 @@ export function createSessionService(deps: {
     },
     refresh: async () => {
       if (gate.kind === 'starting' || gate.kind === 'failed') return;
-      const [stored, settings] = await Promise.all([users.list(), deviceSettings.get()]);
+      const [stored, settings, held] = await Promise.all([users.list(), deviceSettings.get(), account.get()]);
       const current = gate;
       let next: Gate = current;
-      if (stored.length === 0) next = { kind: 'needs-first-user' };
-      else if (current.kind === 'needs-first-user' || current.kind === 'needs-user-selection') {
-        next = decideInitialGate({ users: stored.map(toAppUser), defaultUserId: settings.defaultUserId }).gate;
+      if (held === undefined) next = { kind: 'needs-account' };
+      else if (stored.length === 0) next = { kind: 'needs-first-user' };
+      else if (current.kind === 'needs-account' || current.kind === 'needs-first-user' || current.kind === 'needs-user-selection') {
+        next = decideInitialGate({ hasAccount: true, users: stored.map(toAppUser), defaultUserId: settings.defaultUserId }).gate;
       } else if ((current.kind === 'ready' || current.kind === 'needs-user-unlock') && !stored.some((user) => user.id === current.userId)) {
         next = { kind: 'needs-user-selection' };
       }

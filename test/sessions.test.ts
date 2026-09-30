@@ -6,7 +6,9 @@ import { createSessions, sessionIdentity, sessionRef } from '@/services/sessions
 import { memoryCredentialStore } from './support/fakes';
 
 const manifest: PluginManifest = {
-  id: pluginId('fixture'),
+  id: pluginId('sources/fixture'),
+  category: 'sources',
+  platforms: ['ios', 'android', 'web'],
   displayName: 'Fixture',
   description: 'Test.',
   media: { contentKinds: ['movies'], capabilities: [] },

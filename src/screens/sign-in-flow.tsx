@@ -1,43 +1,25 @@
-import {
-  isAppError,
-  type ConnectionId,
-  type Credentials,
-  type FieldValue,
-  type FieldValues,
-  type PluginId,
-  type PluginManifest,
-} from '@sc/api';
+import { isAppError, type ConnectionId, type Credentials, type FieldValue, type FieldValues, type PluginId, type PluginManifest } from '@sc/api';
 import { useState } from 'react';
 import { Button, H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
-import { ConfirmButton } from '@/components/confirm-button';
 import { describeProofVerdict, listAll } from '@/components/labels';
 import { FieldInput } from '@/components/manifest-form';
 import { OwnerProofForm } from '@/components/owner-proof-form';
 import { PrimaryButton } from '@/components/primary-button';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
-import { useAccount, useAccountProviders, useOwnerMethod } from '@/hooks/use-account';
+import { useAccount, useOwnerMethod } from '@/hooks/use-account';
 import { useConnection } from '@/hooks/use-connections';
 import { useRefreshLocalState } from '@/hooks/use-local-state';
-import { AccountCreatedError, OwnerNotVerifiedError, type PreparedSignIn } from '@/services/account';
+import { AccountCreatedError, OwnerNotVerifiedError, type PreparedAccount } from '@/services/account';
 import { draftOf, initialDraft } from '@/services/connection-draft';
 import { InvalidDraftError, type ConnectionDraft, type SavedSecrets, type SecretChange } from '@/services/connections';
 import { defaultValues, hasErrors, hasFieldErrors, validateDraft, validateFields, type FieldErrors } from '@/services/field-values';
 
 const NOTHING_SAVED: SavedSecrets = { shared: new Set(), profiles: new Map() };
 
-/** Where signing in starts: the list of accounts, one plugin, one of this device's connections, or the account again. */
-export type SignInStart =
-  | { readonly kind: 'pick' }
-  | { readonly kind: 'plugin'; readonly pluginId: PluginId }
-  | { readonly kind: 'connection'; readonly connectionId: ConnectionId }
-  | { readonly kind: 'again' };
-
-interface Target {
-  readonly manifest: PluginManifest;
-  readonly connectionId?: ConnectionId;
-}
+/** Where signing in starts: the list of servers, one plugin, or this device's account again. */
+export type SignInStart = { readonly kind: 'pick' } | { readonly kind: 'plugin'; readonly pluginId: PluginId } | { readonly kind: 'again' };
 
 /** What the details form sends on: a sign-in, or an account to create with these extra fields. */
 interface Submitted {
@@ -49,23 +31,24 @@ type Step =
   | { readonly kind: 'pick' }
   | {
       readonly kind: 'details';
-      readonly target: Target;
+      readonly manifest: PluginManifest;
       readonly draft?: ConnectionDraft;
       readonly error?: string;
       /** The account exists now: the form signs in to it, never creates it again. */
       readonly created?: true;
     }
-  | { readonly kind: 'confirm'; readonly target: Target; readonly submitted: Submitted; readonly error?: string }
-  | { readonly kind: 'ask'; readonly target: Target; readonly prepared: PreparedSignIn }
-  | { readonly kind: 'switch'; readonly target: Target; readonly prepared: PreparedSignIn }
+  | { readonly kind: 'confirm'; readonly manifest: PluginManifest; readonly submitted: Submitted; readonly error?: string }
+  | { readonly kind: 'replace'; readonly prepared: PreparedAccount }
   | { readonly kind: 'completing' };
 
 /**
- * Signing in to an account, shared by Welcome and Settings — so it uses no
- * profile's hooks: at first launch there is no profile. Each step has its own
- * Back. A sign-in that does not go through says why and is never tried again
- * by itself. The host decides what follows, and must not navigate when "Use
- * the account's profiles" took the profile in use: everything under it is gone.
+ * Signing in to your server, shared by Welcome and Settings — so it uses no
+ * profile's hooks: at first launch there is no profile. Signing in replaces
+ * this device's account with the one on the server, after saying so;
+ * creating an account uploads this device's. A sign-in that does not go
+ * through says why, and is never tried again by itself. The host decides what
+ * follows, and must not navigate after a replace: it may have taken the
+ * profile in use, and everything under it.
  */
 export function SignInFlow({
   start,
@@ -79,208 +62,148 @@ export function SignInFlow({
 }) {
   const { account, catalog } = useServices();
   const { data: current } = useAccount();
-  const { data: providers } = useAccountProviders();
   const { data: method } = useOwnerMethod();
   const refresh = useRefreshLocalState();
   const [step, setStep] = useState<Step>();
   const [confirming, setConfirming] = useState(false);
-  // Switching away from an account that checks its owner with its password: typed again before anything is tried.
-  const proofAsks = start.kind !== 'again' && current && method?.via === 'account' ? method.asks : [];
+  const servers = account.servers();
+  // Moving away from an account that checks its owner with its password: typed again before anything is tried.
+  const proofAsks = start.kind !== 'again' && current?.kind === 'server' && method?.via === 'account' ? method.asks : [];
 
   const first = ((): Step | undefined => {
-    if (current === undefined || providers === undefined) return undefined;
+    if (current === undefined) return undefined;
     switch (start.kind) {
       case 'again':
-        return current?.manifest ? { kind: 'details', target: { manifest: current.manifest, connectionId: current.connection.id } } : undefined;
+        return current?.kind === 'server' && current.manifest ? { kind: 'details', manifest: current.manifest } : undefined;
       case 'plugin': {
         const manifest = catalog.get(start.pluginId);
-        return manifest ? { kind: 'details', target: { manifest } } : undefined;
-      }
-      case 'connection': {
-        const provider = providers.find((candidate) => candidate.connections.some((connection) => connection.id === start.connectionId));
-        return provider ? { kind: 'details', target: { manifest: provider.manifest, connectionId: start.connectionId } } : undefined;
+        return manifest ? { kind: 'details', manifest } : undefined;
       }
       case 'pick': {
-        const only = providers.length === 1 ? providers[0] : undefined;
-        return only && only.connections.length === 0 ? { kind: 'details', target: { manifest: only.manifest } } : { kind: 'pick' };
+        const [only] = servers;
+        return servers.length === 1 && only ? { kind: 'details', manifest: only } : { kind: 'pick' };
       }
     }
   })();
   const shown = step ?? first;
 
-  if (current === undefined || providers === undefined) return null;
+  if (current === undefined) return null;
   if (!shown) {
     return (
       <YStack gap="$3" items="flex-start">
         <Paragraph color="$color11">
-          {start.kind === 'again' ? 'This device is not signed in to an account.' : 'This account can’t be used in this version of the app.'}
+          {start.kind === 'again' ? 'This device is not signed in to your server.' : 'This account can’t be used in this version of the app.'}
         </Paragraph>
         <Button onPress={onCancel}>Back</Button>
       </YStack>
     );
   }
 
-  const complete = async (target: Target, prepared: PreparedSignIn, profiles: 'account' | 'both') => {
+  const complete = async (prepared: PreparedAccount) => {
     setStep({ kind: 'completing' });
     try {
-      const result = await account.completeSignIn(prepared, profiles);
+      const result = await account.complete(prepared);
       await refresh({ remote: true });
       await onDone(result);
     } catch (error) {
       const message = describeSignInError(error);
-      setStep({ kind: 'details', target, draft: prepared.draft, ...(message ? { error: message } : {}), ...(prepared.created ? { created: true } : {}) });
+      setStep({ kind: 'details', manifest: prepared.manifest, draft: prepared.draft, ...withError(message), ...(prepared.created ? { created: true } : {}) });
     }
   };
 
-  const prepare = async (target: Target, { draft, signUp }: Submitted, proof?: Credentials) => {
-    const prepared = await account.prepareSignIn(
-      target.connectionId ? { connectionId: target.connectionId, draft } : { pluginId: target.manifest.id, draft, ...(signUp ? { signUp } : {}) },
+  const prepare = async (manifest: PluginManifest, { draft, signUp }: Submitted, proof?: Credentials) => {
+    const prepared = await account.prepare(
+      { pluginId: manifest.id, draft, ...(signUp ? { signUp } : {}), ...(start.kind === 'again' ? { again: true as const } : {}) },
       proof,
     );
-    if (prepared.ask) setStep({ kind: 'ask', target, prepared });
-    else if (prepared.switching) setStep({ kind: 'switch', target, prepared });
-    else await complete(target, prepared, 'both');
+    // A replace that takes this device's profiles away says so first.
+    if (prepared.kind === 'replace' && prepared.deviceProfiles.length > 0) setStep({ kind: 'replace', prepared });
+    else await complete(prepared);
   };
 
-  const confirmThenPrepare = async (target: Target, submitted: Submitted, proof: Credentials) => {
+  const confirmThenPrepare = async (manifest: PluginManifest, submitted: Submitted, proof: Credentials) => {
     setConfirming(true);
     try {
-      await prepare(target, submitted, proof);
+      await prepare(manifest, submitted, proof);
     } catch (error) {
       if (error instanceof OwnerNotVerifiedError) {
-        setStep({ kind: 'confirm', target, submitted, ...withError(describeProofVerdict(error.verdict)) });
+        setStep({ kind: 'confirm', manifest, submitted, ...withError(describeProofVerdict(error.verdict)) });
       } else {
         const created = error instanceof AccountCreatedError;
-        setStep({ kind: 'details', target, draft: submitted.draft, ...withError(describeSignInError(error)), ...(created ? { created: true } : {}) });
+        setStep({ kind: 'details', manifest, draft: submitted.draft, ...withError(describeSignInError(error)), ...(created ? { created: true } : {}) });
       }
     } finally {
       setConfirming(false);
     }
   };
 
-  const backToDetails = (target: Target, prepared: PreparedSignIn) =>
-    setStep({ kind: 'details', target, draft: prepared.draft, ...(prepared.created ? { created: true } : {}) });
-
   switch (shown.kind) {
     case 'pick':
       return (
         <YStack gap="$5">
-          <StepHeading
-            title="Choose your account"
-            body="Your profiles and settings are kept in it, and every device signed in to it gets them."
-          />
-          {providers.map(({ manifest, connections }) => (
-            <SettingsSection key={manifest.id} {...(connections.length > 0 ? { title: manifest.displayName } : {})}>
-              <SettingsRow
-                title={connections.length > 0 ? 'Another account' : manifest.displayName}
-                subtitle={manifest.description}
-                onPress={() => setStep({ kind: 'details', target: { manifest } })}
-              />
-              {connections.map((connection) => (
-                <SettingsRow
-                  key={connection.id}
-                  title={connection.label}
-                  subtitle="Already on this device"
-                  onPress={() => setStep({ kind: 'details', target: { manifest, connectionId: connection.id } })}
-                />
-              ))}
-            </SettingsSection>
-          ))}
+          <StepHeading title="Your own server" body="Your profiles, their settings and your sources are kept there, and every device signed in to it gets them." />
+          <SettingsSection>
+            {servers.map((manifest) => (
+              <SettingsRow key={manifest.id} title={manifest.displayName} subtitle={manifest.description} onPress={() => setStep({ kind: 'details', manifest })} />
+            ))}
+          </SettingsSection>
           <BackButton onPress={onCancel} />
         </YStack>
       );
     case 'details': {
       const back = first?.kind === 'pick' ? () => setStep({ kind: 'pick' }) : onCancel;
-      const { target } = shown;
+      const { manifest } = shown;
       const props = {
-        manifest: target.manifest,
+        manifest,
         passwordsOnly: start.kind === 'again',
         ...(shown.draft ? { restored: shown.draft } : {}),
         ...(shown.error ? { error: shown.error } : {}),
         ...(shown.created ? { created: true } : {}),
         onBack: back,
         onSubmit: async (submitted: Submitted) => {
-          if (proofAsks.length > 0) setStep({ kind: 'confirm', target, submitted });
-          else await prepare(target, submitted);
+          if (proofAsks.length > 0) setStep({ kind: 'confirm', manifest, submitted });
+          else await prepare(manifest, submitted);
         },
       };
-      return shown.target.connectionId ? (
-        <ExistingDetails key={shown.target.connectionId} connectionId={shown.target.connectionId} {...props} />
+      return start.kind === 'again' && current?.kind === 'server' ? (
+        <ExistingDetails connectionId={current.connection.id} {...props} />
       ) : (
-        <DetailsForm
-          key={shown.target.manifest.id}
-          initial={initialDraft(shown.target.manifest, 0)}
-          saved={NOTHING_SAVED}
-          canCreate={start.kind !== 'again'}
-          {...props}
-        />
+        <DetailsForm key={manifest.id} initial={initialDraft(manifest, 0)} saved={NOTHING_SAVED} canCreate {...props} />
       );
     }
     case 'confirm': {
-      const { target, submitted } = shown;
+      const { manifest, submitted } = shown;
+      const name = current?.name ?? 'your account';
       return (
         <YStack gap="$5">
-          <StepHeading
-            title="Confirm it’s you"
-            body={`${current?.connection.label ?? 'Your account'} asks for its password before this device moves to another account.`}
-          />
+          <StepHeading title="Confirm it’s you" body={`${name} asks for its password before this device moves to another account.`} />
           <OwnerProofForm
             asks={proofAsks}
-            prompt={`The password of ${current?.connection.label ?? 'your account'}`}
+            prompt={`The password of ${name}`}
             busy={confirming}
             error={shown.error}
-            onSubmit={(proof) => void confirmThenPrepare(target, submitted, proof)}
-            onCancel={() => setStep({ kind: 'details', target, draft: submitted.draft })}
+            onSubmit={(proof) => void confirmThenPrepare(manifest, submitted, proof)}
+            onCancel={() => setStep({ kind: 'details', manifest, draft: submitted.draft })}
           />
         </YStack>
       );
     }
-    case 'ask': {
-      const { prepared, target } = shown;
-      const name = prepared.accountName ?? prepared.manifest.displayName;
-      const removed = listAll(prepared.onlyHere);
+    case 'replace': {
+      const { prepared } = shown;
+      const theirs = prepared.accountProfiles.length > 0 ? listAll(prepared.accountProfiles) : 'no profiles yet';
       return (
         <YStack gap="$5">
           <StepHeading
-            title="Profiles on both sides"
-            body={`${name} has ${listAll(prepared.accountProfiles)}. ${removed} ${prepared.onlyHere.length === 1 ? 'is' : 'are'} only on this device.`}
+            title={`Use ${prepared.accountName} on this device?`}
+            body={`It replaces what this device holds: ${listAll(prepared.deviceProfiles)}, with their PINs and settings, and this device’s sources. ${prepared.accountName} has ${theirs}.`}
           />
-          {prepared.switching && current ? (
-            <Paragraph size="$3" color="$color10">
-              {`${current.connection.label} keeps what it has, and stops getting this device’s changes.`}
-            </Paragraph>
-          ) : null}
-          <YStack gap="$3" items="stretch">
-            <PrimaryButton onPress={() => void complete(target, prepared, 'both')}>Keep both</PrimaryButton>
-            <ConfirmButton
-              label="Use the account’s profiles"
-              title={`Remove ${removed} from this device?`}
-              description={`${
-                prepared.onlyHere.length === 1
-                  ? 'Everything kept for that profile goes with it, its settings and PIN included.'
-                  : 'Everything kept for those profiles goes with them, their settings and PINs included.'
-              } This device’s connections stay, and join ${name}.`}
-              confirmLabel="Remove"
-              onConfirm={() => void complete(target, prepared, 'account')}
-            />
-          </YStack>
-          <BackButton onPress={() => backToDetails(target, prepared)} />
-        </YStack>
-      );
-    }
-    case 'switch': {
-      const { prepared, target } = shown;
-      const name = prepared.accountName ?? prepared.manifest.displayName;
-      return (
-        <YStack gap="$5">
-          <StepHeading
-            title={`Move your profiles and settings to ${name}?`}
-            body={`Everything on this device goes to ${name}${current ? `. ${current.connection.label} keeps what it has, and stops getting this device’s changes` : ''}.`}
-          />
-          <PrimaryButton size="$5" onPress={() => void complete(target, prepared, 'both')}>
-            Move
+          <Paragraph size="$3" color="$color10">
+            Accounts are never merged. To keep what is here, sign in to your server with a new account instead, and this device’s account goes up to it.
+          </Paragraph>
+          <PrimaryButton size="$5" onPress={() => void complete(prepared)}>
+            Replace
           </PrimaryButton>
-          <BackButton onPress={() => backToDetails(target, prepared)} />
+          <BackButton onPress={() => setStep({ kind: 'details', manifest: prepared.manifest, draft: prepared.draft })} />
         </YStack>
       );
     }
@@ -298,7 +221,7 @@ export function SignInFlow({
 
 interface DetailsProps {
   manifest: PluginManifest;
-  /** Signing in again: the account stays the same, so only its passwords can change. */
+  /** Signing in again: the account stays the same, so only its password can change. */
   passwordsOnly: boolean;
   /** What was typed before a step back. */
   restored?: ConnectionDraft;
@@ -324,9 +247,9 @@ function ExistingDetails({ connectionId, ...props }: DetailsProps & { connection
 }
 
 /**
- * The account's connection fields — nothing per profile, no roles: the account
- * belongs to the device. Where the plugin can create an account (`signUp`), it
- * offers to, with the extra fields that takes.
+ * The server's connection fields — nothing per profile: this device's sign-in
+ * belongs to the device. Where the plugin can create an account (`signUp`),
+ * it offers to, with the extra fields that takes.
  */
 function DetailsForm({
   manifest,
@@ -340,15 +263,15 @@ function DetailsForm({
   onBack,
   onSubmit,
 }: DetailsProps & { initial: ConnectionDraft; saved: SavedSecrets; canCreate: boolean }) {
-  const signUpFields = manifest.sync?.signUp?.fields ?? [];
+  const signUpFields = manifest.account?.signUp?.fields;
   const [draft, setDraft] = useState(restored ?? initial);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState(error);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(createdBefore);
   const [creating, setCreating] = useState(false);
-  const [signUp, setSignUp] = useState<FieldValues>(() => defaultValues(signUpFields));
-  const offersCreate = canCreate && signUpFields.length > 0 && !created;
+  const [signUp, setSignUp] = useState<FieldValues>(() => defaultValues(signUpFields ?? []));
+  const offersCreate = canCreate && signUpFields !== undefined && !created;
   const asCreate = offersCreate && creating;
 
   const setField = (key: string, value: FieldValue) =>
@@ -358,7 +281,7 @@ function DetailsForm({
 
   const submit = async () => {
     const found = validateDraft(manifest, draft, saved);
-    const signUpErrors = asCreate ? validateFields(signUpFields, signUp) : {};
+    const signUpErrors = asCreate ? validateFields(signUpFields ?? [], signUp) : {};
     setErrors({ ...found.shared, ...signUpErrors });
     setMessage(found.form);
     if (hasErrors(found) || hasFieldErrors(signUpErrors)) return;
@@ -382,20 +305,17 @@ function DetailsForm({
     }
   };
 
-  const hasPasswords = manifest.connectionFields.some((field) => field.type === 'password');
   return (
     <YStack gap="$5">
       <StepHeading
         title={asCreate ? 'Create an account' : manifest.displayName}
         body={
           passwordsOnly
-            ? hasPasswords
-              ? 'Enter the password again. The rest stays as it is: another address would be another account.'
-              : 'Sign in again with the details saved on this device.'
+            ? 'Enter the password again. The rest stays as it is: another address would be another account.'
             : created
               ? 'Your account is there now. Sign in to it with the same details.'
               : asCreate
-                ? 'Choose a username and a password. The password protects everything the account holds, and nothing can recover it.'
+                ? 'Choose a username and a password. This device’s account goes up to it — its profiles, settings and sources.'
                 : manifest.description
         }
       />
@@ -429,7 +349,7 @@ function DetailsForm({
             );
           })}
           {asCreate
-            ? signUpFields.map((field) => (
+            ? (signUpFields ?? []).map((field) => (
                 <FieldInput
                   key={`sign-up-${field.key}`}
                   field={field}
@@ -453,11 +373,6 @@ function DetailsForm({
         </PrimaryButton>
         {busy ? <Spinner size="small" color="$accent9" /> : null}
       </XStack>
-      {busy ? (
-        <SizableText size="$2" color="$color10">
-          {asCreate ? 'Creating your account' : 'Signing in'} — this can take a few seconds on a phone.
-        </SizableText>
-      ) : null}
       <BackButton onPress={onBack} disabled={busy} />
     </YStack>
   );
@@ -497,9 +412,9 @@ function describeSignInError(error: unknown): string | undefined {
   }
   if (isAppError(error)) {
     if (error.reason === 'too-many-attempts') return error.message;
-    if (error.code === 'UNAUTHORIZED') return 'The account did not accept these details.';
-    if (error.code === 'OFFLINE') return 'The account could not be reached. Check the network, then try again.';
-    if (error.code === 'TIMEOUT') return 'The account took too long to answer.';
+    if (error.code === 'UNAUTHORIZED') return 'Your server did not accept these details.';
+    if (error.code === 'OFFLINE') return 'Your server could not be reached. Check the network, then try again.';
+    if (error.code === 'TIMEOUT') return 'Your server took too long to answer.';
     return error.message;
   }
   return error instanceof Error ? error.message : String(error);

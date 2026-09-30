@@ -51,7 +51,7 @@ function RootStack() {
       <Stack.Protected guard={gate.kind === 'failed'}>
         <Stack.Screen name="boot" />
       </Stack.Protected>
-      <Stack.Protected guard={gate.kind === 'needs-first-user'}>
+      <Stack.Protected guard={gate.kind === 'needs-account' || gate.kind === 'needs-first-user'}>
         <Stack.Screen name="welcome" />
       </Stack.Protected>
       <Stack.Protected guard={gate.kind === 'needs-user-selection'}>

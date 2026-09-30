@@ -9,7 +9,7 @@ import { MIGRATIONS, migrate, type SqlMigration } from '@/persistence/sqlite/mig
 import { serializeSqlConnection } from '@/persistence/sqlite/sql';
 
 import { openTestDatabase, tempDatabasePath } from './support/engines';
-import { counterIds, fakeClock, silentLog } from './support/fakes';
+import { fakeClock, silentLog } from './support/fakes';
 import { nodeSqliteConnection } from './support/node-sqlite';
 
 const tempFile = tempDatabasePath;
@@ -28,6 +28,9 @@ describe('SQLite migrations', () => {
       (row) => row.name,
     );
     expect(tables).toEqual([
+      'account',
+      'account_sync',
+      'backup_state',
       'change_journal',
       'connection_profile_values',
       'connections',
@@ -36,7 +39,6 @@ describe('SQLite migrations', () => {
       'media_lists',
       'preferences',
       'stale_secrets',
-      'sync_state',
       'users',
     ]);
     expect((await db.get<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(MIGRATIONS.length);
@@ -128,17 +130,14 @@ describe('SQLite migrations', () => {
     `);
     await v1.close();
 
-    const db = openTestDatabase('sqlite', { clock: fakeClock(), path });
-    expect(await db.users.list()).toEqual([{ id: 'u-alex', name: 'Alex' }]);
-    expect((await db.connections.list()).map((connection) => [connection.id, connection.roles])).toEqual([
-      ['c-sync', { sync: false }],
-      ['c-both', { media: true, sync: false }],
+    const v2 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 2));
+    expect(await v2.all('SELECT id, roles FROM connections ORDER BY position')).toEqual([
+      { id: 'c-sync', roles: '{"sync":false}' },
+      { id: 'c-both', roles: '{"media":true,"sync":false}' },
     ]);
-    const [old] = await db.journal.entries();
-    expect(old).toMatchObject({ entity: 'user', entityId: 'u-alex' });
-    expect(old?.changeId).toBeUndefined();
-    expect(await db.syncState.get(connectionId('c-sync'))).toBeUndefined();
-    expect(await versionOf(path)).toBe(MIGRATIONS.length);
+    expect(await v2.all('SELECT entity_id, change_id FROM change_journal')).toEqual([{ entity_id: 'u-alex', change_id: null }]);
+    await v2.close();
+    expect(await versionOf(path)).toBe(2);
   });
 
   it('carry a v2 database over to v3: every plugin id qualified by its category, the mock by what it was', async () => {
@@ -156,22 +155,67 @@ describe('SQLite migrations', () => {
     `);
     await v2.close();
 
-    const db = openTestDatabase('sqlite', { clock: fakeClock(), path });
-    expect((await db.connections.list()).map((connection) => [connection.id, connection.pluginId])).toEqual([
-      ['c-home', 'sources/jellyfin'],
-      ['c-account', 'sync/custom-server'],
-      ['c-mock', 'sources/mock'],
-      ['c-pretend', 'sync/mock'],
+    const v3 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 3));
+    expect(await v3.all('SELECT id, plugin_id FROM connections ORDER BY position')).toEqual([
+      { id: 'c-home', plugin_id: 'sources/jellyfin' },
+      { id: 'c-account', plugin_id: 'sync/custom-server' },
+      { id: 'c-mock', plugin_id: 'sources/mock' },
+      { id: 'c-pretend', plugin_id: 'sync/mock' },
       // A plugin this app no longer ships keeps its id: nothing is guessed.
-      ['c-gone', 'retired'],
+      { id: 'c-gone', plugin_id: 'retired' },
     ]);
-    expect((await db.deviceSettings.get()).plugins).toEqual({
+    const plugins = await v3.get<{ value: string }>("SELECT value FROM device_settings WHERE key = 'plugins'");
+    expect(JSON.parse(plugins?.value ?? '{}')).toEqual({
       'sources/jellyfin': { enabled: true },
       'sources/mock': { enabled: true },
       'sync/mock': { enabled: true },
       'sources/google-drive': { enabled: false },
     });
-    expect(await versionOf(path)).toBe(MIGRATIONS.length);
+    await v3.close();
+    expect(await versionOf(path)).toBe(3);
+  });
+
+  it('carry a v3 database over to v4: the old account goes with every secret of it, a role switch becomes one switch', async () => {
+    const path = tempFile();
+    const v3 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 3));
+    await v3.exec(`
+      INSERT INTO users (id, name, pin_credential_ref, position, version) VALUES ('u-alex', 'Alex', NULL, 1, 1);
+      INSERT INTO connections (id, plugin_id, label, roles, per_profile, fields, settings, credentials_ref, secret_keys, position, version)
+        VALUES ('c-home', 'sources/jellyfin', 'Home', '{"media":true}', 'credentials', '{}', '{}', 'ref-home', '["password"]', 1, 1),
+               ('c-off', 'sources/jellyfin', 'Off', '{"media":false}', 'none', '{}', '{}', NULL, NULL, 2, 1),
+               ('c-account', 'sync/custom-server', 'Sync', '{"sync":true}', 'credentials', '{}', '{}', 'ref-account', '["password"]', 3, 1);
+      INSERT INTO connection_profile_values (connection_id, user_id, off, fields, settings, credentials_ref, secret_keys, version)
+        VALUES ('c-home', 'u-alex', 0, '{}', '{}', 'ref-home-alex', '["password"]', 1),
+               ('c-account', 'u-alex', 0, '{}', '{}', 'ref-account-alex', '["password"]', 1);
+      INSERT INTO media_lists (user_id, connection_id, list_key, fingerprint, items, saved_at)
+        VALUES ('u-alex', 'c-home', 'resume', 'print', '[]', 1), ('u-alex', 'c-account', 'resume', 'print', '[]', 1);
+      INSERT INTO sync_state (connection_id, cursor, checkpoint, awaiting, carried, last_synced_at)
+        VALUES ('c-account', '1.4', 2, '{}', '[]', 1);
+      INSERT INTO device_settings (key, value)
+        VALUES ('plugins', '{"sources/jellyfin":{"enabled":true}}'), ('defaultUserId', '"u-alex"'), ('leftAccountAt', '5');
+      INSERT INTO change_journal (user_id, entity, entity_id, operation, changed_at, local_version, change_id)
+        VALUES ('u-alex', 'user', 'u-alex', 'upsert', 1, 1, 'change-1'), ('u-alex', 'user', 'u-alex', 'upsert', 1, 2, 'change-2');
+    `);
+    await v3.close();
+
+    const db = openTestDatabase('sqlite', { clock: fakeClock(), path });
+    expect((await db.connections.list()).map((connection) => [connection.id, connection.enabled])).toEqual([
+      ['c-home', true],
+      ['c-off', false],
+    ]);
+    expect((await db.connections.get(connectionId('c-home')))?.values.credentialsRef).toBe('ref-home');
+    expect([...(await db.connections.valuesOfProfile(userId('u-alex'))).keys()]).toEqual(['c-home']);
+    expect([...(await db.staleSecrets.list())].sort()).toEqual(
+      ['ref-account', 'ref-account-alex', 'session:c-account:account', 'session:c-account:shared', 'session:c-account:u-alex'].sort(),
+    );
+    expect(await db.deviceSettings.get()).toEqual({ defaultUserId: 'u-alex' });
+    expect(await db.account.get()).toBeUndefined();
+    expect(await db.account.sync()).toEqual({ checkpoint: 0, heldBack: [] });
+    expect(await db.journal.entries()).toEqual([]);
+    // Sequence numbers carry on: one the old log saw is never handed out again.
+    await db.users.update({ id: userId('u-alex'), name: 'Alexandra' });
+    expect((await db.journal.entries()).map((entry) => entry.seq)).toEqual([3]);
+    expect(await versionOf(path)).toBe(4);
   });
 
   it('insist on steps numbered one after another', async () => {
@@ -181,8 +225,7 @@ describe('SQLite migrations', () => {
 });
 
 describe('IndexedDB upgrades', () => {
-  const open = (indexedDB: IDBFactory) =>
-    createIndexedDbDatabase({ indexedDB, IDBKeyRange }, 'streaming-center', { clock: fakeClock(), ids: counterIds('change-'), log: silentLog });
+  const open = (indexedDB: IDBFactory) => createIndexedDbDatabase({ indexedDB, IDBKeyRange }, 'streaming-center', { clock: fakeClock(), log: silentLog });
 
   const rawOpen = (indexedDB: IDBFactory, version?: number) =>
     new Promise<IDBDatabase>((resolve, reject) => {
@@ -200,7 +243,7 @@ describe('IndexedDB upgrades', () => {
     db.close();
   });
 
-  it('carry a v1 database over to v2: every record kept, no connection left as the account', async () => {
+  it('carry a v1 database to v4 one version at a time, each step reading what the one before it wrote', async () => {
     const indexedDB = new IDBFactory();
     const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
       const opening = indexedDB.open('streaming-center', 1);
@@ -209,16 +252,30 @@ describe('IndexedDB upgrades', () => {
         if (!tx) throw new Error('no upgrade transaction');
         upgradeIndexedDb(opening.result, 0, tx, INDEXEDDB_UPGRADES.slice(0, 1));
         tx.objectStore('users').add({ id: 'u-alex', name: 'Alex', position: 1, version: 1 });
+        const connection = { values: { fields: {}, settings: {} }, version: 1 };
+        tx.objectStore('connections').add({ ...connection, id: 'c-both', pluginId: 'mock', label: 'Mock', roles: { media: true, sync: true }, perProfile: 'none', position: 1 });
+        tx.objectStore('connections').add({ ...connection, id: 'c-home', pluginId: 'jellyfin', label: 'Home', roles: { media: true }, perProfile: 'none', position: 2 });
+        tx.objectStore('connections').add({ ...connection, id: 'c-off', pluginId: 'jellyfin', label: 'Off', roles: { media: false }, perProfile: 'none', position: 3 });
         tx.objectStore('connections').add({
-          id: 'c-both',
-          pluginId: 'mock',
-          label: 'Mock',
-          roles: { media: true, sync: true },
-          perProfile: 'none',
-          values: { fields: {}, settings: {} },
-          position: 1,
+          id: 'c-account',
+          pluginId: 'custom-server',
+          label: 'Sync',
+          roles: { sync: true },
+          perProfile: 'credentials',
+          values: { fields: {}, settings: {}, credentialsRef: 'ref-account', secretKeys: ['password'] },
+          position: 4,
           version: 1,
         });
+        tx.objectStore('connectionProfileValues').add({
+          connectionId: 'c-account',
+          userId: 'u-alex',
+          values: { fields: {}, settings: {}, credentialsRef: 'ref-account-alex', secretKeys: ['password'] },
+          version: 1,
+        });
+        tx.objectStore('mediaLists').add({ userId: 'u-alex', connectionId: 'c-account', listKey: 'resume', fingerprint: 'print', items: [], savedAt: 1 });
+        tx.objectStore('mediaLists').add({ userId: 'u-alex', connectionId: 'c-home', listKey: 'resume', fingerprint: 'print', items: [], savedAt: 1 });
+        tx.objectStore('deviceSettings').add({ key: 'plugins', value: { jellyfin: { enabled: true }, 'custom-server': { enabled: true } } });
+        tx.objectStore('deviceSettings').add({ key: 'defaultUserId', value: 'u-alex' });
         tx.objectStore('journal').add({ userId: 'u-alex', entity: 'user', entityId: 'u-alex', operation: 'upsert', changedAt: 1, localVersion: 1 });
       };
       opening.onsuccess = () => resolve(opening.result);
@@ -227,43 +284,25 @@ describe('IndexedDB upgrades', () => {
     v1.close();
 
     const db = open(indexedDB);
-    expect(await db.users.list()).toEqual([{ id: 'u-alex', name: 'Alex' }]);
-    expect((await db.connections.list()).map((connection) => connection.roles)).toEqual([{ media: true, sync: false }]);
-    const [old] = await db.journal.entries();
-    expect(old).toMatchObject({ entity: 'user', entityId: 'u-alex' });
-    expect(old?.changeId).toBeUndefined();
-    expect(await db.syncState.get(connectionId('c-both'))).toBeUndefined();
-  });
-
-  it('carry a v1 database to v3 in one upgrade: v3 rewrites what v2 wrote, never what it read before', async () => {
-    const indexedDB = new IDBFactory();
-    const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = indexedDB.open('streaming-center', 1);
-      opening.onupgradeneeded = () => {
-        const tx = opening.transaction;
-        if (!tx) throw new Error('no upgrade transaction');
-        upgradeIndexedDb(opening.result, 0, tx, INDEXEDDB_UPGRADES.slice(0, 1));
-        const connection = { perProfile: 'none', values: { fields: {}, settings: {} }, version: 1 };
-        tx.objectStore('connections').add({ ...connection, id: 'c-both', pluginId: 'mock', label: 'Mock', roles: { media: true, sync: true }, position: 1 });
-        tx.objectStore('connections').add({ ...connection, id: 'c-home', pluginId: 'jellyfin', label: 'Home', roles: { media: true }, position: 2 });
-        tx.objectStore('deviceSettings').add({ key: 'plugins', value: { jellyfin: { enabled: true }, 'custom-server': { enabled: true } } });
-      };
-      opening.onsuccess = () => resolve(opening.result);
-      opening.onerror = () => reject(opening.error);
-    });
-    v1.close();
-
-    const db = open(indexedDB);
-    // Both steps rewrite connections inside one upgrade transaction: the mock loses its account to v2,
-    // and so goes to the catalogue in v3 — with v2's change kept.
-    expect((await db.connections.list()).map((connection) => [connection.pluginId, connection.roles])).toEqual([
-      ['sources/mock', { media: true, sync: false }],
-      ['sources/jellyfin', { media: true }],
+    // v2 took the mock's account away, so v3 sent it to the catalogue and v4 kept it: had v3 read
+    // the record as it was before v2, the mock would have become the pretend account, and gone.
+    expect((await db.connections.list()).map((connection) => [connection.id, connection.pluginId, connection.enabled])).toEqual([
+      ['c-both', 'sources/mock', true],
+      ['c-home', 'sources/jellyfin', true],
+      ['c-off', 'sources/jellyfin', false],
     ]);
-    expect((await db.deviceSettings.get()).plugins).toEqual({
-      'sources/jellyfin': { enabled: true },
-      'sync/custom-server': { enabled: true },
-    });
+    expect((await db.connections.valuesOfProfile(userId('u-alex'))).size).toBe(0);
+    expect(await db.mediaCache.list(userId('u-alex'), connectionId('c-account'), 'resume', 'print')).toBeUndefined();
+    expect(await db.mediaCache.list(userId('u-alex'), connectionId('c-home'), 'resume', 'print')).toBeDefined();
+    expect([...(await db.staleSecrets.list())].sort()).toEqual(
+      ['ref-account', 'ref-account-alex', 'session:c-account:account', 'session:c-account:shared', 'session:c-account:u-alex'].sort(),
+    );
+    expect(await db.deviceSettings.get()).toEqual({ defaultUserId: 'u-alex' });
+    expect(await db.account.get()).toBeUndefined();
+    expect(await db.journal.entries()).toEqual([]);
+    // The key generator carries on: a seq the old log saw is never handed out again.
+    await db.users.update({ id: userId('u-alex'), name: 'Alexandra' });
+    expect((await db.journal.entries()).map((entry) => entry.seq)).toEqual([2]);
   });
 
   it('refuse data saved by a newer version of the app', async () => {

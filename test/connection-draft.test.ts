@@ -16,7 +16,9 @@ import type { SavedSecrets } from '@/services/connections';
 import { hasErrors, validateDraft } from '@/services/field-values';
 
 const manifest: PluginManifest = {
-  id: pluginId('fixture'),
+  id: pluginId('sources/fixture'),
+  category: 'sources',
+  platforms: ['ios', 'android', 'web'],
   displayName: 'Fixture',
   description: 'Test.',
   media: { contentKinds: ['movies'], capabilities: ['libraries'] },

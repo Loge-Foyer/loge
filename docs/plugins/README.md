@@ -3,9 +3,8 @@
 How the app discovers, registers and talks to plugins, and how to develop
 against the plugins repository locally.
 
-This page describes the target. Until Phase 6 the plugins sit in one flat
-folder with unqualified ids, may declare roles, and Settings → Plugins is one
-list.
+This page describes the target. Players and backup targets have manifests
+and no role yet.
 
 ## Four categories
 

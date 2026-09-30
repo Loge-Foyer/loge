@@ -1,25 +1,34 @@
-import { effectiveRoles, type Connection, type PluginManifest, type SyncCapability } from '@sc/api';
+import type { Connection, PluginManifest } from '@sc/api';
 
 import type { PluginCatalog } from '../plugin-catalog';
 import type { LocalDatabase } from '../ports';
 
-/** The device's account: the one connection with its sync role on. */
-export interface CurrentAccount {
-  readonly connection: Connection;
-  readonly manifest?: PluginManifest;
-  /** Whether this build can run it — its plugin is registered here, with a sync role. */
-  readonly available: boolean;
-  /** What it carries: everything its plugin declares, less any toggle switched off. */
-  readonly carried: ReadonlySet<SyncCapability>;
-}
+/** The device's account, as it stands. */
+export type CurrentAccount =
+  | { readonly kind: 'local'; readonly id: string; readonly name: string }
+  | {
+      readonly kind: 'server';
+      readonly id: string;
+      readonly name: string;
+      readonly maxProfiles: number;
+      readonly connection: Connection;
+      readonly manifest?: PluginManifest;
+      /** Whether this build can reach it: its plugin is registered here, with an account role. */
+      readonly available: boolean;
+    };
 
 export async function currentAccount(db: LocalDatabase, catalog: PluginCatalog): Promise<CurrentAccount | undefined> {
-  const connection = (await db.connections.list()).find((candidate) => candidate.roles.sync === true);
-  if (!connection) return undefined;
+  const account = await db.account.get();
+  if (!account) return undefined;
+  if (account.kind === 'local') return account;
+  const connection = await db.connections.get(account.connectionId);
+  // Its connection gone would be a bug; the account then holds what the device holds, as a local one.
+  if (!connection) return { kind: 'local', id: account.id, name: account.name };
   const manifest = catalog.get(connection.pluginId);
-  const available = manifest !== undefined && catalog.syncRole(connection.pluginId) !== undefined;
-  const carried = manifest
-    ? (effectiveRoles(manifest, { roles: connection.roles, settings: connection.values.settings }).sync?.capabilities ?? new Set<SyncCapability>())
-    : new Set<SyncCapability>();
-  return { connection, ...(manifest ? { manifest } : {}), available, carried };
+  return {
+    ...account,
+    connection,
+    ...(manifest ? { manifest } : {}),
+    available: manifest !== undefined && catalog.accountRole(connection.pluginId) !== undefined,
+  };
 }

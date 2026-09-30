@@ -1,14 +1,14 @@
-import { declaredRoles, type PluginCategory, type PluginManifest } from '@sc/api';
+import type { PluginCategory, PluginManifest } from '@sc/api';
 import { Stack } from 'expo-router';
 import { Paragraph, SizableText } from 'tamagui';
 
 import { Chip, ChipRow } from '@/components/chip';
-import { CATEGORY_LABELS, CONTENT_KIND_LABELS, ROLE_LABELS } from '@/components/labels';
+import { CATEGORY_LABELS, CONTENT_KIND_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
-import { usePluginStates } from '@/hooks/use-plugins';
+import { useConnectedPlugins } from '@/hooks/use-connections';
 
 import { pluginHref } from './plugin-route';
 
@@ -31,7 +31,7 @@ const NONE_HERE: Readonly<Record<PluginCategory, string>> = {
 /** One category's plugins, as they run on this platform. */
 export function CategoryScreen({ category }: { category: PluginCategory | undefined }) {
   const { catalog } = useServices();
-  const { data: states } = usePluginStates();
+  const { data: connected } = useConnectedPlugins();
   const { data: account } = useAccount();
 
   if (!category) {
@@ -55,10 +55,10 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
               title={manifest.displayName}
               subtitle={manifest.description}
               trailing={
-                account?.connection.pluginId === manifest.id ? (
+                account?.kind === 'server' && account.connection.pluginId === manifest.id ? (
                   <Chip label="Your account" tone="accent" />
-                ) : states?.get(manifest.id)?.enabled ? (
-                  <Chip label="Installed" tone="accent" />
+                ) : connected?.has(manifest.id) ? (
+                  <Chip label="Connected" tone="accent" />
                 ) : null
               }
               href={pluginHref(manifest.id)}
@@ -72,15 +72,14 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
   );
 }
 
-/** What a plugin brings and which roles it has, from its manifest. */
+/** What a plugin brings, from its manifest. */
 export function PluginChips({ manifest }: { manifest: PluginManifest }) {
+  const kinds = manifest.media?.contentKinds ?? [];
+  if (kinds.length === 0) return null;
   return (
     <ChipRow>
-      {(manifest.media?.contentKinds ?? []).map((kind) => (
+      {kinds.map((kind) => (
         <Chip key={kind} label={CONTENT_KIND_LABELS[kind]} tone="accent" />
-      ))}
-      {declaredRoles(manifest).map((role) => (
-        <Chip key={role} label={ROLE_LABELS[role]} />
       ))}
     </ChipRow>
   );

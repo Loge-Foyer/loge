@@ -7,45 +7,47 @@ import { Button, H1, Paragraph, SizableText, Spinner, useTheme, YStack } from 't
 import { PrimaryButton } from '@/components/primary-button';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
-import { useAccount, useAccountProviders } from '@/hooks/use-account';
+import { useAccount } from '@/hooks/use-account';
+import { useGate } from '@/hooks/use-session';
 import { SignInFlow } from '@/screens/sign-in-flow';
 
-type Step = 'choose' | 'sign-in' | 'arriving' | 'name';
+type Step = 'choose' | 'local' | 'sign-in' | 'arriving';
 
 /**
- * The first launch on a device: sign in to an account, whose profiles then
- * arrive in "Who's watching?", or keep everything on this device and name
- * its first profile.
+ * The first launch on a device: an account kept here, with a first profile
+ * named after it; or your own server's, whose profiles then arrive in "Who's
+ * watching?". And an account left with no profile asks for a first one.
  */
 export function WelcomeScreen() {
-  const { session } = useServices();
-  const { data: providers } = useAccountProviders();
-  const { data: current } = useAccount();
-  const [step, setStep] = useState<Step>();
+  const { account, session } = useServices();
+  const gate = useGate();
+  const [step, setStep] = useState<Step>('choose');
+  const servers = account.servers();
 
-  if (providers === undefined || current === undefined) return <Page>{null}</Page>;
-  // Nothing to sign in to in this build — or signed in already — leaves naming the first profile.
-  const choice = providers.length > 0 && current === null;
-  const shown = step ?? (choice ? 'choose' : 'name');
+  if (gate.kind === 'needs-first-user') return <FirstProfile />;
 
-  switch (shown) {
+  switch (step) {
     case 'choose':
       return (
         <Page>
           <Heading
             title="Welcome"
-            body="Sign in to an account to bring your household’s profiles, and keep them in step on every device. Or keep everything on this one."
+            body="Your profiles, their PINs and settings, and your sources live in an account. Keep it on this device, or on your own server to share it with every device you sign in on."
           />
           <YStack gap="$3">
-            <PrimaryButton size="$5" icon={<Cloud size={18} />} onPress={() => setStep('sign-in')}>
-              Sign in to sync your profiles
+            <PrimaryButton size="$5" onPress={() => setStep('local')}>
+              Create an account on this device
             </PrimaryButton>
-            <Button size="$5" onPress={() => setStep('name')}>
-              Use on this device only
-            </Button>
+            {servers.length > 0 ? (
+              <Button size="$5" icon={<Cloud size={18} />} onPress={() => setStep('sign-in')}>
+                Sign in to your server
+              </Button>
+            ) : null}
           </YStack>
         </Page>
       );
+    case 'local':
+      return <LocalAccount onBack={() => setStep('choose')} />;
     case 'sign-in':
       return (
         <Page>
@@ -53,15 +55,10 @@ export function WelcomeScreen() {
           <SignInFlow
             start={{ kind: 'pick' }}
             onCancel={() => setStep('choose')}
-            onDone={async ({ profilesArrived }) => {
-              if (profilesArrived === 0) {
-                setStep('name');
-                return;
-              }
-              // The gate moves to "Who's watching?" by itself; this only waits for it.
+            onDone={async () => {
+              // The gate moves by itself — to "Who's watching?", or to a first profile; this only waits for it.
               setStep('arriving');
               await session.refresh();
-              if (session.getSnapshot().kind === 'needs-first-user') setStep('name');
             }}
           />
         </Page>
@@ -77,45 +74,27 @@ export function WelcomeScreen() {
           </YStack>
         </Page>
       );
-    case 'name':
-      return (
-        <FirstProfile
-          {...(current ? { accountLabel: current.connection.label } : {})}
-          {...(choice ? { onBack: () => setStep('choose') } : {})}
-        />
-      );
   }
 }
 
-function FirstProfile({ accountLabel, onBack }: { accountLabel?: string; onBack?: () => void }) {
-  const { profiles, session } = useServices();
+/** An account on this device: its name, which its first profile takes too. */
+function LocalAccount({ onBack }: { onBack: () => void }) {
+  const { account, session } = useServices();
   const [name, setName] = useState('');
   const create = useMutation({
     mutationFn: async () => {
-      const user = await profiles.create(name);
-      await session.select(user.id);
+      const userId = await account.createLocal(name);
+      await session.refresh();
+      await session.select(userId);
     },
   });
-
   return (
     <Page>
       <Heading
         title="Who is this?"
-        body={
-          accountLabel
-            ? `Signed in to ${accountLabel}, which has no profiles yet. Name the first one — it joins the account, and so does everyone added later.`
-            : 'Name the first profile on this device. Everyone can have their own later — with their own history, favourites and, if they like, a PIN.'
-        }
+        body="Your name names the account and its first profile. Everyone can have a profile of their own later — with their own history, favourites and, if they like, a PIN."
       />
-      <TextInput
-        size="$5"
-        value={name}
-        onChangeText={setName}
-        placeholder="Your name"
-        autoFocus
-        onSubmitEditing={() => create.mutate()}
-        aria-label="Profile name"
-      />
+      <TextInput size="$5" value={name} onChangeText={setName} placeholder="Your name" autoFocus onSubmitEditing={() => create.mutate()} aria-label="Your name" />
       {create.error ? (
         <SizableText size="$3" color="$red10">
           {create.error.message}
@@ -124,11 +103,41 @@ function FirstProfile({ accountLabel, onBack }: { accountLabel?: string; onBack?
       <PrimaryButton size="$5" disabled={create.isPending} onPress={() => create.mutate()}>
         Continue
       </PrimaryButton>
-      {onBack ? (
-        <Button chromeless color="$color10" self="flex-start" px={0} onPress={onBack}>
-          Back
-        </Button>
+      <Button chromeless color="$color10" self="flex-start" px={0} onPress={onBack}>
+        Back
+      </Button>
+    </Page>
+  );
+}
+
+/** An account with no profile left — or none yet on your server — names a first one. */
+function FirstProfile() {
+  const { profiles, session } = useServices();
+  const { data: current } = useAccount();
+  const [name, setName] = useState('');
+  const create = useMutation({
+    mutationFn: async () => {
+      const user = await profiles.create(name);
+      await session.refresh();
+      await session.select(user.id);
+    },
+  });
+
+  return (
+    <Page>
+      <Heading
+        title="Who is this?"
+        body={`${current?.name ?? 'Your account'} has no profiles yet. Name the first one — every device of the account gets it.`}
+      />
+      <TextInput size="$5" value={name} onChangeText={setName} placeholder="Your name" autoFocus onSubmitEditing={() => create.mutate()} aria-label="Profile name" />
+      {create.error ? (
+        <SizableText size="$3" color="$red10">
+          {create.error.message}
+        </SizableText>
       ) : null}
+      <PrimaryButton size="$5" disabled={create.isPending} onPress={() => create.mutate()}>
+        Continue
+      </PrimaryButton>
     </Page>
   );
 }

@@ -57,19 +57,21 @@ plugins.
 
 What runs today:
 
-- One optional account per device, with log-based sync, sealed passwords and
-  owner proofs. Your own server is the Node server in
-  `../streaming_center_sync`, created from the app with an invite.
+- One account per device, local or on your own server — PocketBase, in
+  `../streaming_center_sync`. Signing in replaces the device's account,
+  signing up with an invite uploads it, and signing out keeps a local copy. A
+  run pushes the journal, reads the whole account and reconciles; ten
+  profiles at most, or the server's limit.
 - Four tabs, TV with its empty state, and Settings → Plugins as four lists by
   category, of the plugins that run on this platform.
 - Real titles from every live source, merged — Jellyfin the first — and kept
   across restarts where the source allows it.
-- SQLite and the keychain on phones, which run development builds
-  (`modules/key-derivation`); IndexedDB with WebCrypto-encrypted secrets on
-  the web.
-- Nothing plays, and Videos still shows skeletons.
-- vitest covers the database on both engines, the services, and two devices
-  syncing on every pair of engines.
+- SQLite and the keychain on phones, which run development builds; IndexedDB
+  with WebCrypto-encrypted secrets on the web.
+- Nothing plays, Videos still shows skeletons, and there is no backup file
+  yet.
+- vitest covers the database on both engines, every migration, the services,
+  and two devices on one fake server on every pair of engines.
 
 Documentation in `docs/` describes the target, not the present. When you build
 something, update the matching doc in the same commit.

@@ -4,10 +4,9 @@ Layers, the composition root, state ownership, and the rules that keep plugins
 from leaking into screens. The full reasoning is in
 `../../.claude/streaming-center-architecture.md`.
 
-This page describes the target. The four tabs and plugins by category and
-platform are in place; until the account moves to records, the code runs
-Phase 4's model under them: one optional account, synced through a log, and
-plugins that declare roles.
+This page describes the target. The four tabs, plugins by category and
+platform, and one account per device — kept here or on your own server,
+synced record by record — are in place; backups and players are not.
 
 ## Layers
 
@@ -24,9 +23,8 @@ src/
   composition/  builds the service graph; the only place that names a plugin
 ```
 
-The app has no native code of its own in the target: native code comes with
-player plugins, in their packages. Until Phase 6, `modules/key-derivation`
-(PBKDF2 in Swift and Kotlin) is the exception; it retires with the vault.
+The app has no native code of its own: native code comes with player
+plugins, in their packages.
 
 Dependencies point inward. Services depend only on the interfaces in
 `services/ports.ts` — never on a repository implementation or a platform module.
@@ -86,11 +84,12 @@ chosen by file, like storage:
 
 Only `src/platform/` imports noble; lint enforces it.
 
-Until Phase 6 the port also derives keys from passwords, for Phase 4's vault
-and owner proof: PBKDF2, through `modules/key-derivation` on a phone
-(`crypto.ts`) and WebCrypto in a browser (`crypto.web.ts`), never weaker than
-`isKdfParams` allows. Scrypt in plain JavaScript took 22 s on the emulator,
-which is why that was native. Both go with the vault.
+- **Hashing** is SHA-256 in JavaScript (noble): a record's id on your own
+  server is derived from it (`recordId`).
+
+Nothing derives a key from a password any more. Phase 4 did, for its vault
+and owner proof, with a native module: scrypt in plain JavaScript took 22 s on
+the emulator.
 
 ## The local database
 
@@ -105,11 +104,11 @@ rules, and why each exists, are in `docs/data`.
 ## The session gate
 
 `services/session.ts` owns a single gate: `starting`, `needs-account`,
-`needs-user-selection`, `needs-user-unlock`, `ready` or `failed`. The first
-decision after launch is the pure function in `services/boot.ts`, which reads
-whether the device has an account as well as its profiles: with no account, it
-is `needs-account`. (Until Phase 6, `needs-first-user` stands where
-`needs-account` will.) Every root route sits behind exactly one
+`needs-first-user`, `needs-user-selection`, `needs-user-unlock`, `ready` or
+`failed`. The first decision after launch is the pure function in
+`services/boot.ts`, which reads whether the device has an account as well as
+its profiles: with no account, it is `needs-account`; with an account that has
+no profile left, `needs-first-user`. Every root route sits behind exactly one
 `Stack.Protected` guard on that gate, so when the gate moves, the guards do the
 navigating.
 
@@ -181,7 +180,7 @@ profile's own where the mode separates them — and `@sc/api`'s
 values. A connection switched off has nothing in effect; otherwise a declared
 capability is in effect when every toggle gating it is on. Under `all`, two
 profiles can differ in what the same connection may do. The screens only ever
-see that result. (Until Phase 6 the same job is done over Phase 4's roles.)
+see that result.
 
 **Where its content appears** is its category plus its content kind, mapped in
 one place, `services/tab-content.ts`:
@@ -263,10 +262,13 @@ connections — so a run (`sync/engine.ts`) reads all of it:
 1. **Push** (`sync/push.ts`) the journal after the checkpoint, as one batch the
    server stores all or nothing, parents first. Each journaled entity goes as
    its whole current row (`sync/records.ts`), with its passwords read from the
-   keychain outside any transaction, or as a soft delete. A refused batch is
-   split to find the write it refused: a profile over the limit stays on this
-   device only, and says so; a write to a deleted profile or connection gives
-   way to the delete. The checkpoint moves past what was stored.
+   keychain outside any transaction, or as a soft delete. A refused batch
+   names the write that stopped it: a profile over the limit stays on this
+   device only, with everything of it, and says so; a write to a deleted
+   profile or connection gives way to the delete, with its children; one the
+   server finds invalid is left out and logged, and not taken for lost until
+   the app starts again. The rest is sent again, and the checkpoint moves past
+   what was stored.
 2. **Read** every record of the account, deleted ones included, each checked
    with `isAccountRecord`.
 3. **Reconcile** (`sync/reconcile.ts`). First the plan, outside any
@@ -284,9 +286,7 @@ connections — so a run (`sync/engine.ts`) reads all of it:
 
 There are no cursors, revisions or logs: the server's collections are the
 truth. Two devices editing the same profile or connection end on whichever
-pushed last, never by a clock, and nothing is merged field by field. (Until
-Phase 6 the engine pulls a log after a cursor, and joins an account on sign-in;
-this replaces all of it.)
+pushed last, never by a clock, and nothing is merged field by field.
 
 - **When it runs** (`sync/scheduler.ts`): at launch, on coming to the
   foreground, two seconds after a journaled commit, when the network changes,

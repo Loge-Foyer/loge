@@ -1,6 +1,6 @@
 import { AppError } from '@sc/api';
 
-import type { Clock, IdGenerator, Logger, Repositories, SyncDatabase } from '@/services/ports';
+import type { Clock, Logger, Repositories, SyncDatabase } from '@/services/ports';
 
 import { storageError } from '../errors';
 import { journalListeners, standaloneRepositories } from '../standalone';
@@ -31,7 +31,7 @@ export async function prepareSqlite(db: SqlDatabase, migrations: readonly SqlMig
  */
 export function createSqliteDatabase(
   open: () => Promise<SqlDatabase>,
-  deps: { readonly clock: Clock; readonly ids: IdGenerator; readonly log: Logger; readonly migrations?: readonly SqlMigration[] },
+  deps: { readonly clock: Clock; readonly log: Logger; readonly migrations?: readonly SqlMigration[] },
 ): SyncDatabase {
   let ready: Promise<SqlDatabase> | undefined;
   const database = () => {
@@ -47,7 +47,7 @@ export function createSqliteDatabase(
 
   const listeners = journalListeners(deps.log);
   const read = async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> =>
-    work(sqliteRepositories(await database(), { clock: deps.clock, ids: deps.ids, journaled: true }));
+    work(sqliteRepositories(await database(), { clock: deps.clock, journaled: true }));
   const writing =
     (journaled: boolean) =>
     async <T>(work: (repositories: Repositories) => Promise<T>): Promise<T> => {
@@ -56,7 +56,7 @@ export function createSqliteDatabase(
         grew = true;
       };
       const result = await (await database()).transaction((tx) =>
-        work(sqliteRepositories(tx, { clock: deps.clock, ids: deps.ids, journaled, onJournaled })),
+        work(sqliteRepositories(tx, { clock: deps.clock, journaled, onJournaled })),
       );
       // Committed, and outside the statement queue: a listener may use the database again.
       if (grew) listeners.notify();

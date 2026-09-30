@@ -42,17 +42,16 @@ else is real, including the database engine:
   and on IndexedDB through fake-indexeddb. It covers cascades, all-or-nothing
   transactions, the change journal, creation order, and updates that must not
   replace their children. Migrations and upgrades are tested separately,
-  including a table rebuild and a database from a newer version. From Phase 6,
-  a v2 database with rows migrates through v3 and v4 on both engines, keeping
-  every profile, connection and password ref.
+  including a table rebuild and a database from a newer version: every step on
+  SQLite, and on IndexedDB a v1 database through v4 one version at a time,
+  keeping every profile, connection and password ref, and queueing every
+  secret of Phase 4's account.
 - **The credential stores** — the keychain adapter against a SecureStore
   look-alike that refuses keys the way the real one does, and the web store on
   Node's WebCrypto.
-- **The host's crypto** — HKDF against RFC 5869's vectors, and AES-GCM opening
-  what Node sealed and the other way round, on Node's WebCrypto. Until Phase 6
-  also the web's PBKDF2 against RFC 7914's vectors; the native key-derivation
-  module cannot run on Node, and is checked against the same vector on the
-  emulator.
+- **The host's crypto** — SHA-256 against the standard's vectors and the
+  record ids the shared fixtures give, HKDF against RFC 5869's, and AES-GCM
+  opening what Node sealed and the other way round, on Node's WebCrypto.
 - **The services** — connections and per-profile values, profiles and PINs and
   the profile limit, secrets and what happens to them, session binding, the
   provider pool, merged rows, grid pages and Continue Watching, the home
@@ -67,7 +66,9 @@ else is real, including the database engine:
   - edits, renames, deletes and PINs converge
   - a pending edit survives a read, and a remote delete of a profile or
     connection beats it
-  - a refused batch is split, and a profile over the limit stays local
+  - a refused write gives way — a profile over the limit stays local, a write
+    to something deleted goes with its children, an invalid one is left out
+    and not sent again on every run
   - a lost answer converges on the next run, and a server that forgot
     everything gets every row back from the devices
   - passwords arrive in the keychain and never in a database dump, while the
@@ -77,17 +78,15 @@ else is real, including the database engine:
   - signing in replaces, signing up uploads, signing out keeps a local copy,
     and the owner check and Forgot PIN hold on both engines
   - a device-key fingerprint that no longer matches drops the pending journal
-- **Backups** — a round trip on both engines, with sql.js in Node standing in
+    and the session
+- **Backups** (with the backup file, later in Phase 6) — a round trip on both
+  engines, with sql.js in Node standing in
   for expo-sqlite; the passwords arrive in the keychain, never in a database
   dump. A wrong key, a tampered byte, a file over 64 MiB and a newer schema
   are refused, and a changed generation or etag asks rather than overwrites.
 
-Until Phase 6 the fake account is a log server's. It can store part of a push,
-expire a cursor, seal passwords and revoke a device, and the suites prove
-joining an account and the sign-in rule too. Phase 6 replaces it.
-
-The real account plugin meets the real server in the sync repository: its
-harness from Phase 6, `test/plugin.test.ts` there today. The scheduler runs on
+The real account plugin meets the real server in the sync repository's
+harness (Phase 6's S4). The scheduler runs on
 fake timers against a scripted engine. Choosing a player is a pure function in
 `@sc/api`, tested there over a matrix of descriptors and profiles.
 

@@ -1,6 +1,6 @@
 import { AppError } from '@sc/api';
 
-import { qualifiedIdOf, qualifiedPluginStates } from '../plugin-ids';
+import { qualifiedIdOf, qualifiedPluginStates, sessionRefOf } from '../plugin-ids';
 
 import type { SqlDatabase, SqlExecutor } from './sql';
 
@@ -148,7 +148,73 @@ export const MIGRATIONS: readonly SqlMigration[] = [
       }
     },
   },
+  { version: 4, up: accountModel },
 ];
+
+// One account per device, local or on your own server (Phase 6). Phase 4's
+// account — every sync-category connection — goes with every secret it held:
+// the device keeps its profiles as a local account (ensureAccount, at boot),
+// and a server account starts again with a full upload or download.
+const V4 = `
+DROP TABLE sync_state;
+
+CREATE TABLE account (
+  singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
+  kind TEXT NOT NULL,
+  id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  connection_id TEXT,
+  max_profiles INTEGER
+) STRICT;
+
+CREATE TABLE account_sync (
+  singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
+  checkpoint INTEGER NOT NULL,
+  last_synced_at INTEGER,
+  held_back TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE backup_state (
+  connection_id TEXT PRIMARY KEY NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  lineage TEXT NOT NULL,
+  generation INTEGER NOT NULL,
+  etag TEXT,
+  saved_at INTEGER
+) STRICT;
+`;
+
+async function accountModel(tx: SqlExecutor): Promise<void> {
+  const users = (await tx.all<{ id: string }>('SELECT id FROM users')).map((user) => user.id);
+  for (const connection of await tx.all<{ id: string; credentials_ref: string | null }>(
+    "SELECT id, credentials_ref FROM connections WHERE plugin_id LIKE 'sync/%'",
+  )) {
+    const own = await tx.all<{ credentials_ref: string | null }>('SELECT credentials_ref FROM connection_profile_values WHERE connection_id = ?', [
+      connection.id,
+    ]);
+    const refs = [
+      connection.credentials_ref,
+      ...own.map((row) => row.credentials_ref),
+      ...['shared', 'account', ...users].map((scope) => sessionRefOf(connection.id, scope)),
+    ];
+    for (const ref of refs) {
+      if (ref !== null) await tx.run('INSERT INTO stale_secrets (ref) VALUES (?) ON CONFLICT (ref) DO NOTHING', [ref]);
+    }
+    // The cascade takes its profile values, its saved media and its sync state.
+    await tx.run('DELETE FROM connections WHERE id = ?', [connection.id]);
+  }
+
+  // A role switch becomes one switch: on or off, on every device of the account.
+  await tx.exec('ALTER TABLE connections ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1');
+  for (const row of await tx.all<{ id: string; roles: string }>('SELECT id, roles FROM connections')) {
+    const roles = JSON.parse(row.roles) as Record<string, unknown>;
+    if (roles.media === false) await tx.run('UPDATE connections SET enabled = 0 WHERE id = ?', [row.id]);
+  }
+  await tx.exec('ALTER TABLE connections DROP COLUMN roles');
+  await tx.exec(V4);
+  await tx.run("DELETE FROM device_settings WHERE key IN ('plugins', 'leftAccountAt')");
+  // Its entries were for the old log; sequence numbers carry on, never reused.
+  await tx.run('DELETE FROM change_journal');
+}
 
 /**
  * Brings the database up to date, one step per transaction, so a step that

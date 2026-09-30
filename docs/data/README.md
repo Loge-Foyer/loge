@@ -4,9 +4,11 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Until Phase 6 the code runs Phase 4's model:
-the account is one of the device's connections, synced through a log, with
-passwords sealed on the device. This page's history in git has how that works.
+This page describes the target. Database v4 — the account model — is in
+place; the backup file arrives later in Phase 6, and watch status (v5) in
+Phase 7. Phase 4's model — the account as one of the device's connections,
+synced through a log, with passwords sealed on the device — is in this page's
+history in git.
 
 ## Where things live
 
@@ -106,8 +108,8 @@ transaction:
 - a profile's values on a connection
 
 An entry records the entity, its id, `upsert` or `delete`, when it happened,
-the row's new version, and a random change id. It points at data and never
-copies it, so nothing secret can end up there. The database numbers entries
+and the row's new version. It points at data and never copies it, so nothing
+secret can end up there. The database numbers entries
 (`AUTOINCREMENT`), so they keep the order changes committed, whatever the clock
 says, and a number is never used twice: a checkpoint cannot skip changes
 written in the same millisecond. Entries the account has stored are pruned.
@@ -247,15 +249,22 @@ The steps, the same on both engines:
 - **v3** (Phase 6) — plugin ids qualified by category, wherever one is stored:
   `jellyfin` becomes `sources/jellyfin`.
 - **v4** (Phase 6) — the account model:
-  1. Phase 4's account connection — `custom-server`, and any connection that
-     was only the account — goes. Its secrets are queued for deletion first, and
-     the cascade takes its values, its cache and `sync_state`.
+  1. Phase 4's account — every sync-category connection — goes. Its
+     secrets are queued for deletion first: its password, each profile's, and
+     every session it kept. The cascade takes its values, its cache and
+     `sync_state`.
   2. `sync_state` goes; `account`, `account_sync` and `backup_state` arrive.
-  3. A connection's roles become `enabled`, plus its `category`.
-  4. Device settings lose `plugins` for sources — a connection is what puts a
-     source in use now — and `leftAccountAt`, and gain `players`.
+  3. A connection's roles become `enabled`: off only where its media role
+     was. Its category is its id's first part, and needs no column.
+  4. Device settings lose `plugins` — a connection is what puts a source in
+     use now — and `leftAccountAt`. Players' settings arrive with the players
+     screen.
   5. The journal is cleared. Its entries were for the old log, and an account
-     now starts with a full upload or a full download.
+     now starts with a full upload or a full download. Sequence numbers carry
+     on: none is ever used twice.
+
+  On IndexedDB each version opens in a version-change transaction of its own,
+  so a step reads what the step before it committed.
 
   Then, before the gate, `ensureAccount()` gives a device that has profiles a
   local account, named after its default profile, or else its first; a device

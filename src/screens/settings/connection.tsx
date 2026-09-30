@@ -9,15 +9,13 @@ import {
   type PerProfile,
   type PluginId,
   type PluginManifest,
-  type PluginRole,
-  type PluginSettingDescriptor,
   type SelectField,
   type SourceInfo,
   type UserId,
 } from '@sc/api';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Button, Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
@@ -72,8 +70,8 @@ export function NewConnectionScreen({ pluginId }: { pluginId: PluginId }) {
   const { data: existing } = usePluginConnections(pluginId);
   const { create } = useConnectionActions();
   if (!manifest || !existing) return <Missing loading={!!manifest} />;
-  // An account is chosen in Settings → Account, never added here: this form cannot switch a sync role on.
-  if (!manifest.media) return <AccountOnly manifest={manifest} />;
+  // Only sources and IPTV are connected here: an account is chosen in Settings → Account.
+  if (!manifest.media) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={`New ${manifest.displayName} connection`}
@@ -91,7 +89,10 @@ export function EditConnectionScreen({ connectionId }: { connectionId: Connectio
   const manifest = usePluginManifest((data?.connection.pluginId ?? '') as PluginId);
   const { update, remove } = useConnectionActions();
   if (data === undefined) return <Missing loading />;
-  if (data === null || !manifest) return <Missing loading={false} />;
+  if (data === null) return <Missing loading={false} />;
+  // Kept for the devices that can run it — IPTV on the web.
+  if (!manifest) return <Unavailable label={data.connection.label} />;
+  if (!manifest.media) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={data.connection.label}
@@ -113,27 +114,39 @@ function Missing({ loading }: { loading: boolean }) {
   );
 }
 
-function AccountOnly({ manifest }: { manifest: PluginManifest }) {
+function Unavailable({ label }: { label: string }) {
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: label }} />
+      <Paragraph color="$color11">
+        {`${label} isn’t available on this device. Its details are kept for the devices that can use it.`}
+      </Paragraph>
+    </Screen>
+  );
+}
+
+/** A sync plugin: the device's own, and never edited in a connection form. */
+function NotHere({ manifest }: { manifest: PluginManifest }) {
   const { catalog } = useServices();
-  const usable = catalog.syncRole(manifest.id) !== undefined;
+  const usable = catalog.accountRole(manifest.id) !== undefined;
   return (
     <Screen>
       <Stack.Screen options={{ title: manifest.displayName }} />
       <Paragraph color="$color11">
         {usable
-          ? `${manifest.displayName} is an account, not a source. Sign in to it in Settings → Account.`
-          : `${manifest.displayName} is an account, and can’t be used as one in this version of the app yet.`}
+          ? `${manifest.displayName} is where your account can live, not a source. Sign in to it, or change how you sign in, in Settings → Account.`
+          : `${manifest.displayName} can’t be set up in this version of the app yet.`}
       </Paragraph>
       {usable ? (
         <SettingsSection>
-          <SettingsRow title="Sign in" href={{ pathname: '/settings/account/sign-in', params: { plugin: manifest.id } }} />
+          <SettingsRow title="Settings → Account" href="/settings/account" />
         </SettingsSection>
       ) : null}
     </Screen>
   );
 }
 
-function mediaRoleField(manifest: PluginManifest): BooleanField {
+function enabledField(manifest: PluginManifest): BooleanField {
   const kinds = manifest.media?.contentKinds ?? [];
   const tabs = [
     ...(showsOn('media', manifest.category, kinds) ? ['Media'] : []),
@@ -141,21 +154,12 @@ function mediaRoleField(manifest: PluginManifest): BooleanField {
     ...(showsOn('tv', manifest.category, kinds) ? ['TV'] : []),
   ];
   return {
-    key: 'role.media',
-    label: 'Use as a media source',
+    key: 'enabled',
+    label: 'Switched on',
     type: 'boolean',
-    default: false,
-    description: `Brings ${listKinds(kinds)} to ${tabs.join(' and ')}.`,
+    default: true,
+    description: `Brings ${listKinds(kinds)} to ${tabs.join(' and ')}. Switched off, it shows nothing and asks nothing of its server.`,
   };
-}
-
-/** Which role a setting belongs to: the role of what it gates, if anything. */
-function roleOf(setting: PluginSettingDescriptor): PluginRole | null {
-  // Libraries are chosen from what the media role reports, so they belong to it.
-  if (setting.type === 'libraries') return 'media';
-  const gate = setting.type === 'boolean' ? setting.gates?.[0] : undefined;
-  if (!gate) return null;
-  return gate.startsWith('sync.') ? 'sync' : 'media';
 }
 
 function modeField(modes: readonly PerProfile[], current: PerProfile): SelectField {
@@ -182,8 +186,8 @@ interface FormProps {
 }
 
 /**
- * Built entirely from the manifest: its connection fields, one switch per role
- * it declares, and its settings. When a connection keeps values per profile,
+ * Built entirely from the manifest: its connection fields, the one switch every
+ * connection has, and its settings. When a connection keeps values per profile,
  * profile tabs sit right above the first field that differs, and each input
  * shows whose value it is. Nothing here knows which plugin it is.
  */
@@ -201,22 +205,19 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const [errors, setErrors] = useState<DraftErrors>(NO_ERRORS);
   const [saving, setSaving] = useState(false);
 
-  // Only the account service switches a sync role; here the account is shown, and guarded.
-  const isAccount = stored?.connection.roles.sync === true;
-  const modes = isAccount ? [] : perProfileModes(manifest);
+  const modes = perProfileModes(manifest);
   const keys = perProfileKeys(manifest, draft.perProfile);
   const separate = draft.perProfile !== 'none';
   const tabProfile = profiles.find((profile) => profile.id === tab);
   const locked = separate && tab !== userId && tabProfile?.pinProtected === true && !unlocked.has(tab);
   const tabOff = isOffInDraft(draft, tab);
-  const canProbe = catalog.mediaRole(manifest.id) !== undefined && draft.roles.media === true;
+  const canProbe = catalog.mediaRole(manifest.id) !== undefined && draft.enabled;
 
   const target = (): ProbeTarget => {
     const values = probeValues(manifest, draft, tab);
     return {
       pluginId: manifest.id,
       ...(connectionId ? { connectionId } : {}),
-      roles: draft.roles,
       fields: values.fields,
       settings: values.settings,
       scope: values.scope,
@@ -358,6 +359,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const before = firstPerProfile < 0 ? manifest.connectionFields : manifest.connectionFields.slice(0, firstPerProfile);
   const after = firstPerProfile < 0 ? [] : manifest.connectionFields.slice(firstPerProfile);
   const settingsOnlyPerProfile = firstPerProfile < 0 && keys.settings.size > 0;
+  const ownSettings = manifest.settings.some((setting) => keys.settings.has(setting.key));
 
   const submit = async () => {
     const found = validateDraft(manifest, draft, saved);
@@ -379,14 +381,6 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
     }
   };
 
-  const setRole = (role: PluginRole, on: boolean) =>
-    edit((current) => ({ ...current, roles: { ...current.roles, [role]: on } }));
-
-  const groups = [
-    { role: null, title: 'Settings' },
-    { role: 'media', title: 'Media settings' },
-    { role: 'sync', title: 'What your account keeps in step' },
-  ] as const;
   const losing = profilesLosingValues(draft, stored);
   const setUpCount = profiles.filter((profile) => isSetUpInDraft(manifest, draft, profile.id, saved)).length;
   const offNames = profiles.filter((profile) => isOffInDraft(draft, profile.id)).map((profile) => profile.name);
@@ -424,15 +418,9 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
               {...(errors.form ? { error: errors.form } : {})}
             />
           ) : null}
-          {before.map((field) => renderField(field, 'fields', isAccount))}
+          {before.map((field) => renderField(field, 'fields'))}
           {after.length > 0 ? profileSwitcher : null}
-          {after.length > 0 ? (pinGate ?? offNotice ?? after.map((field) => renderField(field, 'fields', isAccount))) : null}
-          {isAccount ? (
-            <SizableText size="$2" color="$color10">
-              These are your account’s details. A new password goes in Settings → Account, with Sign in again; another
-              address would be another account.
-            </SizableText>
-          ) : null}
+          {after.length > 0 ? (pinGate ?? offNotice ?? after.map((field) => renderField(field, 'fields'))) : null}
           {canProbe && !locked && !tabOff ? (
             <TestConnection test={test} ready={probeReady} displayName={manifest.displayName} />
           ) : null}
@@ -442,45 +430,36 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
       )}
 
       <FormSection title="Use this connection">
-        {manifest.media ? (
-          <FieldInput
-            field={mediaRoleField(manifest)}
-            value={draft.roles.media === true}
-            onChange={(on) => setRole('media', on === true)}
-          />
-        ) : null}
-        {manifest.sync ? <AccountRole isAccount={isAccount} usable={catalog.syncRole(manifest.id) !== undefined} /> : null}
+        <FieldInput
+          field={enabledField(manifest)}
+          value={draft.enabled}
+          onChange={(on) => edit((current) => ({ ...current, enabled: on === true }))}
+        />
       </FormSection>
 
       {settingsOnlyPerProfile ? profileSwitcher : null}
       {settingsOnlyPerProfile ? (pinGate ?? offNotice) : null}
-      {groups.map(({ role, title: groupTitle }) => {
-        const settings = manifest.settings.filter((setting) => roleOf(setting) === role);
-        // What an account carries matters only on the account.
-        if (settings.length === 0 || (role === 'sync' && !isAccount)) return null;
-        const inert = role !== null && draft.roles[role] !== true;
-        const ownSettings = settings.some((setting) => keys.settings.has(setting.key));
-        return (
-          <FormSection key={groupTitle} title={groupTitle}>
-            {locked && ownSettings ? (
-              <SizableText size="$2" color="$color10">
-                Enter {tabProfile?.name}’s PIN above to see their settings.
-              </SizableText>
-            ) : tabOff && ownSettings ? (
-              <SizableText size="$2" color="$color10">
-                {`Not used by ${tabProfile?.name ?? 'this profile'}.`}
-              </SizableText>
-            ) : (
-              settings.map((setting) => renderField(setting, 'settings', inert))
-            )}
-          </FormSection>
-        );
-      })}
+      {manifest.settings.length > 0 ? (
+        <FormSection title="Settings">
+          {locked && ownSettings ? (
+            <SizableText size="$2" color="$color10">
+              Enter {tabProfile?.name}’s PIN above to see their settings.
+            </SizableText>
+          ) : tabOff && ownSettings ? (
+            <SizableText size="$2" color="$color10">
+              {`Not used by ${tabProfile?.name ?? 'this profile'}.`}
+            </SizableText>
+          ) : (
+            // Switched off, nothing it has is in effect.
+            manifest.settings.map((setting) => renderField(setting, 'settings', !draft.enabled))
+          )}
+        </FormSection>
+      ) : null}
 
       <Paragraph size="$2" color="$color10">
         {separate
           ? `${setUpCount} of ${profiles.length} ${profiles.length === 1 ? 'profile is' : 'profiles are'} set up${offNames.length > 0 ? `, and ${listAll(offNames)} ${offNames.length === 1 ? 'doesn’t' : 'don’t'} use it` : ''}. A profile that is not set up is asked to finish on its Media tab.`
-          : 'Shared by every profile on this device.'}{' '}
+          : 'Shared by every profile of your account.'}{' '}
         Passwords are kept in secure storage and never shown again.
       </Paragraph>
       {losing > 0 ? (
@@ -494,43 +473,18 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         <PrimaryButton size="$4" disabled={saving} onPress={() => void submit()}>
           {submitLabel}
         </PrimaryButton>
-        {onRemove && !isAccount ? (
+        {onRemove ? (
           <ConfirmButton
             label="Remove connection"
             icon={<Trash2 size={16} />}
             title={`Remove ${draft.label}?`}
-            description="Its details, and every profile's saved password, are deleted from this device."
+            description="Its details, and every profile's saved password, are deleted from your account."
             confirmLabel="Remove"
             onConfirm={onRemove}
           />
         ) : null}
       </YStack>
     </Screen>
-  );
-}
-
-/** The sync role, which no form switches: the account is chosen in Settings → Account. */
-function AccountRole({ isAccount, usable }: { isAccount: boolean; usable: boolean }) {
-  return (
-    <XStack gap="$3" items="center" justify="space-between">
-      <YStack flex={1} gap="$0.5">
-        <SizableText size="$4" color="$color12">
-          {isAccount ? 'Your account' : 'Use as your account'}
-        </SizableText>
-        <SizableText size="$2" color="$color10">
-          {isAccount
-            ? 'It keeps your profiles and settings in step on every device. Switch or sign out in Settings → Account.'
-            : usable
-              ? 'Choose it in Settings → Account, and your profiles and settings are kept in step on every device.'
-              : 'It can’t be an account in this version of the app yet.'}
-        </SizableText>
-      </YStack>
-      {usable || isAccount ? (
-        <Link href="/settings/account" asChild>
-          <Button size="$3">Account</Button>
-        </Link>
-      ) : null}
-    </XStack>
   );
 }
 

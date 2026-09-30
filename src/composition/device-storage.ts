@@ -1,4 +1,4 @@
-import type { Clock, IdGenerator, Logger, SecureCredentialStore, SyncDatabase } from '@/services/ports';
+import type { Clock, Logger, SecureCredentialStore, SyncDatabase } from '@/services/ports';
 
 /** Where this device keeps things. `storage.ts` builds it on native, `storage.web.ts` in a browser. */
 export interface DeviceStorage {
@@ -11,6 +11,5 @@ export interface DeviceStorage {
 
 export interface StorageDeps {
   readonly clock: Clock;
-  readonly ids: IdGenerator;
   readonly log: Logger;
 }

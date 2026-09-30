@@ -18,7 +18,6 @@ import {
 import { createInProcessLock } from '@/platform/in-process-lock';
 import { createAccountService } from '@/services/account';
 import { createConnectionService } from '@/services/connections';
-import { createDevicePlugins } from '@/services/device-plugins';
 import { createHomeLayoutService } from '@/services/home-layout';
 import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
@@ -30,7 +29,7 @@ import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
 import { createSessions } from '@/services/sessions';
 import { createSourceService } from '@/services/sources';
-import type { SyncParts } from '@/services/sync/apply';
+import type { SyncParts } from '@/services/sync/parts';
 import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
@@ -91,6 +90,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
   const manifest: PluginManifest = {
     id: pluginId(`sources/${id}`),
     category: 'sources',
+    platforms: ['ios', 'android', 'web'],
     displayName: id,
     description: `The ${id} test source.`,
     media: {
@@ -174,13 +174,13 @@ export function buildServices(options: {
   clock?: ReturnType<typeof fakeClock>;
   credentials?: ReturnType<typeof memoryCredentialStore>;
   deviceBound?: ReturnType<typeof memoryCredentialStore>;
-  /** Names the device: its ids, change ids and device key. Two devices in one test need two names. */
+  /** Names the device: its ids and its device key. Two devices in one test need two names. */
   device?: string;
   owner?: ReturnType<typeof fakeOwnerAuthentication>;
 }) {
   const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
-  const db = openTestDatabase(options.engine ?? 'sqlite', { clock, ids: counterIds(`${device}-change-`), ...options.where });
+  const db = openTestDatabase(options.engine ?? 'sqlite', { clock, ...options.where });
   const credentials = options.credentials ?? memoryCredentialStore();
   const deviceBound = options.deviceBound ?? memoryCredentialStore();
   const ids = counterIds(`${device}-`);
@@ -188,12 +188,11 @@ export function buildServices(options: {
   const sessions = createSessions(deviceBound);
   const janitor = createSecretJanitor({ db, stores: [credentials, deviceBound], log: silentLog });
   const catalog = createPluginCatalog(options.plugins, { platform: options.platform ?? 'ios', strict: true, warn: () => undefined });
-  const devicePlugins = createDevicePlugins(db.deviceSettings);
   const identity = { identity: async () => ({ appName: 'Test', appVersion: '1', deviceName: 'Test', deviceKey: `${device}-key` }) };
   const crypto = testCrypto();
   const accountProviders = createAccountProviders({ http: unusedHttp, network, identity, clock, crypto, catalog, credentials, sessions });
   const ownerAuthentication = options.owner ?? fakeOwnerAuthentication({ available: false });
-  const parts: SyncParts = { db, credentials, catalog, ids, janitor, crypto, log: silentLog };
+  const parts: SyncParts = { db, credentials, catalog, ids, janitor, log: silentLog };
   const lock = createInProcessLock();
   const engine = createSyncEngine({ parts, providers: accountProviders, lock, clock });
   const owner = createOwnerCheck({
@@ -202,8 +201,8 @@ export function buildServices(options: {
     log: silentLog,
   });
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
-  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, pins });
-  const sources = createSourceService({ catalog, devicePlugins, connections: db.connections });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins });
+  const sources = createSourceService({ catalog, connections: db.connections });
   const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, crypto, log: silentLog });
   const connections = createConnectionService({
     db,
@@ -238,6 +237,7 @@ export function buildServices(options: {
     lock,
     parts,
     sessions,
+    ids,
   });
   engine.onApplied((applied) => {
     for (const id of applied.connections) pool.forgetConnection(id);
@@ -257,7 +257,6 @@ export function buildServices(options: {
     ownerAuthentication,
     services: {
       catalog,
-      devicePlugins,
       session,
       profiles,
       pins,

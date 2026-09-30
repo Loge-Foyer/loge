@@ -1,7 +1,7 @@
 import { connectionId, credentialsRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { LocalDatabase, ProfileValues, SyncState } from '@/services/ports';
+import type { LocalDatabase, ProfileValues, StoredAccount } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -13,9 +13,9 @@ const alex = { id: userId('u-alex'), name: 'Alex' };
 function connection(id: string, extra: Partial<Connection> = {}): Connection {
   return {
     id: connectionId(id),
-    pluginId: pluginId('fake'),
+    pluginId: pluginId('sources/fake'),
     label: id,
-    roles: { media: true },
+    enabled: true,
     perProfile: 'credentials',
     values: { fields: { serverUrl: 'http://home' }, settings: { cacheMetadata: true } },
     ...extra,
@@ -78,7 +78,7 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       const { db } = open();
       const withPin = { ...alex, pinCredentialRef: credentialsRef('pin-1') };
       const home = connection('c-home', {
-        roles: { media: true, sync: false },
+        enabled: false,
         values: {
           fields: { serverUrl: 'http://home', localOnly: true },
           settings: { libraries: { mode: 'only', ids: ['a', 'b'] } },
@@ -190,13 +190,13 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
     it('lose no update when two run at once', async () => {
       const { db } = open();
       await db.users.insert(alex);
-      await Promise.all([
-        db.deviceSettings.update((current) => ({ ...current, plugins: { ...current.plugins, [pluginId('a')]: { enabled: true } } })),
-        db.deviceSettings.update((current) => ({ ...current, plugins: { ...current.plugins, [pluginId('b')]: { enabled: true } } })),
-        db.preferences.update(alex.id, (current) => ({ ...current, homeLayout: layout })),
-      ]);
-      expect(Object.keys((await db.deviceSettings.get()).plugins).sort()).toEqual(['a', 'b']);
-      expect((await db.preferences.get(alex.id)).homeLayout).toEqual(layout);
+      const adding = (id: string) =>
+        db.preferences.update(alex.id, (current) => ({
+          homeLayout: { version: 1, rows: [...(current.homeLayout?.rows ?? []), { id, type: 'continue', hidden: false }] },
+        }));
+      await Promise.all([adding('first'), adding('second'), db.deviceSettings.update((current) => ({ ...current, defaultUserId: alex.id }))]);
+      expect((await db.preferences.get(alex.id)).homeLayout?.rows.map((row) => row.id)).toEqual(['first', 'second']);
+      expect((await db.deviceSettings.get()).defaultUserId).toBe(alex.id);
     });
 
     it('refuse a call to the database from inside a transaction', async () => {
@@ -249,16 +249,29 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       expect(await db.journal.entries()).toHaveLength(before);
     });
 
-    it('leaves device settings, saved media and cascaded rows out', async () => {
+    it('leaves device settings, saved media, the account’s own rows and cascaded rows out', async () => {
       const { db } = open();
       const home = await household(db);
       const before = await db.journal.entries();
       await db.deviceSettings.update((current) => ({ ...current, defaultUserId: alex.id }));
       await db.mediaCache.putList(alex.id, home.id, 'resume', 'print-1', savedList(home.id));
       await db.staleSecrets.add([credentialsRef('old')]);
+      await db.account.put({ kind: 'local', id: 'account-1', name: 'Alex' });
+      await db.account.putSync({ checkpoint: 3, heldBack: [] });
       await db.users.delete(alex.id);
       const added = (await db.journal.entries()).slice(before.length);
       expect(added.map((entry) => [entry.entity, entry.operation, entry.entityId])).toEqual([['user', 'delete', alex.id]]);
+    });
+
+    it('never journals a sync plugin’s connection: it is the device’s own', async () => {
+      const { db } = open();
+      await db.users.insert(alex);
+      const before = (await db.journal.entries()).length;
+      const server = connection('c-server', { pluginId: pluginId('sync/custom-server'), perProfile: 'none' });
+      await db.connections.insert(server);
+      await db.connections.update({ ...server, label: 'Renamed' });
+      await db.connections.delete(server.id);
+      expect(await db.journal.entries()).toHaveLength(before);
     });
 
     it('stores preferences key by key, so a reset is a deletion', async () => {
@@ -281,15 +294,24 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
     });
   });
 
-  describe('what the account phase adds', () => {
-    it('gives every entry a change id of its own, kept when the database is opened again', async () => {
+  describe('the journal and the account', () => {
+    it('prunes what reached the account, and never reuses a seq — not even after a restart', async () => {
       const where = reopenable(engine);
       const first = open(where).db;
-      await household(first);
-      const ids = (await first.journal.entries()).map((entry) => entry.changeId);
-      expect(ids.every((id) => typeof id === 'string' && id !== '')).toBe(true);
-      expect(new Set(ids).size).toBe(ids.length);
-      expect((await open(where).db.journal.entries()).map((entry) => entry.changeId)).toEqual(ids);
+      await first.users.insert(alex);
+      await first.users.insert(kids);
+      await first.users.update({ ...kids, name: 'Kids, renamed' });
+      const [one, two, three] = await first.journal.entries();
+      await first.journal.prune(two?.seq ?? 0);
+      expect((await first.journal.entries()).map((entry) => entry.seq)).toEqual([three?.seq]);
+      await first.journal.prune(await first.journal.head());
+      expect(await first.journal.entries()).toEqual([]);
+
+      const again = open(where).db;
+      await again.users.update({ ...alex, name: 'Alexandra' });
+      const [next] = await again.journal.entries(0);
+      expect(next?.seq).toBeGreaterThan(three?.seq ?? Infinity);
+      expect(one?.seq).toBeLessThan(two?.seq ?? 0);
     });
 
     it('reads the journal inside a transaction, its own writes included', async () => {
@@ -332,7 +354,6 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       });
       const [entry] = await db.journal.entries();
       expect(entry).toMatchObject({ entity: 'user', entityId: alex.id, userId: alex.id, operation: 'upsert', localVersion: 1 });
-      expect(entry?.changeId).toBeDefined();
     });
 
     it('tells its listeners once a journaled commit is done — never for a rollback, a read or an unjournaled write', async () => {
@@ -376,51 +397,44 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       ]);
     });
 
-    it('keeps sync state per connection, refuses it for a connection that is gone, and drops it with the connection', async () => {
-      const { db } = open();
-      const home = connection('c-home');
-      await db.connections.insert(home);
-      const state: SyncState = {
-        connectionId: home.id,
-        checkpoint: 12,
-        awaiting: { 'profile/u-alex': 'change-9' },
-        carried: ['profile', 'preferences'],
-        lastSyncedAt: 5,
-      };
-      await db.syncState.put(state);
-      expect(await db.syncState.get(home.id)).toEqual(state);
-      const moved: SyncState = { ...state, checkpoint: 14, awaiting: {} };
-      await db.syncState.put(moved);
-      expect(await db.syncState.get(home.id)).toEqual(moved);
-      await expect(db.syncState.put({ ...state, connectionId: connectionId('c-gone') })).rejects.toThrow('Unknown connection');
-      await db.connections.delete(home.id);
-      expect(await db.syncState.get(home.id)).toBeUndefined();
+    it('keeps one account, local or on a server, with how its sync stands', async () => {
+      const where = reopenable(engine);
+      const { db } = open(where);
+      expect(await db.account.get()).toBeUndefined();
+      expect(await db.account.sync()).toEqual({ checkpoint: 0, heldBack: [] });
+      const local: StoredAccount = { kind: 'local', id: 'account-1', name: 'The Smiths' };
+      await db.account.put(local);
+      expect(await db.account.get()).toEqual(local);
+
+      const server: StoredAccount = { kind: 'server', id: 'k4r9x2m1q8w3e5t', name: 'sam on home', connectionId: connectionId('c-server'), maxProfiles: 6 };
+      await db.account.put(server);
+      await db.account.putSync({ checkpoint: 12, lastSyncedAt: 5, heldBack: [alex.id] });
+      const again = open(where).db;
+      expect(await again.account.get()).toEqual(server);
+      expect(await again.account.sync()).toEqual({ checkpoint: 12, lastSyncedAt: 5, heldBack: [alex.id] });
+      await again.account.putSync({ checkpoint: 14, heldBack: [] });
+      expect(await again.account.sync()).toEqual({ checkpoint: 14, heldBack: [] });
+
+      await again.account.clear();
+      expect(await again.account.get()).toBeUndefined();
+      expect(await again.account.sync()).toEqual({ checkpoint: 0, heldBack: [] });
     });
 
-    it('removes sync state on request, leaving the connection', async () => {
-      const { db } = open();
-      const home = connection('c-home');
-      await db.connections.insert(home);
-      await db.syncState.put({ connectionId: home.id, checkpoint: 0, awaiting: {}, carried: [] });
-      await db.syncState.remove(home.id);
-      expect(await db.syncState.get(home.id)).toBeUndefined();
-      expect(await db.connections.get(home.id)).toEqual(home);
-    });
-
-    it('refuses the journal and sync state, called directly from inside a transaction', async () => {
+    it('refuses the journal and the account, called directly from inside a transaction', async () => {
       const { db } = open();
       await expect(db.transaction(async () => db.journal.head())).rejects.toThrow('called the database directly');
-      await expect(db.unjournaled(async () => db.syncState.get(connectionId('c-home')))).rejects.toThrow('called the database directly');
+      await expect(db.unjournaled(async () => db.account.get())).rejects.toThrow('called the database directly');
     });
   });
 
   describe('device settings', () => {
-    it('start with no plugins and no default profile, and keep what they are given', async () => {
+    it('start with no default profile, and keep what they are given', async () => {
       const { db } = open();
-      expect(await db.deviceSettings.get()).toEqual({ plugins: {} });
-      await db.deviceSettings.update((current) => ({ ...current, defaultUserId: alex.id, plugins: { [pluginId('jellyfin')]: { enabled: true } } }));
+      expect(await db.deviceSettings.get()).toEqual({});
+      await db.deviceSettings.update((current) => ({ ...current, defaultUserId: alex.id }));
+      expect(await db.deviceSettings.get()).toEqual({ defaultUserId: alex.id });
       await db.deviceSettings.update(({ defaultUserId: _gone, ...rest }) => rest);
-      expect(await db.deviceSettings.get()).toEqual({ plugins: { jellyfin: { enabled: true } } });
+      expect(await db.deviceSettings.get()).toEqual({});
     });
   });
 

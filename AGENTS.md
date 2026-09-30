@@ -72,8 +72,6 @@ Docs: https://docs.expo.dev/eas/index.md
   - Player engines are native code: expo-video for the built-in player
     (Phase 7), Expo modules for KSPlayer, mpv and VLC (Phase 8).
   - Face ID needs the app's usage text, which Expo Go cannot carry.
-  - Until Phase 6 the app also has native code of its own,
-    `modules/key-derivation` (Swift and Kotlin), which retires with the vault.
 
   A native change means building again — a stale build looks like code that
   did not change. The web needs no build.
@@ -262,10 +260,12 @@ silently:
   3. otherwise the server's version replaces the local one when they differ
   4. a local row the server lacks, and that is not pending, was lost by a
      restore: announce it again, and the next push puts it back
-- **A refused batch is split to find the write refused.** A profile over the
-  limit stays on this device only, and says so; a write to a deleted profile or
-  connection gives way to the delete. The checkpoint moves past what was
-  stored, and no further.
+- **A refused batch names the write that stopped it,** and the rest is sent
+  again. A profile over the limit stays on this device only, with everything
+  of it, and says so; a write to a deleted profile or connection gives way to
+  the delete, with its children; one the server finds invalid is left out and
+  logged — and not taken for lost, and sent again, on every run. The
+  checkpoint moves past what was stored, and no further.
 - **A reconcile or replace transaction awaits nothing but `tx`** — not the
   credential store, not a plugin, not `profiles.remove` (use the helpers in
   `services/removal.ts`). PINs and passwords are written to the keychain under
@@ -302,17 +302,16 @@ silently:
   `ownerProof` fields — the account password — are asked for again in
   `OwnerProofForm` and passed to `owner.verify(reason, proof)`; the saved
   password is never the proof. An empty proof is refused before anything is
-  asked. On a local account, or when the server has let this device go, the
-  device answers — never a quiet yes. A server that cannot be reached is a
-  failure, never a fallback to the device.
+  asked. On a local account, or when your server no longer takes this
+  device's saved password, the device answers — never a quiet yes. A server
+  that cannot be reached is a failure, never a fallback to the device.
 - **The owner check guards** Forgot PIN, signing out, replacing or switching
   the account, importing a backup, and showing the backup key — on a device
   that holds profiles. At first launch there is nothing to protect, and
   nothing is asked.
-- **Retired, still in the code until Phase 6:** the log and its cursors,
-  joining an account, sealed passwords, the vault key and the sign-in rule
-  (`sync/sealed.ts`), the derived owner proof, and `modules/key-derivation`.
-  Do not build on them.
+- **Retired:** Phase 4's log and its cursors, joining an account, sealed
+  passwords, the vault key and the sign-in rule, the derived owner proof and
+  `modules/key-derivation`. Never bring them back; git has them.
 
 ---
 
@@ -414,20 +413,19 @@ Hermes also has no JIT: cryptography written in JavaScript runs about a hundred
 times slower than on a browser's engine. Measured on the emulator, scrypt at a
 useful strength took 22 s. So anything heavy is native — AES-GCM through
 expo-crypto, over a whole backup file too — and only cheap work (HKDF: a few
-HMACs) is left to JavaScript. That is why key derivation was a native module
-in Phase 4.
+HMACs, one SHA-256 per record id) is left to JavaScript. That is why key
+derivation was a native module in Phase 4, and why no password-based key
+derivation is built again in JavaScript.
 
 ## Cryptography
 
 - **Only `src/platform/` does cryptography.** noble is imported there alone
-  (lint), and so is `modules/key-derivation` while it exists. Plugins reach it
-  through their context (`PluginContext.crypto`); services — the backup file's
-  included — through what the composition root hands them.
-- **One definition, per-platform parts:** `platform/plugin-crypto.ts` builds
-  the port from expo-crypto's AES-GCM and randomness and noble's HKDF. Until
-  Phase 6 it also carries the platform's PBKDF2 (the module, or WebCrypto in
-  `crypto.web.ts`) for the vault, and nothing weaker than `isKdfParams` is
-  derived, whatever a plugin asks.
+  (lint). Plugins reach it through their context (`PluginContext.crypto`);
+  services — the backup file's included — through what the composition root
+  hands them.
+- **One definition for every platform:** `platform/plugin-crypto.ts` builds
+  the port from expo-crypto's AES-GCM and randomness — WebCrypto behind it in
+  a browser — and noble's SHA-256 and HKDF.
 - **expo-crypto reads a string of additional data as base64**, and turns bytes
   into base64 through `btoa`. Additional data — a backup's header — goes in as
   base64 that `@sc/api` encoded: never raw text, never bytes.
@@ -543,31 +541,32 @@ describes the target. What runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings — with TV showing the way to add
   an IPTV source. Settings → Plugins is four lists, by category, of the
-  plugins that run on this platform; a source is still installed per device
-  before its first connection. Stored plugin ids are qualified by category
-  (database v3).
-- **One optional account per device,** synced through a log, with passwords
-  sealed on the device and used only for the sign-in they were saved with, and
-  owner proofs. Welcome offers "Sign in to sync your profiles" or "Use on this
-  device only". Your own server (`custom-server`) is the Node server in
-  `../streaming_center_sync`: created from the app with an invite, signed in to
-  once, and its password — typed again — is the owner check. The dev-only mock
-  is a pretend account in memory.
+  plugins that run on this platform. Stored plugin ids are qualified by
+  category (database v3).
+- **One account per device,** local or on your own server (database v4).
+  Welcome creates one on the device, or signs in to your server. Signing in
+  replaces the device's account; signing up with an invite uploads it; signing
+  out keeps a local copy. A run pushes the journal as batches, reads the whole
+  account and reconciles by the four rules; a profile over the server's limit
+  stays on this device only. Your own server is PocketBase
+  (`../streaming_center_sync`), and its password, typed again, is the owner
+  check. The dev-only mock is a pretend server in memory. Ten profiles at
+  most, or the server's limit.
 - **Media is real:** Continue Watching, one row per kind with per-profile
   order, sort and card style, a full-screen grid per row, and detail pages —
   from every live source, merged, and kept per profile where the source allows
   it. Jellyfin and the mock implement the media role. Nothing plays, Videos
-  still shows skeletons, and there is no backup file or profile limit.
+  still shows skeletons, and there is no backup file yet.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
-  which run a development build for `modules/key-derivation`; IndexedDB and
-  WebCrypto-encrypted secrets on the web, on a secure page. No development
-  seed: set things up once, and they persist (`docs/getting-started`).
+  which run a development build; IndexedDB and WebCrypto-encrypted secrets on
+  the web, on a secure page. No development seed: set things up once, and they
+  persist (`docs/getting-started`).
 - **The service graph is a runtime singleton** (`src/composition/provider.tsx`)
   — a router remount must never rebuild it, and in development it survives
   Fast Refresh. That stays.
-- **vitest** covers the database on both engines, the credential stores, the
-  services, and two devices syncing through one fake account on every pair of
-  engines (`npm test`).
+- **vitest** covers the database on both engines, every migration, the
+  credential stores, the services, the account's flows, and two devices on one
+  fake server — PocketBase's rules — on every pair of engines (`npm test`).
 
 Do not assume anything else described here exists. Build it, then update the
 docs in the same commit.

@@ -4,7 +4,6 @@ import {
   type CancelSignal,
   type ConnectedMediaProvider,
   type ConnectionId,
-  type ConnectionRoles,
   type ContentKind,
   type FieldValues,
   type GlobalMediaKey,
@@ -88,7 +87,6 @@ export interface ResolvedArtwork {
 export interface ProbeTarget {
   readonly pluginId: PluginId;
   readonly connectionId?: ConnectionId;
-  readonly roles: ConnectionRoles;
   readonly fields: FieldValues;
   readonly settings: FieldValues;
   readonly scope: SecretScope;

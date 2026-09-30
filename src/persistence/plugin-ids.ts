@@ -42,3 +42,12 @@ export function qualifiedPluginStates(states: Readonly<Record<string, unknown>>)
   }
   return next;
 }
+
+/**
+ * Where a connection's session lives for a scope — `sessionRef` in
+ * services/sessions, written out here because a migration never imports a
+ * service: the format is history once a step has run.
+ */
+export function sessionRefOf(connectionId: string, scope: string): string {
+  return `session:${connectionId}:${scope}`;
+}

@@ -42,6 +42,7 @@ function fakeJournal(): ChangeJournal & { commit(): void } {
     head: async () => 0,
     count: async () => 0,
     announce: async () => undefined,
+    prune: async () => undefined,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {

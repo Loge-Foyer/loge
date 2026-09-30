@@ -127,21 +127,21 @@ the design. What runs today, built with [Tamagui](https://tamagui.dev):
     lists them yet.
   - **Settings** — the account, profiles, PIN lock, and the plugins in four
     lists — Sources, IPTV, Players, Sync — showing only those that run on this
-    device. Install a source, connect it through a form the plugin itself
-    describes, and decide what each profile keeps for itself.
-- **The account is optional.** Sign in to the earlier version of your own
-  server — a small Node program in `../streaming_center_sync` — or use the
-  device on its own. Signed in, profiles, PINs, settings and connections stay
-  in step between devices, with the passwords sealed on the devices. A
-  forgotten PIN is reset by confirming it's you: with the account's password,
-  or with Face ID, a fingerprint or the passcode.
+    device. Connect a source through a form the plugin itself describes, and
+    decide what each profile keeps for itself.
+- **One account per device,** kept on the device or on your own server —
+  PocketBase, in `../streaming_center_sync`. On your server, profiles, PINs,
+  settings and sources — their passwords too — stay in step between devices.
+  Signing in replaces what the device held; creating an account there, with
+  an invite, takes the device's along. Up to ten profiles, or what your server
+  allows. A forgotten PIN is reset by confirming it's you: with the account's
+  password, or with Face ID, a fingerprint or the passcode.
 - **Everything is kept on the device**: in SQLite and the keychain on a phone,
   in the browser's own database with the secrets encrypted on the web. What
   the servers answered is kept too, where they allow it, so the home shows up
   at once when the app opens, and still shows — saying how old it is — when a
   server cannot be reached.
-- **Not yet:** nothing plays, and there is no backup file and no limit on
-  profiles.
+- **Not yet:** nothing plays, and there is no backup file.
 
 Development builds also have a pretend account, for trying things offline.
 

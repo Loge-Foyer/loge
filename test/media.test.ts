@@ -14,7 +14,6 @@ async function withSources(sources: readonly ReturnType<typeof fakeMediaPlugin>[
   const kids = await services.profiles.create('Kids');
   const ids: ConnectionId[] = [];
   for (const source of sources) {
-    await services.devicePlugins.setEnabled(source.manifest.id, true);
     let draft = initialDraft(source.manifest, 0);
     draft = setValue(source.manifest, draft, kids.id, 'fields', 'serverUrl', `http://${source.manifest.id}`);
     draft = setValue(source.manifest, draft, kids.id, 'fields', 'username', 'kid');
@@ -189,7 +188,6 @@ describe('media pool', () => {
     await expect(
       built.services.media.test({
         pluginId: source.manifest.id,
-        roles: { media: true },
         fields: { serverUrl: 'http://draft', username: 'kid' },
         settings: {},
         scope: 'shared',

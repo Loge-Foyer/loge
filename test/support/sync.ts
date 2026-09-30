@@ -1,253 +1,304 @@
-// A pretend account that several devices in one test share, with the controls
-// a test needs to make it misbehave the ways a real one can. It keeps a session
-// in each device's context, as a real account plugin does: a device signs in
-// only when it has none, and never signs itself back in once let go.
+// A pretend server that several devices in one test share, keeping the rules
+// your own server keeps: accounts by username, every record of an account by
+// kind and key, batches stored all or nothing, the profile limit, a deleted
+// profile or connection deleted for good, tombstones emptied, and a password a
+// write lists without its value kept. Each device keeps its session in its
+// own context, as the real plugin does: with none, or when it ended, it signs
+// in once with the saved password, and latches a refusal.
 import {
   AppError,
-  isSyncChange,
+  DEFAULT_MAX_PROFILES,
+  isAccountRecord,
   pluginId,
-  syncCursor,
-  type ConnectedUserStateSyncProvider,
+  type AccountRecord,
+  type AccountStatus,
+  type ConnectedAccount,
+  type Credentials,
   type Field,
   type Plugin,
   type PluginContext,
-  type SyncCapability,
-  type SyncChange,
+  type PushOutcome,
+  type PushRefusal,
 } from '@sc/api';
 
 import type { AppActivity, OwnerAnswer, OwnerAuthentication } from '@/services/ports';
 
-export interface FakeAccount {
+export interface FakeServerAccount {
+  readonly id: string;
+  readonly username: string;
+  password: string;
+  /** Every record, tombstones included, by `kind/key`. */
+  readonly records: Map<string, AccountRecord>;
+}
+
+export interface FakeServer {
   readonly plugin: Plugin;
-  /** The vault key every device signed in to it seals with. */
-  readonly vaultKey: Uint8Array;
-  /** Everything stored, in the account's order. */
-  readonly log: readonly SyncChange[];
-  readonly calls: { pushes: number; signIns: number; pulls: number; signOuts: number; vaultKeys: number; owners: number; creates: number };
-  /** Store only the first `n` of the next push. */
-  acceptOnly(n: number): void;
-  /** The next call — of any kind — fails with this. */
+  readonly calls: { infos: number; signIns: number; pulls: number; pushes: number; owners: number; creates: number; signOuts: number };
+  /** Every push, as it arrived. */
+  readonly pushed: (readonly AccountRecord[])[];
+  maxProfiles: number;
+  /** The account with this username — `sam` unless a test says otherwise — made on first use. */
+  account(username?: string): FakeServerAccount;
+  /** The live profiles' names, sorted. */
+  profileNames(username?: string): readonly string[];
+  /** A record as another device would store it, by the same rules. */
+  put(record: AccountRecord, username?: string): PushOutcome;
+  /** Every record back to what `snapshot` took: the server restored from an older copy. */
+  snapshot(username?: string): () => void;
+  /** The password changed elsewhere: every session goes, as PocketBase lets them go. */
+  changePassword(password: string, username?: string): void;
+  /** Every session ends — thirty days offline: each device signs in again with its saved password. */
+  endSessions(): void;
+  /** The next call, of any kind, fails with this. */
   failNext(error: AppError): void;
   /** The next pull fails with this: what comes after a sign-in, not the sign-in itself. */
   failNextPull(error: AppError): void;
   /** The next push is stored, and its answer lost on the way back. */
   loseNextAnswer(): void;
-  /** Lose everything, as a wiped account would: every cursor answers `reset`. */
-  reset(): void;
-  /** Drop the last `n` changes, as an account restored from an older backup would: every cursor answers `reset`. */
-  rewind(n: number): void;
-  /** The next pull answers `expired`: the place in the log is gone, the data is not. */
-  expireNext(): void;
-  refuseOwner(refuse: boolean): void;
+  /** Runs while the next pull is being read: a change made on the device in the middle of a run. */
+  duringNextPull(action: () => Promise<void>): void;
+  /** Refuses the writes this picks, as your server's validation would; `undefined` stops refusing. */
+  refuseWrites(pick: ((record: AccountRecord) => PushRefusal | undefined) | undefined): void;
   /** Answer the owner check as throttled: too many wrong tries. */
   throttleOwner(throttle: boolean): void;
-  /** Refuse every sign-in and every session, as a password changed elsewhere would. */
-  refuseSignIn(refuse: boolean): void;
-  /** Let every device go, as `sc-sync revoke` does: each is signed out, and signs in only when its user does. */
-  revoke(): void;
-  /** Fail every ask for the vault key with this, until `undefined`. */
-  failVaultKey(error: AppError | undefined): void;
-  /** Another device's change, landed before the change with id `before` — or last. */
-  inject(change: SyncChange, before?: string): void;
-  /** The same account, as a plugin declaring what it carries differently — an app update. */
-  pluginCarrying(carries: readonly SyncCapability[]): Plugin;
 }
 
-export interface FakeAccountOptions {
+export interface FakeServerOptions {
   readonly id?: string;
-  readonly pageSize?: number;
-  readonly carries?: readonly SyncCapability[];
-  /** A media role too, as iCloud or Google have — one that lists nothing. */
-  readonly withMedia?: boolean;
-  /** An account that cannot check its owner: the device is asked instead. */
-  readonly noOwnerCheck?: boolean;
-  /** A switch in its settings, on at first, that stops it carrying this. */
-  readonly toggle?: SyncCapability;
-  /** The account password its owner check asks for again (`ownerProof`), as your own server's does. */
-  readonly ownerPassword?: string;
   /** Accounts are created from the app with this invite (`signUp`). */
   readonly invite?: string;
+  /** Asked for the account password again as its owner check, as your own server is. On by default. */
+  readonly ownerProof?: boolean;
+  readonly maxProfiles?: number;
 }
 
-/** What a sealing account carries: everything the fake does, passwords included. */
-export const SEALING: readonly SyncCapability[] = ['profile', 'preferences', 'providerConnections', 'sealedPasswords'];
+/** The password every test account starts with, and the one `serverDraft` fills in. */
+export const ACCOUNT_PASSWORD = 'the account password';
 
-const SIGNED_OUT = 'signed-out';
+const REFUSED = 'refused';
 
-export function fakeSyncAccount(options: FakeAccountOptions = {}): FakeAccount {
-  const pageSize = options.pageSize ?? 50;
-  let epoch = 1;
-  const log: SyncChange[] = [];
-  const stored = new Set<string>();
-  const calls = { pushes: 0, signIns: 0, pulls: 0, signOuts: 0, vaultKeys: 0, owners: 0, creates: 0 };
-  // One account, one vault: every device signed in to it seals with the same key.
-  const vault = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
-  const tokens = new Set<string>();
+export function fakeAccountServer(options: FakeServerOptions = {}): FakeServer {
+  const accounts = new Map<string, FakeServerAccount>();
+  const tokens = new Map<string, string>();
+  const calls = { infos: 0, signIns: 0, pulls: 0, pushes: 0, owners: 0, creates: 0, signOuts: 0 };
+  const pushed: (readonly AccountRecord[])[] = [];
   let issued = 0;
-  let acceptOnly: number | undefined;
+  let made = 0;
   let failNext: AppError | undefined;
   let failPull: AppError | undefined;
   let loseNext = false;
-  let expireNext = false;
-  let refuseOwner = false;
-  let throttleOwner = false;
-  let refuseSignIn = false;
-  let failVaultKey: AppError | undefined;
+  let throttle = false;
+  let duringPull: (() => Promise<void>) | undefined;
+  let refusing: ((record: AccountRecord) => PushRefusal | undefined) | undefined;
+
+  const server = {
+    maxProfiles: options.maxProfiles ?? DEFAULT_MAX_PROFILES,
+  };
+
+  const make = (username: string, password = ACCOUNT_PASSWORD): FakeServerAccount => {
+    made += 1;
+    const account = { id: `account${made}`, username, password, records: new Map<string, AccountRecord>() };
+    accounts.set(username, account);
+    return account;
+  };
+  const accountOf = (username = 'sam') => accounts.get(username) ?? make(username);
 
   const failure = () => {
     const next = failNext;
     failNext = undefined;
     if (next) throw next;
   };
-  const signedOut = () => new AppError('UNAUTHORIZED', 'The account no longer knows this device.', { reason: 'signed-out' });
-  const refused = () => new AppError('UNAUTHORIZED', 'The account did not accept the sign-in.');
-  const newSession = async (context: PluginContext) => {
-    issued += 1;
-    const token = `token-${issued}`;
-    tokens.add(token);
-    await context.session.write(token);
-    return token;
+  const refused = () => new AppError('UNAUTHORIZED', 'Your server did not accept this username and password.', { retry: 'never' });
+  const identity = (record: Pick<AccountRecord, 'kind' | 'key'>) => `${record.kind}/${record.key}`;
+  const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+  /** The passwords a write leaves: what it sends, and the stored one for a name it lists without a value. */
+  const kept = (data: { readonly secretKeys: readonly string[]; readonly secrets: Credentials }, stored: Credentials): Credentials => {
+    const next: Record<string, string> = {};
+    for (const name of data.secretKeys) {
+      const value = data.secrets[name] ?? stored[name];
+      if (value !== undefined) next[name] = value;
+    }
+    return next;
   };
 
-  const connected = (connectionId: ConnectedUserStateSyncProvider['connectionId'], context: PluginContext) => {
-    // What a call runs with: this device's session, signing in when there is none — never after being let go.
-    const session = async () => {
+  /** One batch against a working copy: all of it stored, or the first write refused and nothing. */
+  const store = (account: FakeServerAccount, records: readonly AccountRecord[]): PushOutcome => {
+    const working = new Map(account.records);
+    const refuse = (index: number, reason: PushRefusal): PushOutcome => ({ kind: 'refused', index, reason });
+    for (const [index, record] of records.entries()) {
+      if (!isAccountRecord(record)) return refuse(index, 'invalid');
+      const picked = refusing?.(record);
+      if (picked) return refuse(index, picked);
+      const before = working.get(identity(record));
+      if (record.deleted) {
+        working.set(identity(record), { kind: record.kind, key: record.key, deleted: true } as AccountRecord);
+        continue;
+      }
+      if ((record.kind === 'profile' || record.kind === 'connection') && before?.deleted) return refuse(index, 'deleted');
+      if (record.kind === 'profile' && !before) {
+        const live = [...working.values()].filter((stored) => stored.kind === 'profile' && !stored.deleted).length;
+        if (live >= server.maxProfiles) return refuse(index, 'limit');
+      }
+      const sent = copy(record);
+      const keeps = (sent.kind === 'connection' || sent.kind === 'profileValues') && before && !before.deleted && before.kind === sent.kind;
+      const next: AccountRecord = keeps
+        ? ({ ...sent, data: { ...sent.data, secrets: kept(sent.data, (before.data as { readonly secrets: Credentials }).secrets) } } as AccountRecord)
+        : sent;
+      working.set(identity(next), next);
+    }
+    account.records.clear();
+    for (const [key, record] of working) account.records.set(key, record);
+    return { kind: 'stored' };
+  };
+
+  const connected = (target: { connectionId: ConnectedAccount['connectionId']; fields: Readonly<Record<string, unknown>> }, context: PluginContext) => {
+    const username = String(target.fields.username ?? '');
+    const statusOf = (account: FakeServerAccount): AccountStatus => ({ accountId: account.id, accountName: `${account.username} on the fake server` });
+
+    const signIn = async (): Promise<FakeServerAccount> => {
+      calls.signIns += 1;
+      const password = (await context.credentials.read()).password ?? '';
+      const account = accounts.get(username);
+      if (!account || password !== account.password) {
+        await context.session.write(REFUSED);
+        throw refused();
+      }
+      issued += 1;
+      const token = `token-${issued}`;
+      tokens.set(token, username);
+      await context.session.write(token);
+      return account;
+    };
+
+    /** This device's account, signed in: with the session it has, or once with the saved password. */
+    const live = async (): Promise<FakeServerAccount> => {
       failure();
       const token = await context.session.read();
-      if (token === SIGNED_OUT) throw signedOut();
-      if (token !== undefined) {
-        if (tokens.has(token)) return token;
-        await context.session.write(SIGNED_OUT);
-        throw refuseSignIn ? refused() : signedOut();
-      }
-      calls.signIns += 1;
-      if (refuseSignIn) throw refused();
-      return newSession(context);
+      if (token === REFUSED) throw refused();
+      const account = token === undefined ? undefined : accounts.get(tokens.get(token) ?? '');
+      return account ?? signIn();
     };
-    return {
-      connectionId,
-      getStatus: async () => {
-        await session();
-        return { accountName: 'The fake account' };
+
+    const account: ConnectedAccount = {
+      connectionId: target.connectionId,
+      info: async () => {
+        calls.infos += 1;
+        failure();
+        return { serverVersion: 'test', maxProfiles: server.maxProfiles, signUp: options.invite === undefined ? 'closed' : 'invite' };
       },
-      pull: async (cursor) => {
+      status: async () => statusOf(await live()),
+      pull: async () => {
         calls.pulls += 1;
-        await session();
+        const account = await live();
         const pullFailure = failPull;
         failPull = undefined;
         if (pullFailure) throw pullFailure;
-        if (expireNext) {
-          expireNext = false;
-          return { kind: 'expired' };
-        }
-        let from = 0;
-        if (cursor !== undefined) {
-          const [of, at] = cursor.split('.');
-          if (Number(of) !== epoch || Number(at) > log.length) return { kind: 'reset' };
-          from = Number(at);
-        }
-        const changes = log.slice(from, from + pageSize);
-        const next = from + changes.length;
-        return { kind: 'changes', changes, cursor: syncCursor(`${epoch}.${next}`), more: next < log.length };
+        const records = copy([...account.records.values()]);
+        const action = duringPull;
+        duringPull = undefined;
+        await action?.();
+        return { records };
       },
-      push: async (changes) => {
+      push: async (records) => {
         calls.pushes += 1;
-        await session();
-        const limit = acceptOnly ?? changes.length;
-        acceptOnly = undefined;
-        const accepted: string[] = [];
-        for (const change of changes.slice(0, limit)) {
-          if (!isSyncChange(change)) break;
-          if (!stored.has(change.id)) {
-            stored.add(change.id);
-            log.push(JSON.parse(JSON.stringify(change)) as SyncChange);
-          }
-          accepted.push(change.id);
-        }
-        if (loseNext) {
+        const account = await live();
+        pushed.push(copy(records));
+        const outcome = store(account, records);
+        if (loseNext && outcome.kind === 'stored') {
           loseNext = false;
           throw new AppError('TIMEOUT', 'The answer never came back.', { retry: 'backoff' });
         }
-        return { accepted };
-      },
-      verifyOwner: async (proof) => {
-        calls.owners += 1;
-        await session();
-        if (throttleOwner) throw new AppError('UNAUTHORIZED', 'Too many tries.', { reason: 'too-many-attempts' });
-        const wrong = options.ownerPassword !== undefined && proof.password !== options.ownerPassword;
-        if (refuseOwner || wrong) throw new AppError('UNAUTHORIZED', 'That is not the owner.');
-      },
-      vaultKey: async () => {
-        calls.vaultKeys += 1;
-        await session();
-        if (failVaultKey) throw failVaultKey;
-        return vault;
-      },
-      createAccount: async (fields) => {
-        calls.creates += 1;
-        failure();
-        if (fields.invite !== options.invite) throw new AppError('INVALID_STATE', 'That invite code is used, expired or unknown.');
-        await newSession(context);
-        return { accountName: 'The fake account' };
+        return outcome;
       },
       signOut: async () => {
         calls.signOuts += 1;
         const token = await context.session.read();
-        if (token === undefined || token === SIGNED_OUT) return;
-        tokens.delete(token);
-        await context.session.write(SIGNED_OUT);
+        if (token !== undefined) tokens.delete(token);
+        await context.session.clear();
       },
       dispose: async () => undefined,
-    } satisfies Required<ConnectedUserStateSyncProvider>;
-  };
-
-  const provider = (connectionId: ConnectedUserStateSyncProvider['connectionId'], context: PluginContext): ConnectedUserStateSyncProvider => {
-    const { verifyOwner, createAccount, ...rest } = connected(connectionId, context);
+    };
+    const verifyOwner = async (proof: Credentials) => {
+      calls.owners += 1;
+      const account = await live();
+      if (throttle) throw new AppError('UNAUTHORIZED', 'Too many tries.', { retry: 'never', reason: 'too-many-attempts' });
+      if (proof.password !== account.password) throw new AppError('UNAUTHORIZED', 'That password isn’t right.', { retry: 'never' });
+    };
+    const createAccount = async (fields: Readonly<Record<string, unknown>>, { firstProfile }: { readonly firstProfile: boolean }) => {
+      calls.creates += 1;
+      failure();
+      if (fields.invite !== options.invite) throw new AppError('INVALID_STATE', 'That invite code is used, expired or unknown.', { retry: 'never' });
+      if (accounts.has(username)) throw new AppError('INVALID_STATE', 'That username is taken on this server.', { retry: 'never' });
+      const created = make(username, (await context.credentials.read()).password ?? '');
+      if (firstProfile) {
+        const key = `first-profile-of-${created.id}`;
+        created.records.set(`profile/${key}`, { kind: 'profile', key, deleted: false, data: { userId: key as never, name: username } });
+      }
+      issued += 1;
+      const token = `token-${issued}`;
+      tokens.set(token, username);
+      await context.session.write(token);
+      return statusOf(created);
+    };
     return {
-      ...rest,
-      ...(options.noOwnerCheck ? {} : { verifyOwner }),
+      ...account,
+      ...(options.ownerProof === false ? {} : { verifyOwner }),
       ...(options.invite === undefined ? {} : { createAccount }),
     };
   };
 
   const inviteField: Field = { key: 'invite', label: 'Invite code', type: 'text', required: true };
-  const pluginCarrying = (carries: readonly SyncCapability[]): Plugin => ({
+  const plugin: Plugin = {
     manifest: {
-      id: pluginId(options.id ?? 'fake-account'),
-      displayName: 'Fake account',
-      description: 'An account that exists only in tests.',
-      sync: {
-        capabilities: [...carries],
-        ...(options.ownerPassword === undefined ? {} : { ownerProof: { fields: ['password'] } }),
+      id: pluginId(`sync/${options.id ?? 'fake-server'}`),
+      category: 'sync',
+      platforms: ['ios', 'android', 'web'],
+      displayName: 'Fake server',
+      description: 'A server that exists only in tests.',
+      account: {
+        ...(options.ownerProof === false ? {} : { ownerProof: { fields: ['password'] } }),
         ...(options.invite === undefined ? {} : { signUp: { fields: [inviteField] } }),
       },
-      ...(options.withMedia ? { media: { contentKinds: ['files' as const], capabilities: [] } } : {}),
       connectionFields: [
-        { key: 'server', label: 'Server', type: 'url' },
-        ...(options.ownerPassword === undefined ? [] : [{ key: 'password', label: 'Password', type: 'password' } as const]),
+        { key: 'serverUrl', label: 'Server', type: 'url', required: true },
+        { key: 'username', label: 'Username', type: 'text', required: true, credential: true },
+        { key: 'password', label: 'Password', type: 'password', required: true },
       ],
-      settings: options.toggle
-        ? [{ key: 'carry', label: `Carry ${options.toggle}`, type: 'boolean', default: true, gates: [`sync.${options.toggle}`] }]
-        : [],
+      settings: [],
     },
-    sync: { connect: async (target, context) => provider(target.connectionId, context) },
-  });
+    account: { connect: async (target, context) => connected(target, context) },
+  };
 
   return {
-    plugin: pluginCarrying(options.carries ?? ['profile', 'preferences', 'providerConnections']),
-    vaultKey: vault,
-    pluginCarrying,
-    inject: (change, before) => {
-      stored.add(change.id);
-      const at = before === undefined ? -1 : log.findIndex((candidate) => candidate.id === before);
-      if (at < 0) log.push(change);
-      else log.splice(at, 0, change);
-    },
-    log,
+    plugin,
     calls,
-    acceptOnly: (n) => {
-      acceptOnly = n;
+    pushed,
+    get maxProfiles() {
+      return server.maxProfiles;
     },
+    set maxProfiles(value: number) {
+      server.maxProfiles = value;
+    },
+    account: accountOf,
+    profileNames: (username) =>
+      [...accountOf(username).records.values()]
+        .flatMap((record) => (record.kind === 'profile' && !record.deleted ? [record.data.name] : []))
+        .sort(),
+    put: (record, username) => store(accountOf(username), [record]),
+    snapshot: (username) => {
+      const account = accountOf(username);
+      const saved = copy([...account.records.entries()]);
+      return () => {
+        account.records.clear();
+        for (const [key, record] of saved) account.records.set(key, record);
+      };
+    },
+    changePassword: (password, username) => {
+      accountOf(username).password = password;
+      for (const [token, owner] of tokens) if (owner === (username ?? 'sam')) tokens.delete(token);
+    },
+    endSessions: () => tokens.clear(),
     failNext: (error) => {
       failNext = error;
     },
@@ -257,32 +308,14 @@ export function fakeSyncAccount(options: FakeAccountOptions = {}): FakeAccount {
     loseNextAnswer: () => {
       loseNext = true;
     },
-    reset: () => {
-      epoch += 1;
-      log.length = 0;
-      stored.clear();
+    duringNextPull: (action) => {
+      duringPull = action;
     },
-    rewind: (n) => {
-      epoch += 1;
-      for (const change of log.splice(log.length - n, n)) stored.delete(change.id);
+    refuseWrites: (pick) => {
+      refusing = pick;
     },
-    expireNext: () => {
-      expireNext = true;
-    },
-    refuseOwner: (refuse) => {
-      refuseOwner = refuse;
-    },
-    throttleOwner: (throttle) => {
-      throttleOwner = throttle;
-    },
-    refuseSignIn: (refuse) => {
-      refuseSignIn = refuse;
-      // A changed password: the sessions made with the old one go too.
-      if (refuse) tokens.clear();
-    },
-    revoke: () => tokens.clear(),
-    failVaultKey: (error) => {
-      failVaultKey = error;
+    throttleOwner: (next) => {
+      throttle = next;
     },
   };
 }

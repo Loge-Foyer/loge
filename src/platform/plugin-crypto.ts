@@ -1,6 +1,6 @@
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { AppError, encodeBase64, encodeUtf8, isKdfParams, TransportError, type PluginCrypto } from '@sc/api';
+import { encodeBase64, encodeUtf8, type PluginCrypto } from '@sc/api';
 
 /**
  * AES-256-GCM as the platform offers it: expo-crypto on a phone, WebCrypto
@@ -14,35 +14,20 @@ export interface AesGcm {
   decrypt(key: Uint8Array, sealed: Uint8Array, additionalData: string): Promise<Uint8Array>;
 }
 
-/** PBKDF2-HMAC-SHA256 to 32 bytes, natively: in plain JavaScript on Hermes it is a hundred times too slow. */
-export type Pbkdf2 = (password: Uint8Array, salt: Uint8Array, iterations: number) => Promise<Uint8Array>;
-
 const OVERHEAD = 12 + 16;
 
 /**
  * The host's cryptography, one definition for every platform: the platform's
- * own PBKDF2, AES-GCM and randomness, and HKDF in JavaScript (noble) — a few
- * HMACs, cheap anywhere.
+ * own AES-GCM and randomness, and SHA-256 and HKDF in JavaScript (noble) — a
+ * few rounds over a few bytes, cheap anywhere.
  */
-export function createPluginCrypto(deps: {
-  readonly randomBytes: (length: number) => Uint8Array;
-  readonly pbkdf2: Pbkdf2;
-  readonly aes: AesGcm;
-}): PluginCrypto {
+export function createPluginCrypto(deps: { readonly randomBytes: (length: number) => Uint8Array; readonly aes: AesGcm }): PluginCrypto {
   const context = (text: string) => encodeBase64(encodeUtf8(text));
 
   return {
     randomBytes: (length) => deps.randomBytes(length),
 
-    deriveKey: async (password, params, signal) => {
-      // Whatever a plugin was told, nothing weaker or heavier is derived here.
-      if (!isKdfParams(params)) throw new AppError('INVALID_STATE', 'The account asked for a key this app does not derive.', { retry: 'never' });
-      if (signal?.aborted) throw new TransportError('aborted');
-      const key = await deps.pbkdf2(encodeUtf8(password.normalize('NFC')), params.salt, params.iterations);
-      // A native derivation cannot be stopped half-way; one the caller gave up on is not handed back.
-      if (signal?.aborted) throw new TransportError('aborted');
-      return key;
-    },
+    sha256: async (data) => sha256(data),
 
     expandKey: async (key, info, length) => hkdf(sha256, key, undefined, encodeUtf8(info), length),
 

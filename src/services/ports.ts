@@ -9,9 +9,6 @@ import type {
   MediaDetail,
   MediaItem,
   NetworkKind,
-  PluginId,
-  SyncCapability,
-  SyncCursor,
   UserId,
 } from '@sc/api';
 
@@ -46,9 +43,10 @@ export interface ProfileValues extends ConnectionValues {
 }
 
 /**
- * Connections belong to the device. What a profile keeps for itself on one
- * lives in rows owned by that profile, which go with the profile and with the
- * connection.
+ * A source's or an IPTV plugin's connections belong to the account, and are
+ * journaled; a sync plugin's belong to the device, and never are. What a
+ * profile keeps for itself on one lives in rows owned by that profile, which
+ * go with the profile and with the connection.
  */
 export interface ConnectionRepository {
   list(): Promise<readonly Connection[]>;
@@ -63,19 +61,10 @@ export interface ConnectionRepository {
   deleteProfileValues(id: ConnectionId, userId: UserId): Promise<void>;
 }
 
-/** Per plugin, on this device. A plugin missing here is not installed. */
-export interface DevicePluginState {
-  readonly enabled: boolean;
-}
-
 export interface DeviceSettings {
   readonly defaultUserId?: UserId;
-  readonly plugins: Readonly<Partial<Record<PluginId, DevicePluginState>>>;
-  /**
-   * The journal's head when this device last left an account. What changed
-   * after it is this device's own when it joins one again.
-   */
-  readonly leftAccountAt?: number;
+  /** A fingerprint of the device key, never the key: it spots a phone restored from another's backup. */
+  readonly deviceKeyPrint?: string;
 }
 
 export interface DeviceSettingsRepository {
@@ -146,12 +135,6 @@ export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 
  */
 export interface JournalEntry {
   readonly seq: number;
-  /**
-   * Random, and the same every time the change is sent: the account
-   * deduplicates by it. Entries written before the account phase have none,
-   * and are never sent — every account starts with a join above them.
-   */
-  readonly changeId?: string;
   /** Whose entity this is. An attribute, not ownership: the journal outlives the profile. */
   readonly userId?: UserId;
   readonly entity: JournalEntity;
@@ -161,7 +144,7 @@ export interface JournalEntry {
   readonly localVersion: number;
 }
 
-/** A change recorded by hand: what joining an account announces of this device's rows. */
+/** A change recorded by hand: what a sign-up, or a server that lost a row, announces of this device's rows. */
 export type JournalAnnouncement = Pick<JournalEntry, 'entity' | 'entityId' | 'operation' | 'localVersion'> & {
   readonly userId?: UserId;
 };
@@ -174,6 +157,8 @@ export interface JournalRepository {
   count(after: number): Promise<number>;
   /** Records changes by hand — inside an unjournaled transaction too. */
   announce(changes: readonly JournalAnnouncement[]): Promise<void>;
+  /** Forgets every entry up to `seq`: they reached the account, or there is none to reach. Seqs are never reused. */
+  prune(through: number): Promise<void>;
 }
 
 export interface ChangeJournal extends JournalRepository {
@@ -182,27 +167,38 @@ export interface ChangeJournal extends JournalRepository {
 }
 
 /**
- * Where this device stands with its account. Device-owned and never
- * journaled; it goes with the account's connection.
+ * The device's account: kept here, or on your own server through the one
+ * sync-category connection that reaches it. Device-owned and never journaled.
  */
-export interface SyncState {
-  readonly connectionId: ConnectionId;
-  /** Where this device is in the account's log. */
-  readonly cursor?: SyncCursor;
-  /** Every journal entry up to here has been accepted by the account, or had nothing to send. */
+export type StoredAccount =
+  | { readonly kind: 'local'; readonly id: string; readonly name: string }
+  | {
+      readonly kind: 'server';
+      readonly id: string;
+      /** "faruk on home.example.com". */
+      readonly name: string;
+      readonly connectionId: ConnectionId;
+      /** What the server said an account may hold. */
+      readonly maxProfiles: number;
+    };
+
+/** Where this device stands with a server account. */
+export interface AccountSync {
+  /** Every journal entry up to here reached the account, or had nothing to send. */
   readonly checkpoint: number;
-  /** This device's accepted changes the account has not returned yet: entity key → change id. */
-  readonly awaiting: Readonly<Record<string, string>>;
-  /** What the account carried when this device last joined it. */
-  readonly carried: readonly SyncCapability[];
   readonly lastSyncedAt?: number;
+  /** Profiles the server refused for its limit: kept on this device only, and tried again when there is room. */
+  readonly heldBack: readonly UserId[];
 }
 
-export interface SyncStateRepository {
-  get(connectionId: ConnectionId): Promise<SyncState | undefined>;
-  /** Refused for a connection that is gone. */
-  put(state: SyncState): Promise<void>;
-  remove(connectionId: ConnectionId): Promise<void>;
+export interface AccountRepository {
+  get(): Promise<StoredAccount | undefined>;
+  put(account: StoredAccount): Promise<void>;
+  /** `{ checkpoint: 0, heldBack: [] }` before anything was synced. */
+  sync(): Promise<AccountSync>;
+  putSync(state: AccountSync): Promise<void>;
+  /** No account: while one is replaced by another, or signed out of. */
+  clear(): Promise<void>;
 }
 
 /** Everything the database keeps. Each write appends its journal entry in the same transaction. */
@@ -213,7 +209,7 @@ export interface Repositories {
   readonly preferences: PreferencesRepository;
   readonly mediaCache: MediaCacheRepository;
   readonly staleSecrets: StaleSecretQueue;
-  readonly syncState: SyncStateRepository;
+  readonly account: AccountRepository;
   readonly journal: JournalRepository;
 }
 

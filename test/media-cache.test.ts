@@ -31,7 +31,6 @@ async function setUp(options: { keeps?: boolean; engine?: Engine; where?: Return
   const built = buildServices({ plugins: [source.plugin], engine: options.engine ?? 'sqlite', clock, credentials, deviceBound, ...(options.where ? { where: options.where } : {}) });
   const { services } = built;
   const kids = await services.profiles.create('Kids');
-  await services.devicePlugins.setEnabled(source.manifest.id, true);
   let draft = initialDraft(source.manifest, 0);
   draft = setValue(source.manifest, draft, kids.id, 'fields', 'serverUrl', 'http://home:8096');
   draft = setValue(source.manifest, draft, kids.id, 'fields', 'username', 'family');

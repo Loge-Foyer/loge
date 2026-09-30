@@ -49,16 +49,19 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       list: () => read((r) => r.staleSecrets.list()),
       remove: (refs) => write((r) => r.staleSecrets.remove(refs)),
     },
-    syncState: {
-      get: (id) => read((r) => r.syncState.get(id)),
-      put: (state) => write((r) => r.syncState.put(state)),
-      remove: (id) => write((r) => r.syncState.remove(id)),
+    account: {
+      get: () => read((r) => r.account.get()),
+      put: (account) => write((r) => r.account.put(account)),
+      sync: () => read((r) => r.account.sync()),
+      putSync: (state) => write((r) => r.account.putSync(state)),
+      clear: () => write((r) => r.account.clear()),
     },
     journal: {
       entries: (after, limit) => read((r) => r.journal.entries(after, limit)),
       head: () => read((r) => r.journal.head()),
       count: (after) => read((r) => r.journal.count(after)),
       announce: (changes) => write((r) => r.journal.announce(changes)),
+      prune: (through) => write((r) => r.journal.prune(through)),
     },
   };
 }

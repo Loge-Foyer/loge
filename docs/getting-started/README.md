@@ -26,10 +26,7 @@ ways in:
 - **Sign in to your server.** The account arrives — profiles, PINs, settings
   and sources, with their passwords — and the app asks "Who's watching?".
 - **Restore a backup.** Pick a `.scbackup` file and type its key. It becomes a
-  local account.
-
-Until Phase 6 the first launch offers "Sign in to sync your profiles" or "Use
-on this device only", and then asks for the first profile's name.
+  local account. (It arrives with the backup file, later in Phase 6.)
 
 ## Set up once
 
@@ -39,8 +36,7 @@ the device.
 
 To add a server, go to Settings → Plugins → Sources, pick the plugin, and add a
 connection. The form comes from the plugin itself, and adding a connection is
-all it takes. (Until the account moves to records, a source is installed on
-the device before its first connection.) For development against your own
+all it takes. For development against your own
 Jellyfin, a test account is the thing to use: a wrong password counts against
 the account's lockout on the server.
 
@@ -75,16 +71,6 @@ The server keeps source passwords in plain text, for now. Its data folder and
 its dashboard are as sensitive as the passwords themselves: keep them private,
 and put the server behind TLS anywhere but your home network.
 
-**Until Phase 6** your own server is still the Node server from Phase 4:
-
-```bash
-cd ../streaming_center_sync && npm install && npm run build && npm start
-npm run sc-sync -- invite
-```
-
-at `http://localhost:8730`, or `http://10.0.2.2:8730` from the emulator, with a
-password of ten characters or more.
-
 ## A pretend account
 
 Development builds have a pretend server too: sign in to **Mock**, and its
@@ -99,7 +85,7 @@ endpoint names the account.
 
 ## Backups
 
-From Phase 6, Settings → Plugins → Sync has the backup file. Export it through
+Later in Phase 6, Settings → Plugins → Sync gets the backup file. Export it through
 the share sheet on a phone, or as a download in a browser; its backup key is
 shown after the app asks it's you. Restore it at a first launch, or import it
 from the same place, with the key. Importing replaces this device's account

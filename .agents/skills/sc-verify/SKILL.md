@@ -42,12 +42,13 @@ COOP/COEP headers — or native would ship dead IndexedDB code:
 ```bash
 grep -rl -e wa-sqlite -e expo-sqlite -e ExpoSecureStore -e ExpoLocalAuthentication -e KeyDerivation /tmp/sc-web   # must print nothing
 strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c streaming-center-secrets  # must print 0
+strings /tmp/sc-ios/_expo/static/js/ios/*.hbc | grep -c KeyDerivation             # must print 0
 ```
 
-The same goes for the host crypto: `src/platform/crypto.ts` is the native
-side and `crypto.web.ts` the web's, and the web bundle must not ask for a
-native module it does not have. (`KeyDerivation` stays in the grep until
-Phase 6 retires the module.)
+The host crypto is one file for every platform, `src/platform/crypto.ts`:
+expo-crypto, with WebCrypto behind it in a browser, and noble. `KeyDerivation`
+is Phase 4's native module, retired: it must not come back into either
+bundle.
 
 With `--source-maps` on the web export, also check the vocabulary is bundled
 once: the `sources` of the web map should list each
@@ -99,7 +100,7 @@ log either.
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |
 | `@/composition/*` | `src/app/_layout.tsx` |
 | `expo-local-authentication` | `src/platform/**` — everything else asks `OwnerCheck` |
-| `@noble/*`, and `modules/key-derivation` until Phase 6 | `src/platform/**` — cryptography is the platform's |
+| `@noble/*` | `src/platform/**` — cryptography is the platform's |
 
 The rows marked with a phase are the target: add them to `eslint.config.js`
 when the packages they name exist, in the same commit.
@@ -150,15 +151,15 @@ cd ../streaming_center_plugins && npm run typecheck && npm test
 ```
 
 After a change to the account contract, run the sync repository's tests as
-well: `npm test` there today; from Phase 6, `go test ./...` and
-`(cd harness && npm test)`, which drives the real `sync/custom-server` plugin
-against the real PocketBase binary.
+well: `go test ./...` there, and `(cd harness && npm test)` from Phase 6's
+S4, which drives the real `sync/custom-server` plugin against the real
+PocketBase binary.
 
 ## Current state — read this before trusting a failure
 
-**Phase 5 — the new architecture is written down; the code is still Phase 4's
-until Phase 6.** The checks marked with a phase apply once that phase has
-built what they check; the rest apply today.
+**Phase 6 — the code is moving to the new architecture.** The checks marked
+with a phase apply once that phase has built what they check; the rest apply
+today.
 
 - Storage is **real**: SQLite and the keychain on native, IndexedDB and
   encrypted secrets on the web. Data persists between runs, so a flow that
@@ -167,12 +168,11 @@ built what they check; the rest apply today.
   `localhost`.
 - Phones run a **development build**. A failure that looks like code that did
   not change is usually a stale build: rebuild after anything native changed.
-- `npm test` covers the database, the credential stores and the services —
-  the account and two devices syncing through one fake account included — not
-  screens. Screens are proven by driving the app on each platform (`sc-run`).
-  The real account plugin against the real server is
-  `../streaming_center_sync`'s `npm test` today — the Node server, with the
-  log, sealing and owner proofs — until Phase 6 replaces it with PocketBase.
+- `npm test` covers the database, every migration, the credential stores and
+  the services — the account's flows and two devices on one fake server
+  included — not screens. Screens are proven by driving the app on each
+  platform (`sc-run`). The real account plugin against the real PocketBase is
+  `../streaming_center_sync`'s harness, from Phase 6's S4.
 - There is no `player-kit`, sql.js or backup file yet, and nothing plays.
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before

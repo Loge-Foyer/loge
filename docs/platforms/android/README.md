@@ -5,10 +5,9 @@ Building and running on emulator and device, native modules, and Android-specifi
 The app runs in a **development build**, not Expo Go. The built-in player is
 expo-video on Media3 / ExoPlayer (Phase 7), and mpv (libmpv) and VLC (libVLC)
 are Expo modules in their own plugins (Phase 8), autolinked into the build.
-Until Phase 6 the app also has a native module of its own,
-`modules/key-derivation`, which derives keys from an account password with
-PBKDF2 on `javax.crypto`'s HMAC — JavaScript on Hermes is far too slow for that
-(measured: over twenty seconds on the emulator).
+The app has no native module of its own: Phase 4's key derivation went with
+its vault, so a build made before Phase 6 still carries it, and should be made
+again.
 
 `npm run android` builds the client and installs it; after that, Metro serves
 the JavaScript as usual. Change native code, or add a player, and build again.

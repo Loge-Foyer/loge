@@ -7,7 +7,7 @@ import { kindsForTab, showsOn } from '@/services/tab-content';
 
 const quiet = { strict: true, warn: () => undefined } as const;
 
-function manifest(id: string, rest: Partial<PluginManifest> & Pick<PluginManifest, 'category'>): Plugin {
+function manifest(id: string, rest: Partial<PluginManifest> & Pick<PluginManifest, 'category' | 'platforms'>): Plugin {
   return {
     manifest: {
       id: pluginId(id),

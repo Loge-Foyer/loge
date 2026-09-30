@@ -20,10 +20,16 @@ export function useAccount() {
   return useQuery({ queryKey: deviceKey('account'), queryFn: async () => (await account.current()) ?? null });
 }
 
-/** What can be the account: plugins with a sync role, and this device's connections of them. */
-export function useAccountProviders() {
+/** How many profiles the account may hold: ten on this device, or what your server says. */
+export function useMaxProfiles() {
   const { account } = useServices();
-  return useQuery({ queryKey: deviceKey('account', 'providers'), queryFn: () => account.providers() });
+  return useQuery({ queryKey: deviceKey('account', 'max-profiles'), queryFn: () => account.maxProfiles() });
+}
+
+/** Profiles your server refused for its limit, kept on this device only. */
+export function useHeldBackProfiles() {
+  const { account } = useServices();
+  return useQuery({ queryKey: deviceKey('account', 'held-back'), queryFn: () => account.heldBack() });
 }
 
 /**
@@ -39,7 +45,7 @@ export function useAccountActions() {
   const { account, sync } = useServices();
   const refresh = useRefreshLocalState();
   return {
-    // Signing out lets the account's connection go when it was only the account, and its source with it.
+    // Signing out keeps everything here, as an account of its own.
     signOut: useMutation({ mutationFn: (proof?: Credentials) => account.signOut(proof), onSuccess: () => refresh({ remote: true }) }),
     syncNow: useMutation({ mutationFn: () => sync.now() }),
   };

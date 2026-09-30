@@ -28,7 +28,7 @@ describe.each(ENGINES)('profiles on %s', (engine: Engine) => {
     expect((await db.users.list()).map((user) => user.id)).toEqual([alex.id]);
   });
 
-  it('come back after a restart: profiles, PINs, the default, plugins, connections and layouts', async () => {
+  it('come back after a restart: profiles, PINs, the default, connections and layouts', async () => {
     const where = reopenable(engine);
     const credentials = memoryCredentialStore();
     const deviceBound = memoryCredentialStore();
@@ -37,7 +37,6 @@ describe.each(ENGINES)('profiles on %s', (engine: Engine) => {
     const alex = await first.profiles.create('Alex');
     await first.pins.create(alex.id, '1234');
     await first.profiles.setDefault(alex.id);
-    await first.devicePlugins.setEnabled(source.manifest.id, true);
     let draft = initialDraft(source.manifest, 0);
     draft = setValue(source.manifest, draft, kids.id, 'fields', 'serverUrl', 'http://home:8096');
     draft = setValue(source.manifest, draft, kids.id, 'fields', 'username', 'family');
@@ -47,6 +46,8 @@ describe.each(ENGINES)('profiles on %s', (engine: Engine) => {
 
     // A new launch: a new graph on the same database and the same keychain.
     const again = buildServices({ plugins: [source.plugin], engine, where, credentials, deviceBound }).services;
+    // As the app starts: a device with profiles and no account keeps them as one of its own.
+    await again.account.ensureAccount();
     await again.session.start();
     expect(again.session.getSnapshot()).toEqual({ kind: 'needs-user-unlock', userId: alex.id });
     expect(await again.session.unlock(alex.id, '1234')).toEqual({ ok: true });

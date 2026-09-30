@@ -1,20 +1,19 @@
-import { AppError, isAppError, type AppErrorCode, type CancelSignal, type ConnectedUserStateSyncProvider, type RetryHint } from '@sc/api';
+import { AppError, isAppError, type AppErrorCode, type RetryHint } from '@sc/api';
 
 import { MissingSecretError } from '../plugin-context';
 import type { Clock, RunLock } from '../ports';
-import { applyPage, type Applied, type SyncParts } from './apply';
 import { currentAccount, type CurrentAccount } from './current';
-import { joinAccount, previewAccount, type JoinReason } from './join';
+import type { Applied, SyncParts } from './parts';
 import type { AccountProviders } from './provider';
 import { pushPending } from './push';
-import { vaultOnce, type VaultSource } from './sealed';
+import { reconcile } from './reconcile';
 
 export type SyncPhase =
-  | 'idle' // there is no account
+  | 'idle' // the account is on this device: nothing to sync with
   | 'syncing'
   | 'synced'
   | 'waiting' // for a better network, or for a retry
-  | 'needs-sign-in' // the account refused, or its password is not on this device: never tried again by itself
+  | 'needs-sign-in' // the server refused, or its password is not on this device: never tried again by itself
   | 'unavailable' // this build cannot run the account's plugin
   | 'failed';
 
@@ -38,9 +37,9 @@ export interface SyncEngine {
   /** The same object until something changes. */
   status(): SyncStatus;
   subscribe(listener: () => void): () => void;
-  /** Told of every batch of changes from the account, once committed. */
+  /** Told of every change from the account, once committed. */
   onApplied(listener: (applied: Applied) => void): () => void;
-  /** Changes from the account applied elsewhere — a sign-in's join — for the same listeners to hear of. */
+  /** Changes from the account applied elsewhere — a sign-in's replace — for the same listeners to hear of. */
   report(applied: Applied): void;
   /** A run now, or right after the one in progress. Never throws: what went wrong is in the status. */
   run(): Promise<void>;
@@ -52,8 +51,7 @@ export interface SyncEngine {
   accountChanged(): void;
 }
 
-const LOCK = 'streaming-center-sync';
-const MAX_JOINS_PER_RUN = 2;
+export const SYNC_LOCK = 'streaming-center-sync';
 
 export function createSyncEngine(deps: {
   readonly parts: SyncParts;
@@ -74,99 +72,56 @@ export function createSyncEngine(deps: {
     if (!result.changed) return;
     for (const listener of appliedListeners) listener(result);
   };
-  const pendingOf = async (account: CurrentAccount) => {
-    const state = await parts.db.syncState.get(account.connection.id);
-    return parts.db.journal.count(state?.checkpoint ?? 0);
-  };
+  const pendingOf = async () => parts.db.journal.count((await parts.db.account.sync()).checkpoint);
+  // What the server refused as invalid, until the account changes or the app starts again.
+  const refused = new Set<string>();
 
-  // One per run, asked for only when something is to be sealed or opened; if the account cannot give it, the run stops.
-  const vaultOf = (account: CurrentAccount, provider: ConnectedUserStateSyncProvider, signal?: CancelSignal): VaultSource | undefined => {
-    const key = account.carried.has('sealedPasswords') ? provider.vaultKey?.bind(provider) : undefined;
-    return key && vaultOnce(parts.crypto, () => key(signal));
-  };
-
+  /**
+   * One run: push the journal after the checkpoint, read the whole account,
+   * reconcile. There are no cursors and no log: the server's collections are
+   * the truth, and an account is small enough to read every time.
+   */
   const runOnce = async () => {
     const account = await currentAccount(parts.db, parts.catalog);
-    if (!account) {
+    if (account?.kind !== 'server') {
+      // Nothing reads the journal of an account on this device: it stays short.
+      await parts.db.journal.prune(await parts.db.journal.head());
       set({ phase: 'idle', pending: 0 });
       return;
     }
     if (!account.available) {
-      set({ phase: 'unavailable', pending: await pendingOf(account) });
+      set({ phase: 'unavailable', pending: await pendingOf() });
       return;
     }
     set({ ...status, phase: 'syncing' });
     try {
       const provider = await providers.provider(account.connection);
-      const vault = vaultOf(account, provider);
-      const sealing = vault ? { vault } : {};
-      let joins = 0;
-      const rejoin = async (reason: JoinReason) => {
-        joins += 1;
-        if (joins > MAX_JOINS_PER_RUN) throw new AppError('PROVIDER_UNAVAILABLE', 'The account keeps losing its place.', { retry: 'backoff' });
-        const preview = await previewAccount(provider, account.carried, parts);
-        applied(await joinAccount(parts, account.connection, account.carried, preview, reason, sealing));
-      };
-
-      const stored = await parts.db.syncState.get(account.connection.id);
-      if (!stored) await rejoin({ kind: 'reset' });
-      else if ([...account.carried].some((capability) => !stored.carried.includes(capability))) await rejoin({ kind: 'grow' });
-      else if (stored.carried.some((capability) => !account.carried.has(capability))) {
-        // Carrying less: remembered, so carrying it again joins again and sends what changed meanwhile.
-        await parts.db.unjournaled(async (tx) => {
-          const state = await tx.syncState.get(account.connection.id);
-          if (state) await tx.syncState.put({ ...state, carried: [...account.carried] });
-        });
-      }
-
-      for (;;) {
-        const state = await parts.db.syncState.get(account.connection.id);
-        if (!state) break;
-        const page = await provider.pull(state.cursor);
-        if (page.kind === 'reset') {
-          await rejoin({ kind: 'reset' });
-          continue;
-        }
-        if (page.kind === 'expired') {
-          // Nothing was lost, only the place in the log: read it all again, and send nothing extra.
-          const preview = await previewAccount(provider, account.carried, parts);
-          const result = await applyPage(parts, account.connection, account.carried, state.cursor, preview.changes, preview.cursor, vault);
-          if (result !== 'moved') applied(result);
-          continue;
-        }
-        const result = await applyPage(parts, account.connection, account.carried, state.cursor, page.changes, page.cursor, vault);
-        if (result === 'moved') continue;
-        applied(result);
-        if (!page.more) break;
-      }
-
-      const outcome = await pushPending(parts, provider, account.connection, account.carried, sealing);
+      await pushPending(parts, provider, refused);
+      const snapshot = await provider.pull();
+      applied(await reconcile(parts, snapshot.records, { maxProfiles: account.maxProfiles, refused }));
       const lastSyncedAt = clock.now();
+      const state = await parts.db.account.sync();
       await parts.db.unjournaled(async (tx) => {
-        const state = await tx.syncState.get(account.connection.id);
-        if (state) await tx.syncState.put({ ...state, lastSyncedAt });
+        await tx.account.putSync({ ...(await tx.account.sync()), lastSyncedAt });
+        // What reached the account is kept nowhere else: seqs are never reused, so this is safe.
+        await tx.journal.prune(state.checkpoint);
       });
-      set(
-        outcome === 'done'
-          ? { phase: 'synced', lastSyncedAt, pending: await pendingOf(account) }
-          : {
-              phase: 'waiting',
-              lastSyncedAt,
-              pending: await pendingOf(account),
-              problem: { code: 'PROVIDER_UNAVAILABLE', message: 'The account took only some of the changes.', retry: 'backoff' },
-            },
-      );
+      set({ phase: 'synced', lastSyncedAt, pending: await pendingOf() });
     } catch (error) {
-      const problem = problemOf(error);
-      parts.log.warn('sync', 'A sync run did not finish', { code: problem.code, retry: problem.retry });
-      const state = await parts.db.syncState.get(account.connection.id).catch(() => undefined);
-      set({
-        phase: problem.code === 'UNAUTHORIZED' ? 'needs-sign-in' : problem.retry === 'never' ? 'failed' : 'waiting',
-        ...(state?.lastSyncedAt === undefined ? {} : { lastSyncedAt: state.lastSyncedAt }),
-        pending: await pendingOf(account).catch(() => status.pending),
-        problem,
-      });
+      await failed(account, error);
     }
+  };
+
+  const failed = async (account: CurrentAccount, error: unknown) => {
+    const problem = problemOf(error);
+    parts.log.warn('sync', 'A sync run did not finish', { code: problem.code, retry: problem.retry, account: account.kind });
+    const state = await parts.db.account.sync().catch(() => undefined);
+    set({
+      phase: problem.code === 'UNAUTHORIZED' ? 'needs-sign-in' : problem.retry === 'never' ? 'failed' : 'waiting',
+      ...(state?.lastSyncedAt === undefined ? {} : { lastSyncedAt: state.lastSyncedAt }),
+      pending: await pendingOf().catch(() => status.pending),
+      problem,
+    });
   };
 
   // One run at a time, and at most one waiting behind it: requests meanwhile fold into that one.
@@ -193,7 +148,7 @@ export function createSyncEngine(deps: {
       queued = true;
       tail = tail.then(async () => {
         queued = false;
-        await lock.run(LOCK, runOnce).catch((error: unknown) => {
+        await lock.run(SYNC_LOCK, runOnce).catch((error: unknown) => {
           parts.log.error('sync', 'A sync run broke', { error: String(error) });
         });
       });
@@ -201,24 +156,20 @@ export function createSyncEngine(deps: {
     },
     changed: async () => {
       const seen = status;
-      if (seen.phase === 'syncing') return;
-      const account = await currentAccount(parts.db, parts.catalog).catch(() => undefined);
-      if (!account) return;
-      const pending = await pendingOf(account).catch(() => seen.pending);
+      if (seen.phase === 'syncing' || seen.phase === 'idle') return;
+      const pending = await pendingOf().catch(() => seen.pending);
       // A run that ended meanwhile counted for itself.
       if (status === seen && pending !== seen.pending) set({ ...seen, pending });
     },
     finalPush: async (timeoutMs) => {
       const account = await currentAccount(parts.db, parts.catalog);
-      if (!account?.available) return false;
+      if (account?.kind !== 'server' || !account.available) return false;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        return await lock.run(LOCK, async () => {
-          const provider = await providers.provider(account.connection);
-          const vault = vaultOf(account, provider, controller.signal);
-          const options = { signal: controller.signal, ...(vault ? { vault } : {}) };
-          return (await pushPending(parts, provider, account.connection, account.carried, options)) === 'done';
+        return await lock.run(SYNC_LOCK, async () => {
+          await pushPending(parts, await providers.provider(account.connection), refused, controller.signal);
+          return (await pendingOf()) === 0;
         });
       } catch {
         return false;
@@ -228,6 +179,7 @@ export function createSyncEngine(deps: {
     },
     accountChanged: () => {
       providers.forget();
+      refused.clear();
       set({ phase: 'idle', pending: 0 });
     },
   };

@@ -28,7 +28,6 @@ Phones run a development build, not Expo Go. Player engines are native code —
 expo-video, and Expo modules for KSPlayer, mpv and VLC — and Face ID needs the
 app's usage text. A player plugin's module has to be autolinked into the build
 from its linked package; Phases 7 and 8 prove that path before building on it.
-Until Phase 6 the app's own reason is `modules/key-derivation`.
 
 Change native code, or add a player, and build again: a stale build looks like
 code that did not change. The web needs no build.

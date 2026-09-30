@@ -1,6 +1,8 @@
 import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, UserId } from '@sc/api';
 
 import type {
+  AccountRepository,
+  AccountSync,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
@@ -12,12 +14,12 @@ import type {
   ProfileValues,
   Repositories,
   StaleSecretQueue,
+  StoredAccount,
   StoredUser,
-  SyncState,
-  SyncStateRepository,
   UserPreferences,
   UserRepository,
 } from '@/services/ports';
+import { accountWide } from '@/services/scope';
 
 import { changedKeys, documentOf, field, sameData } from '../documents';
 import { missingRow } from '../errors';
@@ -75,15 +77,19 @@ function toConnection({ position: _position, version: _version, ...connection }:
 
 /** The repositories over one open transaction, which spans every store. */
 export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & { readonly env: IndexedDbEnvironment }): Repositories {
-  const { clock, ids, env } = deps;
+  const { clock, env } = deps;
   const store = (name: StoreName) => tx.objectStore(name);
 
   const append = async (change: JournalAnnouncement) => {
-    await request(store('journal').add({ ...change, changeId: ids.next(), changedAt: clock.now() } satisfies Omit<JournalEntry, 'seq'>));
+    await request(store('journal').add({ ...change, changedAt: clock.now() } satisfies Omit<JournalEntry, 'seq'>));
     deps.onJournaled?.();
   };
   const record = async (change: JournalAnnouncement) => {
     if (deps.journaled) await append(change);
+  };
+  // A sync plugin's connection is the device's own: it never travels, so it is never journaled.
+  const recordConnection = async (plugin: string, change: JournalAnnouncement) => {
+    if (accountWide(plugin)) await record(change);
   };
 
   const get = <T>(name: StoreName, key: IDBValidKey) => request(store(name).get(key) as IDBRequest<T | undefined>);
@@ -149,7 +155,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       await request(
         store('connections').add({ ...connection, position: await nextPosition('connections'), version: 1 } satisfies ConnectionRecord),
       );
-      await record({ entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: 1 });
+      await recordConnection(connection.pluginId, { entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: 1 });
     },
     update: async (connection) => {
       const row = await get<ConnectionRecord>('connections', connection.id);
@@ -157,7 +163,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       if (sameData(toConnection(row), connection)) return;
       const version = row.version + 1;
       await request(store('connections').put({ ...connection, position: row.position, version } satisfies ConnectionRecord));
-      await record({ entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: version });
+      await recordConnection(connection.pluginId, { entity: 'connection', entityId: connection.id, operation: 'upsert', localVersion: version });
     },
     delete: async (id) => {
       const row = await get<ConnectionRecord>('connections', id);
@@ -166,8 +172,8 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
-      await request(store('syncState').delete(id));
-      await record({ entity: 'connection', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+      await request(store('backupState').delete(id));
+      await recordConnection(row.pluginId, { entity: 'connection', entityId: id, operation: 'delete', localVersion: row.version + 1 });
     },
     profileValues: async (id) => {
       const rows = await request(store('connectionProfileValues').index('byConnection').getAll(id) as IDBRequest<ProfileValuesRecord[]>);
@@ -188,19 +194,26 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       );
     },
     putProfileValues: async (id, user, values) => {
-      if (!(await get('connections', id))) throw missingRow('connection', id);
+      const connection = await get<ConnectionRecord>('connections', id);
+      if (!connection) throw missingRow('connection', id);
       if (!(await get('users', user))) throw missingRow('profile', user);
       const row = await get<ProfileValuesRecord>('connectionProfileValues', [id, user]);
       if (row && sameData(row.values, values)) return;
       const version = (row?.version ?? 0) + 1;
       await request(store('connectionProfileValues').put({ connectionId: id, userId: user, values, version } satisfies ProfileValuesRecord));
-      await record({ userId: user, entity: 'connectionProfileValues', entityId: `${id}/${user}`, operation: 'upsert', localVersion: version });
+      await recordConnection(connection.pluginId, {
+        userId: user,
+        entity: 'connectionProfileValues',
+        entityId: `${id}/${user}`,
+        operation: 'upsert',
+        localVersion: version,
+      });
     },
     deleteProfileValues: async (id, user) => {
       const row = await get<ProfileValuesRecord>('connectionProfileValues', [id, user]);
       if (!row) return;
       await request(store('connectionProfileValues').delete([id, user]));
-      await record({
+      await recordConnection((await get<ConnectionRecord>('connections', id))?.pluginId ?? '', {
         userId: user,
         entity: 'connectionProfileValues',
         entityId: `${id}/${user}`,
@@ -213,7 +226,6 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
   const readDeviceSettings = async () =>
     documentOf<DeviceSettings>(
       (await request(store('deviceSettings').getAll() as IDBRequest<{ key: string; value: unknown }[]>)).map((row) => [row.key, row.value]),
-      { plugins: {} },
     );
 
   const deviceSettings: DeviceSettingsRepository = {
@@ -331,14 +343,17 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  const syncState: SyncStateRepository = {
-    get: (id) => get<SyncState>('syncState', id),
-    put: async (state) => {
-      if (!(await get('connections', state.connectionId))) throw missingRow('connection', state.connectionId);
-      await request(store('syncState').put(state));
+  const account: AccountRepository = {
+    get: async () => (await get<{ readonly account: StoredAccount }>('account', 'account'))?.account,
+    put: async (next) => {
+      await request(store('account').put({ key: 'account', account: next }));
     },
-    remove: async (id) => {
-      await request(store('syncState').delete(id));
+    sync: async (): Promise<AccountSync> => (await get<{ readonly sync: AccountSync }>('account', 'sync'))?.sync ?? { checkpoint: 0, heldBack: [] },
+    putSync: async (state) => {
+      await request(store('account').put({ key: 'sync', sync: state }));
+    },
+    clear: async () => {
+      await request(store('account').clear());
     },
   };
 
@@ -354,7 +369,10 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     announce: async (changes) => {
       for (const change of changes) await append(change);
     },
+    prune: async (through) => {
+      await request(store('journal').delete(env.IDBKeyRange.upperBound(through)));
+    },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, syncState, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, journal };
 }
