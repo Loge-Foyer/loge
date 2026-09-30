@@ -1,4 +1,15 @@
-import { AppError, type AudioTrack, type MediaPlayer, type PlayerContext, type PlayerLoad, type StreamProtocol, type SubtitleTrack } from '@sc/api';
+import {
+  AppError,
+  createPlayerEvents,
+  playbackFailed,
+  playerReleased,
+  type AudioTrack,
+  type MediaPlayer,
+  type PlayerContext,
+  type PlayerLoad,
+  type StreamProtocol,
+  type SubtitleTrack,
+} from '@sc/api';
 import {
   createVideoPlayer,
   type AudioTrack as EngineAudioTrack,
@@ -6,8 +17,6 @@ import {
   type SubtitleTrack as EngineSubtitleTrack,
   type VideoPlayer,
 } from 'expo-video';
-
-import { createEvents, playbackFailed, released } from './events';
 
 /** The expo-video player behind each controller. This package's view draws it; nothing else touches it. */
 const engines = new WeakMap<MediaPlayer, VideoPlayer>();
@@ -32,7 +41,7 @@ export function createEngine(context: PlayerContext): MediaPlayer {
   const video = createVideoPlayer(null);
   // Once a second: enough for a scrubber and for progress reports.
   video.timeUpdateEventInterval = 1;
-  const events = createEvents();
+  const events = createPlayerEvents();
   let audio: readonly EngineAudioTrack[] = [];
   let subtitles: readonly EngineSubtitleTrack[] = [];
   // Applied once the stream is ready: AVPlayer drops a seek made before then.
@@ -141,9 +150,9 @@ export function createEngine(context: PlayerContext): MediaPlayer {
 
   const player: MediaPlayer = {
     load: async ({ source, ...wanted }) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       const headers = source.headersRef === undefined ? undefined : await context.resolveHeaders(source.headersRef);
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       loaded = true;
       ready = false;
       wantsToPlay = false;
@@ -162,7 +171,7 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       }
     },
     play: () => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       wantsToPlay = true;
       if (events.state() === 'ended') {
         video.currentTime = 0;
@@ -171,21 +180,21 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       video.play();
     },
     pause: () => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       wantsToPlay = false;
       video.pause();
     },
     seek: (positionMs) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       video.currentTime = Math.max(0, positionMs) / 1000;
       if (events.state() === 'ended') events.setState('paused');
     },
     setAudioTrack: (id) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       chooseAudio(id);
     },
     setSubtitleTrack: (id) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       chooseSubtitle(id);
     },
     subscribe: (listener) => events.subscribe(listener),

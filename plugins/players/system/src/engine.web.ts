@@ -1,8 +1,15 @@
-import { AppError, type AudioTrack, type MediaPlayer, type PlayerContext, type SubtitleTrack } from '@sc/api';
+import {
+  AppError,
+  createPlayerEvents,
+  playbackFailed,
+  playerReleased,
+  type AudioTrack,
+  type MediaPlayer,
+  type PlayerContext,
+  type SubtitleTrack,
+} from '@sc/api';
 import type Hls from 'hls.js';
 import type { ErrorData } from 'hls.js';
-
-import { createEvents, playbackFailed, released } from './events';
 
 /** What the engine takes from the page, so a test can hand it fakes. */
 export interface WebEngineHost {
@@ -34,7 +41,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
   const video = host.createVideo();
   video.playsInline = true;
   video.preload = 'auto';
-  const events = createEvents();
+  const events = createPlayerEvents();
   let hls: Hls | undefined;
   let pendingStartMs: number | undefined;
   let ready = false;
@@ -153,7 +160,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
 
   const player: MediaPlayer = {
     load: async ({ source, startMs }) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       detach();
       ready = false;
       recovered = false;
@@ -161,7 +168,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       pendingStartMs = startMs;
       events.setState('loading');
       const headers = source.headersRef === undefined ? undefined : await context.resolveHeaders(source.headersRef);
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       if (source.protocol === 'hls') {
         if (!headers && video.canPlayType('application/vnd.apple.mpegurl') !== '') {
           video.src = source.uri;
@@ -173,7 +180,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
         } catch (error) {
           throw fail(playbackFailed('The HLS player could not be loaded.', error));
         }
-        if (disposed) throw released();
+        if (disposed) throw playerReleased();
         if (!HlsClass.isSupported()) throw fail(new AppError('INVALID_STATE', 'This browser cannot play HLS.'));
         const instance = new HlsClass({
           enableWorker: false,
@@ -203,7 +210,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       video.load();
     },
     play: () => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       if (events.state() === 'ended') video.currentTime = 0;
       video.play().catch((error: unknown) => {
         const name = nameOf(error);
@@ -214,22 +221,22 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       });
     },
     pause: () => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       video.pause();
     },
     seek: (positionMs) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       video.currentTime = Math.max(0, positionMs) / 1000;
       if (events.state() === 'ended') events.setState('paused');
     },
     setAudioTrack: (id) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       const index = indexOf(id, 'audio');
       if (!hls || index < 0 || index >= hls.audioTracks.length) throw new AppError('NOT_FOUND', 'This stream has no such audio track.');
       hls.audioTrack = index;
     },
     setSubtitleTrack: (id) => {
-      if (disposed) throw released();
+      if (disposed) throw playerReleased();
       const index = id === null ? -1 : indexOf(id, 'subtitle');
       if (hls) {
         if (id !== null && (index < 0 || index >= hls.subtitleTracks.length)) throw new AppError('NOT_FOUND', 'This stream has no such subtitle track.');

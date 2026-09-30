@@ -1,4 +1,15 @@
-import { canPlay, choosePlayer, missingFor, pluginId, type PlaybackSource, type PlayerProfile } from '@sc/api';
+import {
+  AppError,
+  canPlay,
+  choosePlayer,
+  createPlayerEvents,
+  missingFor,
+  playbackFailed,
+  pluginId,
+  type PlaybackSource,
+  type PlayerEvent,
+  type PlayerProfile,
+} from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 // Rough shapes of the engines, enough to exercise the rules.
@@ -77,5 +88,41 @@ describe('choosePlayer', () => {
   it('says when no enabled player can', () => {
     expect(choosePlayer([mkv], [{ id: system, profile: avplayer }])).toEqual({ kind: 'none' });
     expect(choosePlayer([hls], [])).toEqual({ kind: 'none' });
+  });
+});
+
+describe('createPlayerEvents', () => {
+  it('tells a state once, and a new listener the current one at once', () => {
+    const events = createPlayerEvents();
+    const early: PlayerEvent[] = [];
+    events.subscribe((event) => early.push(event));
+    events.setState('loading');
+    events.setState('loading');
+    events.setState('playing');
+    const late: PlayerEvent[] = [];
+    const unsubscribe = events.subscribe((event) => late.push(event));
+    expect(early).toEqual([
+      { type: 'state', state: 'idle' },
+      { type: 'state', state: 'loading' },
+      { type: 'state', state: 'playing' },
+    ]);
+    expect(late).toEqual([{ type: 'state', state: 'playing' }]);
+    unsubscribe();
+    events.setState('paused');
+    expect(late).toHaveLength(1);
+  });
+
+  it('makes a failure a state and an error both', () => {
+    const events = createPlayerEvents();
+    const heard: PlayerEvent[] = [];
+    events.subscribe((event) => heard.push(event));
+    const error = playbackFailed('   ');
+    events.fail(error);
+    expect(heard.slice(1)).toEqual([{ type: 'state', state: 'failed' }, { type: 'error', error }]);
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({ code: 'PROVIDER_UNAVAILABLE', retry: 'backoff', message: 'The stream could not be played.' });
+    events.clear();
+    events.setState('idle');
+    expect(heard).toHaveLength(3);
   });
 });
