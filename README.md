@@ -84,7 +84,7 @@ it.
 
 ## Current state
 
-**Phase 6 — the code moves to the new architecture.** The plugins are in
+**Phase 6 — the code is on the new architecture.** The plugins are in
 their four folders, each with an id that names its category, and every
 manifest declares one block.
 

@@ -80,7 +80,7 @@ handling stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
-Phase 6 — the code is moving to the new architecture. The plugins are in
+Phase 6 — the code is on the new architecture. The plugins are in
 their category folders, with qualified ids, categories and platforms, and the
 account is kept record by record on your own server, PocketBase.
 
