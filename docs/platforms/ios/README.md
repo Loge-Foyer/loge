@@ -3,9 +3,11 @@
 Building and running on simulator and device, native modules, config plugins, and the development build.
 
 The app runs in a **development build**, not Expo Go. The built-in player is
-expo-video on AVPlayer (Phase 7), and KSPlayer, mpv (MPVKit) and VLC (VLCKit)
-are Expo modules in their own plugins (Phase 8), autolinked into the build.
-Face ID needs the app's usage text, which Expo Go cannot carry. The app has
+expo-video on AVPlayer (Phase 7). VLC (VLCKit), mpv (MPVKit) and KSPlayer are
+Expo modules in their own plugins, autolinked into the build the way the
+Android halves already are — Phase 9 brings them, and until it does the
+built-in player is the only engine here. Face ID needs the app's usage text,
+which Expo Go cannot carry. The app has
 no native module of its own: Phase 4's key derivation went with its vault, so
 a build made before Phase 6 still carries it, and should be made again.
 
@@ -13,16 +15,55 @@ a build made before Phase 6 still carries it, and should be made again.
 Metro serves the JavaScript as usual. Change native code, or add a player, and
 build again.
 
-## Servers on the local network
+## Servers over plain HTTP
 
 App Transport Security refuses plain `http` unless the app says otherwise.
-`app.json` does, through `ios.infoPlist`: `NSAllowsLocalNetworking` lets the
-app reach a server on the local network — a Jellyfin, or your own server — and
-`NSLocalNetworkUsageDescription` is the reason iOS shows when it asks for
-local-network permission. Never edit the generated `ios/` folder instead.
+`app.json` says otherwise, through `ios.infoPlist`:
+
+```jsonc
+"NSAppTransportSecurity": { "NSAllowsArbitraryLoads": true }
+```
+
+**Why blanket, rather than an exception per host.** This app's whole job is
+reaching servers the user types in at runtime, so there is no list to write at
+build time. `NSExceptionDomains` keys are domain names, and it cannot express
+an IP literal at all — which is the single most common shape a home media
+server takes. And naming a real portal or server in `app.json` would commit
+someone's address to the source tree for good. ATS was never protecting this
+app's user from their own Jellyfin; it was only stopping them reaching it. The
+protections that matter are elsewhere and unchanged: secrets in the keychain,
+descriptors in memory only, redacted logs. What is true, and worth saying: over
+plain `http` a portal's sign-in and a stream's address cross the network in the
+clear. That is a property of the server the user chose, and no client can
+repair it.
+
+**`NSAllowsLocalNetworking` is deliberately absent.** On iOS 10 and later,
+`NSAllowsArbitraryLoads` is *ignored* when `NSAllowsLocalNetworking`,
+`NSAllowsArbitraryLoadsInWebContent` or `…ForMedia` is also present — that
+pairing is the old iOS-9 compatibility idiom, and falling back to the narrow
+key is its entire purpose. Adding it back silently disables everything above.
+Arbitrary loads already covers every address local networking did.
+
+**`NSLocalNetworkUsageDescription` stays, and is not ATS.** It is the reason
+iOS shows for the separate local-network privacy prompt, which a request to a
+LAN address must pass *as well as* ATS.
+
+**A change here needs a prebuild.** `npm run ios` only prebuilds when `ios/` is
+absent, so on this repository it would rebuild the same `Info.plist` and the
+change would never land:
+
+```bash
+npx expo prebuild -p ios      # not --clean: that discards the Pods install
+                              # and any signing team set in Xcode
+npx expo config --type introspect   # cheaper: renders the plist without writing
+plutil -p ios/StreamingCenter/Info.plist
+```
+
+Never edit the generated `ios/` folder instead.
 
 The simulator shares the computer's network, so your own server running there
-is `http://localhost:8090`.
+is `http://localhost:8090`. On a real device it is the computer's LAN address,
+which is exactly the case the policy above exists for.
 
 ## Storage
 
@@ -42,11 +83,18 @@ is `http://localhost:8090`.
 ## Players
 
 - **AVPlayer**, the built-in player through expo-video (Phase 7), plays HLS and
-  progressive files, but not raw MPEG-TS over HTTP. A channel that only offers
-  `.ts` says it needs another player until Phase 8; the IPTV plugin asks the
-  portal for HLS where it can.
-- **KSPlayer** runs on iOS only, and is GPL by default: Phase 8 settles its
-  licence before it ships.
+  progressive files, but **not raw MPEG-TS over HTTP** — it reads MPEG-TS only
+  inside HLS. So `players/system`'s `ios` profile omits `mpegts`, on purpose,
+  and a channel that only offers `.ts` correctly says it needs another player.
+  The IPTV plugin asks the portal for HLS where it can.
+- **No other engine is built here yet.** `players/vlc` and `players/mpv` have
+  Android halves only, and `players/ksplayer` is a manifest with no profile, so
+  the app never picks it. That is the gap Phase 9 closes, and until it does,
+  a portal's raw MPEG-TS channels have no player on an iPhone.
+- **Licences are settled** (Phase 8): the app is GPL-3.0-or-later, so a player
+  may link a GPL engine. VLCKit is LGPL-2.1 and adds no constraint; libmpv's
+  and KSPlayer's builds are GPL. A closed or App Store build would need LGPL
+  engines instead — a plan of its own.
 - Which players are on, and the default, are this device's settings.
 
 ## iCloud

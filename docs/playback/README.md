@@ -43,9 +43,9 @@ A player plugin is in the `players` category, and has three parts:
 | Plugin | Engine | Platforms | Arrives |
 | --- | --- | --- | --- |
 | `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js and mpegts.js on the web | all | Phase 7; MPEG-TS on the web in Phase 8 |
-| `players/ksplayer` | KSPlayer | iOS | Phase 8 |
-| `players/mpv` | libmpv on Android, through an Expo module in its package with its own JNI; MPVKit on iOS later | Android | Phase 8 — Android is in |
-| `players/vlc` | libVLC on Android, through an Expo module in its package; VLCKit on iOS later | Android | Phase 8 — Android is in |
+| `players/ksplayer` | KSPlayer | iOS | Phase 9 — a spike first: it is on no package manager, and its FFmpeg dependency ships only as a very large git clone |
+| `players/mpv` | libmpv on Android, through an Expo module in its package with its own JNI; MPVKit on iOS | Android, iOS | Phase 8 — Android is in; iOS in Phase 9 |
+| `players/vlc` | libVLC on Android, through an Expo module in its package; MobileVLCKit on iOS | Android, iOS | Phase 8 — Android is in; iOS in Phase 9 |
 
 On the web there is only the built-in player. It plays raw MPEG-TS through
 mpegts.js, fetched as a chunk of its own the first time a stream needs it, as

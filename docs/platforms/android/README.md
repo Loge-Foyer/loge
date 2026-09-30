@@ -17,13 +17,22 @@ the JavaScript as usual. Change native code, or add a player, and build again.
 The Material tab bar is themed from Tamagui explicitly, because it would
 otherwise follow the system's light theme under a dark app.
 
-## Servers on the local network
+## Servers over plain HTTP
 
-The development build is a debug build, whose generated manifest allows plain
-`http` — a Jellyfin on your network, your own server, and Metro itself. A
-release build blocks cleartext from Android 9 on, and will need it allowed
-through a config plugin in `app.json` (`expo-build-properties`) — never an edit
-to the generated `android/` folder.
+Android blocks cleartext from Android 9 on. Two things allow it here, and only
+one of them covers a release build:
+
+- The development build is a debug build, whose *generated debug* manifest
+  allows plain `http` on its own — a Jellyfin on your network, your own server,
+  and Metro itself.
+- `expo-build-properties` sets `android.usesCleartextTraffic` in `app.json`,
+  which writes the attribute onto `<application>` in the **main** manifest, so
+  release builds reach the same servers. Without it a release build fails for
+  every plain-`http` source, and looks like a bug in the source rather than in
+  packaging.
+
+Never edit the generated `android/` folder instead. iOS needs the same thing
+said differently — see `../ios/README.md`.
 
 The emulator reaches the computer at `10.0.2.2`, so your own server running
 there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
