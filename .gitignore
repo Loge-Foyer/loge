@@ -9,3 +9,6 @@ node_modules/
 plugins/players/*/android/build/
 plugins/players/*/android/.gradle/
 plugins/players/*/android/.cxx/
+
+# A scratch corner for one-off scripts run against a real server.
+.probe/

@@ -28,7 +28,9 @@ import {
   toVod,
   type ChannelRow,
   type EpisodeRow,
+  type SeasonRow,
   type VodRow,
+  type VodType,
 } from './map';
 import { createPortal, unreadable } from './portal';
 
@@ -48,8 +50,11 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   // What `create_link` takes for each id — in memory only: on some portals it is the stream's address, sign-in and all.
   const channelCmds = new Map<string, string>();
   const vod = new Map<string, VodRow>();
+  const seasonRows = new Map<string, SeasonRow>();
   const episodeRows = new Map<string, EpisodeRow>();
   let everyChannel: Promise<void> | undefined;
+  // Whether this portal keeps its series apart from its films, asked once.
+  let seriesSection: Promise<boolean> | undefined;
 
   const remember = (rows: readonly ChannelRow[]) => {
     for (const row of rows) if (row.cmd) channelCmds.set(row.channel.key.externalId, row.cmd);
@@ -68,7 +73,21 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
   const own = (key: GlobalMediaKey) => key.connectionId === connectionId;
 
-  const describe = async (request: PlaybackRequest, type: 'itv' | 'vod', params: Readonly<Record<string, string | number>>, live: boolean, signal?: CancelSignal): Promise<PlaybackDescriptor> => {
+  /**
+   * Whether the portal has a series section of its own. Its categories are the
+   * honest question: a portal without one answers nothing, while asking it for
+   * a list of series can hand back the films. Asked once, and never again —
+   * a refusal counts as no.
+   */
+  const hasSeriesSection = (signal?: CancelSignal) => {
+    seriesSection ??= portal
+      .call('series', 'get_categories', {}, signal)
+      .then((js) => Array.isArray(js) && js.length > 0)
+      .catch(() => false);
+    return seriesSection;
+  };
+
+  const describe = async (request: PlaybackRequest, type: 'itv' | VodType, params: Readonly<Record<string, string | number>>, live: boolean, signal?: CancelSignal): Promise<PlaybackDescriptor> => {
     const link = linkOf(await portal.call(type, 'create_link', { series: '', forced_storage: 'undefined', disable_ad: 0, download: 0, force_ch_link_check: 0, ...params }, signal));
     if (link.error === 'limit') throw new AppError('PROVIDER_UNAVAILABLE', 'Too many devices are watching on this subscription right now.', { retry: 'backoff' });
     if (link.error === 'nothing_to_play') throw new AppError('NOT_FOUND', 'The portal has nothing to play for this.');
@@ -84,10 +103,10 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   };
 
   /** Every page of a series' seasons or episodes: a portal pages them like everything else. */
-  const allPages = async (params: Readonly<Record<string, string | number>>, signal?: CancelSignal) => {
+  const allPages = async (from: VodType, params: Readonly<Record<string, string | number>>, signal?: CancelSignal) => {
     const data: unknown[] = [];
     for (let page = 1; page <= EPISODE_PAGES; page += 1) {
-      const js = await portal.call('vod', 'get_ordered_list', { ...params, p: page }, signal);
+      const js = await portal.call(from, 'get_ordered_list', { ...params, p: page }, signal);
       const body = js && typeof js === 'object' && !Array.isArray(js) ? (js as { data?: unknown; total_items?: unknown; max_page_items?: unknown }) : undefined;
       const rows = Array.isArray(body?.data) ? body.data : [];
       data.push(...rows);
@@ -145,13 +164,22 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     listItems: async (query, signal) => {
       if (query.kind !== 'movies' && query.kind !== 'shows') return { items: [] };
       const page = query.cursor ? Number(query.cursor) : 1;
-      const js = await portal.call('vod', 'get_ordered_list', { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: page }, signal);
-      const result = toVod(js, page, connectionId, portal.root());
-      for (const row of result.rows) vod.set(row.item.key.externalId, row);
-      const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
-      // Films and series share the portal's pages; each kind takes its own from them.
-      const type = query.kind === 'movies' ? 'movie' : 'show';
-      return { items: result.rows.map((row) => row.item).filter((item) => item.type === type), ...(more ? { nextCursor: String(result.page + 1) } : {}) };
+      const wanted = query.kind === 'movies' ? 'movie' : 'show';
+
+      const ask = async (from: VodType) => {
+        const js = await portal.call(from, 'get_ordered_list', { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: page }, signal);
+        const result = toVod(js, page, connectionId, portal.root(), from);
+        for (const row of result.rows) vod.set(row.item.key.externalId, row);
+        const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
+        // Where films and series share pages, each kind takes its own from them.
+        return { items: result.rows.map((row) => row.item).filter((item) => item.type === wanted), ...(more ? { nextCursor: String(result.page + 1) } : {}) };
+      };
+
+      if (wanted === 'movie') return ask('vod');
+      // A portal with a series section of its own keeps every series there,
+      // and its films where the films are. An older one has no such section
+      // and mixes them, which is what the fall-back reads.
+      return (await hasSeriesSection(signal)) ? ask('series') : ask('vod');
     },
 
     getItem: async (externalId) => {
@@ -163,14 +191,15 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     getChildren: async (parent, signal) => {
       const at = parseId(parent.key.externalId);
       if (parent.type === 'show' && at?.kind === 'show') {
-        const seasons = toSeasons(await allPages({ movie_id: at.id, season_id: 0, episode_id: 0 }, signal), parent, connectionId);
-        if (seasons.length > 0) return { items: seasons, total: seasons.length };
+        const rows = toSeasons(await allPages(at.from, { movie_id: at.id, season_id: 0, episode_id: 0 }, signal), parent, connectionId);
+        for (const row of rows) seasonRows.set(row.season.key.externalId, row);
+        if (rows.length > 0) return { items: rows.map((row) => row.season), total: rows.length };
         // An old portal numbers a series' episodes on the series itself: one season holds them.
         const numbered = vod.get(parent.key.externalId)?.episodes;
         if (!numbered) return { items: [] };
         const season: Season = {
           type: 'season',
-          key: { connectionId, externalId: ids.season(at.id, '1') },
+          key: { connectionId, externalId: ids.season(at.id, '1', at.from) },
           title: 'Season 1',
           show: parent.key,
           showTitle: parent.title,
@@ -182,27 +211,32 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         return { items: [season], total: 1 };
       }
       if (parent.type === 'season' && at?.kind === 'season') {
-        const show = vod.get(ids.show(at.show));
-        const rows: readonly EpisodeRow[] =
-          show?.episodes && at.season === '1'
-            ? show.episodes.map((number) => ({
-                item: {
-                  type: 'episode' as const,
-                  key: { connectionId, externalId: ids.episode(at.show, '1', String(number)) },
-                  title: `Episode ${number}`,
-                  show: parent.show,
-                  season: parent.key,
-                  showTitle: parent.showTitle ?? '',
-                  seasonNumber: 1,
-                  episodeNumber: number,
-                  ratings: {},
-                  genres: [],
-                  images: {},
-                },
-                ...(show.cmd ? { cmd: show.cmd } : {}),
-                series: number,
-              }))
-            : toEpisodes(await allPages({ movie_id: at.show, season_id: at.season, episode_id: 0 }, signal), parent, connectionId);
+        const show = vod.get(ids.show(at.show, at.from));
+        // Either the season or the series itself may list the episodes by
+        // number instead of as rows: they are played through whichever did,
+        // with the number `create_link` asks for.
+        const season = seasonRows.get(parent.key.externalId);
+        const numbered = season?.episodes ?? (at.season === '1' ? show?.episodes : undefined);
+        const cmd = season?.episodes ? season.cmd : show?.cmd;
+        const rows: readonly EpisodeRow[] = numbered
+          ? numbered.map((number) => ({
+              item: {
+                type: 'episode' as const,
+                key: { connectionId, externalId: ids.episode(at.show, at.season, String(number), at.from) },
+                title: `Episode ${number}`,
+                show: parent.show,
+                season: parent.key,
+                showTitle: parent.showTitle ?? '',
+                ...(parent.seasonNumber === undefined ? {} : { seasonNumber: parent.seasonNumber }),
+                episodeNumber: number,
+                ratings: {},
+                genres: [],
+                images: {},
+              },
+              ...(cmd ? { cmd } : {}),
+              series: number,
+            }))
+          : toEpisodes(await allPages(at.from, { movie_id: at.show, season_id: at.season, episode_id: 0 }, signal), parent, connectionId);
         for (const row of rows) episodeRows.set(row.item.key.externalId, row);
         const items: readonly MediaItem[] = rows.map((row) => row.item);
         return { items, total: items.length };
@@ -226,6 +260,8 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       if (at?.kind === 'episode') {
         const row = episodeRows.get(request.key.externalId);
         if (!row?.cmd) throw new AppError('NOT_FOUND', 'Open the season again.');
+        // Always `vod`: a portal's series section lists, and the films' side
+        // makes every link — asking `series` for one answers nothing at all.
         return describe(request, 'vod', { cmd: row.cmd, ...(row.series === undefined ? {} : { series: row.series }) }, false, signal);
       }
       throw new AppError('INVALID_STATE', 'A series plays one episode at a time.');
@@ -236,6 +272,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     dispose: async () => {
       channelCmds.clear();
       vod.clear();
+      seasonRows.clear();
       episodeRows.clear();
     },
   };

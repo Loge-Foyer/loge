@@ -346,8 +346,9 @@ TypeScript program of its own with React Native's types.
 - **`iptv/mock`** implements it with live TV: groups, channels, a guide, a
   few films and series, and public test streams to play.
 - **`iptv/stalker`** implements it against a Stalker portal — handshake,
-  profile, genres, channels, guide, `create_link`, films and series — tested
-  against a fake portal; it has not met a real one yet.
+  profile, genres, channels, guide, `create_link`, films, and series from a
+  section of the portal's own where it has one. Tested against a fake portal,
+  and run against a real one.
 - **`players/system`** implements the player role: expo-video on phones, the
   browser's `<video>` with a lazily loaded hls.js on the web, a profile per
   platform. Its engines are tested against fakes (`vitest.config.ts` aliases

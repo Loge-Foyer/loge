@@ -115,7 +115,9 @@ Phase 8 adds players — VLC and mpv on Android are in.
   server in memory, and `sync/mock-backup` at being a backup target.
 - **Stalker:** implements the media role against a Stalker portal —
   handshake and profile, live TV with its guide, links made when playing,
-  films and series — tested against a fake portal, not yet a real one.
+  films, and series from whichever section the portal keeps them in. Tested
+  against a fake portal, and run against a real one: 4,658 channels, a day of
+  guide, and a series' episodes played.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
 - **Every other plugin:** a manifest — the other IPTV plugins, KSPlayer, and

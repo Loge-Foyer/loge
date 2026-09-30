@@ -16,34 +16,50 @@ import {
 import { record, text } from './portal';
 
 /**
- * The portal's answers as domain types. Ids carry what they name — `ch:`,
- * `vod:`, `series:`, `season:`, `episode:` — so one call knows what it is
- * asked about. A `cmd` never goes into an id: on some portals it is the
- * stream's address, sign-in and all.
+ * Where a portal keeps something: its live section, its films, or a series
+ * section of its own. Not every portal has the third — an older one mixes its
+ * series into the films — and the two answer different calls for the same
+ * thing, so what a series came from travels with it.
  */
+export type VodType = 'vod' | 'series';
+
+/**
+ * The portal's answers as domain types. Ids carry what they name — `ch:`,
+ * `vod:`, `show:`, `season:`, `episode:` — and, for a series, which section it
+ * came from, so one call knows what it is asked about. **Every part is
+ * encoded**, because a portal's own ids hold colons (`18390:18390`). A `cmd`
+ * never goes into an id: on some portals it is the stream's address, sign-in
+ * and all.
+ */
+const part = (value: string) => encodeURIComponent(value);
+const of = (from: VodType) => (from === 'series' ? 's' : 'v');
+
 export const ids = {
-  channel: (id: string) => `ch:${id}`,
-  movie: (id: string) => `vod:${id}`,
-  show: (id: string) => `series:${id}`,
-  season: (show: string, season: string) => `season:${show}:${season}`,
-  episode: (show: string, season: string, episode: string) => `episode:${show}:${season}:${episode}`,
+  channel: (id: string) => `ch:${part(id)}`,
+  movie: (id: string) => `vod:${part(id)}`,
+  show: (id: string, from: VodType) => `show:${of(from)}:${part(id)}`,
+  season: (show: string, season: string, from: VodType) => `season:${of(from)}:${part(show)}:${part(season)}`,
+  episode: (show: string, season: string, episode: string, from: VodType) =>
+    `episode:${of(from)}:${part(show)}:${part(season)}:${part(episode)}`,
 };
 
 export type Parsed =
   | { readonly kind: 'channel'; readonly id: string }
   | { readonly kind: 'movie'; readonly id: string }
-  | { readonly kind: 'show'; readonly id: string }
-  | { readonly kind: 'season'; readonly show: string; readonly season: string }
-  | { readonly kind: 'episode'; readonly show: string; readonly season: string; readonly episode: string };
+  | { readonly kind: 'show'; readonly from: VodType; readonly id: string }
+  | { readonly kind: 'season'; readonly from: VodType; readonly show: string; readonly season: string }
+  | { readonly kind: 'episode'; readonly from: VodType; readonly show: string; readonly season: string; readonly episode: string };
 
 export function parseId(externalId: string): Parsed | undefined {
-  const [kind, ...parts] = externalId.split(':');
-  const [a, b, c] = parts;
-  if (kind === 'ch' && a) return { kind: 'channel', id: a };
-  if (kind === 'vod' && a) return { kind: 'movie', id: a };
-  if (kind === 'series' && a) return { kind: 'show', id: a };
-  if (kind === 'season' && a && b) return { kind: 'season', show: a, season: b };
-  if (kind === 'episode' && a && b && c) return { kind: 'episode', show: a, season: b, episode: c };
+  const [kind, ...rest] = externalId.split(':');
+  if (kind === 'ch' && rest[0]) return { kind: 'channel', id: decodeURIComponent(rest[0]) };
+  if (kind === 'vod' && rest[0]) return { kind: 'movie', id: decodeURIComponent(rest[0]) };
+  const from: VodType | undefined = rest[0] === 's' ? 'series' : rest[0] === 'v' ? 'vod' : undefined;
+  const [a, b, c] = rest.slice(1).map((value) => decodeURIComponent(value));
+  if (!from) return undefined;
+  if (kind === 'show' && a) return { kind: 'show', from, id: a };
+  if (kind === 'season' && a && b) return { kind: 'season', from, show: a, season: b };
+  if (kind === 'episode' && a && b && c) return { kind: 'episode', from, show: a, season: b, episode: c };
   return undefined;
 }
 
@@ -174,11 +190,11 @@ export interface VodRow {
   readonly episodes?: readonly number[];
 }
 
-export function toVod(js: unknown, requested: number, connectionId: ConnectionId, root: string | undefined): Page<VodRow> {
-  return pageOf(js, requested, (row) => toVodRow(row, connectionId, root));
+export function toVod(js: unknown, requested: number, connectionId: ConnectionId, root: string | undefined, from: VodType): Page<VodRow> {
+  return pageOf(js, requested, (row) => toVodRow(row, connectionId, root, from));
 }
 
-function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: ConnectionId, root: string | undefined): VodRow | undefined {
+function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: ConnectionId, root: string | undefined, from: VodType): VodRow | undefined {
   const id = text(row.id);
   const title = text(row.name);
   if (!id || !title) return undefined;
@@ -202,13 +218,14 @@ function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: Connecti
     images: poster ? { poster } : {},
   };
   const cmd = text(row.cmd);
-  if (yes(row.is_series)) {
+  // Everything in a portal's series section is a series, whatever it says.
+  if (from === 'series' || yes(row.is_series)) {
     const episodes = list(row.series).flatMap((entry) => {
       const value = number(entry);
       return value === undefined ? [] : [value];
     });
     return {
-      item: { ...common, type: 'show', key: { connectionId, externalId: ids.show(id) } },
+      item: { ...common, type: 'show', key: { connectionId, externalId: ids.show(id, from) } },
       ...(cmd ? { cmd } : {}),
       ...(episodes.length > 0 ? { episodes } : {}),
     };
@@ -216,7 +233,14 @@ function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: Connecti
   return { item: { ...common, type: 'movie', key: { connectionId, externalId: ids.movie(id) } }, ...(cmd ? { cmd } : {}) };
 }
 
-export function toSeasons(js: unknown, show: Show, connectionId: ConnectionId): readonly Season[] {
+export interface SeasonRow {
+  readonly season: Season;
+  readonly cmd?: string;
+  /** A season that lists its episodes by number rather than as rows of their own. */
+  readonly episodes?: readonly number[];
+}
+
+export function toSeasons(js: unknown, show: Show, connectionId: ConnectionId): readonly SeasonRow[] {
   const showId = parseId(show.key.externalId);
   if (showId?.kind !== 'show') return [];
   return list(record(js)?.data).flatMap((entry, index) => {
@@ -224,17 +248,26 @@ export function toSeasons(js: unknown, show: Show, connectionId: ConnectionId): 
     const id = text(row?.id);
     if (!row || !id) return [];
     const seasonNumber = number(row.season_number) ?? index + 1;
+    const cmd = text(row.cmd);
+    const numbered = list(row.series).flatMap((value) => {
+      const each = number(value);
+      return each === undefined ? [] : [each];
+    });
     return [
       {
-        type: 'season' as const,
-        key: { connectionId, externalId: ids.season(showId.id, id) },
-        title: text(row.name) ?? `Season ${seasonNumber}`,
-        show: show.key,
-        showTitle: show.title,
-        seasonNumber,
-        ratings: {},
-        genres: [],
-        images: {},
+        season: {
+          type: 'season' as const,
+          key: { connectionId, externalId: ids.season(showId.id, id, showId.from) },
+          title: text(row.name) ?? `Season ${seasonNumber}`,
+          show: show.key,
+          showTitle: show.title,
+          seasonNumber,
+          ratings: {},
+          genres: [],
+          images: {},
+        },
+        ...(cmd ? { cmd } : {}),
+        ...(numbered.length > 0 ? { episodes: numbered } : {}),
       },
     ];
   });
@@ -260,7 +293,7 @@ export function toEpisodes(js: unknown, season: Season, connectionId: Connection
       {
         item: {
           type: 'episode' as const,
-          key: { connectionId, externalId: ids.episode(at.show, at.season, id) },
+          key: { connectionId, externalId: ids.episode(at.show, at.season, id, at.from) },
           title: text(row.name) ?? `Episode ${episodeNumber}`,
           show: season.show,
           season: season.key,

@@ -38,6 +38,18 @@ const vodPage = {
   },
 };
 const seasons = { js: { total_items: 2, max_page_items: 14, data: [{ id: '61', name: 'Season 1', season_number: '1' }, { id: '62', name: 'Season 2', season_number: '2' }] } };
+// A portal that keeps its series apart, with ids of its own that hold a colon
+// and a season that lists its episodes by number.
+const seriesCategories = { js: [{ id: '*', title: 'All' }, { id: '270', title: 'Drama' }] };
+const seriesPage = {
+  js: {
+    total_items: 1,
+    max_page_items: 14,
+    cur_page: 1,
+    data: [{ id: '18390:18390', name: 'Harbour Nights', year: '2026', screenshot_uri: 'http://cdn.test/18390.jpg' }],
+  },
+};
+const seriesSeasons = { js: { total_items: 1, max_page_items: 14, data: [{ id: '18390:1', name: 'Season 1', series: [1, 2, 3], cmd: 'L3Nlcmllcy8xODM5MC5ta3Y=' }] } };
 const episodes = { js: { total_items: 2, max_page_items: 14, data: [{ id: '611', name: 'Pilot', series_number: '1', cmd: 'L3Nlcmllcy82MTEubWt2' }, { id: '612', name: 'Second', series_number: '2', cmd: 'L3Nlcmllcy82MTIubWt2' }] } };
 const now = 1_000_000; // the fake clock's, in ms
 const epg = (channel: string, start: number) => ({ ch_id: channel, name: `Show at ${start}`, descr: 'About it.', start_timestamp: start, stop_timestamp: start + 1800 });
@@ -47,6 +59,8 @@ interface PortalOptions {
   readonly expireOnce?: boolean;
   readonly expireAlways?: boolean;
   readonly link?: (request: RecordedRequest) => Reply;
+  /** A portal that keeps its series apart from its films, as newer ones do. */
+  readonly seriesSection?: boolean;
 }
 
 /** A Ministra portal at /stalker_portal/, answering by `type` and `action`. */
@@ -79,6 +93,14 @@ function fakePortal(options: PortalOptions = {}) {
         return { status: 200, json: { js: { data: { '101': [epg('101', start), epg('101', start + 7200)], '102': [epg('102', start)] } } } };
       }
       if (action === 'create_link') return options.link?.(request) ?? { status: 200, json: { js: { id: '1', cmd: 'ffmpeg http://stream.test/live/abc123/101.ts?play_token=t0k3n', error: '' } } };
+      if (type === 'series') {
+        if (!options.seriesSection) return { status: 404 };
+        if (action === 'get_categories') return { status: 200, json: seriesCategories };
+        if (action === 'get_ordered_list') {
+          if (request.query.movie_id === '18390:18390') return { status: 200, json: seriesSeasons };
+          return { status: 200, json: seriesPage };
+        }
+      }
       if (type === 'vod' && action === 'get_ordered_list') {
         if (request.query.movie_id === '601') return { status: 200, json: request.query.season_id === '0' ? seasons : episodes };
         if (request.query.movie_id === '701') return { status: 200, json: { js: { total_items: 0, data: [] } } };
@@ -234,7 +256,7 @@ describe('Stalker — live TV', () => {
 describe('Stalker — films and series', () => {
   const profile = { protocols: ['progressive' as const, 'hls' as const, 'mpegts' as const], containers: ['mkv', 'mp4', 'ts'], videoCodecs: [], audioCodecs: [], subtitleFormats: [] };
 
-  it('lists films and series from the portal’s shared pages, in its order for the sort', async () => {
+  it('lists films and series from an older portal’s shared pages, in its order for the sort', async () => {
     const { provider, http } = await connect();
     const listItems = need(provider, 'listItems');
     const movies = await listItems({ kind: 'movies', sort: { by: 'addedAt', order: 'desc' }, limit: 20 });
@@ -254,7 +276,7 @@ describe('Stalker — films and series', () => {
     ]);
     const shows = await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 });
     expect(http.to(LOAD).at(-1)?.query.sortby).toBe('name');
-    expect(shows.items.map((item) => item.key.externalId)).toEqual(['series:601', 'series:701']);
+    expect(shows.items.map((item) => item.key.externalId)).toEqual(['show:v:601', 'show:v:701']);
     expect((await need(provider, 'getItem')('vod:501')).item.title).toBe('Harbor Lights');
   });
 
@@ -274,17 +296,17 @@ describe('Stalker — films and series', () => {
     if (!show) throw new Error('no show');
     const { items: found } = await getChildren(show);
     expect(found.map((season) => [season.key.externalId, season.title])).toEqual([
-      ['season:601:61', 'Season 1'],
-      ['season:601:62', 'Season 2'],
+      ['season:v:601:61', 'Season 1'],
+      ['season:v:601:62', 'Season 2'],
     ]);
     const [first] = found;
     if (!first) throw new Error('no season');
     const { items: list } = await getChildren(first);
     expect(list.map((episode) => [episode.key.externalId, episode.type === 'episode' ? episode.episodeNumber : undefined])).toEqual([
-      ['episode:601:61:611', 1],
-      ['episode:601:61:612', 2],
+      ['episode:v:601:61:611', 1],
+      ['episode:v:601:61:612', 2],
     ]);
-    await need(provider, 'getPlaybackDescriptor')({ key: key('episode:601:61:611'), profile });
+    await need(provider, 'getPlaybackDescriptor')({ key: key('episode:v:601:61:611'), profile });
     expect(http.to(LOAD).at(-1)?.query).toMatchObject({ type: 'vod', action: 'create_link', cmd: 'L3Nlcmllcy82MTEubWt2', series: '1' });
   });
 
@@ -292,18 +314,65 @@ describe('Stalker — films and series', () => {
     const { provider, http } = await connect();
     const listItems = need(provider, 'listItems');
     const getChildren = need(provider, 'getChildren');
-    const show = (await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 })).items.find((item) => item.key.externalId === 'series:701');
+    const show = (await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 })).items.find((item) => item.key.externalId === 'show:v:701');
     if (!show) throw new Error('no show');
     const [season] = (await getChildren(show)).items;
     if (!season) throw new Error('no season');
     const { items: list } = await getChildren(season);
     expect(list.map((episode) => episode.title)).toEqual(['Episode 1', 'Episode 2', 'Episode 3']);
-    await need(provider, 'getPlaybackDescriptor')({ key: key('episode:701:1:2'), profile });
+    await need(provider, 'getPlaybackDescriptor')({ key: key('episode:v:701:1:2'), profile });
     expect(http.to(LOAD).at(-1)?.query).toMatchObject({ action: 'create_link', cmd: 'L21lZGlhLzcwMS5tcGc=', series: '2' });
+  });
+
+  it('takes a portal’s own series section, ids with a colon and all, and plays an episode through it', async () => {
+    const { provider, http } = await connect({
+      seriesSection: true,
+      link: () => ({ status: 200, json: { js: { cmd: 'ffmpeg http://stream.test/series/18390.mkv' } } }),
+    });
+    const listItems = need(provider, 'listItems');
+    const getChildren = need(provider, 'getChildren');
+
+    const shows = await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 });
+    // Asked for once — the portal's categories say whether it has the section —
+    // and then it is the series list that answers, not the films.
+    expect(http.to(LOAD).map((request) => `${request.query.type} ${request.query.action}`)).toEqual([
+      'stb handshake',
+      'stb get_profile',
+      'series get_categories',
+      'series get_ordered_list',
+    ]);
+    expect(shows.items.map((item) => [item.key.externalId, item.title])).toEqual([['show:s:18390%3A18390', 'Harbour Nights']]);
+
+    // The films are still the films.
+    const movies = await listItems({ kind: 'movies', sort: { by: 'title', order: 'asc' }, limit: 20 });
+    expect(http.to(LOAD).at(-1)?.query.type).toBe('vod');
+    expect(movies.items.map((item) => item.key.externalId)).toEqual(['vod:501']);
+
+    const [show] = shows.items;
+    if (!show) throw new Error('no show');
+    const { items: found } = await getChildren(show);
+    expect(http.to(LOAD).at(-1)?.query).toMatchObject({ type: 'series', movie_id: '18390:18390', season_id: '0' });
+    expect(found.map((season) => [season.key.externalId, season.title])).toEqual([['season:s:18390%3A18390:18390%3A1', 'Season 1']]);
+
+    // This season lists its episodes by number, so they need no call of their own.
+    const [season] = found;
+    if (!season) throw new Error('no season');
+    const before = http.to(LOAD).length;
+    const { items: list } = await getChildren(season);
+    expect(http.to(LOAD).length).toBe(before);
+    expect(list.map((episode) => [episode.key.externalId, episode.title])).toEqual([
+      ['episode:s:18390%3A18390:18390%3A1:1', 'Episode 1'],
+      ['episode:s:18390%3A18390:18390%3A1:2', 'Episode 2'],
+      ['episode:s:18390%3A18390:18390%3A1:3', 'Episode 3'],
+    ]);
+
+    // A portal's series section lists; every link is made on the films' side.
+    await need(provider, 'getPlaybackDescriptor')({ key: key('episode:s:18390%3A18390:18390%3A1:2'), profile });
+    expect(http.to(LOAD).at(-1)?.query).toMatchObject({ type: 'vod', action: 'create_link', cmd: 'L3Nlcmllcy8xODM5MC5ta3Y=', series: '2' });
   });
 
   it('refuses to play a series as a whole', async () => {
     const { provider } = await connect();
-    await expect(need(provider, 'getPlaybackDescriptor')({ key: key('series:601'), profile })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    await expect(need(provider, 'getPlaybackDescriptor')({ key: key('show:v:601'), profile })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 });
