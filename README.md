@@ -131,3 +131,11 @@ model, settings, testing and publishing.
 
 The full architecture is in
 [`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).
+
+---
+
+## Licence
+
+**GPL-3.0-or-later.** `api` and the plugins are free software; the player
+plugins link engines — FFmpeg, mpv, libVLC — and mpv's build is GPL, which
+sets the licence for anything shipped with it.

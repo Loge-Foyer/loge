@@ -2,6 +2,7 @@
   "name": "streaming-center-plugins",
   "version": "0.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "workspaces": [
     "api",
