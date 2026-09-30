@@ -14,7 +14,8 @@
           "NSAllowsLocalNetworking": true
         },
         "NSLocalNetworkUsageDescription": "Streaming Center reaches your media servers and sync server on this network."
-      }
+      },
+      "bundleIdentifier": "com.fakg.streaming-center-app"
     },
     "android": {
       "adaptiveIcon": {
