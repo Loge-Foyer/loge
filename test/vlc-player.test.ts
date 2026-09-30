@@ -174,16 +174,25 @@ describe('VLC on Android (libVLC)', () => {
     await expect(player.load({ source: source() })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
-  it('plays what the built-in player on Android cannot: Matroska with DTS or TrueHD, AV1, raw MPEG-TS', () => {
-    const android = PROFILES.android;
-    if (!android) throw new Error('no Android profile');
-    expect(canPlay(android, source({ videoCodec: 'hevc', audioCodecs: ['dts'], height: 2160 }))).toBe(true);
-    expect(canPlay(android, source({ videoCodec: 'h264', audioCodecs: ['truehd'] }))).toBe(true);
-    expect(canPlay(android, source({ container: 'webm', videoCodec: 'av1', audioCodecs: ['opus'] }))).toBe(true);
-    expect(canPlay(android, source({ uri: 'http://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true }))).toBe(true);
-    // Stated no wider than it is.
-    expect(android.hdr).toBeUndefined();
-    expect(PROFILES.ios).toBeUndefined();
+  it('plays what the built-in player cannot: Matroska with DTS or TrueHD, AV1, raw MPEG-TS', () => {
+    for (const [platform, profile] of Object.entries(PROFILES)) {
+      if (!profile) throw new Error(`no ${platform} profile`);
+      expect(canPlay(profile, source({ videoCodec: 'hevc', audioCodecs: ['dts'], height: 2160 }))).toBe(true);
+      expect(canPlay(profile, source({ videoCodec: 'h264', audioCodecs: ['truehd'] }))).toBe(true);
+      expect(canPlay(profile, source({ container: 'webm', videoCodec: 'av1', audioCodecs: ['opus'] }))).toBe(true);
+      expect(canPlay(profile, source({ uri: 'http://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true }))).toBe(true);
+      // Stated no wider than it is.
+      expect(profile.hdr).toBeUndefined();
+    }
+  });
+
+  it('plays the same on an iPhone as on Android: one engine, one set of formats', () => {
+    const { ios, android } = PROFILES;
+    if (!ios || !android) throw new Error('both phones');
+    // MobileVLCKit is the same libVLC generation as libvlc-all. VideoToolbox
+    // and MediaCodec change how much decodes in hardware, not what decodes.
+    expect(ios).toEqual(android);
+    // There is no VLC for a browser.
     expect(PROFILES.web).toBeUndefined();
   });
 });

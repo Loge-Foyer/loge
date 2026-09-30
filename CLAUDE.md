@@ -97,9 +97,11 @@ Phase 8 adds players — VLC and mpv on Android are in.
   expo-video on phones, `<video>` with a lazily loaded hls.js on the web, a
   profile per platform — tested against fakes of expo-video, the element and
   hls.js.
-- **VLC:** `players/vlc` implements it on Android — libVLC behind an Expo
-  module in its own `android/` folder, reached through `expo` — tested against
-  a fake of that module, and played on the Android emulator.
+- **VLC:** `players/vlc` implements it on both phones — libVLC behind one Expo
+  module with a half per platform, `android/` in Kotlin and `ios/` in Swift
+  against MobileVLCKit, both reached through `expo`. Everything in `src/` is
+  shared between them. Tested against a fake of that module, and played on the
+  Android emulator; the iOS half compiles and links but has not played yet.
 - **mpv:** `players/mpv` implements it on Android — libmpv behind an Expo
   module with this project's own JNI, because the engine's published wrapper
   logs every stream address it opens. It decodes in software for now, and so

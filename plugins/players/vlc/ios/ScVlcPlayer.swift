@@ -9,7 +9,7 @@ import MobileVLCKit
  there: VLCKit 3 calls its delegate on libVLC's own event thread, and reading
  a track list from there re-enters libVLC while it holds its own lock.
  */
-public final class ScVlcPlayer: SharedObject, VLCMediaPlayerDelegate {
+public final class ScVlcPlayer: SharedObject {
   // Quiet: libVLC's messages quote the stream's address, token and all, and
   // none of them may reach the device's log. `--quiet` silences libVLC itself;
   // `loggers` is what VLCKit would otherwise hand them to.
@@ -26,10 +26,16 @@ public final class ScVlcPlayer: SharedObject, VLCMediaPlayerDelegate {
   private var lastSecond: Int64 = -1
   private var released = false
 
+  // VLCKit's delegate is an Objective-C protocol, so whatever conforms to it
+  // has to be an `NSObject` — and `SharedObject` is not one. This forwards.
+  // `VLCMediaPlayer.delegate` is weak, so the forwarder is held here.
+  private let forwarder = ScVlcDelegate()
+
   public override init() {
     super.init()
     vlc.libraryInstance.loggers = nil
-    vlc.delegate = self
+    forwarder.player = self
+    vlc.delegate = forwarder
   }
 
   // MARK: - Events, always from the main thread
@@ -69,9 +75,9 @@ public final class ScVlcPlayer: SharedObject, VLCMediaPlayerDelegate {
     ])
   }
 
-  // MARK: - VLCMediaPlayerDelegate
+  // MARK: - What the forwarder hands on
 
-  public func mediaPlayerStateChanged(_ aNotification: Notification) {
+  fileprivate func stateChanged() {
     onMain { [weak self] in
       guard let self, !self.released else { return }
       switch self.vlc.state {
@@ -98,7 +104,7 @@ public final class ScVlcPlayer: SharedObject, VLCMediaPlayerDelegate {
     }
   }
 
-  public func mediaPlayerTimeChanged(_ aNotification: Notification) {
+  fileprivate func timeChanged() {
     onMain { [weak self] in
       guard let self, !self.released else { return }
       let ms = Int64(self.vlc.time.intValue)
@@ -187,5 +193,19 @@ public final class ScVlcPlayer: SharedObject, VLCMediaPlayerDelegate {
     onMain {
       self.releasePlayer()
     }
+  }
+}
+
+/// VLCKit calls this on libVLC's own event thread; `ScVlcPlayer` hops to the
+/// main one before it touches the engine again.
+private final class ScVlcDelegate: NSObject, VLCMediaPlayerDelegate {
+  weak var player: ScVlcPlayer?
+
+  func mediaPlayerStateChanged(_ aNotification: Notification) {
+    player?.stateChanged()
+  }
+
+  func mediaPlayerTimeChanged(_ aNotification: Notification) {
+    player?.timeChanged()
   }
 }

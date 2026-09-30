@@ -1,6 +1,16 @@
 {
-  "platforms": ["android"],
+  "platforms": [
+    "apple",
+    "android"
+  ],
+  "apple": {
+    "modules": [
+      "ScVlcModule"
+    ]
+  },
   "android": {
-    "modules": ["expo.modules.scvlc.ScVlcModule"]
+    "modules": [
+      "expo.modules.scvlc.ScVlcModule"
+    ]
   }
 }

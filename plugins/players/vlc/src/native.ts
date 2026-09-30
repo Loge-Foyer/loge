@@ -3,9 +3,10 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { requireNativeModule, requireNativeView, SharedObject } from 'expo';
 
 /**
- * The Expo module in `android/`: libVLC's player as a shared object, and the
- * view it draws into. Reached lazily — the module exists in an Android build
- * only, and merely importing this package must not fail anywhere else.
+ * The Expo module in `android/` and `ios/`: libVLC's player as a shared
+ * object, and the view it draws into. Reached lazily — the module exists in a
+ * native build only, and merely importing this package must not fail anywhere
+ * else.
  */
 
 /** A track as libVLC lists it: its own id, and a name it makes up — "Track 1 - [English]". */

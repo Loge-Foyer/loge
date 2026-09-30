@@ -353,10 +353,15 @@ TypeScript program of its own with React Native's types.
   browser's `<video>` with a lazily loaded hls.js on the web, a profile per
   platform. Its engines are tested against fakes (`vitest.config.ts` aliases
   expo-video), and it has played on the Android emulator and in Chrome.
-- **`players/vlc`** implements it on Android: libVLC behind an Expo module in
-  its own `android/` folder, reached through `expo` — tested against a fake of
-  that module (`vitest.config.ts` aliases `expo`), and played on the Android
-  emulator: raw MPEG-TS, Matroska with E-AC-3 as the file, its subtitles.
+- **`players/vlc`** implements it on iOS and Android: libVLC behind one Expo
+  module in this package, `android/` in Kotlin and `ios/` in Swift against
+  MobileVLCKit, both reached through `expo` — tested against a fake of that
+  module (`vitest.config.ts` aliases `expo`), and played on the Android
+  emulator: raw MPEG-TS, Matroska with E-AC-3 as the file, its subtitles. The
+  two halves expose the same module name, class and view, so `src/` is shared
+  unchanged. VLCKit's delegate is an Objective-C protocol and `SharedObject`
+  is no `NSObject`, so a small forwarder stands between them. The iOS half
+  compiles and links; it has not played yet.
 - **`players/mpv`** implements it on Android: libmpv behind an Expo module
   in its own `android/` folder, with this package's own JNI — the engine's
   published wrapper prints every stream address it opens to the device log,

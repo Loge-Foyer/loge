@@ -1,7 +1,7 @@
 /**
  * VLC's engine, libVLC, for nearly anything — Matroska, DTS and TrueHD, raw
- * MPEG-TS, the subtitles inside a file. Android for now, through the Expo
- * module in `android/`; VLCKit on iPhone and iPad comes later.
+ * MPEG-TS, the subtitles inside a file. Through the Expo module in this
+ * package: `android/` on Android, `ios/` on iPhone, one engine behind both.
  */
 import { pluginId } from '@sc/api';
 import type { PlayerPlugin } from '@sc/player-kit';
@@ -14,7 +14,7 @@ export const plugin: PlayerPlugin = {
   manifest: {
     id: pluginId('players/vlc'),
     category: 'players',
-    platforms: ['android'],
+    platforms: ['ios', 'android'],
     displayName: 'VLC',
     description: 'VLC’s engine: plays nearly anything, streams included.',
     player: { profiles: PROFILES },
