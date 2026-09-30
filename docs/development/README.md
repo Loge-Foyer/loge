@@ -79,11 +79,15 @@ else is real, including the database engine:
     and the owner check and Forgot PIN hold on both engines
   - a device-key fingerprint that no longer matches drops the pending journal
     and the session
-- **Backups** (with the backup file, later in Phase 6) — a round trip on both
-  engines, with sql.js in Node standing in
-  for expo-sqlite; the passwords arrive in the keychain, never in a database
-  dump. A wrong key, a tampered byte, a file over 64 MiB and a newer schema
-  are refused, and a changed generation or etag asks rather than overwrites.
+- **Backups** (`test/backup.test.ts`) — the key and how it is typed, the
+  container, the database inside, and a round trip on both engines, with
+  sql.js in Node standing in for expo-sqlite: the passwords arrive in the
+  keychain, never in a database dump. Another key, a mistyped one, a changed
+  byte, a stranger, a file over 64 MiB, a newer format or schema and a row the
+  contract refuses are all refused before anything changes; the key is shown
+  only to the owner; a device on your server signs out before it imports.
+  With backup targets (next): a changed generation or etag asks rather than
+  overwrites.
 
 The real account plugin meets the real server in the sync repository's
 harness (Phase 6's S4). The scheduler runs on

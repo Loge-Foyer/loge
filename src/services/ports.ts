@@ -201,6 +201,26 @@ export interface AccountRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * What this device last saved to one backup target: which account, which
+ * save, and the file's etag then — so a save never overwrites a file another
+ * device changed since. Device state: never journaled, never backed up.
+ */
+export interface BackupState {
+  readonly connectionId: ConnectionId;
+  /** The account the file holds (its id): another one is another file. */
+  readonly lineage: string;
+  readonly generation: number;
+  readonly etag?: string;
+  readonly savedAt?: number;
+}
+
+export interface BackupStateRepository {
+  get(connectionId: ConnectionId): Promise<BackupState | undefined>;
+  /** Refused for a connection that does not exist; it goes with its connection. */
+  put(state: BackupState): Promise<void>;
+}
+
 /** Everything the database keeps. Each write appends its journal entry in the same transaction. */
 export interface Repositories {
   readonly users: UserRepository;
@@ -210,6 +230,7 @@ export interface Repositories {
   readonly mediaCache: MediaCacheRepository;
   readonly staleSecrets: StaleSecretQueue;
   readonly account: AccountRepository;
+  readonly backupState: BackupStateRepository;
   readonly journal: JournalRepository;
 }
 
@@ -302,4 +323,39 @@ export interface Logger {
   debug(category: LogCategory, message: string, fields?: LogFields): void;
   warn(category: LogCategory, message: string, fields?: LogFields): void;
   error(category: LogCategory, message: string, fields?: LogFields): void;
+}
+
+export type BackupSqlValue = string | number | null;
+
+/**
+ * A backup file's database, built and read in memory — expo-sqlite on a
+ * phone, sql.js in a browser — and never a database the app runs on.
+ */
+export interface BackupSqlDatabase {
+  exec(sql: string): Promise<void>;
+  run(sql: string, params?: readonly BackupSqlValue[]): Promise<void>;
+  all<T>(sql: string, params?: readonly BackupSqlValue[]): Promise<readonly T[]>;
+  /** The database file, as bytes. */
+  serialize(): Promise<Uint8Array>;
+  close(): Promise<void>;
+}
+
+export interface BackupSql {
+  create(): Promise<BackupSqlDatabase>;
+  /** Throws for bytes that are not a SQLite database. */
+  open(bytes: Uint8Array): Promise<BackupSqlDatabase>;
+}
+
+/** A file the user picked: its size first, so one too large is refused before it is read. */
+export interface PickedFile {
+  readonly name: string;
+  readonly size: number;
+  read(): Promise<Uint8Array>;
+}
+
+/** Files the user moves in and out: the share sheet or a download, the document picker or a file input. */
+export interface FileExchange {
+  save(name: string, bytes: Uint8Array): Promise<'saved' | 'cancelled'>;
+  /** Nothing when the user backed out. */
+  pick(): Promise<PickedFile | undefined>;
 }

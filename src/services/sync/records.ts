@@ -52,7 +52,7 @@ export function announcementOf(kind: RecordKind, key: string): JournalAnnounceme
  * of one.
  */
 export async function recordFor(
-  entry: JournalEntry,
+  entry: Pick<JournalEntry, 'entity' | 'entityId' | 'operation'>,
   deps: { readonly db: LocalDatabase; readonly credentials: SecureCredentialStore },
 ): Promise<AccountRecord | undefined> {
   const kind = KIND_OF[entry.entity];
@@ -145,4 +145,33 @@ export async function recordFor(
     }
   }
   return record && isAccountRecord(record) ? record : undefined;
+}
+
+/**
+ * The whole account as records, each row as it is now, parents first — what a
+ * backup holds. Read outside any transaction: the keychain is no part of one.
+ * A PIN or password this device cannot read is left out, never written as
+ * "none".
+ */
+export async function recordsOfAccount(deps: { readonly db: LocalDatabase; readonly credentials: SecureCredentialStore }): Promise<readonly AccountRecord[]> {
+  const { db } = deps;
+  const wanted: Pick<JournalEntry, 'entity' | 'entityId' | 'operation'>[] = [];
+  const upsert = (entity: JournalEntity, entityId: string) => wanted.push({ entity, entityId, operation: 'upsert' });
+  const users = await db.users.list();
+  for (const user of users) upsert('user', user.id);
+  for (const user of users) if (user.pinCredentialRef) upsert('userPin', user.id);
+  for (const user of users) {
+    for (const name of Object.keys(await db.preferences.get(user.id))) upsert('preferences', `${user.id}/${name}`);
+  }
+  const connections = (await db.connections.list()).filter((connection) => accountWide(connection.pluginId));
+  for (const connection of connections) upsert('connection', connection.id);
+  for (const connection of connections) {
+    for (const userId of (await db.connections.profileValues(connection.id)).keys()) upsert('connectionProfileValues', `${connection.id}/${userId}`);
+  }
+  const records: AccountRecord[] = [];
+  for (const entry of wanted) {
+    const record = await recordFor(entry, deps);
+    if (record) records.push(record);
+  }
+  return records;
 }

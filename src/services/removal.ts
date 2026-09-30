@@ -1,6 +1,7 @@
 import type { ConnectionId, CredentialsRef, UserId } from '@sc/api';
 
 import type { Repositories } from './ports';
+import { accountWide } from './scope';
 import { sessionRef } from './sessions';
 
 const isRef = (ref: CredentialsRef | undefined): ref is CredentialsRef => ref !== undefined;
@@ -51,4 +52,16 @@ export async function removeConnectionIn(tx: Repositories, id: ConnectionId): Pr
     ...users.map((user) => sessionRef(id, user.id)),
   ]);
   return true;
+}
+
+/**
+ * Everything the account holds on this device goes, inside `tx`: its profiles
+ * and its sources, with every secret of theirs queued. What a replace starts
+ * from — a sign-in, or a backup imported. The device's own connections stay.
+ */
+export async function removeAccountRowsIn(tx: Repositories): Promise<void> {
+  for (const user of await tx.users.list()) await removeProfileIn(tx, user.id, { allowLast: true });
+  for (const connection of await tx.connections.list()) {
+    if (accountWide(connection.pluginId)) await removeConnectionIn(tx, connection.id);
+  }
 }

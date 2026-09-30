@@ -255,6 +255,10 @@ export function buildServices(options: {
     scheduler,
     activity,
     ownerAuthentication,
+    // What the backup service is built from, until the composition root builds it too.
+    parts,
+    lock,
+    identity,
     services: {
       catalog,
       session,

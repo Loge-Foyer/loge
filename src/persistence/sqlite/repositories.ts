@@ -16,6 +16,8 @@ import {
 import type {
   AccountRepository,
   AccountSync,
+  BackupState,
+  BackupStateRepository,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
@@ -85,6 +87,14 @@ interface AccountRow {
   readonly name: string;
   readonly connection_id: string | null;
   readonly max_profiles: number | null;
+}
+
+interface BackupStateRow {
+  readonly connection_id: string;
+  readonly lineage: string;
+  readonly generation: number;
+  readonly etag: string | null;
+  readonly saved_at: number | null;
 }
 
 interface AccountSyncRow {
@@ -480,6 +490,31 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  // Device state, like the account's own rows: never journaled.
+  const backupState: BackupStateRepository = {
+    get: async (id) => {
+      const row = await sql.get<BackupStateRow>('SELECT * FROM backup_state WHERE connection_id = ?', [id]);
+      return (
+        row && {
+          connectionId: connectionId(row.connection_id),
+          lineage: row.lineage,
+          generation: row.generation,
+          ...(row.etag === null ? {} : { etag: row.etag }),
+          ...(row.saved_at === null ? {} : { savedAt: row.saved_at }),
+        }
+      );
+    },
+    put: async (state: BackupState) => {
+      if (!(await connectionRow(state.connectionId))) throw missingRow('connection', state.connectionId);
+      await sql.run(
+        `INSERT INTO backup_state (connection_id, lineage, generation, etag, saved_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (connection_id) DO UPDATE SET
+           lineage = excluded.lineage, generation = excluded.generation, etag = excluded.etag, saved_at = excluded.saved_at`,
+        [state.connectionId, state.lineage, state.generation, state.etag ?? null, state.savedAt ?? null],
+      );
+    },
+  };
+
   const journal: JournalRepository = {
     entries: async (after = 0, limit) =>
       (await sql.all<JournalRow>('SELECT * FROM change_journal WHERE seq > ? ORDER BY seq LIMIT ?', [after, limit ?? -1])).map(
@@ -495,7 +530,7 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, journal };
 }
 
 async function readDeviceSettings(sql: SqlExecutor): Promise<DeviceSettings> {

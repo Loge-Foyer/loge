@@ -56,6 +56,10 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       putSync: (state) => write((r) => r.account.putSync(state)),
       clear: () => write((r) => r.account.clear()),
     },
+    backupState: {
+      get: (id) => read((r) => r.backupState.get(id)),
+      put: (state) => write((r) => r.backupState.put(state)),
+    },
     journal: {
       entries: (after, limit) => read((r) => r.journal.entries(after, limit)),
       head: () => read((r) => r.journal.head()),

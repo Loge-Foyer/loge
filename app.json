@@ -51,7 +51,9 @@
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to confirm it’s you when a PIN is forgotten."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

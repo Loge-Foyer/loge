@@ -12,4 +12,8 @@ config.watchFolders = [
   path.resolve(__dirname, '../streaming_center_plugins'),
 ];
 
+// sql.js's WebAssembly, for backups on the web: served as a file, fetched by
+// the lazily loaded chunk that needs it (src/persistence/backup/sql-js-web.ts).
+config.resolver.assetExts = [...config.resolver.assetExts, 'wasm'];
+
 module.exports = config;

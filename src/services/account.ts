@@ -17,7 +17,7 @@ import type { OwnerCheck, OwnerVerdict } from './owner-check';
 import type { PluginCatalog } from './plugin-catalog';
 import { profileLimitOf } from './profiles';
 import type { IdGenerator, JournalAnnouncement, Repositories, RunLock, SyncDatabase } from './ports';
-import { removeConnectionIn, removeProfileIn } from './removal';
+import { removeAccountRowsIn, removeConnectionIn } from './removal';
 import { accountWide } from './scope';
 import type { SecretJanitor } from './secrets';
 import { sessionIdentity, type Sessions } from './sessions';
@@ -178,14 +178,6 @@ export function createAccountService(deps: {
     return manifest;
   };
 
-  /** Everything the account holds on this device goes, inside `tx`: its profiles and its sources, with every secret of theirs. */
-  const empty = async (tx: Repositories) => {
-    for (const user of await tx.users.list()) await removeProfileIn(tx, user.id, { allowLast: true });
-    for (const connection of await tx.connections.list()) {
-      if (accountWide(connection.pluginId)) await removeConnectionIn(tx, connection.id);
-    }
-  };
-
   /** Every account-wide row this device holds, announced as if just changed: the upload a sign-up starts with. */
   const everything = async (tx: Repositories): Promise<readonly JournalAnnouncement[]> => {
     const announced: JournalAnnouncement[] = [];
@@ -336,7 +328,7 @@ export function createAccountService(deps: {
             if (before?.kind === 'server') await removeConnectionIn(tx, before.connectionId);
             // Before the account's rows go: the save checks it finds the profiles it was planned with.
             await connections.commit(tx, planned);
-            if (prepared.kind === 'replace') await empty(tx);
+            if (prepared.kind === 'replace') await removeAccountRowsIn(tx);
             await tx.account.put({
               kind: 'server',
               id: prepared.accountId,

@@ -555,8 +555,12 @@ describes the target. What runs today:
 - **Media is real:** Continue Watching, one row per kind with per-profile
   order, sort and card style, a full-screen grid per row, and detail pages —
   from every live source, merged, and kept per profile where the source allows
-  it. Jellyfin and the mock implement the media role. Nothing plays, Videos
-  still shows skeletons, and there is no backup file yet.
+  it. Jellyfin and the mock implement the media role. Nothing plays, and
+  Videos still shows skeletons.
+- **The backup file's core** (`services/backup/`) — the key, the container,
+  the database inside, export and import — is built and tested, and not yet
+  wired: no screen, file picker or share sheet uses it, the composition root
+  does not build it, and there are no backup targets yet.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they

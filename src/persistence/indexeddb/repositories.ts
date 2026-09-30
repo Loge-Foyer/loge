@@ -3,6 +3,8 @@ import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, 
 import type {
   AccountRepository,
   AccountSync,
+  BackupState,
+  BackupStateRepository,
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
@@ -374,5 +376,14 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, journal };
+  // Device state, like the account's own records: never journaled.
+  const backupState: BackupStateRepository = {
+    get: (id) => get<BackupState>('backupState', id),
+    put: async (state) => {
+      if (!(await get('connections', state.connectionId))) throw missingRow('connection', state.connectionId);
+      await request(store('backupState').put({ ...state }));
+    },
+  };
+
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, journal };
 }

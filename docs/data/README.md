@@ -182,7 +182,9 @@ logged — never its payload.
 ## The backup file
 
 A backup is one encrypted SQLite file, `.scbackup`, written by
-`services/backup/` (Phase 6). It holds the account: its name, its profiles and
+`services/backup/`. The format, the key, export and import are built and
+tested; the screens, the file picker and share sheet, and backup targets come
+next in Phase 6. It holds the account: its name, its profiles and
 their PINs, preferences, and source and IPTV connections with each profile's
 values — and their passwords, so nobody types a Jellyfin password again on a
 new device. It never holds caches, device settings, players, sync settings,
@@ -196,18 +198,24 @@ tokens, the device key, the journal or sync state.
   - `connections` and `profile_values`, each with a `secrets` JSON column
 
   Row shapes are the server's records' shapes, so one mapper serves the
-  server, the upload to a new server account, and backups. The tables are
-  plain, with `journal_mode=DELETE`, `application_id` and `user_version`.
+  server, the upload to a new server account, and backups
+  (`services/backup/database.ts`): an export writes `recordsOfAccount`, an
+  import reads records back and applies them as a sign-in's replace does. The
+  tables are plain, never WAL, with `application_id` (`SCBK`) and
+  `user_version`.
 - **Built and read in memory,** never opened as a database the app runs on:
   expo-sqlite's `serializeAsync` / `deserializeDatabaseAsync` on native, and
   sql.js (WebAssembly) on the web, loaded only when a backup is written or
   opened.
 - **Encrypted as a whole.** A 76-byte header, then AES-256-GCM over the
-  serialized database, with the header as additional data. The header holds the
+  serialized database (`services/backup/container.ts`). The header holds the
   magic `SCBK`, the format and schema versions, the key id, the lineage (the
-  local account's id), the generation (+1 each save), the writer (this
-  install), when it was created, and the nonce. Anything over 64 MiB is refused
-  before it is read; a typical file is under 1 MB.
+  account's id, hashed — the database inside holds it whole), the generation
+  (+1 each save), the writer (this install, hashed), when it was created, and
+  the nonce. Its first 64 bytes are the additional data, and the nonce — its
+  last 12 — GCM authenticates by itself, so no byte of it changes unnoticed.
+  Anything over 64 MiB is refused before it is read; a typical file is under
+  1 MB.
 - **The backup key** is 20 random bytes, shown as eight groups of four in
   Crockford base32 plus a checksum group, and forgiving when typed. The file's
   encryption key and key id are derived from it with HKDF. It is kept in the
