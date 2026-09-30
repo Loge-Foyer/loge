@@ -21,9 +21,7 @@ test/                    vitest — api rules, plugins against fake HTTP, confor
 docs/
 ```
 
-**Transitional:** the account code — `sync/custom-server` and `sync/mock` —
-still carries Phase 4's sync role until your own server becomes PocketBase,
-and `player-kit` arrives with the first player (Phase 7).
+**Not here yet:** `player-kit` arrives with the first player (Phase 7).
 
 npm workspaces (`["api", "plugins/*/*"]`, and `player-kit` when it exists),
 source-only — `"exports": "./src/index.ts"`, no build step. Every plugin lists
@@ -225,8 +223,6 @@ definition:
   stored value, else the default.
 - An ungated capability follows its connection.
 
-Until Phase 6, the same rule is `effectiveRoles` over Phase 4's role switches.
-
 ---
 
 ## Non-negotiables
@@ -310,8 +306,8 @@ the test of whether this architecture is real.
 ## Current state
 
 Phase 6 — the code is moving to the new architecture. The plugins are in
-their category folders, with qualified ids; the account still speaks Phase 4's
-log.
+their category folders, with qualified ids, and the account is kept record by
+record on your own server, PocketBase.
 
 **`api` holds:**
 
@@ -326,20 +322,24 @@ log.
   `choosePlayer`
 - the account role, record by record (`AccountRecord`, `isAccountRecord`), and
   the backup role
-- the host's crypto port (`PluginCrypto`), and bytes as text (`bytes.ts`)
-- until the account moves to records: Phase 4's roles (`effectiveRoles`,
-  `defaultRoles`) and its log-based sync role (`sync.ts`), with sealed
-  passwords and owner proofs
+- the host's crypto port (`PluginCrypto`: random bytes, SHA-256, HKDF,
+  AES-GCM), and bytes as text (`bytes.ts`)
 
 **The plugins:**
 
 - **`sources/jellyfin`** implements the media role.
-- **`sources/mock`** implements it with a fixed catalogue; **`sync/mock`**
-  plays at being an account, on Phase 4's sync role.
-- **`sync/custom-server`** implements Phase 4's sync role against the Phase 4
-  server.
+- **`sources/mock`** implements it with a fixed catalogue.
+- **`sync/custom-server`** implements the account role on PocketBase: one
+  sign-in, latched refusals, the whole account read, batches written, sign-up
+  with an invite, the password typed again as the owner check.
+- **`sync/mock`** plays at being your own server in memory, and
+  **`sync/mock-backup`** at being a backup target.
 - **Every other plugin** is a manifest that declares no capability: IPTV,
   players with no profile, backup targets with no role.
+
+Phase 4's roles (`effectiveRoles`, `defaultRoles`), its log-based sync role,
+sealed passwords and the derived owner proof are retired, with PBKDF2 in the
+crypto port.
 
 ## Verify
 

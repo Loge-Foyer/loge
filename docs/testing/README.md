@@ -40,7 +40,6 @@ plugin arrives:
 - `errors.test.ts` — retry hints.
 - `bytes.test.ts` — base64, base64url and UTF-8 against known vectors and
   Node's own, both ways, and every malformed input refused.
-- `sync.test.ts` — Phase 4's sync wire, until Phase 6 retires it.
 
 **The plugins:**
 
@@ -56,12 +55,15 @@ plugin arrives:
   - paging across libraries with no duplicates or gaps
   - mapping every item type
   - artwork addresses
-- `mock.test.ts` and `mock-sync.test.ts` — the catalogue is deterministic and
-  honours sort, libraries, paging and latency; the pretend account behaves as
-  its contract says.
-- `custom-server.test.ts` — your own server's plugin against a fake of the
-  server's routes (`support/fake-sync-server.ts`). Phase 6 points it at
-  PocketBase's routes.
+- `mock.test.ts` and `mock-account.test.ts` — the catalogue is deterministic
+  and honours sort, libraries, paging and latency; the pretend account keeps
+  your server's rules — all or nothing, the limit, deleted stays deleted,
+  kept passwords — and the pretend backup target refuses a stale etag.
+- `custom-server.test.ts` — your own server's plugin against a fake of
+  PocketBase's routes and rules (`support/fake-pocketbase.ts`): one sign-in
+  shared by every caller, a refusal latched, a newer session taken, one more
+  sign-in when a session ends, throttling that waits; paged reads, batches and
+  the refusal each maps to; sign-up with its invite; the owner check.
 - `manifests.test.ts` — the conformance check. It is the one file allowed to
   import every plugin. It checks, per category:
   - every manifest is sound, runs somewhere, and ids are unique

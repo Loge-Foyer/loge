@@ -1,6 +1,6 @@
-import { createCipheriv, createDecipheriv, createHmac, hkdfSync, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
 
-import { isKdfParams, type PluginCrypto } from '@sc/api';
+import type { PluginCrypto } from '@sc/api';
 
 const NONCE = 12;
 const TAG = 16;
@@ -12,8 +12,7 @@ const TAG = 16;
 export function nodeCrypto(): PluginCrypto {
   return {
     randomBytes: (length) => new Uint8Array(randomBytes(length)),
-    deriveKey: async (password, params) =>
-      new Uint8Array(pbkdf2Sync(Buffer.from(password.normalize('NFC'), 'utf8'), params.salt, params.iterations, 32, 'sha256')),
+    sha256: async (data) => new Uint8Array(createHash('sha256').update(data).digest()),
     expandKey: async (key, info, length) => new Uint8Array(hkdfSync('sha256', key, new Uint8Array(0), Buffer.from(info, 'utf8'), length)),
     seal: async (key, plaintext, context) => {
       const nonce = randomBytes(NONCE);
@@ -33,24 +32,5 @@ export function nodeCrypto(): PluginCrypto {
         return undefined;
       }
     },
-  };
-}
-
-/**
- * The same port with a key derivation that takes no time, and counts itself:
- * a test that signs in many times need not spend a second on each. It refuses
- * weak parameters, as the app's does.
- */
-export function quickCrypto(): PluginCrypto & { readonly derivations: () => number } {
-  const base = nodeCrypto();
-  let derivations = 0;
-  return {
-    ...base,
-    deriveKey: async (password, params) => {
-      if (!isKdfParams(params)) throw new Error('The host refuses weak parameters.');
-      derivations += 1;
-      return new Uint8Array(createHmac('sha256', params.salt).update(password.normalize('NFC'), 'utf8').digest());
-    },
-    derivations: () => derivations,
   };
 }

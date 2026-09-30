@@ -4,8 +4,9 @@ export const MEDIA_CAPABILITIES = [
   'libraries',
   'collections',
   'playlists',
+  // Live channels, in groups: `listChannelGroups`, `listChannels`. What is live
+  // is a kind of content, `live`, not a capability.
   'channels',
-  'live',
   // The guide for the channels a source brings.
   'epg',
   // Something to play: `getPlaybackDescriptor`.
@@ -22,21 +23,5 @@ export const MEDIA_CAPABILITIES = [
 
 export type MediaCapability = (typeof MEDIA_CAPABILITIES)[number];
 
-export const SYNC_CAPABILITIES = [
-  'profile',
-  'preferences',
-  'watchProgress',
-  'favorites',
-  'watchlist',
-  'history',
-  'providerConnections',
-  // Connections' passwords, sealed by the app with a key the account never has (`vaultKey`).
-  'sealedPasswords',
-  'customLists',
-  'fullBackup',
-] as const;
-
-export type SyncCapability = (typeof SYNC_CAPABILITIES)[number];
-
-/** A capability qualified by its role, the way a setting's `gates` names it. */
-export type CapabilityKey = `media.${MediaCapability}` | `sync.${SyncCapability}`;
+/** A capability qualified by its block, the way a setting's `gates` names it. */
+export type CapabilityKey = `media.${MediaCapability}`;

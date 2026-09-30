@@ -21,9 +21,6 @@ app and anything else agree on one definition:
   (`resolveValues`). A connection that keeps every setting per profile can
   cache metadata for one profile and not another.
 
-Until Phase 6, the same rule runs as `effectiveRoles` over Phase 4's role
-switches.
-
 Players and sync plugins have no capabilities of this kind.
 
 - **A player's** manifest says what its engine plays instead: its
@@ -46,8 +43,8 @@ Players and sync plugins have no capabilities of this kind.
 | `watchStateWrite` | It takes progress and played state back | arrive with playback (Phase 7) |
 | `search`, `collections`, `playlists`, `favoritesRead`, `favoritesWrite` | Named now, promised by nobody yet | arrive with their first implementation |
 
-`MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code. The capability
-`live` goes in Phase 6, in favour of the `live` content kind.
+`MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code. What is live is a
+content kind, `live`, not a capability.
 
 ## Declare honestly
 

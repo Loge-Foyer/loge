@@ -4,8 +4,6 @@ import {
   BACKUP_MEMBERS,
   categoryOfPluginId,
   MEDIA_CAPABILITY_MEMBERS,
-  SYNC_CAPABILITY_MEMBERS,
-  SYNC_PROVIDER_MEMBERS,
   validateManifest,
   type Plugin,
 } from '@sc/api';
@@ -30,6 +28,7 @@ import { plugin as customServer } from '@sc/sync-custom-server';
 import { plugin as googleDriveBackup } from '@sc/sync-google-drive';
 import { plugin as icloudBackup } from '@sc/sync-icloud';
 import { plugin as mockAccount } from '@sc/sync-mock';
+import { plugin as mockBackup } from '@sc/sync-mock-backup';
 import { plugin as onedriveBackup } from '@sc/sync-onedrive';
 import { describe, expect, it } from 'vitest';
 
@@ -58,6 +57,7 @@ const plugins: readonly Plugin[] = [
   googleDriveBackup,
   onedriveBackup,
   mockAccount,
+  mockBackup,
 ];
 
 const context = () => fakeContext({ http: fakeHttp({}).client }).context;
@@ -67,9 +67,8 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
 
   it('has a sound manifest, in the category its id names, running somewhere', () => {
     expect(validateManifest(manifest)).toEqual([]);
-    expect(manifest.category).toBeDefined();
     expect(categoryOfPluginId(manifest.id)).toBe(manifest.category);
-    expect(manifest.platforms?.length ?? 0).toBeGreaterThan(0);
+    expect(manifest.platforms.length).toBeGreaterThan(0);
   });
 
   // A declared capability is a promise the app acts on. Every one of them
@@ -114,28 +113,6 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     for (const member of BACKUP_MEMBERS) expect(typeof backup[member], `the backup role needs ${member}`).toBe('function');
     await backup.dispose();
   });
-
-  // Phase 4's sync role, until Phase 6's S3 retires it.
-  it('declares only sync capabilities it implements', async () => {
-    const declared = manifest.sync?.capabilities ?? [];
-    if (!plugin.sync) {
-      expect(declared).toEqual([]);
-      return;
-    }
-    expect(manifest.sync).toBeDefined();
-    const provider = await plugin.sync.connect(target({}), context());
-    for (const member of SYNC_PROVIDER_MEMBERS) {
-      expect(typeof provider[member], `the sync role needs ${member}`).toBe('function');
-    }
-    for (const capability of declared) {
-      for (const member of SYNC_CAPABILITY_MEMBERS[capability] ?? []) {
-        expect(typeof provider[member], `${capability} needs ${member}`).toBe('function');
-      }
-    }
-    if (manifest.sync?.ownerProof) expect(typeof provider.verifyOwner, 'ownerProof needs verifyOwner').toBe('function');
-    if (manifest.sync?.signUp) expect(typeof provider.createAccount, 'signUp needs createAccount').toBe('function');
-    await provider.dispose();
-  });
 });
 
 it('gives every plugin a distinct id', () => {
@@ -146,7 +123,6 @@ it('gives every plugin a distinct id', () => {
 it('keeps media servers sources: they are the master of their watch state', () => {
   for (const server of [jellyfin, emby, plex]) {
     expect(server.manifest.category).toBe('sources');
-    expect(server.manifest.sync).toBeUndefined();
     expect(server.manifest.account).toBeUndefined();
   }
 });

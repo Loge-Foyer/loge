@@ -1,15 +1,15 @@
 /**
  * Your own server — the account for someone who wants neither Apple nor
- * Google: a Streaming Center sync server they run (streaming_center_sync).
+ * Google: PocketBase, run by the household itself (streaming_center_sync).
  *
- * The account password never reaches the server. The device derives a proof
- * to sign in with and a key that wraps a random vault key, which the app
- * seals connections' passwords with; the server keeps a hash of the proof and
- * the wrapped key, and can open neither.
+ * The device signs in with PocketBase's own password sign-in and keeps its
+ * session. Records move whole: every one on a pull, one all-or-nothing batch
+ * on a push. Source and IPTV passwords travel in plain text, for now: the
+ * server is the household's own.
  */
 import { pluginId, type Plugin } from '@sc/api';
 
-import { createSyncProvider } from './provider';
+import { createAccount } from './account';
 
 export const plugin: Plugin = {
   manifest: {
@@ -17,10 +17,8 @@ export const plugin: Plugin = {
     category: 'sync',
     platforms: ['ios', 'android', 'web'],
     displayName: 'Your own server',
-    description: 'A Streaming Center sync server you run yourself.',
-    sync: {
-      // Nothing else is journaled yet: watch progress, favourites and lists arrive with the code that carries them.
-      capabilities: ['profile', 'preferences', 'providerConnections', 'sealedPasswords'],
+    description: 'Keeps your account on a Streaming Center server you run yourself.',
+    account: {
       ownerProof: { fields: ['password'] },
       signUp: {
         fields: [
@@ -28,9 +26,8 @@ export const plugin: Plugin = {
             key: 'invite',
             label: 'Invite code',
             type: 'text',
-            required: true,
-            placeholder: 'ABCD-EFGH-JKMN',
-            description: 'Made on the server with sc-sync invite. It works once.',
+            placeholder: 'ABCD-EFGH-JKMN-PQRS',
+            description: 'Made on the server with its invite command, and good for one account. An open server needs none.',
           },
         ],
       },
@@ -42,14 +39,14 @@ export const plugin: Plugin = {
         type: 'url',
         required: true,
         placeholder: 'https://sync.example.com',
-        description: 'Use https anywhere but your home network: the whole household travels through it.',
+        description: 'Use https anywhere but your home network: your sources’ passwords travel through it.',
       },
       { key: 'username', label: 'Username', type: 'text', required: true, credential: true },
       { key: 'password', label: 'Password', type: 'password', required: true },
     ],
     settings: [],
   },
-  sync: {
-    connect: async (target, context) => createSyncProvider(target, context),
+  account: {
+    connect: async (target, context) => createAccount(target, context),
   },
 };

@@ -19,9 +19,9 @@ with their passwords — so every device signed in to it has the same.
 **Creating an account** takes one more field, `invite`: a code from the
 server's `invite` command, good for one account.
 
-## From Phase 6: PocketBase, used as it is
+## PocketBase, used as it is
 
-The server becomes PocketBase, and this plugin speaks its own API.
+The server is PocketBase, and this plugin speaks its own API.
 
 - **Signing in** is PocketBase's password sign-in, over TLS.
   - The session token is kept in the device-bound session store, and
@@ -48,22 +48,13 @@ The server becomes PocketBase, and this plugin speaks its own API.
   and with `firstProfile` when the device has no profiles of its own to
   upload.
 
-## Today: Phase 4's zero-knowledge sign-in
-
-Until Phase 6, this plugin speaks to the Phase 4 server:
-
-- **It never sends the password.** The device derives a proof and a wrap key
-  from it with PBKDF2 and HKDF.
-- **Passwords are sealed.** Connections' passwords are sealed with a vault
-  key that only the password opens.
-- **The server keeps a change log** per account.
-
-Phase 6 retires all of this, for now; the code stays in git.
-
 ## Status
 
-Phase 4's sync role is implemented and tested against a fake of that server's
-routes (`test/custom-server.test.ts`); `streaming_center_sync` runs it against
-the real server. The PocketBase version arrives in Phase 6.
+The account role is implemented and tested against a fake of PocketBase's
+routes and rules (`test/custom-server.test.ts`, `test/support/fake-pocketbase.ts`).
+`streaming_center_sync`'s harness runs it against the real server.
+
+Phase 4's zero-knowledge sign-in — a derived proof, sealed passwords, a change
+log — is retired; it stays in git.
 
 See `docs/writing-a-plugin/` at the repository root.

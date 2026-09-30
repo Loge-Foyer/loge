@@ -1,12 +1,11 @@
 /**
- * Mock account — a pretend account, held in memory and keyed by its endpoint,
- * so the account's flows can be exercised with no server at all. It declines
- * some capabilities on purpose: sealed passwords, so the app's way of asking
- * for a missing password stays exercised.
+ * Mock account — a pretend account on "your own server", held in memory and
+ * keyed by its endpoint, so the account's flows can be exercised with no
+ * server at all. Development builds only.
  */
 import { pluginId, type Plugin } from '@sc/api';
 
-import { createSyncProvider } from './sync';
+import { createAccount } from './account';
 
 export const plugin: Plugin = {
   manifest: {
@@ -15,7 +14,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Mock account',
     description: 'A pretend account kept in memory, for working offline.',
-    sync: { capabilities: ['profile', 'preferences', 'providerConnections'] },
+    account: { signUp: { fields: [] } },
     connectionFields: [
       {
         key: 'endpoint',
@@ -39,7 +38,7 @@ export const plugin: Plugin = {
       },
     ],
   },
-  sync: {
-    connect: async (target, context) => createSyncProvider(target, context),
+  account: {
+    connect: async (target, context) => createAccount(target, context),
   },
 };

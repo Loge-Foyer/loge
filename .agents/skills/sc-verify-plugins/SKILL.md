@@ -51,9 +51,10 @@ paths. Metro resolution across the repository boundary fails in ways `tsc`
 cannot see.
 
 **After changing an account record** (`api/src/account.ts` or its fixtures),
-run the sync server's tests too. Until Phase 6 that is the TypeScript server:
-`cd ../streaming_center_sync && npm test`. From Phase 6 it is
-`go test ./...`, plus `cd harness && npm test` there.
+run the sync server's tests too: `cd ../streaming_center_sync && go test ./...`
+reads the same fixtures. Its harness (`cd harness && npm test` there, from
+Phase 6's S4) drives this repository's `sync/custom-server` against the real
+server.
 
 ## Boundary checks
 
@@ -136,12 +137,12 @@ state an account quietly drops.
 - the account role, by record, with fixtures shared with the server
 - the backup role
 - the host's crypto port
-- Phase 4's roles and log-based sync role, until the account moves to records
 
 **The plugins,** in their category folders with qualified ids:
 
 - **`sources/jellyfin` and `sources/mock`** implement the media role.
-- **`sync/mock` and `sync/custom-server`** implement Phase 4's sync role.
+- **`sync/custom-server` and `sync/mock`** implement the account role, and
+  **`sync/mock-backup`** the backup role.
 - **Every other plugin** is a manifest: IPTV, the players with no profile,
   and the backup targets.
 

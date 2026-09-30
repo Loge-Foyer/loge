@@ -1,19 +1,18 @@
-import { isKdfParams, KDF_LIMITS, pluginId, validateManifest, type PluginManifest } from '@sc/api';
+import { pluginId, validateManifest, type PluginManifest } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 const sound: PluginManifest = {
-  id: pluginId('fixture'),
+  id: pluginId('sources/fixture'),
+  category: 'sources',
+  platforms: ['ios', 'android', 'web'],
   displayName: 'Fixture',
   description: 'A plugin that exists only in tests.',
-  media: { contentKinds: ['videos'], capabilities: ['browse'] },
-  sync: { capabilities: ['profile', 'watchProgress'] },
+  media: { contentKinds: ['videos'], capabilities: ['browse', 'offlineMetadata'] },
   connectionFields: [
     { key: 'serverUrl', label: 'Server URL', type: 'url', required: true },
     { key: 'password', label: 'Password', type: 'password' },
   ],
-  settings: [
-    { key: 'syncWatchProgress', label: 'Progress', type: 'boolean', default: false, gates: ['sync.watchProgress'] },
-  ],
+  settings: [{ key: 'cacheMetadata', label: 'Keep', type: 'boolean', default: false, gates: ['media.offlineMetadata'] }],
 };
 
 function problemsWith(overrides: Partial<PluginManifest>): readonly string[] {
@@ -25,15 +24,13 @@ describe('validateManifest', () => {
     expect(validateManifest(sound)).toEqual([]);
   });
 
-  it('rejects a manifest with no role', () => {
-    const { media: _media, sync: _sync, ...roleless } = sound;
-    expect(validateManifest({ ...roleless, settings: [] })).toContain('declares no role');
+  it('rejects a manifest with no block', () => {
+    const { media: _media, ...blockless } = sound;
+    expect(validateManifest({ ...blockless, settings: [] })).toContain('declares no block');
   });
 
-  it('rejects a media role that brings nothing', () => {
-    expect(problemsWith({ media: { contentKinds: [], capabilities: [] } })).toContain(
-      'media role brings no content kind',
-    );
+  it('rejects a media block that brings nothing', () => {
+    expect(problemsWith({ media: { contentKinds: [], capabilities: [] } })).toContain('media role brings no content kind');
   });
 
   it('rejects duplicate keys within a list', () => {
@@ -62,58 +59,17 @@ describe('validateManifest', () => {
     expect(problems).toContain('connection field "apiToken" looks secret but is not a password field');
   });
 
-  // Signing in to an account is the opt-in: it carries what it declares.
-  it('accepts a sync capability without a toggle', () => {
-    expect(problemsWith({ settings: [] })).toEqual([]);
-  });
-
-  it('accepts a sync toggle that defaults to on', () => {
-    const problems = problemsWith({
-      settings: [
-        { key: 'syncWatchProgress', label: 'Progress', type: 'boolean', default: true, gates: ['sync.watchProgress'] },
-      ],
-    });
-    expect(problems).toEqual([]);
-  });
-
-  it('rejects a per-profile sync capability without profiles', () => {
-    for (const capability of ['preferences', 'watchProgress', 'favorites', 'watchlist', 'history', 'customLists'] as const) {
-      expect(problemsWith({ sync: { capabilities: [capability] }, settings: [] })).toContain(
-        `sync capability "${capability}" needs "profile"`,
-      );
-    }
-    expect(problemsWith({ sync: { capabilities: ['providerConnections'] }, settings: [] })).toEqual([]);
-  });
-
   it('rejects a gate on an undeclared capability', () => {
     const problems = problemsWith({
-      settings: [
-        ...sound.settings,
-        { key: 'showLive', label: 'Live', type: 'boolean', default: true, gates: ['media.live'] },
-      ],
+      settings: [...sound.settings, { key: 'showSearch', label: 'Search', type: 'boolean', default: true, gates: ['media.search'] }],
     });
-    expect(problems).toContain('setting "showLive" gates undeclared "media.live"');
-  });
-
-  it('rejects a toggle that gates two roles', () => {
-    const problems = problemsWith({
-      settings: [
-        {
-          key: 'syncEverything',
-          label: 'Everything',
-          type: 'boolean',
-          default: false,
-          gates: ['sync.watchProgress', 'media.browse'],
-        },
-      ],
-    });
-    expect(problems).toContain('setting "syncEverything" gates more than one role');
+    expect(problems).toContain('setting "showSearch" gates undeclared "media.search"');
   });
 });
 
 describe('validateManifest — libraries and credentials', () => {
   const libraries = { key: 'libraries', label: 'Libraries', type: 'libraries', default: { mode: 'all' } } as const;
-  const withLibrariesCapability = { contentKinds: ['movies'], capabilities: ['browse', 'libraries'] } as const;
+  const withLibrariesCapability = { contentKinds: ['movies'], capabilities: ['browse', 'libraries', 'offlineMetadata'] } as const;
 
   it('accepts a libraries setting when the plugin can list its libraries', () => {
     expect(problemsWith({ media: withLibrariesCapability, settings: [...sound.settings, libraries] })).toEqual([]);
@@ -150,26 +106,25 @@ describe('validateManifest — libraries and credentials', () => {
 });
 
 describe('validateManifest — the account', () => {
-  const account = (sync: NonNullable<PluginManifest['sync']>) => problemsWith({ sync, settings: [] });
+  const { media: _media, ...blockless } = sound;
+  const account = (block: NonNullable<PluginManifest['account']>) =>
+    validateManifest({ ...blockless, id: pluginId('sync/fixture'), category: 'sync', account: block, settings: [] });
 
   it('accepts an owner proof that names password fields', () => {
-    expect(account({ capabilities: ['profile'], ownerProof: { fields: ['password'] } })).toEqual([]);
+    expect(account({ ownerProof: { fields: ['password'] } })).toEqual([]);
   });
 
   it('rejects an owner proof that names no field, or a field that is not a password', () => {
-    expect(account({ capabilities: ['profile'], ownerProof: { fields: [] } })).toContain('ownerProof names no field');
-    expect(account({ capabilities: ['profile'], ownerProof: { fields: ['serverUrl'] } })).toContain(
-      'ownerProof field "serverUrl" is not a password connection field',
-    );
+    expect(account({ ownerProof: { fields: [] } })).toContain('ownerProof names no field');
+    expect(account({ ownerProof: { fields: ['serverUrl'] } })).toContain('ownerProof field "serverUrl" is not a password connection field');
   });
 
   it('accepts sign-up fields beside the connection’s own', () => {
-    expect(account({ capabilities: ['profile'], signUp: { fields: [{ key: 'invite', label: 'Invite', type: 'text' }] } })).toEqual([]);
+    expect(account({ signUp: { fields: [{ key: 'invite', label: 'Invite', type: 'text' }] } })).toEqual([]);
   });
 
   it('rejects a sign-up field that is a password, clashes, repeats or is badly named', () => {
     const problems = account({
-      capabilities: ['profile'],
       signUp: {
         fields: [
           { key: 'secret', label: 'Secret', type: 'password' },
@@ -190,41 +145,6 @@ describe('validateManifest — the account', () => {
         'select "plan" defaults to a missing option',
       ]),
     );
-  });
-
-  it('rejects sealed passwords without the connections they travel in', () => {
-    expect(account({ capabilities: ['profile', 'sealedPasswords'] })).toContain(
-      'sync capability "sealedPasswords" needs "providerConnections"',
-    );
-    expect(account({ capabilities: ['profile', 'providerConnections', 'sealedPasswords'] })).toEqual([]);
-  });
-});
-
-describe('isKdfParams', () => {
-  const params = { algorithm: 'pbkdf2-sha256', iterations: 600_000, salt: new Uint8Array(16) } as const;
-
-  it('accepts PBKDF2 within the limits', () => {
-    expect(isKdfParams(params)).toBe(true);
-    expect(isKdfParams({ ...params, iterations: KDF_LIMITS.minIterations })).toBe(true);
-    expect(isKdfParams({ ...params, iterations: KDF_LIMITS.maxIterations, salt: new Uint8Array(64) })).toBe(true);
-  });
-
-  // A server — or anyone between it and the device — asking for less would get a proof cheap to guess from.
-  it('refuses anything weaker, heavier, or not what the device derives', () => {
-    for (const bad of [
-      { ...params, iterations: KDF_LIMITS.minIterations - 1 },
-      { ...params, iterations: 1 },
-      { ...params, iterations: KDF_LIMITS.maxIterations + 1 },
-      { ...params, iterations: 600_000.5 },
-      { ...params, iterations: '600000' },
-      { ...params, salt: new Uint8Array(8) },
-      { ...params, salt: new Uint8Array(65) },
-      { ...params, salt: 'c2FsdA' },
-      { ...params, algorithm: 'scrypt' },
-      null,
-    ]) {
-      expect(isKdfParams(bad), JSON.stringify(bad)).toBe(false);
-    }
   });
 });
 
@@ -308,7 +228,7 @@ describe('validateManifest — categories and platforms', () => {
     );
   });
 
-  it('checks an account block as the sync block was', () => {
+  it('checks an account block’s owner proof and sign-up fields', () => {
     const { media: _media, ...blockless } = source;
     const problems = validateManifest({
       ...blockless,

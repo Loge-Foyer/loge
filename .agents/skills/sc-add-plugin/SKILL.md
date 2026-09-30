@@ -9,10 +9,6 @@ Read `docs/categories/`, `docs/writing-a-plugin/` and
 `../.claude/streaming-center-architecture.md` section 7 first. This is the
 working checklist.
 
-**Transitional:** until the account moves to records, `sync/custom-server`
-and `sync/mock` declare Phase 4's `sync` block. A new sync plugin declares
-`account` or `backup`.
-
 ## The test of success
 
 One new folder under `plugins/<category>/`, and one line registering it in the
@@ -207,12 +203,11 @@ npm test
   with the server)
 - the backup role
 
-Phase 4's roles and log-based sync role stay until the account moves to
-records.
-
 **Read these before writing another:**
 
 - `plugins/sources/jellyfin` — the reference implementation of a media role
 - `plugins/sources/mock` — a partial one, on purpose
-- `plugins/sync/custom-server` — Phase 4's account, until it moves to
-  PocketBase
+- `plugins/sync/custom-server` — the reference account role: PocketBase's
+  sign-in and sessions, records read and written, sign-up and the owner check
+- `plugins/sync/mock-backup` — a backup target at its smallest: bytes and
+  etags

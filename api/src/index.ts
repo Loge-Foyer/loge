@@ -23,7 +23,6 @@ export * from './http';
 export * from './crypto';
 export * from './context';
 export * from './media-role';
-export * from './sync';
 export * from './playback';
 export * from './player';
 export * from './live';

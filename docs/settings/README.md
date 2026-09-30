@@ -93,5 +93,3 @@ A player has no connection: it is on or off on each device, with its
 settings. A sync plugin's connection stays on its device too: your server's
 address and sign-in, or a backup target. It is chosen in Settings as the
 account's home, or as its backup's, and never by adding a source.
-
-Until Phase 6, connections still carry Phase 4's role switches instead.

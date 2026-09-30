@@ -11,7 +11,7 @@ without learning about the others.
 | `category.ts` | The four categories — `sources`, `iptv`, `players`, `sync` — and whether each is account-wide or device-wide (`CATEGORY_SCOPE`). The platforms (`PlatformId`: `ios`, `android`, `web`) and `runsOn()`. `qualifiedPluginId()` and `categoryOfPluginId()`, for ids like `sources/jellyfin`. |
 | `bytes.ts` | Bytes as text and back — base64, base64url, UTF-8 — written by hand, since a plugin has no `btoa` or `TextEncoder` and Hermes may lack them. |
 | `ids.ts` | Branded IDs: `PluginId`, `UserId`, `ConnectionId`, `CredentialsRef`. A `UserId` is a string at runtime, but the compiler will not accept one where a `ConnectionId` belongs. |
-| `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files`; and, from Phase 6, `live`. |
+| `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files` and `live`. |
 | `capabilities.ts` | The media capability flags, and `CapabilityKey` (`'media.offlineMetadata'`), the form a setting uses to gate one. |
 | `fields.ts` | The field descriptors a plugin uses to ask for input: `text` (optionally a `credential`), `url`, `password`, `boolean`, `select`, and the setting-only `libraries`. |
 | `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists. |
@@ -27,12 +27,11 @@ without learning about the others.
 | `player.ts` | The player role: `MediaPlayer`, `PlayerEvent`, `PlayerManifest`, and the pure `canPlay()`, `missingFor()` and `choosePlayer()`. |
 | `errors.ts` | `AppError`: a code from the spec, a retry hint, and an optional reason. |
 | `http.ts` | `HttpClient`, the port a plugin reaches the network through, and `TransportError`. |
-| `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, PBKDF2, HKDF, AES-GCM — and `KdfParams` with `isKdfParams`. |
+| `crypto.ts` | `PluginCrypto`, the host's cryptography — random bytes, SHA-256, HKDF, AES-GCM. |
 | `context.ts` | `PluginContext` and `PluginTarget` — what a plugin may use from its host, and the values it runs with. |
 | `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. |
 | `account.ts` | The account role: `AccountRecord` and its kinds, `AccountSnapshot`, `PushOutcome`, `AccountInfo`, `ConnectedAccount`, `recordKey()`, `recordId()` and `isAccountRecord()`, and `DEFAULT_MAX_PROFILES`. |
 | `backup.ts` | The backup role: `ConnectedBackupTarget` — `stat`, `read`, `write` with `ifMatch`, `list`. |
-| `sync.ts` | Phase 4's log-based sync role, until Phase 6 retires it. |
 
 `fixtures/account-records.json` holds records every side must accept or
 refuse. The tests here read it, and so do the sync server's.

@@ -12,7 +12,7 @@ are plugins of their own:
 | --- | --- |
 | `sources/mock` | the catalogue below |
 | `sync/mock` | a pretend account (`plugins/sync/mock`) |
-| `sync/mock-backup` | a pretend backup target (Phase 6's S3) |
+| `sync/mock-backup` | a pretend backup target (`plugins/sync/mock-backup`) |
 | `iptv/mock` | channels, groups, a guide and a little VOD for the TV tab (Phase 7) |
 
 ## Brings

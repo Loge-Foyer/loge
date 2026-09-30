@@ -13,7 +13,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 const manifest: PluginManifest = {
-  id: pluginId('fixture'),
+  id: pluginId('sources/fixture'),
+  category: 'sources',
+  platforms: ['ios', 'android', 'web'],
   displayName: 'Fixture',
   description: 'A plugin that exists only in tests.',
   media: { contentKinds: ['movies'], capabilities: ['libraries'] },
@@ -41,7 +43,7 @@ function connection(perProfile: Connection['perProfile']): Connection {
     id: connectionId('c1'),
     pluginId: manifest.id,
     label: 'Home',
-    roles: { media: true },
+    enabled: true,
     perProfile,
     values: shared,
   };

@@ -43,6 +43,6 @@ export interface PluginContext {
     now(): number;
     sleep(ms: number, signal?: CancelSignal): Promise<void>;
   };
-  /** Random bytes, key derivation and sealing — an account's, for keys the server must never have. */
+  /** Random bytes, hashing, key expansion and sealing, from the host. */
   readonly crypto: PluginCrypto;
 }

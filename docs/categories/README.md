@@ -15,9 +15,6 @@ category and declares that category's one block.
 The app's Settings → Plugins has the same four lists, and shows only plugins
 whose `platforms` include the one it runs on.
 
-**Until the account moves to records**, `sync/custom-server` and `sync/mock`
-still declare Phase 4's `sync` block.
-
 ## Sources
 
 Bring media: films, series, anime, web video, plain files. A source declares

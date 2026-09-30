@@ -81,8 +81,8 @@ handling stays genuinely tested. Jellyfin is the first real media source.
 ## Current state
 
 Phase 6 — the code is moving to the new architecture. The plugins are in
-their category folders, with qualified ids, categories and platforms; the
-account still speaks Phase 4's log until your own server becomes PocketBase.
+their category folders, with qualified ids, categories and platforms, and the
+account is kept record by record on your own server, PocketBase.
 
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and
@@ -90,26 +90,24 @@ account still speaks Phase 4's log until your own server becomes PocketBase.
   - per-profile values, the media contract with live TV and playback members
   - the player contract, the account role (records), the backup role
   - errors, the HTTP port and the host's crypto port
-  - Phase 4's roles and log-based sync role, until the account moves to
-    records
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
 - **Mock:** `sources/mock` implements the media role with a fixed catalogue;
-  `sync/mock` implements Phase 4's sync role as a pretend account.
-- **Custom server:** implements Phase 4's sync role against the Phase 4 server,
-  until it moves to PocketBase.
+  `sync/mock` plays at being your own server in memory, and `sync/mock-backup`
+  at being a backup target.
+- **Custom server:** implements the account role on PocketBase — sign-in,
+  reading the whole account, batches, sign-up with an invite, the owner check.
 - **Every other plugin:** a manifest — the IPTV and player plugins and the
   backup targets included.
 - **`npm run typecheck`:** two programs — `api` and the plugins with no host
   types at all, and the tests with Node's. Players get a third, with React
   Native's types, when the first one arrives.
 - **`npm test`:** runs everything.
-  - the api rules, bytes as text, the sync wire, and the new contracts:
-    categories, account records against their shared fixtures, choosing a
-    player
+  - the api rules, bytes as text, and the contracts: categories, account
+    records against their shared fixtures, choosing a player
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
-  - the mock, as a source and as an account
-  - the custom server against a fake of its routes
+  - the mock, as a source, as an account and as a backup target
+  - the custom server against a fake of PocketBase's routes and rules
   - the conformance check that each declared capability is implemented
 
 ## Git

@@ -1,6 +1,5 @@
 import type { FieldValues } from './fields';
 import type { ConnectionId, CredentialsRef, PluginId } from './ids';
-import type { PluginManifest, PluginRole } from './manifest';
 
 /**
  * What each profile keeps for itself on a connection. `none`: every profile
@@ -10,9 +9,6 @@ import type { PluginManifest, PluginRole } from './manifest';
 export type PerProfile = 'none' | 'credentials' | 'all';
 
 export const PER_PROFILE_MODES: readonly PerProfile[] = ['none', 'credentials', 'all'];
-
-/** A role missing here is off, so a role a plugin gains later never appears enabled. */
-export type ConnectionRoles = Readonly<Partial<Record<PluginRole, boolean>>>;
 
 /** One set of values: the connection's shared ones, or one profile's own. */
 export interface ConnectionValues {
@@ -26,28 +22,18 @@ export interface ConnectionValues {
 }
 
 /**
- * One configured instance of a plugin — "Jellyfin Home". Every connection
- * belongs to the device; `perProfile` decides which of its values each profile
- * keeps separately, and those are stored with the profile.
+ * One configured instance of a plugin — "Jellyfin Home". A source's or an IPTV
+ * plugin's connection belongs to the account, and travels with it; a sync
+ * plugin's belongs to the device. `perProfile` decides which of its values
+ * each profile keeps separately, and those are stored with the profile.
  */
 export interface Connection {
   readonly id: ConnectionId;
   readonly pluginId: PluginId;
   readonly label: string;
-  readonly roles: ConnectionRoles;
+  /** Switched off, it stays configured and nothing of it is used, on any device of the account. */
+  readonly enabled: boolean;
   readonly perProfile: PerProfile;
   /** The values every profile shares. */
   readonly values: ConnectionValues;
-}
-
-/**
- * Roles switched on for a new connection: media on, sync off. The sync role is
- * switched on only by choosing the connection as the device's account — at
- * most one per device — never by adding it.
- */
-export function defaultRoles(manifest: PluginManifest): ConnectionRoles {
-  return {
-    ...(manifest.media ? { media: true } : {}),
-    ...(manifest.sync ? { sync: false } : {}),
-  };
 }

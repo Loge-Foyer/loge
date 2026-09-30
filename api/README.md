@@ -43,10 +43,4 @@ the player contract lives next door, in `../player-kit`, so that this can.
 - **The host's crypto port**, and bytes as text, both written for a host with
   no WebCrypto.
 
-**Still here until Phase 6 retires them:**
-
-- the roles model (`PluginRole`, `effectiveRoles`, `defaultRoles`)
-- the log-based sync contract (`sync.ts`), with sealed passwords and owner
-  proofs
-
 See `../docs/api/`.

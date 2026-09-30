@@ -1,15 +1,12 @@
 import type { AccountManifest, AccountRole } from './account';
 import type { BackupManifest, BackupRole } from './backup';
-import type { CapabilityKey, MediaCapability, SyncCapability } from './capabilities';
+import type { CapabilityKey, MediaCapability } from './capabilities';
 import type { PlatformId, PluginCategory } from './category';
 import type { ContentKind } from './content';
 import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
 import type { MediaRole } from './media-role';
 import type { PlayerManifest, PlayerRole } from './player';
-import type { SyncRole } from './sync';
-
-export type PluginRole = 'media' | 'sync';
 
 export interface MediaRoleManifest {
   /** What this source can bring. */
@@ -17,24 +14,7 @@ export interface MediaRoleManifest {
   readonly capabilities: readonly MediaCapability[];
 }
 
-export interface SyncRoleManifest {
-  readonly capabilities: readonly SyncCapability[];
-  /**
-   * The password fields the owner check asks for again — Forgot PIN, switching
-   * and signing out — handed to `verifyOwner`. Without them, the account
-   * vouches with no proof, or the device answers.
-   */
-  readonly ownerProof?: { readonly fields: readonly string[] };
-  /** Creating an account from the app: the fields it takes beyond the connection's own, handed to `createAccount`. */
-  readonly signUp?: { readonly fields: readonly Field[] };
-}
-
-/**
- * A boolean setting that can switch capabilities off for one connection. For
- * the account, signing in is the opt-in, so a sync toggle is optional and may
- * default on; the sync role itself is off until the connection is chosen as
- * the account.
- */
+/** A boolean setting that can switch capabilities off for one connection. */
 export interface ToggleSetting extends BooleanField {
   readonly gates?: readonly CapabilityKey[];
 }
@@ -46,49 +26,40 @@ export interface ToggleSetting extends BooleanField {
 export type PluginSettingDescriptor = TextField | UrlField | SelectField | ToggleSetting | LibrariesField;
 
 export interface PluginManifest {
-  /** `category/name` once a manifest names its category (`sources/jellyfin`); a bare name before. */
+  /** `category/name`, which is also the plugin's folder: `sources/jellyfin`. */
   readonly id: PluginId;
   /** Which list the plugin is in, and which one block it declares. */
-  readonly category?: PluginCategory;
-  /** Where it runs. A manifest without it runs everywhere. */
-  readonly platforms?: readonly PlatformId[];
+  readonly category: PluginCategory;
+  /** Where it runs. The app offers it only there. */
+  readonly platforms: readonly PlatformId[];
   readonly displayName: string;
   /** One sentence for the plugin list. */
   readonly description: string;
+  /** Sources and IPTV. */
   readonly media?: MediaRoleManifest;
-  readonly sync?: SyncRoleManifest;
+  /** Players. */
   readonly player?: PlayerManifest;
+  /** Sync: where the account is kept. */
   readonly account?: AccountManifest;
+  /** Sync: where the account's backup file is kept. */
   readonly backup?: BackupManifest;
-  /**
-   * What a connection needs: endpoint, account, secrets. Shared by every role,
-   * because one connection has one endpoint and one set of credentials.
-   */
+  /** What a connection needs: endpoint, account, secrets. */
   readonly connectionFields: readonly Field[];
   readonly settings: readonly PluginSettingDescriptor[];
 }
 
 /**
- * What a plugin package exports. A role's implementation joins the manifest
- * once it is written; a declared capability promises the members it maps to
- * (`MEDIA_CAPABILITY_MEMBERS`, `SYNC_PROVIDER_MEMBERS`,
- * `SYNC_CAPABILITY_MEMBERS`), as `ownerProof` promises `verifyOwner` and
- * `signUp` promises `createAccount`.
+ * What a plugin package exports: its manifest, and the role its block
+ * promises once it is written. A declared capability promises the members it
+ * maps to (`MEDIA_CAPABILITY_MEMBERS`); an account's `ownerProof` promises
+ * `verifyOwner`, and its `signUp` promises `createAccount`.
  */
 export interface Plugin {
   readonly manifest: PluginManifest;
   readonly media?: MediaRole;
-  readonly sync?: SyncRole;
   readonly player?: PlayerRole;
   readonly account?: AccountRole;
   readonly backup?: BackupRole;
-}
-
-export function declaredRoles(manifest: PluginManifest): readonly PluginRole[] {
-  return [
-    ...(manifest.media ? (['media'] as const) : []),
-    ...(manifest.sync ? (['sync'] as const) : []),
-  ];
 }
 
 export function isToggle(setting: PluginSettingDescriptor): setting is ToggleSetting {

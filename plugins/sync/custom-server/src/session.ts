@@ -1,27 +1,23 @@
-import { decodeBase64Url, encodeBase64Url, isKdfParams, type KdfParams } from '@sc/api';
-
-import { isRecord, kdfToWire, readKdf } from './wire';
-
 /**
- * What the plugin keeps in its session, in the device-bound store: this
- * device's token, the vault key, and the key's parameters — so the owner
- * check derives without asking the server for them. Or a tombstone: the
- * server let this device go, and nothing signs in again until the user does.
+ * What the plugin keeps in its session, in the device-bound store: PocketBase's
+ * token and the account it names. Or a latch: a sign-in with the saved
+ * password was refused, and nothing signs in again until the user does — a
+ * new password gives the connection a new session anyway.
  */
 export type Session =
-  | { readonly kind: 'live'; readonly token: string; readonly vaultKey: Uint8Array; readonly kdf: KdfParams }
-  | { readonly kind: 'signed-out' };
+  | { readonly kind: 'live'; readonly token: string; readonly accountId: string; readonly username: string }
+  | { readonly kind: 'refused' };
 
 export type LiveSession = Extract<Session, { kind: 'live' }>;
 
-const VERSION = 1;
-const VAULT_KEY_LENGTH = 32;
+// Phase 4's sessions were version 1: they read as none, and the plugin signs in afresh.
+const VERSION = 2;
 
 export function encodeSession(session: Session): string {
   return JSON.stringify(
-    session.kind === 'signed-out'
-      ? { v: VERSION, signedOut: true }
-      : { v: VERSION, token: session.token, vault: encodeBase64Url(session.vaultKey), kdf: kdfToWire(session.kdf) },
+    session.kind === 'refused'
+      ? { v: VERSION, refused: true }
+      : { v: VERSION, token: session.token, accountId: session.accountId, username: session.username },
   );
 }
 
@@ -34,11 +30,10 @@ export function decodeSession(raw: string | undefined): Session | undefined {
   } catch {
     return undefined;
   }
-  if (!isRecord(value) || value.v !== VERSION) return undefined;
-  if (value.signedOut === true) return { kind: 'signed-out' };
-  if (typeof value.token !== 'string' || value.token === '' || typeof value.vault !== 'string') return undefined;
-  const vaultKey = decodeBase64Url(value.vault);
-  const kdf = readKdf(value.kdf);
-  if (vaultKey?.length !== VAULT_KEY_LENGTH || !isKdfParams(kdf)) return undefined;
-  return { kind: 'live', token: value.token, vaultKey, kdf };
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { v, refused, token, accountId, username } = value as Readonly<Record<string, unknown>>;
+  if (v !== VERSION) return undefined;
+  if (refused === true) return { kind: 'refused' };
+  if (typeof token !== 'string' || token === '' || typeof accountId !== 'string' || typeof username !== 'string') return undefined;
+  return { kind: 'live', token, accountId, username };
 }

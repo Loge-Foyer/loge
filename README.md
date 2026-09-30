@@ -84,9 +84,9 @@ it.
 
 ## Current state
 
-**Phase 5 — the new layout, written down.** The documents describe the four
-folders; the code still has its Phase 4 layout, one folder per plugin under
-`plugins/`, until Phase 6 moves it.
+**Phase 6 — the code moves to the new architecture.** The plugins are in
+their four folders, each with an id that names its category, and every
+manifest declares one block.
 
 What is real today:
 
@@ -97,20 +97,23 @@ What is real today:
     knows what each user watched, and builds artwork addresses.
   - It is tested against recorded server answers, and has been run against a
     real Jellyfin 12 server.
-- **The mock** has a fixed catalogue behind the same contract, so the app works
-  fully offline. It can also play at being an account.
-- **Your own server** (`custom-server`) is a working account, against the
-  Phase 4 sync server.
+- **The mock source** has a fixed catalogue behind the same contract, so the
+  app works fully offline.
+- **Your own server** (`sync/custom-server`) is a working account on
+  PocketBase: it signs in, reads the whole account and writes it back record
+  by record, and creates an account with an invite.
+- **The mock account** plays at being your own server, in memory, and **the
+  mock backup target** at being a cloud folder.
 - **Every other plugin** still describes itself with a manifest, and declares
   nothing it cannot do yet.
 
-The contracts for the new plugins are written too:
+The contracts for what comes next are written too:
 
-- categories and platforms
 - what to play, and the player that plays it
 - live TV
-- the account on your own server, record by record
 - a place to keep a backup
+
+Phase 4's roles, its change log and its sealed passwords are retired.
 
 ## Documentation
 
