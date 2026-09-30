@@ -502,7 +502,8 @@ config.resolver.blockList = [...blockList, /^<plugins>\/node_modules\/.*/];
     linked, in this app's `node_modules`, so its imports find this app's
     types. Never map `react` in `paths` — Expo's Metro applies tsconfig paths
     too, and React's types are not a module it can bundle.
-  - **vitest** dedupes React, React Native, expo, expo-video and hls.js, and
+  - **vitest** dedupes React, React Native, expo, expo-video, hls.js and
+    mpegts.js, and
     stubs expo-video and expo (`test/support/`): the shipped list includes the
     built-in player and VLC, and Node has no native module.
   - **Autolinking** searches this app's `node_modules` first

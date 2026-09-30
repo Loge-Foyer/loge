@@ -90,7 +90,8 @@ describe('pressing Play', () => {
       players: [fakePlayerPlugin('first', { ios: hlsOnly })],
       describe: (request) => ({ key: request.key, sources: [ts], audioTracks: [], subtitleTracks: [] }),
     });
-    expect(await t.services.playback.plan(t.kids, t.item.key)).toEqual({ kind: 'none', needs: ['protocol', 'container'], source: ts });
+    // A stream's container is its protocol's: only the protocol is missing.
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toEqual({ kind: 'none', needs: ['protocol'], source: ts });
   });
 
   it('says so when every player is switched off here, without asking the source', async () => {

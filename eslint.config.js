@@ -100,6 +100,7 @@ const sqlJsChunk = {
 const playerEngines = [
   { name: 'expo-video', message: 'The app never imports an engine. The player plugin drives it; take its controller and view from useServices().' },
   { name: 'hls.js', message: 'The app never imports an engine. The built-in player loads hls.js itself, on the web, when it needs it.' },
+  { name: 'mpegts.js', message: 'The app never imports an engine. The built-in player loads mpegts.js itself, on the web, when a stream needs it.' },
 ];
 
 // @sc/player-kit holds only types, the React half of the player contract. A

@@ -14,7 +14,7 @@ export default defineConfig({
       { find: /^expo$/, replacement: fileURLToPath(new URL('./test/support/expo.ts', import.meta.url)) },
     ],
     // As in metro.config.js: what a plugin file imports is the app's copy, never the plugins repository's.
-    dedupe: ['react', 'react-native', 'expo', 'expo-video', 'hls.js'],
+    dedupe: ['react', 'react-native', 'expo', 'expo-video', 'hls.js', 'mpegts.js'],
   },
   define: { __DEV__: 'true' },
   test: {

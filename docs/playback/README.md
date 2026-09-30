@@ -42,13 +42,14 @@ A player plugin is in the `players` category, and has three parts:
 
 | Plugin | Engine | Platforms | Arrives |
 | --- | --- | --- | --- |
-| `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js on the web | all | Phase 7 — the engine is in |
+| `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js and mpegts.js on the web | all | Phase 7; MPEG-TS on the web in Phase 8 |
 | `players/ksplayer` | KSPlayer | iOS | Phase 8 |
 | `players/mpv` | MPVKit on iOS, libmpv on Android | iOS, Android | Phase 8 |
 | `players/vlc` | libVLC on Android, through an Expo module in its package; VLCKit on iOS later | Android | Phase 8 — Android is in |
 
-On the web there is only the built-in player; Phase 8 adds mpegts.js to it for
-MPEG-TS live streams.
+On the web there is only the built-in player. It plays raw MPEG-TS through
+mpegts.js, fetched as a chunk of its own the first time a stream needs it, as
+hls.js is for HLS; CORS still applies.
 
 **Which players are on, and which plays first, are device settings**
 (`DeviceSettings.players: { off, preferred }`, `services/players.ts`): never
