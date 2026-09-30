@@ -77,7 +77,9 @@ What runs today:
   in a browser — with Resume, Mark watched, the tracks and Next episode. On
   Android VLC and mpv play too, Expo modules in their plugins' packages:
   Matroska, DTS and TrueHD as the file, raw MPEG-TS, a file's own subtitles —
-  mpv drawing them with libass. A browser plays raw MPEG-TS through mpegts.js.
+  mpv drawing them with libass. Both now have iOS halves that build into the
+  app, but neither has played on a device yet. A browser plays raw MPEG-TS
+  through mpegts.js.
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos still shows skeletons.

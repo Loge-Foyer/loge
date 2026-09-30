@@ -641,7 +641,8 @@ Everything above describes the target; what runs today:
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
   transcode — on phones and in a browser; VLC and mpv play on Android, from
-  Expo modules in their plugins' packages. Each player has its switch, "Play
+  Expo modules in their plugins' packages, and their iOS halves build into the
+  app but have not played on a device yet. Each player has its switch, "Play
   with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
 - **Watch status (database v5):** marking something watched and where
