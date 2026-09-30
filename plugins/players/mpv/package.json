@@ -5,6 +5,10 @@
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*"
+    "@sc/api": "*",
+    "@sc/player-kit": "*",
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
   }
 }

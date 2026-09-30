@@ -1,6 +1,6 @@
-// expo's modules API as VLC's engine sees it, in memory: its Expo module's
-// player as a shared object. The test sends the native side's events; the
-// fake records what the engine asked.
+// expo's modules API as the native players' engines see it, in memory: each
+// Expo module's player as a shared object. The test sends the native side's
+// events; the fake records what the engine asked.
 type Listener = (payload: never) => void;
 
 export class SharedObject {
@@ -77,8 +77,58 @@ export class FakeVlcPlayer extends SharedObject {
 
 export const created: FakeVlcPlayer[] = [];
 
+export interface FakeMpvLoad {
+  readonly uri: string;
+  readonly headers: Readonly<Record<string, string>> | null;
+  readonly startMs: number | null;
+}
+
+/** mpv's module: the same shape, except that mpv takes whatever headers a stream needs. */
+export class FakeMpvPlayer extends SharedObject {
+  readonly loads: FakeMpvLoad[] = [];
+  readonly calls: string[] = [];
+  audioTrack: number | undefined;
+  subtitleTrack: number | undefined;
+
+  constructor() {
+    super();
+    createdMpv.push(this);
+  }
+
+  async load(uri: string, headers: Readonly<Record<string, string>> | null, startMs: number | null) {
+    this.loads.push({ uri, headers, startMs });
+  }
+
+  play() {
+    this.calls.push('play');
+  }
+
+  pause() {
+    this.calls.push('pause');
+  }
+
+  replay(startMs: number) {
+    this.calls.push(`replay ${startMs}`);
+  }
+
+  seek(positionMs: number) {
+    this.calls.push(`seek ${positionMs}`);
+  }
+
+  setAudioTrack(id: number) {
+    this.audioTrack = id;
+  }
+
+  setSubtitleTrack(id: number) {
+    this.subtitleTrack = id;
+  }
+}
+
+export const createdMpv: FakeMpvPlayer[] = [];
+
 export function requireNativeModule(name: string): unknown {
   if (name === 'ScVlc') return { Player: FakeVlcPlayer };
+  if (name === 'ScMpv') return { Player: FakeMpvPlayer };
   throw new Error(`Cannot find native module '${name}'`);
 }
 

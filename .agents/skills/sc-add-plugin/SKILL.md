@@ -194,8 +194,13 @@ format and encryption are the app's.
   - Hand the native view the player's `__expo_shared_object_id__`, never the
     object: React Native's development renderer deep-freezes every prop a
     native view mounts with, and a frozen shared object cannot be released.
-  - Keep every call to the engine on one thread, and stream addresses in
-    memory only. An engine whose own log quotes them is kept quiet.
+  - Keep every call to the engine on one thread of the package's own — never
+    the app's main thread, where a call that waits for a busy engine is an
+    ANR — and stream addresses in memory only.
+  - **An engine that logs the address it opens is a leak**, since a stream
+    URL carries a Jellyfin `api_key` or a portal's session token. libVLC is
+    quietened with `--quiet`; libmpv's published Android wrapper cannot be,
+    so `plugins/players/mpv` talks to its C API itself.
   - `platforms` says where the module is built — no more.
   - In the app, check autolinking takes nothing from this repository's
     `node_modules` (the app's `docs/plugins`).
@@ -241,5 +246,8 @@ npm test
   platform
 - `plugins/players/vlc` — the reference native player: libVLC behind an Expo
   module of its own, on Android
+- `plugins/players/mpv` — the same, one step further: its own JNI on the
+  engine's C API, every call on a thread of its own, and a watchdog that says
+  so when a decoder takes a stream and hands back no frame
 - `plugins/iptv/mock` — live TV at its simplest: groups, channels, a guide
   worked out from the time

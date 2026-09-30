@@ -79,7 +79,7 @@ can, the app says which one would. Players are device-wide: which are on, which
 is the default, and their settings stay on the device.
 
 Players: `system` (expo-video — AVPlayer, Media3/ExoPlayer, and the browser's
-`<video>` with hls.js), `ksplayer` (iOS), `mpv`, `vlc`.
+`<video>` with hls.js), `vlc` and `mpv` (Android), `ksplayer` (iOS).
 
 ## Sync
 

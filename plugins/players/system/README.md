@@ -81,5 +81,5 @@ iOS, Android and the web.
 The player role is implemented, with a profile per platform, and tested
 against fakes of expo-video, the `<video>` element, hls.js and mpegts.js. On
 the Android emulator it played HLS, live HLS, raw MPEG-TS and MP4; in Chrome,
-HLS (native, and through hls.js), MP4, and raw MPEG-TS through mpegts.js. iOS
-waits for the workspace path to lose its space.
+HLS (native, and through hls.js), MP4, and raw MPEG-TS through mpegts.js. On
+an iPhone it has not been run yet.

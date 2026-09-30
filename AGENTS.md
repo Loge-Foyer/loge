@@ -315,7 +315,7 @@ the test of whether this architecture is real.
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, and the account is kept record by record
 on your own server, PocketBase. Phase 7 made it play; Phase 8 adds players —
-VLC on Android is in.
+VLC and mpv on Android are in.
 
 **`api` holds:**
 
@@ -356,14 +356,20 @@ TypeScript program of its own with React Native's types.
   its own `android/` folder, reached through `expo` — tested against a fake of
   that module (`vitest.config.ts` aliases `expo`), and played on the Android
   emulator: raw MPEG-TS, Matroska with E-AC-3 as the file, its subtitles.
+- **`players/mpv`** implements it on Android: libmpv behind an Expo module
+  in its own `android/` folder, with this package's own JNI — the engine's
+  published wrapper prints every stream address it opens to the device log,
+  and nothing turns that off. Tested against a fake of that module, and played
+  on the Android emulator: a portal's raw MPEG-TS channel, and a Jellyfin film
+  as the file, with libass drawing its subtitles. It decodes in software for
+  now, so its profile stops at 1080p.
 - **`sync/custom-server`** implements the account role on PocketBase: one
   sign-in, latched refusals, the whole account read, batches written, sign-up
   with an invite, the password typed again as the owner check.
 - **`sync/mock`** plays at being your own server in memory, and
   **`sync/mock-backup`** at being a backup target.
 - **Every other plugin** is a manifest that declares no capability: the other
-  IPTV plugins, mpv and KSPlayer, with no profile, backup targets with no
-  role.
+  IPTV plugins, KSPlayer with no profile, backup targets with no role.
 
 Phase 4's roles (`effectiveRoles`, `defaultRoles`), its log-based sync role,
 sealed passwords and the derived owner proof are retired, with PBKDF2 in the
