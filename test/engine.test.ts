@@ -13,7 +13,7 @@ const MISSING_ON_HERMES: readonly { readonly pattern: RegExp; readonly instead: 
   { pattern: /\bfromBase64\(/, instead: 'decodeBase64Url from @sc/api' },
 ];
 
-const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../plugins/*/*/src/**/*.ts'], {
+const sources = import.meta.glob<string>(['../api/src/**/*.ts', '../player-kit/src/**/*.{ts,tsx}', '../plugins/*/*/src/**/*.{ts,tsx}'], {
   query: '?raw',
   import: 'default',
   eager: true,

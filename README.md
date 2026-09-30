@@ -84,9 +84,9 @@ it.
 
 ## Current state
 
-**Phase 6 — the code is on the new architecture.** The plugins are in
-their four folders, each with an id that names its category, and every
-manifest declares one block.
+**Phase 6 moved the code to the new architecture; Phase 7, playback, is
+under way.** The plugins are in their four folders, each with an id that names
+its category, and every manifest declares one block.
 
 What is real today:
 
@@ -98,7 +98,8 @@ What is real today:
   - It is tested against recorded server answers, and has been run against a
     real Jellyfin 12 server.
 - **The mock source** has a fixed catalogue behind the same contract, so the
-  app works fully offline.
+  app works fully offline, and **the mock portal** does the same for live TV:
+  channels in groups, a guide, a few films and series.
 - **Your own server** (`sync/custom-server`) is a working account on
   PocketBase: it signs in, reads the whole account and writes it back record
   by record, and creates an account with an invite.
@@ -109,7 +110,8 @@ What is real today:
 
 The contracts for what comes next are written too:
 
-- what to play, and the player that plays it
+- what to play, the player that plays it, and its view (`player-kit`)
+- progress and played state, back to the source
 - live TV
 - a place to keep a backup
 

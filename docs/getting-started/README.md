@@ -3,7 +3,7 @@
 ```
 api/                  @sc/api — the vocabulary; depends on nothing
   fixtures/           records every side must judge alike
-player-kit/           @sc/player-kit — the React half of the player contract (Phase 7)
+player-kit/           @sc/player-kit — the React half of the player contract
 plugins/
   sources/<name>/     media from a server, a share or a drive
   iptv/<name>/        live TV, and a provider's films and series

@@ -9,5 +9,7 @@
   "include": [
     "api/src/**/*.ts",
     "plugins/*/*/src/**/*.ts"
-  ]
+  ],
+  // Players have a program of their own, with React Native's types: tsconfig.players.json.
+  "exclude": ["plugins/players/**"]
 }

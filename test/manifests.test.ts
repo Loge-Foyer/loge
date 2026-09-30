@@ -8,6 +8,7 @@ import {
   type Plugin,
 } from '@sc/api';
 import { plugin as m3u } from '@sc/iptv-m3u';
+import { plugin as mockIptv } from '@sc/iptv-mock';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
 import { plugin as ksplayer } from '@sc/player-ksplayer';
@@ -48,6 +49,7 @@ const plugins: readonly Plugin[] = [
   m3u,
   stalker,
   xtream,
+  mockIptv,
   systemPlayer,
   ksplayer,
   mpv,

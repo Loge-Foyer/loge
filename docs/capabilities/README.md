@@ -40,7 +40,7 @@ Players and sync plugins have no capabilities of this kind.
 | `epg` | It has a guide for those channels | `getGuide` |
 | `playback` | It can say what to play for an item | `getPlaybackDescriptor` |
 | `offlineMetadata` | Items keep stable ids and tag-versioned artwork, so the app may keep them on the device | none — a permission, not a call |
-| `watchStateWrite` | It takes progress and played state back | arrive with playback (Phase 7) |
+| `watchStateWrite` | It takes progress and played state back | `reportPlayback`, `setPlayed` |
 | `search`, `collections`, `playlists`, `favoritesRead`, `favoritesWrite` | Named now, promised by nobody yet | arrive with their first implementation |
 
 `MEDIA_CAPABILITY_MEMBERS` in `api` is that table in code. What is live is a

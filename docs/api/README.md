@@ -128,6 +128,10 @@ await provider.listItems({ kind: 'movies', sort: { by: 'releaseDate', order: 'de
 - **`getPlaybackDescriptor(request)`**, behind `playback`, says what to play
   for the engine the request describes. A descriptor lives in memory only: its
   addresses can carry credentials.
+- **`reportPlayback(report)` and `setPlayed(key, played)`**, behind
+  `watchStateWrite`, take progress and played state back to a source that
+  masters them. The app's outbox delivers them, and may deliver one twice, so
+  both are safe to repeat.
 
 ## Players
 

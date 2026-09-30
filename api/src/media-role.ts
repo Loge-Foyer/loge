@@ -3,8 +3,8 @@ import type { PluginContext, PluginTarget } from './context';
 import type { CancelSignal } from './http';
 import type { ConnectionId } from './ids';
 import type { ChannelGroup, ChannelPage, ChannelQuery, GuideQuery, Programme } from './live';
-import type { HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
-import type { PlaybackDescriptor, PlaybackRequest } from './playback';
+import type { GlobalMediaKey, HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
+import type { PlaybackDescriptor, PlaybackRequest, ProgressReport } from './playback';
 import type { ItemPage, ItemQuery } from './query';
 
 /** One connection's values, resolved for the profile it runs for. */
@@ -48,6 +48,14 @@ export interface ConnectedMediaProvider {
   getGuide?(query: GuideQuery, signal?: CancelSignal): Promise<readonly Programme[]>;
   /** What to play, for the engine the request describes. Its addresses are held in memory only. */
   getPlaybackDescriptor?(request: PlaybackRequest, signal?: CancelSignal): Promise<PlaybackDescriptor>;
+  /**
+   * Where playback got to: started, progress, stopped. The app's outbox
+   * delivers these, and may deliver one twice after a lost answer, so a report
+   * must be safe to repeat.
+   */
+  reportPlayback?(report: ProgressReport, signal?: CancelSignal): Promise<void>;
+  /** Watched, or not, as the user said. Safe to repeat, like a report. */
+  setPlayed?(key: GlobalMediaKey, played: boolean, signal?: CancelSignal): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -67,4 +75,5 @@ export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   channels: ['listChannelGroups', 'listChannels'],
   epg: ['getGuide'],
   playback: ['getPlaybackDescriptor'],
+  watchStateWrite: ['reportPlayback', 'setPlayed'],
 };

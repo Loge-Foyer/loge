@@ -7,13 +7,13 @@ npm test
 
 Vitest, run over `test/` at the repository root.
 
-`npm run typecheck` is two programs today, and three once the first player
-plugin arrives:
+`npm run typecheck` is three programs:
 
 1. **`api` and the non-player plugins** compile with `lib: ["esnext"]` and no
    types at all, so a host global cannot creep in.
-2. **Player plugins and `player-kit`** get React Native's types, because an
-   engine draws.
+2. **Player plugins and `player-kit`** (`tsconfig.players.json`) get React
+   Native's types, and the DOM's for the browser's `<video>`, because an engine
+   draws.
 3. **The tests** are a program of their own (`test/tsconfig.json`), with
    Node's types, because the fake context's crypto runs on `node:crypto`.
 
@@ -55,6 +55,12 @@ plugin arrives:
   - paging across libraries with no duplicates or gaps
   - mapping every item type
   - artwork addresses
+- `iptv-mock.test.ts` — the mock portal's lineup is the same every run and
+  pages by group; its guide has no gaps and agrees with itself in any window,
+  and its setting switches `epg` off; its films and series come in
+  `compareItems` order; a channel plays over HLS, while one in every group only
+  offers MPEG-TS, which AVPlayer's profile cannot play; another connection's
+  key gets nothing.
 - `mock.test.ts` and `mock-account.test.ts` — the catalogue is deterministic
   and honours sort, libraries, paging and latency; the pretend account keeps
   your server's rules — all or nothing, the limit, deleted stays deleted,

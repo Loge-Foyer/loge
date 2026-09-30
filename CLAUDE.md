@@ -80,33 +80,37 @@ handling stays genuinely tested. Jellyfin is the first real media source.
 
 ## Current state
 
-Phase 6 — the code is on the new architecture. The plugins are in
-their category folders, with qualified ids, categories and platforms, and the
-account is kept record by record on your own server, PocketBase.
+Phase 6 moved the code to the new architecture: the plugins are in their
+category folders, with qualified ids, categories and platforms, and the account
+is kept record by record on your own server, PocketBase. Phase 7, playback, is
+under way.
 
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and
     the player, account and backup blocks
-  - per-profile values, the media contract with live TV and playback members
+  - per-profile values, the media contract with live TV and playback members,
+    and watch state written back (`reportPlayback`, `setPlayed`)
   - the player contract, the account role (records), the backup role
   - errors, the HTTP port and the host's crypto port
+- **`player-kit`:** `PlayerView`'s props and `PlayerPlugin`.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads.
-- **Mock:** `sources/mock` implements the media role with a fixed catalogue;
-  `sync/mock` plays at being your own server in memory, and `sync/mock-backup`
-  at being a backup target.
+- **Mock:** `sources/mock` implements the media role with a fixed catalogue,
+  and `iptv/mock` with live TV — groups, channels, a guide, a few films and
+  series, public test streams to play; `sync/mock` plays at being your own
+  server in memory, and `sync/mock-backup` at being a backup target.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
-- **Every other plugin:** a manifest — the IPTV and player plugins and the
-  backup targets included.
-- **`npm run typecheck`:** two programs — `api` and the plugins with no host
-  types at all, and the tests with Node's. Players get a third, with React
-  Native's types, when the first one arrives.
+- **Every other plugin:** a manifest — the other IPTV plugins, the players
+  and the backup targets included.
+- **`npm run typecheck`:** three programs — `api` and the non-player plugins
+  with no host types at all; `player-kit` and the players with React Native's
+  and the DOM's; the tests with Node's.
 - **`npm test`:** runs everything.
   - the api rules, bytes as text, and the contracts: categories, account
     records against their shared fixtures, choosing a player
   - Jellyfin's behaviour: sign-in, local-only, paging, mapping
-  - the mock, as a source, as an account and as a backup target
+  - the mock, as a source, an IPTV portal, an account and a backup target
   - the custom server against a fake of PocketBase's routes and rules
   - the conformance check that each declared capability is implemented
 

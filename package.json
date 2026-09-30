@@ -5,14 +5,18 @@
   "type": "module",
   "workspaces": [
     "api",
+    "player-kit",
     "plugins/*/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.players.json && tsc --noEmit -p test",
     "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^24",
+    "@types/react": "~19.2.2",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
     "typescript": "~6.0.3",
     "vitest": "^5.0.1"
   }

@@ -11,7 +11,7 @@ they are written in. Read the workspace root `AGENTS.md` and
 ```
 api/                     @sc/api — domain types + every contract. Depends on NOTHING
   fixtures/              records every side must judge alike (the Go server's tests read them too)
-player-kit/              @sc/player-kit — the React half of the player contract (Phase 7)
+player-kit/              @sc/player-kit — the React half of the player contract
 plugins/
   sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
   iptv/<name>/           m3u stalker xtream mock
@@ -21,12 +21,10 @@ test/                    vitest — api rules, plugins against fake HTTP, confor
 docs/
 ```
 
-**Not here yet:** `player-kit` arrives with the first player (Phase 7).
-
-npm workspaces (`["api", "plugins/*/*"]`, and `player-kit` when it exists),
-source-only — `"exports": "./src/index.ts"`, no build step. Every plugin lists
-`@sc/api` as a **peer** dependency: the host supplies the one instance, so
-branded IDs from the app and from a plugin are the same type.
+npm workspaces (`["api", "player-kit", "plugins/*/*"]`), source-only —
+`"exports": "./src/index.ts"`, no build step. Every plugin lists `@sc/api` as
+a **peer** dependency: the host supplies the one instance, so branded IDs from
+the app and from a plugin are the same type.
 
 ## One category per plugin
 
@@ -56,7 +54,7 @@ create `plugins/sync/jellyfin`.
 | Package | May import | Must not import |
 | --- | --- | --- |
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
-| `player-kit` | `@sc/api`, `react` (peer) | any plugin, the app |
+| `player-kit` | `@sc/api`, `react`, `react-native` (peers) | any plugin, the app |
 | a sources, IPTV or sync plugin | `@sc/api` | any framework, the app, another plugin |
 | a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder) | the app, another plugin |
 
@@ -140,6 +138,7 @@ the connection's values already resolved for one profile.
 | `channels` | `listChannelGroups`, `listChannels` |
 | `epg` | `getGuide` |
 | `playback` | `getPlaybackDescriptor` |
+| `watchStateWrite` | `reportPlayback` (started, progress, stopped), `setPlayed` |
 | `offlineMetadata` | none — permission for the app to keep items on the device |
 
 `check()` and `dispose()` are always present. Rules every provider follows:
@@ -153,6 +152,8 @@ the connection's values already resolved for one profile.
 - **A playback descriptor lives in memory only.** A stream address can carry a
   password (Xtream) or a session token (Stalker). Never put one in a log, a
   cache or a session.
+- **Reports are safe to repeat.** The app's outbox delivers `reportPlayback`
+  and `setPlayed`, and may deliver one twice after a lost answer.
 
 ### The player role
 
@@ -305,9 +306,9 @@ the test of whether this architecture is real.
 
 ## Current state
 
-Phase 6 — the code is on the new architecture. The plugins are in
-their category folders, with qualified ids, and the account is kept record by
-record on your own server, PocketBase.
+Phase 6 moved the code to the new architecture: the plugins are in their
+category folders, with qualified ids, and the account is kept record by record
+on your own server, PocketBase. Phase 7, playback, is under way.
 
 **`api` holds:**
 
@@ -319,23 +320,28 @@ record on your own server, PocketBase.
   `isSetUpFor`)
 - `AppError` with retry hints, and `HttpClient`
 - playback: `PlaybackDescriptor`, `PlayerProfile`, `MediaPlayer`,
-  `choosePlayer`
+  `choosePlayer`, and watch state written back (`reportPlayback`, `setPlayed`)
 - the account role, record by record (`AccountRecord`, `isAccountRecord`), and
   the backup role
 - the host's crypto port (`PluginCrypto`: random bytes, SHA-256, HKDF,
   AES-GCM), and bytes as text (`bytes.ts`)
 
+**`player-kit`** holds `PlayerView`'s props and `PlayerPlugin`, in a
+TypeScript program of its own with React Native's types.
+
 **The plugins:**
 
 - **`sources/jellyfin`** implements the media role.
 - **`sources/mock`** implements it with a fixed catalogue.
+- **`iptv/mock`** implements it with live TV: groups, channels, a guide, a
+  few films and series, and public test streams to play.
 - **`sync/custom-server`** implements the account role on PocketBase: one
   sign-in, latched refusals, the whole account read, batches written, sign-up
   with an invite, the password typed again as the owner check.
 - **`sync/mock`** plays at being your own server in memory, and
   **`sync/mock-backup`** at being a backup target.
-- **Every other plugin** is a manifest that declares no capability: IPTV,
-  players with no profile, backup targets with no role.
+- **Every other plugin** is a manifest that declares no capability: the other
+  IPTV plugins, players with no profile, backup targets with no role.
 
 Phase 4's roles (`effectiveRoles`, `defaultRoles`), its log-based sync role,
 sealed passwords and the derived owner proof are retired, with PBKDF2 in the

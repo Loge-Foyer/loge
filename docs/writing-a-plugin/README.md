@@ -77,6 +77,9 @@ jobs becomes two plugins, one in each folder.
   describes: a server that transcodes reads the request's `PlayerProfile` and
   answers with what that engine can play. A descriptor's addresses can carry
   credentials, so keep them in memory: never in the session, never in a log.
+- **Progress back** (`reportPlayback`, `setPlayed`, behind `watchStateWrite`)
+  comes through the app's outbox, which may deliver a report twice after a
+  lost answer: make both safe to repeat.
 
 ## Inside an IPTV plugin
 

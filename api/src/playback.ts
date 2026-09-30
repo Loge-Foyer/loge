@@ -103,3 +103,6 @@ export type PlaybackReport =
   | { readonly kind: 'progress'; readonly key: GlobalMediaKey; readonly positionMs: number; readonly paused: boolean }
   | { readonly kind: 'stopped'; readonly key: GlobalMediaKey; readonly positionMs: number }
   | { readonly kind: 'played'; readonly key: GlobalMediaKey; readonly played: boolean };
+
+/** Where playback got to — what `reportPlayback` takes. Watched or not goes through `setPlayed`. */
+export type ProgressReport = Exclude<PlaybackReport, { readonly kind: 'played' }>;

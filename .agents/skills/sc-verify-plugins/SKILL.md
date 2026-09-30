@@ -11,12 +11,12 @@ npm run typecheck
 npm test
 ```
 
-`npm run typecheck` runs two programs today, three once a player plugin
-exists:
+`npm run typecheck` runs three programs:
 
 1. **`api` and the non-player plugins,** with no host types at all
    (`"types": []`).
-2. **Player plugins and `player-kit`,** with React Native's types.
+2. **Player plugins and `player-kit`** (`tsconfig.players.json`), with React
+   Native's types and the DOM's.
 3. **The tests** (`test/tsconfig.json`), with Node's.
 
 Keep them apart. Node's or React Native's types in the first program would let
