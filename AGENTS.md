@@ -101,9 +101,11 @@ These are specific to Streaming Center and matter more than anything above.
    `services/tab-content.ts` and nowhere else.
 
 3. **Only the composition root imports a concrete plugin** — a source, IPTV,
-   player or sync package, a player's view, and `@sc/player-kit`. Screens
-   resolve what they need from injected services. This is what keeps the
-   boundary real rather than aspirational.
+   player or sync package, and so a player's view. Screens resolve what they
+   need from injected services. `@sc/player-kit` holds only types — the React
+   half of the player contract — and may be named anywhere as `import type`;
+   lint refuses anything more. This is what keeps the boundary real rather
+   than aspirational.
 
 4. **Secrets never reach the database** — SQLite on native, IndexedDB on web.
    The database stores opaque refs; values live behind `SecureCredentialStore`
@@ -352,9 +354,9 @@ has the format. These break silently:
 
 ## Players
 
-The built-in player is in the build — expo-video on phones, the browser's
-`<video>` with hls.js on the web — and nothing opens it until the player screen
-(Phase 7). `docs/playback` has the design; these are the rules:
+The built-in player plays — expo-video on phones, the browser's `<video>`
+with hls.js on the web — from the player screen. `docs/playback` has the
+design; these are the rules:
 
 - **Players are device-wide plugins.** Which are on, the default and their
   settings are device settings — never journaled, never on the server, never
@@ -384,6 +386,16 @@ The built-in player is in the build — expo-video on phones, the browser's
   anywhere else, and never master it a second time.
 - **The null engine fails loudly.** A silent no-op turns "playback not
   implemented" into a mystery bug.
+- **A controller is made inside an effect, never kept across one**, and a
+  descriptor lives in that screen's state, never in the query cache
+  (`hooks/use-playback.ts`). Fast Refresh and strict mode run effects twice:
+  a controller disposed in one run and reused in the next hands the native
+  view a released player.
+- **Every screen but the player's is upright.** `app.json` allows every
+  orientation, the app locks upright at launch through
+  `ScreenOrientationControl` (`platform/screen-orientation.ts`), and the
+  player screen frees it while open. Never set `orientation` back to
+  `portrait`: the player could not turn.
 
 ---
 
@@ -596,23 +608,24 @@ the target; what runs today:
 - **Media is real:** Continue Watching, one row per kind with per-profile
   order, sort and card style, a full-screen grid per row, and detail pages —
   from every live source, merged, and kept per profile where the source allows
-  it. Jellyfin and the mock implement the media role. Nothing plays, and
-  Videos still shows skeletons.
+  it. Jellyfin and the mock implement the media role. Videos still shows
+  skeletons.
 - **The backup file:** Settings → Plugins → Sync exports it — the share sheet
   on a phone, a download in a browser — imports it, and shows its key behind
   the owner check; Welcome restores one. Backup targets keep it saved, asking
   before they overwrite a file another device changed; the dev-only mock
   target is the only one with a role so far. sql.js is its own lazily loaded
   chunk on the web.
-- **Players:** each one's switch and "Play with it first", as device
-  settings. The built-in player's engine is in the build — expo-video on
-  phones, `<video>` with hls.js on the web — with a profile per platform;
-  nothing opens it until the player screen.
+- **Playing:** Play, Resume and Mark watched on detail pages; the player
+  screen chooses the player (`PlaybackService`), draws its view under the
+  app's controls, turns with the device, and reports progress through the
+  outbox. The built-in player plays Jellyfin — a file as it is, or a
+  transcode — on phones and in a browser. Each player has its switch and
+  "Play with it first", as device settings.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages
-  and Continue Watching show this device's state. Nothing plays yet, so
-  nothing calls it but the tests.
+  and Continue Watching show this device's state.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they

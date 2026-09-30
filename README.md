@@ -146,7 +146,11 @@ design, and all but playback runs today, built with
   the share sheet or as a download, and imported with its key — and backup
   targets keep it saved as the account changes, asking before they overwrite
   a file another device changed.
-- **Not yet:** nothing plays.
+- **Press Play** on a film or an episode from Jellyfin — on a phone, which
+  turns the player with the device, or in a browser — and pick up where you
+  left off. Progress and "watched" go back to the server, offline too: they
+  are written on the device first and delivered when it can.
+- **Not yet:** live TV, and players other than the built-in one.
 
 Development builds also have a pretend account, for trying things offline.
 

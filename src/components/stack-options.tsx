@@ -52,6 +52,14 @@ export const detailOptions: StackOptions = {
   title: '',
 };
 
+/** The player: the whole screen, no header, faded in over the tabs. */
+export const playerOptions: StackOptions = {
+  headerShown: false,
+  presentation: 'fullScreenModal',
+  animation: 'fade',
+  gestureEnabled: false,
+};
+
 /**
  * A native sheet on iOS and Android, a plain page in a browser. What it shows
  * must be inline — a Tamagui portal would render behind the native sheet.

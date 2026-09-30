@@ -23,6 +23,7 @@ function film(connectionId: ConnectionId, id = 'm1', extra: Partial<Parameters<t
 describe.each(ENGINES)('watch status on %s', (engine: Engine) => {
   async function setUp(options: { keeps?: boolean; writes?: boolean } = {}) {
     let failing: AppError | undefined;
+    let refusing: AppError | undefined;
     let resume: (id: ConnectionId) => readonly MediaItem[] = () => [];
     const source = fakeMediaPlugin('home', {
       movies: (id) => [film(id)],
@@ -30,6 +31,7 @@ describe.each(ENGINES)('watch status on %s', (engine: Engine) => {
       withImages: options.keeps ?? true,
       writesWatchState: options.writes ?? true,
       failWith: () => failing,
+      failWritesWith: () => refusing,
     });
     const network = fakeNetwork();
     const built = buildServices({ plugins: [source.plugin], engine, network });
@@ -47,6 +49,9 @@ describe.each(ENGINES)('watch status on %s', (engine: Engine) => {
       item: film(connection.id),
       fail: (error: AppError | undefined) => {
         failing = error;
+      },
+      refuseWrites: (error: AppError | undefined) => {
+        refusing = error;
       },
       resumeWith: (next: (id: ConnectionId) => readonly MediaItem[]) => {
         resume = next;
@@ -161,11 +166,11 @@ describe.each(ENGINES)('watch status on %s', (engine: Engine) => {
     const t = await setUp();
     t.resumeWith((id) => [film(id, 'm1', { watch: { played: false, positionMs: 10 * MINUTE, lastPlayedAt: '2026-09-01T00:00:00Z' } })]);
     expect((await t.services.media.continueWatching(t.kids)).items).toHaveLength(1);
-    t.fail(offline());
+    // The source answers, but backs off from taking anything back: the outbox still holds this device's word.
+    t.refuseWrites(new AppError('PROVIDER_UNAVAILABLE', 'Busy.', { retry: 'backoff' }));
     await t.services.watch.setPlayed(t.kids, t.item, true);
-    t.fail(undefined);
-    // Answering again, but the outbox has not delivered yet: this device's word stands.
-    t.services.media.unpark();
+    await t.drainer.drain();
+    expect(await t.db.outbox.list()).toHaveLength(1);
     expect((await t.services.media.continueWatching(t.kids)).items).toEqual([]);
   });
 

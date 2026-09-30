@@ -1,0 +1,113 @@
+import {
+  choosePlayer,
+  missingFor,
+  type CancelSignal,
+  type ConnectionId,
+  type Episode,
+  type MediaItem,
+  type MediaPlayer,
+  type PlaybackDescriptor,
+  type PlaybackSource,
+  type PlayerRequirement,
+  type PluginId,
+  type Show,
+  type UserId,
+} from '@sc/api';
+import type { PlayerPlugin, PlayerView } from '@sc/player-kit';
+
+import type { MediaService } from './media';
+import { playbackReports, type PlaybackReports } from './playback-reports';
+import type { PlayerService } from './players';
+import type { Clock } from './ports';
+import type { WatchService } from './watch';
+
+/** What pressing Play comes to, on this device. */
+export type PlaybackPlan =
+  | {
+      readonly kind: 'play';
+      readonly player: PluginId;
+      readonly source: PlaybackSource;
+      /** Held in memory only: its addresses can carry credentials. */
+      readonly descriptor: PlaybackDescriptor;
+    }
+  /** No player here plays any of the item's streams; `needs` is what the best one lacks. */
+  | { readonly kind: 'none'; readonly needs: readonly PlayerRequirement[]; readonly source?: PlaybackSource }
+  /** Every player is switched off on this device. */
+  | { readonly kind: 'no-player' };
+
+export interface PlaybackOptions {
+  readonly startMs?: number;
+  readonly audioTrackId?: string;
+  readonly subtitleTrackId?: string;
+}
+
+export interface PlaybackService {
+  /**
+   * The player that plays this item, and what it plays: the source is asked
+   * for a stream fit for the player that plays first — a server that
+   * transcodes shapes its answer to that player's profile — and
+   * `choosePlayer` confirms it, or finds the player that can.
+   */
+  plan(userId: UserId, item: MediaItem, options?: PlaybackOptions, signal?: CancelSignal): Promise<PlaybackPlan>;
+  /** A controller for a chosen player. Whoever creates it disposes it. */
+  create(userId: UserId, player: PluginId, connectionId: ConnectionId): MediaPlayer;
+  /** The view that draws a player's controllers. */
+  view(player: PluginId): PlayerView | undefined;
+  /** The episode after this one — the next season's first, after a season's last. */
+  nextEpisode(userId: UserId, episode: Episode, signal?: CancelSignal): Promise<Episode | undefined>;
+  /** Where playing an item gets to, reported as it goes. One per session: made when it starts, stopped when it ends. */
+  reports(userId: UserId, item: MediaItem, live: boolean): PlaybackReports;
+}
+
+export function createPlaybackService(deps: {
+  readonly players: readonly PlayerPlugin[];
+  readonly choosing: PlayerService['choosing'];
+  readonly media: Pick<MediaService, 'playbackDescriptor' | 'children' | 'artworkHeaders'>;
+  readonly watch: Pick<WatchService, 'report'>;
+  readonly clock: Pick<Clock, 'now'>;
+}): PlaybackService {
+  const { media } = deps;
+  const pluginOf = (id: PluginId) => deps.players.find((player) => player.manifest.id === id);
+
+  return {
+    plan: async (userId, item, options = {}, signal) => {
+      const { candidates, preferred } = await deps.choosing();
+      const first = candidates.find((candidate) => candidate.id === preferred) ?? candidates[0];
+      if (!first) return { kind: 'no-player' };
+      const descriptor = await media.playbackDescriptor(userId, { key: item.key, profile: first.profile, ...options }, signal);
+      const choice = choosePlayer(descriptor.sources, candidates, preferred);
+      if (choice.kind === 'play') return { kind: 'play', player: choice.player, source: choice.source, descriptor };
+      const best = descriptor.sources[0];
+      return { kind: 'none', needs: best ? missingFor(first.profile, best) : [], ...(best ? { source: best } : {}) };
+    },
+
+    create: (userId, player, connectionId) => {
+      const plugin = pluginOf(player);
+      if (!plugin) throw new Error(`No engine for ${player} in this build.`);
+      // A stream's headers come from its source, in memory, when the engine loads it.
+      return plugin.player.create({ resolveHeaders: (ref) => media.artworkHeaders(userId, connectionId, ref) });
+    },
+
+    view: (player) => pluginOf(player)?.View,
+
+    nextEpisode: async (userId, episode, signal) => {
+      // The source needs no more of a series than its key to list its seasons.
+      const show: Show = { type: 'show', key: episode.show, title: episode.showTitle, ratings: {}, genres: [], images: {} };
+      const seasons = (await media.children(userId, show, signal)).items;
+      const at = seasons.findIndex((season) => season.key.externalId === episode.season?.externalId);
+      for (const season of at >= 0 ? seasons.slice(at) : []) {
+        const episodes = (await media.children(userId, season, signal)).items.filter((item): item is Episode => item.type === 'episode');
+        if (season === seasons[at]) {
+          const index = episodes.findIndex((item) => item.key.externalId === episode.key.externalId);
+          const next = index >= 0 ? episodes[index + 1] : undefined;
+          if (next) return next;
+          continue;
+        }
+        if (episodes[0]) return episodes[0];
+      }
+      return undefined;
+    },
+
+    reports: (userId, item, live) => playbackReports({ watch: deps.watch, clock: deps.clock, userId, item, live }),
+  };
+}

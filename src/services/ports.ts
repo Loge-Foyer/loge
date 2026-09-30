@@ -366,6 +366,12 @@ export interface OwnerAuthentication {
   authenticate(reason: string): Promise<OwnerAnswer>;
 }
 
+/** Which ways the screen may turn: upright, as the app is laid out, or any way — a film fills a phone on its side. */
+export interface ScreenOrientationControl {
+  upright(): Promise<void>;
+  free(): Promise<void>;
+}
+
 /** Whether the app is in front of someone. */
 export interface AppActivity {
   active(): boolean;

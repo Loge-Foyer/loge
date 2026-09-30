@@ -11,6 +11,7 @@ import { createNetworkMonitor } from '@/platform/network';
 import { createOwnerAuthentication } from '@/platform/owner-authentication';
 import { currentPlatform } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
+import { screenOrientation } from '@/platform/screen-orientation';
 import { createAccountService } from '@/services/account';
 import { createBackupService } from '@/services/backup';
 import { createBackupTargets } from '@/services/backup/targets';
@@ -21,6 +22,7 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
+import { createPlaybackService } from '@/services/playback';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
@@ -36,7 +38,7 @@ import { createSyncScheduler } from '@/services/sync/scheduler';
 import { createWatchService } from '@/services/watch';
 import { createOutboxDrainer } from '@/services/watch/drainer';
 
-import { plugins } from './plugins';
+import { players as playerPlugins, plugins } from './plugins';
 import { createStorage } from './storage';
 
 export interface AppServices {
@@ -147,6 +149,8 @@ export function createServices(): AppServices {
     ids,
     log,
   });
+  const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: currentPlatform() });
+  const playback = createPlaybackService({ players: playerPlugins, choosing: players.choosing, media, watch, clock });
   // What the account brought: running providers let changed connections and removed profiles go, and the gate looks again.
   engine.onApplied((applied) => {
     for (const id of applied.connections) pool.forgetConnection(id);
@@ -177,10 +181,14 @@ export function createServices(): AppServices {
       backup,
       backupTargets,
       files: createFileExchange(log),
-      players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
+      players,
       watch,
+      playback,
+      orientation: screenOrientation,
     },
     start: async () => {
+      // Upright, as every screen but the player's is laid out; iOS starts that way already.
+      void screenOrientation.upright().catch(() => undefined);
       // Before anything reads the journal: another phone's, restored here, is never sent.
       await checkRestoredDevice({ db, deviceKey: async () => (await identity.identity()).deviceKey, sha256: crypto.sha256, log }).catch((error: unknown) =>
         log.error('app.boot', 'The device key could not be checked', { error: String(error) }),

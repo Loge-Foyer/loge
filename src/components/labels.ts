@@ -6,6 +6,8 @@ import type {
   ItemSortKey,
   MediaItem,
   PerProfile,
+  PlaybackSource,
+  PlayerRequirement,
   PluginCategory,
 } from '@sc/api';
 
@@ -114,6 +116,49 @@ export function timeLeft(item: MediaItem): string | undefined {
   if (!runtimeMs || position === undefined) return undefined;
   const minutes = Math.max(1, Math.round((runtimeMs - position) / 60_000));
   return `${minutes} min left`;
+}
+
+/** "4:07", "1:05:09": a position or a length, as a player shows it. */
+export function clockTime(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, '0');
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+const FORMAT_NAMES: Readonly<Record<string, string>> = {
+  mpegts: 'MPEG-TS',
+  hls: 'HLS',
+  dash: 'DASH',
+  h264: 'H.264',
+  hevc: 'HEVC',
+  av1: 'AV1',
+  vp9: 'VP9',
+  ac3: 'AC-3',
+  eac3: 'E-AC-3',
+  dts: 'DTS',
+  truehd: 'TrueHD',
+};
+const formatName = (name: string) => FORMAT_NAMES[name] ?? name.toUpperCase();
+
+/** "This needs a player that plays MPEG-TS." — what no player on this device can do, in the order the engine lacks it. */
+export function describeMissing(needs: readonly PlayerRequirement[], source: PlaybackSource | undefined): string {
+  const [need] = needs;
+  if (!source || !need) return 'No player on this device plays this.';
+  const what =
+    need === 'protocol'
+      ? source.protocol === 'progressive'
+        ? 'files like this one'
+        : formatName(source.protocol)
+      : need === 'container'
+        ? `${formatName(source.container ?? 'this kind of')} files`
+        : need === 'videoCodec'
+          ? `${formatName(source.videoCodec ?? 'this')} video`
+          : need === 'audioCodec'
+            ? `${formatName(source.audioCodecs?.[0] ?? 'this')} audio`
+            : `${source.height ?? 'this'}p video`;
+  return `This needs a player that plays ${what}.`;
 }
 
 /** "S2 · E5". */

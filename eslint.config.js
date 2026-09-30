@@ -6,8 +6,8 @@ const expoConfig = require('eslint-config-expo/flat');
 // (spec §15). These make that a lint error rather than a convention.
 const implementations = [
   {
-    // A source, IPTV, player or sync package — and @sc/player-kit, which the player-* pattern covers too.
-    group: ['@sc/source-*', '@sc/iptv-*', '@sc/player-*', '@sc/sync-*'],
+    // A source, IPTV, player or sync package. @sc/player-kit is the player contract: its types go anywhere (below).
+    group: ['@sc/source-*', '@sc/iptv-*', '@sc/player-*', '!@sc/player-kit', '@sc/sync-*'],
     message: 'Only src/composition/ imports a concrete plugin. Use the catalogue from useServices().',
   },
   {
@@ -102,6 +102,24 @@ const playerEngines = [
   { name: 'hls.js', message: 'The app never imports an engine. The built-in player loads hls.js itself, on the web, when it needs it.' },
 ];
 
+// @sc/player-kit holds only types, the React half of the player contract. A
+// screen may name them; the views themselves come from the composition root,
+// through useServices() — so nothing else imports it for real.
+const playerKitTypesOnly = {
+  '@typescript-eslint/no-restricted-imports': [
+    'error',
+    {
+      paths: [
+        {
+          name: '@sc/player-kit',
+          allowTypeImports: true,
+          message: 'Only types from @sc/player-kit outside src/composition/. The views come from useServices().',
+        },
+      ],
+    },
+  ],
+};
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -110,6 +128,11 @@ module.exports = defineConfig([
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: missingOnHermes,
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/composition/**'],
+    rules: playerKitTypesOnly,
   },
   {
     files: ['src/**/*.{ts,tsx}'],

@@ -6,8 +6,9 @@ import type { HomeLayoutService } from './home-layout';
 import type { MediaService } from './media';
 import type { OwnerCheck } from './owner-check';
 import type { PinService } from './pins';
+import type { PlaybackService } from './playback';
 import type { PlayerService } from './players';
-import type { FileExchange } from './ports';
+import type { FileExchange, ScreenOrientationControl } from './ports';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
 import type { SessionService } from './session';
@@ -46,4 +47,7 @@ export interface Services {
   readonly players: PlayerService;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */
   readonly watch: WatchService;
+  /** Pressing Play: which player plays what, its controller and its view. */
+  readonly playback: PlaybackService;
+  readonly orientation: ScreenOrientationControl;
 }

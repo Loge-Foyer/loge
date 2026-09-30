@@ -17,6 +17,8 @@ import {
   type MediaCapability,
   type MediaDetail,
   type MediaItem,
+  type PlaybackDescriptor,
+  type PlaybackRequest,
   type PluginId,
   type SourceInfo,
   type UserId,
@@ -100,6 +102,12 @@ export interface MediaService {
   gridPage(userId: UserId, spec: RowSpec, state: MergeState | null, pageSize: number, signal?: CancelSignal): Promise<GridPage>;
   item(userId: UserId, key: GlobalMediaKey, signal?: CancelSignal): Promise<ItemResult>;
   children(userId: UserId, parent: MediaItem, signal?: CancelSignal): Promise<ChildrenResult>;
+  /**
+   * What to play, for the engine the request describes. Its addresses can
+   * carry credentials: it is held in memory only — never saved, never logged —
+   * and asked for again each time something plays.
+   */
+  playbackDescriptor(userId: UserId, request: PlaybackRequest, signal?: CancelSignal): Promise<PlaybackDescriptor>;
   readonly saved: SavedMedia;
   /** Synchronous: an image address needs no network, only a connected source. */
   artwork(userId: UserId, connectionId: ConnectionId, ref: ImageRef, size: ImageSize): ResolvedArtwork | null;
@@ -451,6 +459,15 @@ export function createMediaService(deps: {
         if (!stand) throw failure;
         return { items: await watch.overlay(userId, stand.items), sourceError: sourceError(source, failure, stand.savedAt) };
       }
+    },
+
+    playbackDescriptor: async (userId, request, signal) => {
+      const source = await sourceFor(userId, request.key.connectionId);
+      if (!can(source, 'playback')) throw new AppError('INVALID_STATE', 'This source has nothing to play.', { retry: 'never' });
+      return call(source, (provider) => {
+        if (!provider.getPlaybackDescriptor) throw missing('getPlaybackDescriptor');
+        return provider.getPlaybackDescriptor(request, signal);
+      });
     },
 
     saved,

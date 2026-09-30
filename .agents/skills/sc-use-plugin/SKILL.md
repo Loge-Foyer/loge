@@ -184,10 +184,11 @@ and retry handled there.
 
 `plugin.player.create(context)` makes a `MediaPlayer` — `load`, `play`,
 `pause`, `seek`, the track setters, `subscribe`, `dispose` — and the plugin's
-`PlayerView`, from `@sc/player-kit`, draws it. Both are imported in
-`src/composition/` only; the player screen gets the chosen player's controller
-and view from the service graph. The context resolves a stream's `headersRef`
-at load time, in memory only.
+`PlayerView`, from `@sc/player-kit`, draws it. A player plugin is imported in
+`src/composition/` only, and listed there twice: in `plugins`, and — with its
+engine and view — in `players`, which `PlaybackService` hands out. Anywhere
+else `@sc/player-kit` is `import type` only (lint). The context resolves a
+stream's `headersRef` at load time, in memory only.
 
 - **Which player** is `choosePlayer` from `@sc/api`: the device's default if it
   can play one of the item's sources, else the first enabled player on this
@@ -269,4 +270,5 @@ batches, the password typed again as the owner check, and sign-up with an
 invite (open, on the mock). `sync/mock-backup` implements the backup role,
 in development builds. The rest export manifests only — IPTV, the players, the backup targets
 and the other sources: the app lists them in their category, and says plainly
-that they cannot list titles, play or keep backups yet. Nothing plays.
+that they cannot list titles, play or keep backups yet. The built-in player
+(`players/system`) plays.

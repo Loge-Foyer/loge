@@ -5,8 +5,8 @@ types and never know which plugin produced them.
 
 This page describes the target. Today the four tabs, Settings → Plugins' four
 lists, Welcome with its three ways in, the sign-in and import flows, Settings →
-Account, the backup file, backup targets and the players' switches are in
-place; nothing plays.
+Account, the backup file, backup targets, the players' switches, and the
+player screen with Play, Resume and Mark watched on detail pages are in place.
 
 ## Tamagui
 
@@ -132,7 +132,7 @@ only what sources bring as `live`.
   - **Sources** and **IPTV** list their connections and add new ones.
   - **Players** list this device's engines, with "Plays first" or "Off": each
     one's page has its switch and "Play with it first" (`services/players.ts`,
-    device settings). Until Phase 7 each says nothing plays yet.
+    device settings). The built-in player plays; the others arrive in Phase 8.
   - **Sync** has your own server, the backup targets — iCloud on iOS only,
     Google Drive and OneDrive, as they arrive — and the backup file: Export,
     Import, and Show the backup key, behind the owner check. When a save finds

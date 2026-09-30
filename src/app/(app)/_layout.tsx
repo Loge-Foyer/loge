@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { detailOptions, fullScreenOptions, sheetOptions } from '@/components/stack-options';
+import { detailOptions, fullScreenOptions, playerOptions, sheetOptions } from '@/components/stack-options';
 import { useMediaEffects } from '@/hooks/use-media';
 import { ActiveUserContext, useGate } from '@/hooks/use-session';
 import { BootScreen } from '@/screens/boot';
@@ -25,6 +25,7 @@ export default function AppLayout() {
         <Stack.Screen name="browse/[rowId]" options={fullScreenOptions} />
         <Stack.Screen name="item/[connectionId]/[itemId]" options={detailOptions} />
         <Stack.Screen name="customize-home" options={sheetOptions} />
+        <Stack.Screen name="play/[connectionId]/[itemId]" options={playerOptions} />
       </Stack>
     </ActiveUserContext>
   );

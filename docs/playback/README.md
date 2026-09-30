@@ -4,9 +4,9 @@ How the app plays what a source offers: descriptors and players, choosing an
 engine, where each player is switched on, and how watch status gets back to the
 source that masters it.
 
-The built-in player's engine is in the build; the player screen that opens
-it comes later in Phase 7, with Jellyfin and Stalker playing on it. Phase 8
-brings KSPlayer, mpv and VLC. This page is the design they build to.
+Jellyfin plays on the built-in player, on phones and in a browser; Stalker
+comes later in Phase 7, and Phase 8 brings KSPlayer, mpv and VLC. This page is
+the design they build to, and says where today differs.
 
 ## What to play, and how to play it
 
@@ -195,13 +195,41 @@ names them.
 
 ## The player screen
 
-`(app)/play/[connectionId]/[itemId]` (Phase 7) is full screen, over the tabs:
+`(app)/play/[connectionId]/[itemId]` (`screens/player.tsx`) is full screen,
+over the tabs, with `start` in milliseconds for a resume:
 
-- scrubbing, the audio and subtitle pickers, and the next episode
-- for live TV, channel up and down, and what is on now and next
+- **Pressing Play** is `PlaybackService.plan`: the device's players that can
+  play here (`players.choosing()` — on, with a profile for this platform, in
+  the catalogue's order), the source asked for a stream fit for the one that
+  plays first, and `choosePlayer` over the answer. Where no player can, the
+  screen says which kind would ("This needs a player that plays MPEG-TS."),
+  with a way to Settings → Plugins → Players.
+- **The chosen player's own view** draws underneath; the app's controls sit on
+  top, the same for every engine: play and pause, ten seconds back and
+  forward, a scrubber, the audio and subtitle tracks the stream carries, Next
+  episode, and close. They step aside three and a half seconds after a touch
+  while it plays, and come back at a tap or whenever it stops.
+- **The controller is made in the screen's effect, never kept across one**
+  (`hooks/use-playback.ts`): Fast Refresh and React's strict mode run effects
+  twice, and a controller disposed in one run and reused in the next hands
+  the native view a player that is gone — expo-video says "cannot be cast to
+  VideoPlayer". It reaches the screen through its own first event, belongs to
+  its plan, and is released a moment after the view has let go of it.
+- **Reports** (`services/playback-reports.ts`): a start when it first plays,
+  progress every ten seconds and on each pause, a stop at the end or wherever
+  the player closed — each made when it happens and written in turn through
+  `WatchService`, which tells only a source that keeps watch state. Live
+  streams report nothing.
+- **Upright everywhere else.** The app allows every orientation natively and
+  locks upright at launch (iOS starts upright through expo-screen-orientation's
+  `initialOrientation`); the player screen turns with the device, and upright
+  comes back when it closes. A browser turns with its window.
+- For live TV, channel up and down and what is on now and next come with the
+  TV tab (Phase 7).
 
-Detail pages get Play, Resume, Mark watched or unwatched, and Next episode
-with it.
+Detail pages get Play — or Resume where the source says it stopped, with
+From the beginning — for a film or an episode whose source has `playback` in
+effect, and Mark watched or unwatched where it has `watchStateWrite`.
 
 ## Until an engine exists
 

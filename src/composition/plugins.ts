@@ -1,4 +1,5 @@
 import type { Plugin } from '@sc/api';
+import type { PlayerPlugin } from '@sc/player-kit';
 import { plugin as m3u } from '@sc/iptv-m3u';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
@@ -52,3 +53,6 @@ export const plugins: readonly Plugin[] = [
   // Test doubles — offline, deliberately partial. Development builds only.
   ...(__DEV__ ? [mockSource, mockAccount, mockBackups] : []),
 ];
+
+/** The players with an engine, and the view that draws it — what the player screen is handed. */
+export const players: readonly PlayerPlugin[] = [systemPlayer];

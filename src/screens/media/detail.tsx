@@ -1,12 +1,15 @@
-import type { ConnectionId, Episode, MediaDetail, MediaItem, Person, Show } from '@sc/api';
+import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, Person, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
-import { Link } from 'expo-router';
+import { Play } from '@tamagui/lucide-icons-2/icons/Play';
+import { useMutation } from '@tanstack/react-query';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
-import { H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { Button, H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { Artwork, ArtworkLogo } from '@/components/artwork';
+import { PrimaryButton } from '@/components/primary-button';
 import { Chip, ChipRow } from '@/components/chip';
 import { episodeCode, formatCommunityRating, formatRuntime, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
@@ -15,7 +18,9 @@ import { SourceNotices } from '@/components/media/source-notices';
 import { Scrim } from '@/components/scrim';
 import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
+import { useServices } from '@/hooks/services-context';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
+import { useActiveUserId } from '@/hooks/use-session';
 import { useTabSources } from '@/hooks/use-sources';
 import type { SourceError } from '@/services/media';
 
@@ -23,9 +28,9 @@ import type { SourceError } from '@/services/media';
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
   const detail = useItem({ connectionId, externalId: itemId });
   const { data: sources = [] } = useTabSources('media');
-  const showWatch = sources.some(
-    (source) => source.connection.id === connectionId && (source.effective.media?.capabilities.has('watchStateRead') ?? false),
-  );
+  const capabilities = sources.find((source) => source.connection.id === connectionId)?.effective.media?.capabilities;
+  const can = (capability: MediaCapability) => capabilities?.has(capability) ?? false;
+  const showWatch = can('watchStateRead');
 
   if (detail.isPending) {
     return (
@@ -47,6 +52,8 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
     <Detail
       detail={detail.data.detail}
       showWatch={showWatch}
+      canPlay={can('playback')}
+      canMarkWatched={can('watchStateWrite')}
       {...(season ? { season } : {})}
       {...(detail.data.sourceError ? { sourceError: detail.data.sourceError } : {})}
     />
@@ -56,11 +63,15 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
 function Detail({
   detail,
   showWatch,
+  canPlay,
+  canMarkWatched,
   season,
   sourceError,
 }: {
   detail: MediaDetail;
   showWatch: boolean;
+  canPlay: boolean;
+  canMarkWatched: boolean;
   season?: string;
   /** The source could not answer; this page shows what was saved from it. */
   sourceError?: SourceError;
@@ -73,6 +84,7 @@ function Detail({
       <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={1100} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
+        <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} />
         {showWatch ? <WatchState item={item} /> : null}
         {tagline ? (
           <SizableText size="$5" color="$color11" fontStyle="italic">
@@ -155,6 +167,45 @@ function Meta({ item }: { item: MediaItem }) {
         </ChipRow>
       ) : null}
     </YStack>
+  );
+}
+
+/**
+ * Play, or Resume where the source says it stopped — for a film or an
+ * episode, where the source can play. Watched and unwatched, where it keeps
+ * what was watched: written here first, the source hears later.
+ */
+function Actions({ item, canPlay, canMarkWatched }: { item: MediaItem; canPlay: boolean; canMarkWatched: boolean }) {
+  const userId = useActiveUserId();
+  const { watch } = useServices();
+  const mark = useMutation({ mutationFn: (played: boolean) => watch.setPlayed(userId, item, played), networkMode: 'always' });
+  const playable = canPlay && (item.type === 'movie' || item.type === 'episode');
+  const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
+  if (!playable && !canMarkWatched) return null;
+  const play = (startMs?: number) =>
+    router.push({
+      pathname: '/play/[connectionId]/[itemId]',
+      params: { connectionId: item.key.connectionId, itemId: item.key.externalId, ...(startMs ? { start: String(startMs) } : {}) },
+    });
+  const played = item.watch?.played ?? false;
+  return (
+    <XStack gap="$3" flexWrap="wrap" items="center">
+      {playable ? (
+        <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)}>
+          {resumeAt ? 'Resume' : 'Play'}
+        </PrimaryButton>
+      ) : null}
+      {playable && resumeAt ? (
+        <Button size="$4" onPress={() => play()}>
+          From the beginning
+        </Button>
+      ) : null}
+      {canMarkWatched ? (
+        <Button size="$4" {...(played ? {} : { icon: <Check size={18} /> })} disabled={mark.isPending} onPress={() => mark.mutate(!played)}>
+          {played ? 'Mark unwatched' : 'Mark watched'}
+        </Button>
+      ) : null}
+    </XStack>
   );
 }
 

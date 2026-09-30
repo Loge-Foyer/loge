@@ -176,7 +176,8 @@ phase apply once that phase has built what they check; the rest apply today.
   included — not screens. Screens are proven by driving the app on each
   platform (`sc-run`). The real account plugin against the real PocketBase is
   `../streaming_center_sync`'s harness, from Phase 6's S4.
-- The built-in player's engine is in the build, and nothing opens it yet.
+- The built-in player plays Jellyfin on phones and in a browser; live TV
+  and the other players are still to come.
   The backup file, its import and export and backup targets are in place; the
   only backup target with a role is the dev-only mock.
 - `expo-doctor` reports "multiple copies" of React, React Native and

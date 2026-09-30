@@ -15,7 +15,13 @@ import {
   type PluginManifest,
   type ConnectionId,
   type ProgressReport,
+  type PlaybackDescriptor,
+  type PlaybackRequest,
+  type PlayerProfile,
+  type MediaPlayer,
+  type PlayerContext,
 } from '@sc/api';
+import type { PlayerPlugin } from '@sc/player-kit';
 
 import initSqlJs from 'sql.js';
 
@@ -42,6 +48,7 @@ import type { SyncParts } from '@/services/sync/parts';
 import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
+import { createPlaybackService } from '@/services/playback';
 import { createWatchService } from '@/services/watch';
 import { createOutboxDrainer } from '@/services/watch/drainer';
 
@@ -97,6 +104,10 @@ export interface FakeSourceOptions {
   readonly withNote?: boolean;
   /** Takes progress and watched state back (`watchStateWrite`), recording each report. */
   readonly writesWatchState?: boolean;
+  /** Thrown by the watch-state writes alone while set: the source answers, but takes nothing back. */
+  readonly failWritesWith?: () => AppError | undefined;
+  /** Says what to play (`playback`), given the request — recorded in `stats.playbackRequests`. */
+  readonly playback?: (request: PlaybackRequest) => PlaybackDescriptor;
 }
 
 /** A media plugin backed by lists, with the counters a test needs to see what was asked. */
@@ -111,6 +122,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     signedInAt: [] as string[],
     /** What reached the source, in order: `started 0`, `stopped 90000`, `played true`. */
     reports: [] as string[],
+    playbackRequests: [] as PlaybackRequest[],
   };
   const manifest: PluginManifest = {
     id: pluginId(`sources/${id}`),
@@ -124,6 +136,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
         'browse',
         'watchStateRead',
         ...(options.writesWatchState ? (['watchStateWrite'] as const) : []),
+        ...(options.playback ? (['playback'] as const) : []),
         ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
       ],
     },
@@ -183,14 +196,28 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
           ...(options.withImages
             ? { resolveImage: (ref: string, size: { width: number }) => ({ uri: `https://img.test/${ref}?w=${size.width}` }) }
             : {}),
+          ...(options.playback
+            ? {
+                getPlaybackDescriptor: async (request: PlaybackRequest) => {
+                  await fail();
+                  stats.playbackRequests.push(request);
+                  return options.playback?.(request) as PlaybackDescriptor;
+                },
+                resolveHeaders: async (ref: string) => (ref === 'stream' ? { Authorization: 'Token t' } : undefined),
+              }
+            : {}),
           ...(options.writesWatchState
             ? {
                 reportPlayback: async (report: ProgressReport) => {
                   await fail();
+                  const refused = options.failWritesWith?.();
+                  if (refused) throw refused;
                   stats.reports.push(`${report.key.externalId} ${report.kind} ${report.positionMs}`);
                 },
                 setPlayed: async (key: GlobalMediaKey, played: boolean) => {
                   await fail();
+                  const refused = options.failWritesWith?.();
+                  if (refused) throw refused;
                   stats.reports.push(`${key.externalId} played ${played}`);
                 },
               }
@@ -223,6 +250,8 @@ export function buildServices(options: {
   files?: FileExchange;
   /** How long backup targets wait after a change before saving. */
   backupDebounceMs?: number;
+  /** Players with an engine, as the composition root lists them. */
+  players?: readonly PlayerPlugin[];
 }) {
   const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
@@ -326,6 +355,9 @@ export function buildServices(options: {
     for (const id of applied.removedProfiles) media.forgetUser(id);
     void session.refresh();
   });
+  const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
+  const playback = createPlaybackService({ players: options.players ?? [], choosing: players.choosing, media, watch, clock });
+  const orientation = { turns: [] as string[], upright: async () => void orientation.turns.push('upright'), free: async () => void orientation.turns.push('free') };
   return {
     db,
     credentials,
@@ -341,6 +373,7 @@ export function buildServices(options: {
     lock,
     drainer,
     pool,
+    orientation,
     services: {
       catalog,
       session,
@@ -356,8 +389,55 @@ export function buildServices(options: {
       backup,
       backupTargets,
       files: options.files ?? unusedFiles,
-      players: createPlayerService({ catalog, deviceSettings: db.deviceSettings }),
+      players,
       watch,
+      playback,
+      orientation,
     },
   };
+}
+
+/** A player plugin with a fake engine: every controller it made, and the context each got. */
+export function fakePlayerPlugin(name: string, profiles: Partial<Record<PlatformId, PlayerProfile>>) {
+  const made: { readonly context: PlayerContext; readonly player: MediaPlayer; readonly loads: unknown[]; disposed: boolean }[] = [];
+  const plugin: PlayerPlugin = {
+    manifest: {
+      id: pluginId(`players/${name}`),
+      category: 'players',
+      platforms: ['ios', 'android', 'web'],
+      displayName: name,
+      description: `The ${name} test player.`,
+      player: { profiles },
+      connectionFields: [],
+      settings: [],
+    },
+    player: {
+      create: (context) => {
+        const loads: unknown[] = [];
+        const entry = {
+          context,
+          loads,
+          disposed: false,
+          player: {
+            load: async (request: unknown) => {
+              loads.push(request);
+            },
+            play: () => undefined,
+            pause: () => undefined,
+            seek: () => undefined,
+            setAudioTrack: () => undefined,
+            setSubtitleTrack: () => undefined,
+            subscribe: () => () => undefined,
+            dispose: async () => {
+              entry.disposed = true;
+            },
+          } satisfies MediaPlayer,
+        };
+        made.push(entry);
+        return entry.player;
+      },
+    },
+    View: () => null,
+  };
+  return { plugin, made };
 }

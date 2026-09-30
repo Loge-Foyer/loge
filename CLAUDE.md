@@ -70,12 +70,14 @@ What runs today:
   with WebCrypto-encrypted secrets on the web.
 - The encrypted backup file: export, import, its key behind the owner check,
   Welcome's Restore, and backup targets that ask before overwriting.
-- Players' switches and which plays first, per device. The built-in
-  player's engine is in the build — expo-video on phones, `<video>` with
-  hls.js on the web — and nothing opens it yet; Videos still shows skeletons.
+- Press Play: Jellyfin films and episodes play on the built-in player —
+  expo-video on phones, which turn it with the device, `<video>` with hls.js
+  in a browser — with Resume, Mark watched, the tracks and Next episode.
+  Players' switches and which plays first are per device. Videos still shows
+  skeletons.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
-  the source has heard — ready for the player screen.
+  the source has heard.
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

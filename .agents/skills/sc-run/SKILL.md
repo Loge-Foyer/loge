@@ -12,7 +12,7 @@ npm run web        # browser — no build
 npm start          # Metro alone, for a development client already installed
 ```
 
-**Phase 6 — the code is on the new architecture; nothing plays until Phase 7.**
+**Phase 7 is under way: Jellyfin plays on the built-in player; live TV comes next.**
 This skill describes the target, and says where today differs. "What you will see" at the end has
 both.
 
@@ -269,9 +269,11 @@ The target, once Phase 6 has landed:
   waiting"), then the current profile, profiles (up to ten: "Add a profile"
   goes at the limit), PIN lock, and Plugins as four rows — Sources, IPTV,
   Players, Sync — each opening this platform's list. iCloud shows on iOS only.
-  Nothing plays.
+- **Playing** — a film or an episode's page has Play (or Resume, and From the
+  beginning) and Mark watched; the player is full screen and turns with the
+  device.
 
-**Today (nothing plays):**
+**Today:**
 
 - Welcome offers "Create an account on this device", "Sign in to your server"
   (the mock too, in development) and "Restore a backup". An account with
@@ -286,6 +288,15 @@ The target, once Phase 6 has landed:
 - Settings → Plugins → Sync has the backup file — Export, Import, Show the
   backup key — and, in development, Mock backups as a target. Players each
   have a switch and "Play with it first".
+- Playing, driven: the controls hide three and a half seconds after a touch
+  while it plays, and a uiautomator dump takes seconds while video runs — by
+  the time it answers they are gone. On Android close with Back
+  (`input keyevent KEYCODE_BACK`); in a browser press "Show the controls"
+  first. Turning the emulator: `settings put system accelerometer_rotation 0`,
+  then `user_rotation 1` (on its side) or `0`. Playing a real server's item
+  writes its watch state there: note it first, put it back after — and only
+  once the player has closed and its outbox is delivered, or a late report
+  undoes the cleanup.
 - Headless Chrome drives the backup flows: `Page.setInterceptFileChooserDialog`
   and `DOM.setFileInputFiles` answer the picker, `Browser.setDownloadBehavior`
   catches the export, and `Target.createBrowserContext` is a second device

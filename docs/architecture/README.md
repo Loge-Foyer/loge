@@ -368,7 +368,7 @@ protect.
 
 ## Choosing a player
 
-Nothing plays until Phase 7; `docs/playback` has the design. A source's
+`docs/playback` has the design and the player screen. A source's
 `getPlaybackDescriptor` says what to play, and a player plugin plays it.
 `choosePlayer` in `@sc/api`, a pure function, picks the device's default if it
 can play the item, else the best enabled player on this platform that can, and
