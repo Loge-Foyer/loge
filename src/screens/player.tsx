@@ -1,7 +1,9 @@
-import type { AudioTrack, ConnectionId, Episode, MediaItem, MediaPlayer, SubtitleTrack } from '@sc/api';
+import type { AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, SubtitleTrack } from '@sc/api';
 import type { PlayerView } from '@sc/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
+import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Pause } from '@tamagui/lucide-icons-2/icons/Pause';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
@@ -16,6 +18,7 @@ import { Button, SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
 import { PrimaryButton } from '@/components/primary-button';
+import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
 import { useFreeOrientation, useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, type PlayerSnapshot } from '@/hooks/use-playback';
 import { useServices } from '@/hooks/services-context';
@@ -28,18 +31,30 @@ const SKIP_MS = 10_000;
  * app's controls on top — the same for every engine. Where no player here
  * can play the item, it says which kind would.
  */
-export function PlayerScreen({ connectionId, itemId, startMs }: { connectionId: ConnectionId; itemId: string; startMs?: number }) {
+export function PlayerScreen({
+  connectionId,
+  itemId,
+  startMs,
+  live,
+}: {
+  connectionId: ConnectionId;
+  itemId: string;
+  startMs?: number;
+  /** A channel: no item to read, nothing to report, and the channels of its group either side. */
+  live?: { readonly title: string; readonly group?: string };
+}) {
   useFreeOrientation();
-  const detail = useItem({ connectionId, externalId: itemId });
-  const item = detail.data?.detail.item;
-  const { plan, error: planError, retry } = usePlaybackPlan(item, startMs);
-  const report = usePlaybackReports(item, false);
+  const key = { connectionId, externalId: itemId };
+  const detail = useItem(key, !live);
+  const item = live ? undefined : detail.data?.detail.item;
+  const { plan, error: planError, retry } = usePlaybackPlan(live ? key : item?.key, startMs);
+  const report = usePlaybackReports(item, live !== undefined);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;
   const next = useNextEpisode(item?.type === 'episode' ? item : undefined);
 
-  const problem = detail.error
+  const problem = !live && detail.error
     ? detail.error.message
     : planError
       ? `This could not be started: ${planError.message}`
@@ -67,6 +82,7 @@ export function PlayerScreen({ connectionId, itemId, startMs }: { connectionId: 
           snapshot={snapshot}
           starting={!plan || !controller}
           {...(next.data ? { next: next.data } : {})}
+          {...(live ? { live: <LiveBar channel={key} title={live.title} {...(live.group ? { group: live.group } : {})} /> } : {})}
         />
       )}
     </YStack>
@@ -89,12 +105,15 @@ function Controls({
   snapshot,
   starting,
   next,
+  live,
 }: {
   item: MediaItem | undefined;
   controller: MediaPlayer | undefined;
   snapshot: PlayerSnapshot;
   starting: boolean;
   next?: Episode;
+  /** For a channel: its name, now and next, and the channels either side. */
+  live?: ReactNode;
 }) {
   const [visible, setVisible] = useState(true);
   const [touchedAt, setTouchedAt] = useState(0);
@@ -143,6 +162,7 @@ function Controls({
               <X size={26} color="white" />
             </IconButton>
             <YStack flex={1}>
+              {live}
               {item?.type === 'episode' ? (
                 <SizableText size="$2" color="rgba(255,255,255,0.75)" numberOfLines={1}>
                   {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
@@ -155,9 +175,11 @@ function Controls({
           </XStack>
 
           <XStack items="center" justify="center" gap="$8">
-            <IconButton label="Back ten seconds" onPress={() => skip(-SKIP_MS)} disabled={!controller}>
-              <RotateCcw size={30} color="white" />
-            </IconButton>
+            {live ? null : (
+              <IconButton label="Back ten seconds" onPress={() => skip(-SKIP_MS)} disabled={!controller}>
+                <RotateCcw size={30} color="white" />
+              </IconButton>
+            )}
             {waiting ? (
               <Spinner size="large" color="white" />
             ) : (
@@ -165,9 +187,11 @@ function Controls({
                 {playing ? <Pause size={44} color="white" fill="white" /> : <Play size={44} color="white" fill="white" />}
               </IconButton>
             )}
-            <IconButton label="Forward ten seconds" onPress={() => skip(SKIP_MS)} disabled={!controller}>
-              <RotateCw size={30} color="white" />
-            </IconButton>
+            {live ? null : (
+              <IconButton label="Forward ten seconds" onPress={() => skip(SKIP_MS)} disabled={!controller}>
+                <RotateCw size={30} color="white" />
+              </IconButton>
+            )}
           </XStack>
 
           <YStack gap="$3">
@@ -183,7 +207,8 @@ function Controls({
                 }}
               />
             ) : null}
-            {durationMs ? (
+            {/* A channel is never scrubbed, even when its stream reports a length. */}
+            {durationMs && !live ? (
               <XStack items="center" gap="$3">
                 <SizableText size="$2" color="white" minW={52}>
                   {clockTime(scrub ?? positionMs)}
@@ -233,6 +258,58 @@ function Controls({
         </YStack>
       ) : null}
     </Pressable>
+  );
+}
+
+/** A channel's name marked live, what is on now and next, and the channels either side in its group. */
+function LiveBar({ channel, title, group }: { channel: GlobalMediaKey; title: string; group?: string }) {
+  const channels = useChannels(channel.connectionId, group);
+  const list = channels.data?.pages.flatMap((page) => page.value.channels) ?? [];
+  const at = list.findIndex((each) => each.key.externalId === channel.externalId);
+  const guide = useGuide(channel.connectionId, [channel]);
+  const now = useNow();
+  const { now: airing, next } = nowAndNext(guide.data?.value, channel, now);
+  const zap = (offset: number) => {
+    const target = at >= 0 ? list[(at + offset + list.length) % list.length] : undefined;
+    if (!target || target.key.externalId === channel.externalId) return;
+    router.replace({
+      pathname: '/play/[connectionId]/[itemId]',
+      params: { connectionId: target.key.connectionId, itemId: target.key.externalId, live: '1', title: target.name, ...(group ? { group } : {}) },
+    });
+  };
+  return (
+    <XStack items="center" gap="$3">
+      <YStack flex={1} gap="$1">
+        <XStack items="center" gap="$2">
+          <SizableText size="$1" fontWeight="800" color="white" bg="$red10" px="$1.5" rounded="$2">
+            LIVE
+          </SizableText>
+          <SizableText size="$5" fontWeight="600" color="white" numberOfLines={1}>
+            {title}
+          </SizableText>
+        </XStack>
+        {airing ? (
+          <SizableText size="$2" color="rgba(255,255,255,0.8)" numberOfLines={1}>
+            {`Now: ${airing.title}`}
+          </SizableText>
+        ) : null}
+        {next ? (
+          <SizableText size="$2" color="rgba(255,255,255,0.6)" numberOfLines={1}>
+            {`Next: ${next.title}`}
+          </SizableText>
+        ) : null}
+      </YStack>
+      {list.length > 1 && at >= 0 ? (
+        <XStack gap="$2">
+          <IconButton label="Previous channel" onPress={() => zap(-1)}>
+            <ChevronUp size={28} color="white" />
+          </IconButton>
+          <IconButton label="Next channel" onPress={() => zap(1)}>
+            <ChevronDown size={28} color="white" />
+          </IconButton>
+        </XStack>
+      ) : null}
+    </XStack>
   );
 }
 

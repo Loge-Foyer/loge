@@ -104,17 +104,27 @@ default ones can only be hidden. Reset puts the default back.
 
 ## TV
 
-The TV tab arrives in Phase 6 with its empty state, which points to Settings →
-Plugins → IPTV. Phase 7 fills it:
+`screens/tv.tsx`. With no IPTV connection it shows the way to add one (in a
+browser, that providers can't be reached there). Otherwise:
 
-- **Live** — group chips, the channel list with what is on now and next, and a
-  day guide.
-- **Movies** and **Series** — the media components, for IPTV content only.
-- **Offline** — channels and the guide are kept per profile, like the media
-  cache, and shown with how old they are when the provider cannot be reached.
+- **One provider at a time** — a pill for each across the top, then Live,
+  Movies and Shows as the provider brings them.
+- **Live** — group chips ("All" first), and the channels in the provider's own
+  order: logo or number, name, what is on now with how far along, and what is
+  next. The guide is asked for the channels near the top, refreshed every five
+  minutes. A tap plays the channel; the calendar opens its day
+  (`tv/channel/[connectionId]/[channelId]`): today from midnight, what is on
+  now marked, and Watch live.
+- **Movies** and **Shows** — posters in the provider's own order, one provider,
+  never merged with the library; a poster opens the ordinary detail page, with
+  Play where the provider can play.
+- **Offline** — the groups, each group's first page of channels, each
+  channel's day of guide and the first page of films and series are kept per
+  profile, where the provider allows it (`offlineMetadata`), and shown with how
+  old they are when it cannot be reached.
 
-IPTV is hidden on the web until a proxy exists, so in a browser the tab holds
-only what sources bring as `live`.
+IPTV is hidden on the web until a proxy exists — except the development mock
+portal, which has no portal to be refused by.
 
 ## Settings
 

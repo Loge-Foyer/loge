@@ -1,6 +1,9 @@
 import {
   AppError,
   type CancelSignal,
+  type ChannelGroup,
+  type ChannelPage,
+  type ChannelQuery,
   type ConnectedMediaProvider,
   type ConnectionId,
   type ContentKind,
@@ -20,6 +23,7 @@ import {
   type PlaybackDescriptor,
   type PlaybackRequest,
   type PluginId,
+  type Programme,
   type SourceInfo,
   type UserId,
 } from '@sc/api';
@@ -62,6 +66,17 @@ export interface ItemResult {
 
 export interface ChildrenResult {
   readonly items: readonly MediaItem[];
+  readonly sourceError?: SourceError;
+}
+
+/** What one source answered for live TV — or, when it could not, what was saved from it and why. */
+export interface LiveResult<T> {
+  readonly value: T;
+  readonly sourceError?: SourceError;
+}
+
+/** One source's own page of one kind, in its own order — the TV tab's films and series. */
+export interface SourcePage extends ItemPage {
   readonly sourceError?: SourceError;
 }
 
@@ -108,6 +123,14 @@ export interface MediaService {
    * and asked for again each time something plays.
    */
   playbackDescriptor(userId: UserId, request: PlaybackRequest, signal?: CancelSignal): Promise<PlaybackDescriptor>;
+  /** A source's channel groups. */
+  channelGroups(userId: UserId, connectionId: ConnectionId, signal?: CancelSignal): Promise<LiveResult<readonly ChannelGroup[]>>;
+  /** A page of a source's channels, in its own order. */
+  channels(userId: UserId, connectionId: ConnectionId, query: ChannelQuery, signal?: CancelSignal): Promise<LiveResult<ChannelPage>>;
+  /** What the channels air in a window. Kept per channel and day, where the source may be kept. */
+  guide(userId: UserId, connectionId: ConnectionId, channels: readonly GlobalMediaKey[], from: string, to: string, signal?: CancelSignal): Promise<LiveResult<readonly Programme[]>>;
+  /** One source's page of one kind, in the source's own order: nothing is merged with another source. */
+  sourcePage(userId: UserId, connectionId: ConnectionId, query: ItemQuery, signal?: CancelSignal): Promise<SourcePage>;
   readonly saved: SavedMedia;
   /** Synchronous: an image address needs no network, only a connected source. */
   artwork(userId: UserId, connectionId: ConnectionId, ref: ImageRef, size: ImageSize): ResolvedArtwork | null;
@@ -132,12 +155,26 @@ const REFILLS_PER_PAGE = 2;
 // refresh; what accumulates is what was opened once — details and episodes.
 const PRUNE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const CHILDREN = 'children:';
+const GUIDE_KEPT_MS = 7 * 24 * 60 * 60 * 1000;
 
+const GUIDE = 'guide:';
 const listKey = {
   row: (spec: RowSpec) => `row:${spec.kind}:${spec.sort.by}:${spec.sort.order}`,
   grid: (spec: RowSpec) => `grid:${spec.kind}:${spec.sort.by}:${spec.sort.order}`,
   resume: 'resume',
   children: (parent: MediaItem) => `${CHILDREN}${parent.key.externalId}`,
+  source: (query: ItemQuery) => `source:${query.kind}:${query.sort.by}:${query.sort.order}`,
+  groups: 'live:groups',
+  channels: (groupId: string | undefined) => `live:channels:${groupId ?? '*'}`,
+  // One channel's day, in UTC: what the guide keeps, merged as windows of it arrive.
+  guide: (channel: GlobalMediaKey, day: string) => `${GUIDE}${channel.externalId}:${day}`,
+};
+
+const dayOf = (iso: string) => iso.slice(0, 10);
+const daysBetween = (from: string, to: string): readonly string[] => {
+  const days: string[] = [];
+  for (let at = Date.parse(`${dayOf(from)}T00:00:00Z`); at < Date.parse(to); at += 86_400_000) days.push(new Date(at).toISOString().slice(0, 10));
+  return days;
 };
 
 // Gone or no longer possible: what was saved for it is wrong now, not merely old.
@@ -305,6 +342,63 @@ export function createMediaService(deps: {
       .slice(0, limit);
   };
 
+  /**
+   * A live-TV call to one source, saved where the source may be kept — and
+   * when it cannot answer, what was saved from it, with why beside it.
+   */
+  const liveCall = async <T>(
+    userId: UserId,
+    connectionId: ConnectionId,
+    capability: MediaCapability,
+    key: string | undefined,
+    run: (provider: ConnectedMediaProvider) => Promise<T>,
+  ): Promise<LiveResult<T>> => {
+    const source = await sourceFor(userId, connectionId);
+    if (!can(source, capability)) throw new AppError('INVALID_STATE', 'This source brings no live TV.', { retry: 'never' });
+    try {
+      const value = await call(source, run);
+      if (key && keeps(source)) await quietly(cache.putValue(userId, connectionId, key, fingerprintOf(source), { value, savedAt: clock.now() }));
+      return { value };
+    } catch (error) {
+      if (isAborted(error) || !key || !keeps(source)) throw error;
+      const failure = toAppError(error, log);
+      const saved = await quietly(cache.value<T>(userId, connectionId, key, fingerprintOf(source)));
+      if (!saved) throw failure;
+      return { value: saved.value, sourceError: sourceError(source, failure, saved.savedAt) };
+    }
+  };
+
+  /** Each channel's day, merged with what was kept of it: the guide arrives a window at a time. */
+  const saveGuide = async (userId: UserId, source: Source, channels: readonly GlobalMediaKey[], programmes: readonly Programme[]) => {
+    const print = fingerprintOf(source);
+    for (const channel of channels) {
+      const own = programmes.filter((programme) => programme.channel.externalId === channel.externalId);
+      for (const day of new Set(own.map((programme) => dayOf(programme.startsAt)))) {
+        const key = listKey.guide(channel, day);
+        const kept = (await cache.value<readonly Programme[]>(userId, source.connection.id, key, print))?.value ?? [];
+        const fresh = own.filter((programme) => dayOf(programme.startsAt) === day);
+        const starts = new Set(fresh.map((programme) => programme.startsAt));
+        const merged = [...kept.filter((programme) => !starts.has(programme.startsAt)), ...fresh].sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1));
+        await cache.putValue(userId, source.connection.id, key, print, { value: merged, savedAt: clock.now() });
+      }
+    }
+  };
+
+  const savedGuide = async (userId: UserId, source: Source, channels: readonly GlobalMediaKey[], from: string, to: string) => {
+    const print = fingerprintOf(source);
+    const found: Programme[] = [];
+    let savedAt: number | undefined;
+    for (const channel of channels) {
+      for (const day of daysBetween(from, to)) {
+        const saved = await cache.value<readonly Programme[]>(userId, source.connection.id, listKey.guide(channel, day), print);
+        if (!saved) continue;
+        found.push(...saved.value);
+        savedAt = Math.min(savedAt ?? saved.savedAt, saved.savedAt);
+      }
+    }
+    return savedAt === undefined ? undefined : { value: found, savedAt };
+  };
+
   const withWatch = async (userId: UserId, detail: MediaDetail): Promise<MediaDetail> => {
     const [item] = await watch.overlay(userId, [detail.item]);
     return item === detail.item || !item ? detail : { ...detail, item };
@@ -470,6 +564,55 @@ export function createMediaService(deps: {
       });
     },
 
+    channelGroups: (userId, connectionId, signal) =>
+      liveCall(userId, connectionId, 'channels', listKey.groups, (provider) => {
+        if (!provider.listChannelGroups) throw missing('listChannelGroups');
+        return provider.listChannelGroups(signal);
+      }),
+
+    channels: (userId, connectionId, query, signal) =>
+      // Only a group's first page is kept: a saved page is shown, never paged from.
+      liveCall(userId, connectionId, 'channels', query.cursor ? undefined : listKey.channels(query.groupId), (provider) => {
+        if (!provider.listChannels) throw missing('listChannels');
+        return provider.listChannels(query, signal);
+      }),
+
+    guide: async (userId, connectionId, channels, from, to, signal) => {
+      const source = await sourceFor(userId, connectionId);
+      if (!can(source, 'epg')) return { value: [] };
+      const inWindow = (programme: Programme) => programme.endsAt > from && programme.startsAt < to;
+      try {
+        const programmes = await call(source, (provider) => {
+          if (!provider.getGuide) throw missing('getGuide');
+          return provider.getGuide({ channels, from, to }, signal);
+        });
+        if (keeps(source)) await quietly(saveGuide(userId, source, channels, programmes));
+        return { value: programmes };
+      } catch (error) {
+        if (isAborted(error) || !keeps(source)) throw error;
+        const failure = toAppError(error, log);
+        const saved = await quietly(savedGuide(userId, source, channels, from, to));
+        if (!saved || saved.value.length === 0) throw failure;
+        return { value: saved.value.filter(inWindow), sourceError: sourceError(source, failure, saved.savedAt) };
+      }
+    },
+
+    sourcePage: async (userId, connectionId, query, signal) => {
+      const source = await sourceFor(userId, connectionId);
+      const key = listKey.source(query);
+      try {
+        const page = await call(source, (provider) => listItems(provider, query, signal));
+        if (!query.cursor) await saveList(userId, source, key, page.items);
+        return { ...page, items: await watch.overlay(userId, page.items) };
+      } catch (error) {
+        if (isAborted(error) || query.cursor) throw error;
+        const failure = toAppError(error, log);
+        const stand = await savedFor(userId, source, key, failure);
+        if (!stand) throw failure;
+        return { items: await watch.overlay(userId, stand.items), sourceError: sourceError(source, failure, stand.savedAt) };
+      }
+    },
+
     saved,
 
     artwork: (userId, connectionId, ref, size) => {
@@ -503,6 +646,8 @@ export function createMediaService(deps: {
 
     prune: async () => {
       await quietly(cache.prune(clock.now() - PRUNE_AFTER_MS, CHILDREN));
+      // A day's guide is old news in a week.
+      await quietly(cache.prune(clock.now() - GUIDE_KEPT_MS, GUIDE));
     },
 
     forgetConnection: (id) => pool.forgetConnection(id),

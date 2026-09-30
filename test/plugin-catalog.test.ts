@@ -89,7 +89,8 @@ describe('the plugins this app ships', () => {
     }
   });
 
-  it('offer no IPTV in a browser, where providers cannot be reached', () => {
-    expect(createPluginCatalog(plugins, { platform: 'web', ...quiet }).inCategory('iptv')).toEqual([]);
+  it('offer no real IPTV provider in a browser, where providers cannot be reached', () => {
+    // The pretend portal has no portal to be refused by: in development it runs in a browser too.
+    expect(createPluginCatalog(plugins, { platform: 'web', ...quiet }).inCategory('iptv').map((manifest) => manifest.id)).toEqual(['iptv/mock']);
   });
 });

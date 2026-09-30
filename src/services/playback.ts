@@ -4,6 +4,7 @@ import {
   type CancelSignal,
   type ConnectionId,
   type Episode,
+  type GlobalMediaKey,
   type MediaItem,
   type MediaPlayer,
   type PlaybackDescriptor,
@@ -48,7 +49,7 @@ export interface PlaybackService {
    * transcodes shapes its answer to that player's profile — and
    * `choosePlayer` confirms it, or finds the player that can.
    */
-  plan(userId: UserId, item: MediaItem, options?: PlaybackOptions, signal?: CancelSignal): Promise<PlaybackPlan>;
+  plan(userId: UserId, key: GlobalMediaKey, options?: PlaybackOptions, signal?: CancelSignal): Promise<PlaybackPlan>;
   /** A controller for a chosen player. Whoever creates it disposes it. */
   create(userId: UserId, player: PluginId, connectionId: ConnectionId): MediaPlayer;
   /** The view that draws a player's controllers. */
@@ -70,11 +71,11 @@ export function createPlaybackService(deps: {
   const pluginOf = (id: PluginId) => deps.players.find((player) => player.manifest.id === id);
 
   return {
-    plan: async (userId, item, options = {}, signal) => {
+    plan: async (userId, key, options = {}, signal) => {
       const { candidates, preferred } = await deps.choosing();
       const first = candidates.find((candidate) => candidate.id === preferred) ?? candidates[0];
       if (!first) return { kind: 'no-player' };
-      const descriptor = await media.playbackDescriptor(userId, { key: item.key, profile: first.profile, ...options }, signal);
+      const descriptor = await media.playbackDescriptor(userId, { key, profile: first.profile, ...options }, signal);
       const choice = choosePlayer(descriptor.sources, candidates, preferred);
       if (choice.kind === 'play') return { kind: 'play', player: choice.player, source: choice.source, descriptor };
       const best = descriptor.sources[0];

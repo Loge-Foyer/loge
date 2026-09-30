@@ -370,6 +370,13 @@ device, per profile and per source:
   source reported it, inside each item; what this device changed since lives
   in `watch_status` and the outbox (v5), and is laid over it until the source
   has heard.
+- **Live TV is kept beside the lists** (`MediaCacheRepository.value` /
+  `putValue`), under keys of its own in the same table: `live:groups`,
+  `live:channels:<group>` (a group's first page), `guide:<channel>:<day>` —
+  one channel's UTC day, merged as windows of it arrive, pruned after a week —
+  and `source:<kind>:<sort>`, a provider's first page of films or series. The
+  same rules hold: only where `offlineMetadata` is in effect, only under the
+  fingerprint it was saved with. A link to play is never kept.
 - **Only where allowed.** Nothing is kept unless the source declares
   `offlineMetadata` — stable ids, artwork versioned by tag — and the
   connection's "Keep metadata on this device" switch is on for that profile.

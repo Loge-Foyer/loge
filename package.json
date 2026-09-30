@@ -7,6 +7,7 @@
     "@noble/hashes": "^2.4.0",
     "@sc/api": "file:../streaming_center_plugins/api",
     "@sc/iptv-m3u": "file:../streaming_center_plugins/plugins/iptv/m3u",
+    "@sc/iptv-mock": "file:../streaming_center_plugins/plugins/iptv/mock",
     "@sc/iptv-stalker": "file:../streaming_center_plugins/plugins/iptv/stalker",
     "@sc/iptv-xtream": "file:../streaming_center_plugins/plugins/iptv/xtream",
     "@sc/player-kit": "file:../streaming_center_plugins/player-kit",

@@ -439,6 +439,23 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
         key.externalId,
       ]);
     },
+    // Beside the lists, under keys of their own: the items column holds any JSON.
+    value: async <T>(user: UserId, connection: ConnectionId, key: string, fingerprint: string) => {
+      const row = await sql.get<{ items: string; saved_at: number }>(
+        'SELECT items, saved_at FROM media_lists WHERE user_id = ? AND connection_id = ? AND list_key = ? AND fingerprint = ?',
+        [user, connection, key, fingerprint],
+      );
+      return row && { value: parse<T>(row.items), savedAt: row.saved_at };
+    },
+    putValue: async (user, connection, key, fingerprint, saved) => {
+      if (!(await parentsExist(user, connection))) return;
+      await sql.run(
+        `INSERT INTO media_lists (user_id, connection_id, list_key, fingerprint, items, saved_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, connection_id, list_key) DO UPDATE SET
+           fingerprint = excluded.fingerprint, items = excluded.items, saved_at = excluded.saved_at`,
+        [user, connection, key, fingerprint, JSON.stringify(saved.value), saved.savedAt],
+      );
+    },
     purge: async (connection, user) => {
       const where = user === undefined ? 'connection_id = ?' : 'connection_id = ? AND user_id = ?';
       const params = user === undefined ? [connection] : [connection, user];

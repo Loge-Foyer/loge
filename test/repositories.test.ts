@@ -483,6 +483,18 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       expect(await db.mediaCache.list(kids.id, home.id, 'row:movies', 'print-1')).toBeUndefined();
     });
 
+    it('keeps other answers beside the lists — a guide, channels — served only for their values', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.mediaCache.putValue(alex.id, home.id, 'live:groups', 'print-1', { value: [{ id: 'news', name: 'News' }], savedAt: 5 });
+      expect(await db.mediaCache.value(alex.id, home.id, 'live:groups', 'print-1')).toEqual({ value: [{ id: 'news', name: 'News' }], savedAt: 5 });
+      expect(await db.mediaCache.value(alex.id, home.id, 'live:groups', 'print-2')).toBeUndefined();
+      await db.mediaCache.putValue(alex.id, connectionId('c-gone'), 'live:groups', 'print-1', { value: [], savedAt: 5 });
+      expect(await db.mediaCache.value(alex.id, connectionId('c-gone'), 'live:groups', 'print-1')).toBeUndefined();
+      await db.mediaCache.purge(home.id);
+      expect(await db.mediaCache.value(alex.id, home.id, 'live:groups', 'print-1')).toBeUndefined();
+    });
+
     it('prunes old details and old lists under a prefix, and keeps the rest', async () => {
       const { db } = open();
       const home = await household(db);

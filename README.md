@@ -150,7 +150,10 @@ design, and all but playback runs today, built with
   turns the player with the device, or in a browser — and pick up where you
   left off. Progress and "watched" go back to the server, offline too: they
   are written on the device first and delivered when it can.
-- **Not yet:** live TV, and players other than the built-in one.
+- **Live TV** on the TV tab, from a Stalker portal: channels in their groups
+  with what is on now and next, a day's guide, channel up and down, and the
+  provider's films and series.
+- **Not yet:** players other than the built-in one; M3U and Xtream.
 
 Development builds also have a pretend account, for trying things offline.
 

@@ -54,9 +54,11 @@ what a flow needs once and it is there on every later launch.
   the account's lockout: do not loop a wrong password.
 - **Offline work**: the mock plugins (development builds only) need no
   network. `sources/mock` is a pretend library, and `iptv/mock` pretend
-  channels, a guide and a little VOD for the TV tab (Phase 7). Add a
-  connection like any other. `iptv/mock` is written, and joins the app with
-  the TV tab.
+  channels, a guide and a little VOD for the TV tab — in a browser too. Add a
+  connection like any other; playing needs the network (public test
+  streams), and its MPEG-TS channels (104, 108, …) play on Android only.
+  Registering a plugin needs the app relaunched: the service graph survives
+  Fast Refresh.
 - **A real account: your own server** — PocketBase. Give it a data directory
   of its own:
 
@@ -262,9 +264,10 @@ The target, once Phase 6 has landed:
 - **Customize** (the sliders button, top right) — per-row order, visibility,
   sort and card style, per profile.
 - **Videos** — one tab per source, skeleton shelves: nothing lists videos yet.
-- **TV** — its empty state, pointing to Settings → Plugins → IPTV. Live, Movies
-  and Series fill in with Phase 7. In a browser IPTV is hidden, so it stays
-  empty there.
+- **TV** — one IPTV provider at a time: Live (group chips, channels with now
+  and next, the calendar for a channel's day), Movies and Shows. With no IPTV
+  connection it points to Settings → Plugins → IPTV; in a browser only the
+  development mock portal is offered.
 - **Settings** — the account first (local, or "Synced just now · 1 change
   waiting"), then the current profile, profiles (up to ten: "Add a profile"
   goes at the limit), PIN lock, and Plugins as four rows — Sources, IPTV,
@@ -278,7 +281,8 @@ The target, once Phase 6 has landed:
 - Welcome offers "Create an account on this device", "Sign in to your server"
   (the mock too, in development) and "Restore a backup". An account with
   profiles lands on "Who's watching?".
-- Four tabs — Media, Videos, TV, Settings; TV shows its empty state.
+- Four tabs — Media, Videos, TV, Settings; TV shows IPTV once a provider is
+  added.
 - Settings → Plugins is four lists — Sources, IPTV, Players, Sync — of what
   runs on this platform. Add a connection through a form built from its
   manifest, and choose what each profile keeps for itself.

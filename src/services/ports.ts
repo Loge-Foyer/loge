@@ -98,6 +98,12 @@ export interface SavedDetail {
   readonly savedAt: number;
 }
 
+/** Anything else a source answered — its channels, a guide — as it was when saved. */
+export interface SavedValue<T> {
+  readonly value: T;
+  readonly savedAt: number;
+}
+
 /**
  * What sources answered, kept per profile so a screen can show it while the
  * source is slow or unreachable. A cache, not user state: nothing here is
@@ -113,6 +119,10 @@ export interface MediaCacheRepository {
   /** Skipped when the profile or the connection is gone. */
   putDetail(userId: UserId, fingerprint: string, saved: SavedDetail): Promise<void>;
   removeDetail(userId: UserId, key: GlobalMediaKey): Promise<void>;
+  /** A saved answer that is not a list of items, under its own key — `live:`, `guide:` — kept beside the lists. */
+  value<T>(userId: UserId, connectionId: ConnectionId, key: string, fingerprint: string): Promise<SavedValue<T> | undefined>;
+  /** Skipped when the profile or the connection is gone. */
+  putValue(userId: UserId, connectionId: ConnectionId, key: string, fingerprint: string, saved: SavedValue<unknown>): Promise<void>;
   /** Everything saved for a connection, or only for one profile's use of it. */
   purge(connectionId: ConnectionId, userId?: UserId): Promise<void>;
   /** Details, and lists whose key starts with `listPrefix`, not saved since `before`. */

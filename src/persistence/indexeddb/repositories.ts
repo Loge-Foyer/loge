@@ -61,7 +61,8 @@ interface MediaListRecord {
   readonly connectionId: ConnectionId;
   readonly listKey: string;
   readonly fingerprint: string;
-  readonly items: readonly MediaItem[];
+  /** A list of items — or, under a key of its own, any other saved answer. */
+  readonly items: unknown;
   readonly savedAt: number;
 }
 
@@ -300,7 +301,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
   const mediaCache: MediaCacheRepository = {
     list: async (user, connection, key, fingerprint) => {
       const row = await get<MediaListRecord>('mediaLists', [user, connection, key]);
-      return row?.fingerprint === fingerprint ? { items: row.items, savedAt: row.savedAt } : undefined;
+      return row?.fingerprint === fingerprint ? { items: row.items as readonly MediaItem[], savedAt: row.savedAt } : undefined;
     },
     putList: async (user, connection, key, fingerprint, list) => {
       if (!(await parentsExist(user, connection))) return;
@@ -338,6 +339,23 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
     removeDetail: async (user, key) => {
       await request(store('mediaDetails').delete([user, key.connectionId, key.externalId]));
+    },
+    value: async <T>(user: UserId, connection: ConnectionId, key: string, fingerprint: string) => {
+      const row = await get<MediaListRecord>('mediaLists', [user, connection, key]);
+      return row?.fingerprint === fingerprint ? { value: row.items as T, savedAt: row.savedAt } : undefined;
+    },
+    putValue: async (user, connection, key, fingerprint, saved) => {
+      if (!(await parentsExist(user, connection))) return;
+      await request(
+        store('mediaLists').put({
+          userId: user,
+          connectionId: connection,
+          listKey: key,
+          fingerprint,
+          items: saved.value,
+          savedAt: saved.savedAt,
+        } satisfies MediaListRecord),
+      );
     },
     purge: async (connection, user) => {
       for (const name of ['mediaLists', 'mediaDetails'] as const) {

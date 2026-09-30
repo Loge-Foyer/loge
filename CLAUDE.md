@@ -62,8 +62,10 @@ What runs today:
   signing up with an invite uploads it, and signing out keeps a local copy. A
   run pushes the journal, reads the whole account and reconciles; ten
   profiles at most, or the server's limit.
-- Four tabs, TV with its empty state, and Settings → Plugins as four lists by
-  category, of the plugins that run on this platform.
+- Four tabs, and Settings → Plugins as four lists by category, of the plugins
+  that run on this platform. TV holds IPTV: live channels with now and next,
+  a day guide, channels played live, and the provider's films and series —
+  Stalker and, in development, the mock portal.
 - Real titles from every live source, merged — Jellyfin the first — and kept
   across restarts where the source allows it.
 - SQLite and the keychain on phones, which run development builds; IndexedDB

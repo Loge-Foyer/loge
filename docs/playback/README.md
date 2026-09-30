@@ -224,8 +224,11 @@ over the tabs, with `start` in milliseconds for a resume:
   locks upright at launch (iOS starts upright through expo-screen-orientation's
   `initialOrientation`); the player screen turns with the device, and upright
   comes back when it closes. A browser turns with its window.
-- For live TV, channel up and down and what is on now and next come with the
-  TV tab (Phase 7).
+- **A channel** opens the same screen with `live=1`, its name and its group:
+  no item to read and nothing reported, no scrubber and no skipping, but LIVE,
+  what is on now and next, and channel up and down through the group it was
+  opened from. A channel whose only stream is raw MPEG-TS says, in a browser or
+  on an iPhone, which player would play it.
 
 Detail pages get Play — or Resume where the source says it stopped, with
 From the beginning — for a film or an episode whose source has `playback` in

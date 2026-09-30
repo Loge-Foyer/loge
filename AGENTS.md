@@ -416,7 +416,8 @@ Not an afterthought. Things to know:
   is part of their protection.
 - **IPTV is hidden on the web** until a proxy exists: portals send no CORS
   headers, and a browser forbids a `Cookie` header. Their manifests leave `web`
-  out of `platforms`; never work around that in the app.
+  out of `platforms`; never work around that in the app. The development mock
+  portal, which reaches no portal, is the one exception.
 - `web.output` is `"single"` — an SPA. Nothing is pre-rendered; do not add
   `+html.tsx` or server-only assumptions.
 - `src/app/_layout.tsx` imports `@tamagui/core/reset.css`; without it browser
@@ -592,8 +593,10 @@ because training data goes stale between SDK releases.
 **Phase 6 — the code is on the new architecture.** Everything above describes
 the target; what runs today:
 
-- **Four tabs** — Media, Videos, TV, Settings — with TV showing the way to add
-  an IPTV source. Settings → Plugins is four lists, by category, of the
+- **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
+  a time: Live with group chips, channels with now and next, a day guide per
+  channel, channels played live with channel up and down; its films and
+  series as posters. Settings → Plugins is four lists, by category, of the
   plugins that run on this platform. Stored plugin ids are qualified by
   category (database v3).
 - **One account per device,** local or on your own server (database v4).

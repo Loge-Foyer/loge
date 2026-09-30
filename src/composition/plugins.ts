@@ -1,6 +1,7 @@
 import type { Plugin } from '@sc/api';
 import type { PlayerPlugin } from '@sc/player-kit';
 import { plugin as m3u } from '@sc/iptv-m3u';
+import { plugin as mockIptv } from '@sc/iptv-mock';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
 import { plugin as ksplayer } from '@sc/player-ksplayer';
@@ -51,7 +52,7 @@ export const plugins: readonly Plugin[] = [
   googleDriveBackup,
   onedriveBackup,
   // Test doubles — offline, deliberately partial. Development builds only.
-  ...(__DEV__ ? [mockSource, mockAccount, mockBackups] : []),
+  ...(__DEV__ ? [mockSource, mockIptv, mockAccount, mockBackups] : []),
 ];
 
 /** The players with an engine, and the view that draws it — what the player screen is handed. */

@@ -75,14 +75,14 @@ describe('choosing a player', () => {
 describe('pressing Play', () => {
   it('asks the source for a stream fit for the player that plays first, and plays it there', async () => {
     const t = await setUp();
-    const plan = await t.services.playback.plan(t.kids, t.item, { startMs: 90_000 });
+    const plan = await t.services.playback.plan(t.kids, t.item.key, { startMs: 90_000 });
     expect(t.source.stats.playbackRequests).toEqual([{ key: t.item.key, profile: hlsOnly, startMs: 90_000 }]);
     expect(plan).toMatchObject({ kind: 'play', player: 'players/first', source: hls });
   });
 
   it('finds the player that can, when the first cannot', async () => {
     const t = await setUp({ describe: (request) => ({ key: request.key, sources: [ts], audioTracks: [], subtitleTracks: [] }) });
-    expect(await t.services.playback.plan(t.kids, t.item)).toMatchObject({ kind: 'play', player: 'players/second', source: ts });
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play', player: 'players/second', source: ts });
   });
 
   it('says what no player here can do', async () => {
@@ -90,19 +90,19 @@ describe('pressing Play', () => {
       players: [fakePlayerPlugin('first', { ios: hlsOnly })],
       describe: (request) => ({ key: request.key, sources: [ts], audioTracks: [], subtitleTracks: [] }),
     });
-    expect(await t.services.playback.plan(t.kids, t.item)).toEqual({ kind: 'none', needs: ['protocol', 'container'], source: ts });
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toEqual({ kind: 'none', needs: ['protocol', 'container'], source: ts });
   });
 
   it('says so when every player is switched off here, without asking the source', async () => {
     const t = await setUp({ players: [fakePlayerPlugin('first', { ios: hlsOnly })] });
     await t.services.players.setEnabled(t.players[0]?.plugin.manifest.id ?? ('' as never), false);
-    expect(await t.services.playback.plan(t.kids, t.item)).toEqual({ kind: 'no-player' });
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toEqual({ kind: 'no-player' });
     expect(t.source.stats.playbackRequests).toEqual([]);
   });
 
   it('refuses an item from a source that cannot play', async () => {
     const t = await setUp({ canPlay: false });
-    await expect(t.services.playback.plan(t.kids, t.item)).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    await expect(t.services.playback.plan(t.kids, t.item.key)).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
   it('parks a source that refused its sign-in, as every call to it does', async () => {
@@ -113,11 +113,11 @@ describe('pressing Play', () => {
         return { key: t.item.key, sources: [hls], audioTracks: [], subtitleTracks: [] };
       },
     });
-    await expect(t.services.playback.plan(t.kids, t.item)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(t.services.playback.plan(t.kids, t.item.key)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     refused = false;
-    await expect(t.services.playback.plan(t.kids, t.item)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(t.services.playback.plan(t.kids, t.item.key)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     t.services.media.unpark();
-    expect(await t.services.playback.plan(t.kids, t.item)).toMatchObject({ kind: 'play' });
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play' });
   });
 
   it('makes a controller whose headers come from the item’s source', async () => {

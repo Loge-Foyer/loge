@@ -41,6 +41,8 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       detail: (...args) => read((r) => r.mediaCache.detail(...args)),
       putDetail: (...args) => write((r) => r.mediaCache.putDetail(...args)),
       removeDetail: (...args) => write((r) => r.mediaCache.removeDetail(...args)),
+      value: (userId, connectionId, key, fingerprint) => read((r) => r.mediaCache.value(userId, connectionId, key, fingerprint)),
+      putValue: (...args) => write((r) => r.mediaCache.putValue(...args)),
       purge: (...args) => write((r) => r.mediaCache.purge(...args)),
       prune: (...args) => write((r) => r.mediaCache.prune(...args)),
     },

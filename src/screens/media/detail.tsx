@@ -21,13 +21,14 @@ import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { useActiveUserId } from '@/hooks/use-session';
-import { useTabSources } from '@/hooks/use-sources';
+import { useSources } from '@/hooks/use-sources';
 import type { SourceError } from '@/services/media';
 
 /** A film, a series with its seasons and episodes, or one episode — whatever the key points at. */
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
   const detail = useItem({ connectionId, externalId: itemId });
-  const { data: sources = [] } = useTabSources('media');
+  // Every source of the profile: an IPTV provider's films open here from the TV tab.
+  const { data: sources = [] } = useSources();
   const capabilities = sources.find((source) => source.connection.id === connectionId)?.effective.media?.capabilities;
   const can = (capability: MediaCapability) => capabilities?.has(capability) ?? false;
   const showWatch = can('watchStateRead');

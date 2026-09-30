@@ -100,13 +100,14 @@ export function useGrid(spec: RowSpec | undefined) {
   });
 }
 
-export function useItem(key: GlobalMediaKey) {
+export function useItem(key: GlobalMediaKey, enabled = true) {
   const userId = useActiveUserId();
   const { media } = useServices();
   return useQuery({
     queryKey: remoteKey(userId, 'item', key.connectionId, key.externalId),
     queryFn: ({ signal }) => media.item(userId, key, signal),
     staleTime: 2 * MINUTE,
+    enabled,
     ...remote,
   });
 }
