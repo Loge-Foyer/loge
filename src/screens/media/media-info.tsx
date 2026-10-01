@@ -1,9 +1,7 @@
 import type { AudioStreamInfo, MediaVersion, SubtitleStreamInfo } from '@sc/api';
 import { connectionId as asConnectionId } from '@sc/api';
-import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView } from 'react-native';
-import { Button, H2, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { SizableText, Spinner, YStack } from 'tamagui';
 
 import {
   bitrateName,
@@ -16,6 +14,7 @@ import {
   spatialName,
 } from '@/components/labels';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { SheetScreen } from '@/components/sheet';
 import { SourceTabs } from '@/components/source-tabs';
 import { useItem } from '@/hooks/use-media';
 
@@ -33,39 +32,29 @@ export function MediaInfoScreen({ connectionId, itemId }: { connectionId: string
   const version = versions[Math.min(chosen, versions.length - 1)];
 
   return (
-    <YStack flex={1} bg="$background">
-      <XStack px="$4" pt="$5" pb="$3" items="center" justify="space-between">
-        <H2 size="$8" color="$color12">
-          Media details
-        </H2>
-        <Button size="$3" onPress={() => router.back()}>
-          Done
-        </Button>
-      </XStack>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 48, gap: 16 }}>
-        {detail.isPending ? (
-          <YStack py="$8" items="center">
-            <Spinner size="large" color="$accent9" />
-          </YStack>
-        ) : !version ? (
-          <SizableText color="$color10">This source does not say what the file is.</SizableText>
-        ) : (
-          <>
-            {versions.length > 1 ? (
-              <SourceTabs
-                tabs={versions.map((candidate, index) => ({
-                  id: String(index),
-                  label: candidate.label ?? resolutionName(candidate.video?.height, candidate.video?.width) ?? `Version ${index + 1}`,
-                }))}
-                selected={String(Math.min(chosen, versions.length - 1))}
-                onSelect={(id) => setChosen(Number(id))}
-              />
-            ) : null}
-            <VersionDetails version={version} />
-          </>
-        )}
-      </ScrollView>
-    </YStack>
+    <SheetScreen title="Media details">
+      {detail.isPending ? (
+        <YStack py="$8" items="center">
+          <Spinner size="large" color="$accent9" />
+        </YStack>
+      ) : !version ? (
+        <SizableText color="$color10">This source does not say what the file is.</SizableText>
+      ) : (
+        <>
+          {versions.length > 1 ? (
+            <SourceTabs
+              tabs={versions.map((candidate, index) => ({
+                id: String(index),
+                label: candidate.label ?? resolutionName(candidate.video?.height, candidate.video?.width) ?? `Version ${index + 1}`,
+              }))}
+              selected={String(Math.min(chosen, versions.length - 1))}
+              onSelect={(id) => setChosen(Number(id))}
+            />
+          ) : null}
+          <VersionDetails version={version} />
+        </>
+      )}
+    </SheetScreen>
   );
 }
 

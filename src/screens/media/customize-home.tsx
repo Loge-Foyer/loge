@@ -4,13 +4,12 @@ import { ArrowUp } from '@tamagui/lucide-icons-2/icons/ArrowUp';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
-import { router } from 'expo-router';
-import { ScrollView } from 'react-native';
-import { Button, H2, SizableText, XStack, YStack } from 'tamagui';
+import { Button, SizableText, XStack, YStack } from 'tamagui';
 
 import { AppSwitch } from '@/components/app-switch';
 import { ConfirmButton } from '@/components/confirm-button';
 import { CONTENT_KIND_LABELS, rowTitle, SORT_LABELS, sortDirectionLabel } from '@/components/labels';
+import { SheetScreen } from '@/components/sheet';
 import { SourceTabs } from '@/components/source-tabs';
 import { useHomeLayoutActions, useHomeRows } from '@/hooks/use-home-layout';
 import { addRow, moveRow, removeRow, setRow, type CardStyle, type HomeRowView } from '@/services/home-layout';
@@ -36,64 +35,54 @@ export function CustomizeHomeScreen({ rowId }: { rowId?: string }) {
   const kinds = TAB_CONTENT.media.filter((kind) => all.some((row) => row.type === 'kind' && row.kind === kind && row.available));
 
   return (
-    <YStack flex={1} bg="$background">
-      <XStack px="$4" pt="$5" pb="$3" items="center" justify="space-between">
-        <H2 size="$8" color="$color12">
-          {rowId && shown[0] ? rowTitle(shown[0]) : 'Home screen'}
-        </H2>
-        <Button size="$3" onPress={() => router.back()}>
-          Done
-        </Button>
-      </XStack>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 48, gap: 16 }}>
-        {shown.map((row) => (
-          <RowEditor
-            key={row.id}
-            row={row}
-            first={all[0]?.id === row.id}
-            last={all.at(-1)?.id === row.id}
-            movable={!rowId}
-            onMove={(by) => update.mutate((current) => moveRow(current, row.id, by))}
-            onChange={(change) => update.mutate((current) => setRow(current, row.id, change))}
-            onRemove={() => update.mutate((current) => removeRow(current, row.id))}
+    <SheetScreen title={rowId && shown[0] ? rowTitle(shown[0]) : 'Home screen'}>
+      {shown.map((row) => (
+        <RowEditor
+          key={row.id}
+          row={row}
+          first={all[0]?.id === row.id}
+          last={all.at(-1)?.id === row.id}
+          movable={!rowId}
+          onMove={(by) => update.mutate((current) => moveRow(current, row.id, by))}
+          onChange={(change) => update.mutate((current) => setRow(current, row.id, change))}
+          onRemove={() => update.mutate((current) => removeRow(current, row.id))}
+        />
+      ))}
+      {!rowId && kinds.length > 0 ? (
+        <YStack gap="$2" p="$4" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor">
+          <SizableText size="$3" fontWeight="600" color="$color12">
+            Add a row
+          </SizableText>
+          <XStack gap="$2" flexWrap="wrap">
+            {kinds.map((kind: ContentKind) => (
+              <Button
+                key={kind}
+                size="$3"
+                icon={Plus}
+                onPress={() => update.mutate((current) => addRow(current, kind, `${kind}-${Date.now().toString(36)}`))}
+              >
+                {CONTENT_KIND_LABELS[kind]}
+              </Button>
+            ))}
+          </XStack>
+          <SizableText size="$2" color="$color10">
+            A second view of the same library — newest additions first, until you choose another order.
+          </SizableText>
+        </YStack>
+      ) : null}
+      {!rowId ? (
+        <YStack items="flex-start">
+          <ConfirmButton
+            label="Reset to default"
+            icon={<RotateCcw size={16} />}
+            title="Reset the home screen?"
+            description="Continue watching, then films and series by release date, newest first. Rows you added are removed."
+            confirmLabel="Reset"
+            onConfirm={() => reset.mutate()}
           />
-        ))}
-        {!rowId && kinds.length > 0 ? (
-          <YStack gap="$2" p="$4" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor">
-            <SizableText size="$3" fontWeight="600" color="$color12">
-              Add a row
-            </SizableText>
-            <XStack gap="$2" flexWrap="wrap">
-              {kinds.map((kind: ContentKind) => (
-                <Button
-                  key={kind}
-                  size="$3"
-                  icon={Plus}
-                  onPress={() => update.mutate((current) => addRow(current, kind, `${kind}-${Date.now().toString(36)}`))}
-                >
-                  {CONTENT_KIND_LABELS[kind]}
-                </Button>
-              ))}
-            </XStack>
-            <SizableText size="$2" color="$color10">
-              A second view of the same library — newest additions first, until you choose another order.
-            </SizableText>
-          </YStack>
-        ) : null}
-        {!rowId ? (
-          <YStack items="flex-start">
-            <ConfirmButton
-              label="Reset to default"
-              icon={<RotateCcw size={16} />}
-              title="Reset the home screen?"
-              description="Continue watching, then films and series by release date, newest first. Rows you added are removed."
-              confirmLabel="Reset"
-              onConfirm={() => reset.mutate()}
-            />
-          </YStack>
-        ) : null}
-      </ScrollView>
-    </YStack>
+        </YStack>
+      ) : null}
+    </SheetScreen>
   );
 }
 
