@@ -1,7 +1,7 @@
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Link, type Href } from 'expo-router';
 import { Children, Fragment, type ReactNode } from 'react';
-import { ListItem, Separator, SizableText, YGroup, YStack } from 'tamagui';
+import { Button, ListItem, Separator, SizableText, XStack, YGroup, YStack } from 'tamagui';
 
 export function SettingsSection({
   title,
@@ -83,5 +83,47 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
     </Link>
   ) : (
     item
+  );
+}
+
+/** A row whose trailing edge is a short list of choices, one of them taken. */
+export function ChoiceRow<T extends string | number>({
+  title,
+  subtitle,
+  options,
+  label,
+  value,
+  disabled,
+  onChoose,
+}: {
+  title: string;
+  subtitle?: string;
+  options: readonly T[];
+  label: (option: T) => string;
+  value: T;
+  disabled: boolean;
+  onChoose: (option: T) => void;
+}) {
+  return (
+    <SettingsRow
+      title={title}
+      {...(subtitle ? { subtitle } : {})}
+      trailing={
+        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={240}>
+          {options.map((option) => (
+            <Button
+              key={String(option)}
+              size="$2"
+              aria-label={`${title}: ${label(option)}`}
+              disabled={disabled}
+              {...(option === value ? ({ theme: 'accent' } as const) : {})}
+              onPress={() => onChoose(option)}
+            >
+              <Button.Text>{label(option)}</Button.Text>
+            </Button>
+          ))}
+        </XStack>
+      }
+    />
   );
 }

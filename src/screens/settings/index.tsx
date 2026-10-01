@@ -18,8 +18,7 @@ import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
 import { useDownloadBudget } from '@/hooks/use-downloads';
 import type { DownloadBudget } from '@/services/downloads';
-import { SettingsRow, SettingsSection } from '@/components/settings-list';
-import { SourceTabs } from '@/components/source-tabs';
+import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
@@ -27,7 +26,7 @@ import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
+import { CONTENT_TABS } from '@/services/tab-content';
 
 import { categoryHref } from './plugin-route';
 
@@ -100,16 +99,14 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">
-        <SettingsRow
+        <ChoiceRow
           title="Open on"
           subtitle="The tab the app starts on"
-          trailing={
-            <SourceTabs
-              tabs={CONTENT_TABS.map((tab) => ({ id: tab, label: TAB_LABELS[tab] }))}
-              selected={openOn}
-              onSelect={(tab) => set.mutate({ openOn: tab as ContentTab })}
-            />
-          }
+          options={CONTENT_TABS}
+          label={(tab) => TAB_LABELS[tab]}
+          value={openOn}
+          disabled={appSettings.data === undefined || set.isPending}
+          onChoose={(tab) => set.mutate({ openOn: tab })}
         />
         <SettingsRow
           title="Always show profile selector"

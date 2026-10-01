@@ -8,7 +8,7 @@ import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
 import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
-import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
@@ -240,48 +240,6 @@ const BUTTON_NOTES: Readonly<Partial<Record<PlayerButton, string>>> = {
 
 const JUMP_LABELS: Readonly<Record<PlayerJump, string>> = { off: 'Off', seek: 'Seconds', chapter: 'Chapter' };
 const SLIDER_LABELS: Readonly<Record<PlayerSlider, string>> = { off: 'Off', brightness: 'Brightness', volume: 'Volume' };
-
-/** A row whose trailing edge is a short list of choices, one of them taken. */
-function ChoiceRow<T extends string | number>({
-  title,
-  subtitle,
-  options,
-  label,
-  value,
-  disabled,
-  onChoose,
-}: {
-  title: string;
-  subtitle?: string;
-  options: readonly T[];
-  label: (option: T) => string;
-  value: T;
-  disabled: boolean;
-  onChoose: (option: T) => void;
-}) {
-  return (
-    <SettingsRow
-      title={title}
-      {...(subtitle ? { subtitle } : {})}
-      trailing={
-        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={240}>
-          {options.map((option) => (
-            <Button
-              key={String(option)}
-              size="$2"
-              aria-label={`${title}: ${label(option)}`}
-              disabled={disabled}
-              {...(option === value ? ({ theme: 'accent' } as const) : {})}
-              onPress={() => onChoose(option)}
-            >
-              <Button.Text>{label(option)}</Button.Text>
-            </Button>
-          ))}
-        </XStack>
-      }
-    />
-  );
-}
 
 function ButtonRows({ row, title, footer }: { row: ButtonRow; title: string; footer: string }) {
   const { data } = useAppSettings();
