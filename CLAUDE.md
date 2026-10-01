@@ -54,7 +54,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brings more players: VLC and mpv on Android are in.**
+**Phase 7 — it plays. Phase 8 brought more players; Phase 9 took VLC out again.**
 
 The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
 categories, and Settings → Plugins shows one list per category for this
@@ -85,11 +85,10 @@ What runs today:
 - Press Play: Jellyfin films and episodes play on the built-in player —
   expo-video on phones, which turn it with the device, `<video>` with hls.js
   in a browser — with Resume, Mark watched, the tracks and Next episode. On
-  Android VLC and mpv play too, Expo modules in their plugins' packages:
-  Matroska, DTS and TrueHD as the file, raw MPEG-TS, a file's own subtitles —
-  mpv drawing them with libass. Both now have iOS halves that build into the
-  app, but neither has played on a device yet. A browser plays raw MPEG-TS
-  through mpegts.js.
+  mpv plays too, an Expo module in its adapter: Matroska, DTS and TrueHD as
+  the file, raw MPEG-TS, a file's own subtitles drawn with libass — on Android
+  and, built but not yet played, on iPhone. **VLC was dropped in Phase 9**;
+  git has it. A browser plays raw MPEG-TS through mpegts.js.
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos still shows skeletons.

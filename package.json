@@ -15,7 +15,6 @@
     "@sc/player-ksplayer": "*",
     "@sc/player-mpv": "*",
     "@sc/player-system": "*",
-    "@sc/player-vlc": "*",
     "@sc/source-emby": "*",
     "@sc/source-google-drive": "*",
     "@sc/source-icloud-drive": "*",

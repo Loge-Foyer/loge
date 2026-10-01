@@ -15,7 +15,7 @@ player-kit/              @sc/player-kit — the React half of the player contrac
 plugins/
   sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
   iptv/<name>/           m3u stalker xtream mock
-  players/<name>/        system ksplayer mpv vlc
+  players/<name>/        system ksplayer mpv
   sync/<name>/           custom-server icloud google-drive onedrive mock mock-backup
 test/                    vitest — api rules, plugins against fake HTTP, conformance
 docs/
@@ -316,7 +316,7 @@ the test of whether this architecture is real.
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, and the account is kept record by record
 on your own server, PocketBase. Phase 7 made it play; Phase 8 adds players —
-VLC and mpv on Android are in.
+Phase 9 dropped VLC and left mpv.
 
 **`api` holds:**
 
@@ -354,15 +354,6 @@ TypeScript program of its own with React Native's types.
   browser's `<video>` with a lazily loaded hls.js on the web, a profile per
   platform. Its engines are tested against fakes (`vitest.config.ts` aliases
   expo-video), and it has played on the Android emulator and in Chrome.
-- **`players/vlc`** implements it on iOS and Android: libVLC behind one Expo
-  module in this package, `android/` in Kotlin and `ios/` in Swift against
-  MobileVLCKit, both reached through `expo` — tested against a fake of that
-  module (`vitest.config.ts` aliases `expo`), and played on the Android
-  emulator: raw MPEG-TS, Matroska with E-AC-3 as the file, its subtitles. The
-  two halves expose the same module name, class and view, so `src/` is shared
-  unchanged. VLCKit's delegate is an Objective-C protocol and `SharedObject`
-  is no `NSObject`, so a small forwarder stands between them. The iOS half
-  compiles and links; it has not played yet.
 - **`players/mpv`** implements it on iOS and Android: libmpv's own C API
   behind one Expo module in this package — this package's JNI on Android,
   and straight from Swift on iOS, where `import MPVKit` exposes the same

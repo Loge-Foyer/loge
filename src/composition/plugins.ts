@@ -4,10 +4,8 @@ import { plugin as m3u } from '@sc/iptv-m3u';
 import { plugin as mockIptv } from '@sc/iptv-mock';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
-import { plugin as ksplayer } from '@sc/player-ksplayer';
 import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
-import { plugin as vlc } from '@sc/player-vlc';
 import { plugin as emby } from '@sc/source-emby';
 import { plugin as invidious } from '@sc/source-invidious';
 import { plugin as jellyfin } from '@sc/source-jellyfin';
@@ -42,9 +40,10 @@ export const plugins: readonly Plugin[] = [
   xtream,
   m3u,
   systemPlayer,
-  ksplayer,
+  // KSPlayer is not registered: it is a manifest with no engine, so listing it
+  // only ever showed a player that could never be chosen. Its adapter stays,
+  // and an import plus a line brings it back the day it has one.
   mpv,
-  vlc,
   customServer,
   icloudBackup,
   googleDriveBackup,
@@ -54,4 +53,4 @@ export const plugins: readonly Plugin[] = [
 ];
 
 /** The players with an engine, and the view that draws it — what the player screen is handed. */
-export const players: readonly PlayerPlugin[] = [systemPlayer, vlc, mpv];
+export const players: readonly PlayerPlugin[] = [systemPlayer, mpv];

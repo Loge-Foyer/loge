@@ -70,7 +70,7 @@ Docs: https://docs.expo.dev/eas/index.md
   `npm run android` / `npm run ios` build and install it, then Metro serves the
   JavaScript as before.
   - Player engines are native code: expo-video for the built-in player
-    (Phase 7), Expo modules for KSPlayer, mpv and VLC (Phase 8).
+    (Phase 7), and an Expo module for mpv.
   - Face ID needs the app's usage text, which Expo Go cannot carry.
 
   A native change means building again — a stale build looks like code that
@@ -522,8 +522,8 @@ npx expo-modules-autolinking resolve --platform apple --json
 npx expo-modules-autolinking resolve --platform android --json
 ```
 
-**One copy of a native library, and the newest.** React Native, libVLC and
-libmpv each carry a `libc++_shared.so`, and an APK holds one: the first the
+**One copy of a native library, and the newest.** React Native and libmpv each
+carry a `libc++_shared.so`, and an APK holds one: the first the
 merge sees, which is React Native's — and which libmpv cannot load. A source
 set of the app's own wins the merge, so `config-plugins/with-newest-libcxx.js`
 points one at what mpv's module unpacks. **Packaging is the app's**: no adapter
@@ -595,7 +595,7 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brings more players: VLC and mpv on Android are in.**
+**Phase 7 — it plays. Phase 8 brought more players; Phase 9 took VLC out again.**
 Everything above describes the target; what runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
@@ -628,9 +628,9 @@ Everything above describes the target; what runs today:
   screen chooses the player (`PlaybackService`), draws its view under the
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
-  transcode — on phones and in a browser; VLC and mpv play on Android, from
-  Expo modules in their plugins' packages, and their iOS halves build into the
-  app but have not played on a device yet. Each player has its switch, "Play
+  transcode — on phones and in a browser; mpv plays too, an Expo module in its
+  adapter, on Android and (built, not yet played) on iPhone. VLC was dropped
+  in Phase 9. Each player has its switch, "Play
   with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
 - **Search is closed:** a term rides on a query that already names its kind,

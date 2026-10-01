@@ -183,11 +183,11 @@ format and encryption are the app's.
 - **Platform files** — `engine.ts` / `engine.web.ts`, `view.tsx` /
   `view.web.tsx` — exporting the same names.
 - **Tests against a fake engine:** alias a native one in `vitest.config.ts`,
-  hand a web one its host. `plugins/players/system` shows both.
+  hand a web one its host. `players/system` shows both.
 - **Native code,** if any: an Expo module in the package's own folder —
   `expo-module.config.json` beside `package.json`, naming its platforms, and
   `android/` built with `expo-module-gradle-plugin`: the player a shared
-  object, its picture an `ExpoView`. `plugins/players/vlc` shows it.
+  object, its picture an `ExpoView`. `players/mpv` shows it.
   - Reach it through `expo` (a peer), lazily: `requireNativeModule` when the
     first controller is made, never at import. The package is imported on
     every platform, and the module exists only where it was built.
@@ -198,9 +198,9 @@ format and encryption are the app's.
     the app's main thread, where a call that waits for a busy engine is an
     ANR — and stream addresses in memory only.
   - **An engine that logs the address it opens is a leak**, since a stream
-    URL carries a Jellyfin `api_key` or a portal's session token. libVLC is
+    URL carries a Jellyfin `api_key` or a portal's session token. libmpv is
     quietened with `--quiet`; libmpv's published Android wrapper cannot be,
-    so `plugins/players/mpv` talks to its C API itself.
+    so `players/mpv` talks to its C API itself.
   - `platforms` says where the module is built — no more.
   - In the app, check autolinking takes nothing from this repository's
     `node_modules` (the app's `docs/plugins`).
@@ -235,19 +235,19 @@ npm test
 
 **Read these before writing another:**
 
-- `plugins/sources/jellyfin` — the reference implementation of a media role
-- `plugins/sources/mock` — a partial one, on purpose
-- `plugins/sync/custom-server` — the reference account role: PocketBase's
+- `sources/jellyfin` — the reference implementation of a media role
+- `sources/mock` — a partial one, on purpose
+- `sync/custom-server` — the reference account role: PocketBase's
   sign-in and sessions, records read and written, sign-up and the owner check
-- `plugins/sync/mock-backup` — a backup target at its smallest: bytes and
+- `sync/mock-backup` — a backup target at its smallest: bytes and
   etags
-- `plugins/players/system` — the reference player: expo-video on phones, the
+- `players/system` — the reference player: expo-video on phones, the
   browser's `<video>` and a lazily loaded hls.js on the web, a profile per
   platform
-- `plugins/players/vlc` — the reference native player: libVLC behind an Expo
+- `players/mpv` — the reference native player: libmpv behind an Expo
   module of its own, on Android
-- `plugins/players/mpv` — the same, one step further: its own JNI on the
+- `players/mpv` — the same, one step further: its own JNI on the
   engine's C API, every call on a thread of its own, and a watchdog that says
   so when a decoder takes a stream and hands back no frame
-- `plugins/iptv/mock` — live TV at its simplest: groups, channels, a guide
+- `iptv/mock` — live TV at its simplest: groups, channels, a guide
   worked out from the time

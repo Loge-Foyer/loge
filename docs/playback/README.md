@@ -4,9 +4,9 @@ How the app plays what a source offers: descriptors and players, choosing an
 engine, where each player is switched on, and how watch status gets back to the
 source that masters it.
 
-Jellyfin and Stalker play on the built-in player, on phones and in a
-browser, and on VLC and mpv on Android; Phase 8 brings KSPlayer too. This page
-is the design they build to, and says where today differs.
+Jellyfin and Stalker play on the built-in player, on phones and in a browser,
+and on mpv. This page is the design they build to, and says where today
+differs.
 
 ## What to play, and how to play it
 
@@ -43,9 +43,15 @@ A player plugin is in the `players` category, and has three parts:
 | Plugin | Engine | Platforms | Arrives |
 | --- | --- | --- | --- |
 | `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js and mpegts.js on the web | all | Phase 7; MPEG-TS on the web in Phase 8 |
-| `players/ksplayer` | KSPlayer | iOS | Phase 9 — a spike first: it is on no package manager, and its FFmpeg dependency ships only as a very large git clone |
-| `players/mpv` | libmpv on Android, through an Expo module in its package with its own JNI; MPVKit on iOS | Android, iOS | Phase 8 — Android is in; iOS in Phase 9 |
-| `players/vlc` | libVLC on Android, through an Expo module in its package; MobileVLCKit on iOS | Android, iOS | Phase 8 — Android is in; iOS in Phase 9 |
+| `players/mpv` | libmpv on Android, through an Expo module in its adapter with its own JNI; MPVKit on iOS | Android, iOS | Phase 8 — Android is in; iOS built, not yet played |
+
+**VLC was dropped in Phase 9**, both halves. On iPhone libVLC draws into a
+plain OpenGL view, so the system has no layer to take over for picture in
+picture; on Android mpv already played everything it did, and a second engine
+of its size is 37 MB of framework and a longer install for nothing. Git has
+it. **KSPlayer never arrived**: it is on no package manager, its own podspec
+pins a tag that does not exist, and its FFmpeg ships only as a very large git
+clone — its adapter is a manifest, and is not registered.
 
 On the web there is only the built-in player. It plays raw MPEG-TS through
 mpegts.js, fetched as a chunk of its own the first time a stream needs it, as
@@ -83,17 +89,15 @@ player's peers.
 
 **Players are native code.** expo-video is a published package, so the app
 installs it and autolinking builds it from the app's `node_modules`. An Expo
-module in a player's own package — VLC's and mpv's, and later KSPlayer's — is
-found through the `file:` link and built into the development build from the
-plugins repository, while every package it depends on comes from the app's
-`node_modules` (`docs/plugins`). On the Android emulator VLC and mpv each
-played the mock portal's raw MPEG-TS and a Jellyfin film in Matroska with
-E-AC-3 as the file itself, from where it was left, with the file's own
-subtitles, turning with the device. A new or changed player means building
-again.
+module in a player's own adapter — mpv's — is autolinked from `adapters/`,
+which is a workspace of this app, so every package it depends on is the one
+copy in `node_modules`. On the Android emulator mpv played the mock portal's
+raw MPEG-TS and a Jellyfin film in Matroska with E-AC-3 as the file itself,
+from where it was left, with the file's own subtitles, turning with the
+device. A new or changed player means building again.
 
-**One libc++_shared.so, and the newest.** React Native, libVLC and libmpv
-each carry one, and an APK holds a single copy: the first the merge sees,
+**One libc++_shared.so, and the newest.** React Native and libmpv each carry
+one, and an APK holds a single copy: the first the merge sees,
 which is React Native's, and which libmpv cannot load. A source set of the
 app's own wins the merge outright, so
 `config-plugins/with-newest-libcxx.js` points one at what mpv's module
@@ -108,8 +112,7 @@ On a phone the built-in player's "playing" follows what was asked for, not the
 engine's flag — Media3 is not playing while it buffers, and a stream turns
 ready before it starts — so a screen never flashes a pause; it names a track by
 its place (`audio-0`, `subtitle-1`), because iOS gives expo-video's tracks no
-id. VLC says "playing" once libVLC's buffer is full, and names tracks by
-libVLC's own ids (`audio-1`, `subtitle-3`); mpv names them as the file does,
+id. mpv names them as the file does,
 with each track's language and codec, and says so out loud when a decoder
 takes a stream and hands back no frame.
 

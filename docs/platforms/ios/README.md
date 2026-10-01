@@ -3,10 +3,9 @@
 Building and running on simulator and device, native modules, config plugins, and the development build.
 
 The app runs in a **development build**, not Expo Go. The built-in player is
-expo-video on AVPlayer (Phase 7). VLC (VLCKit), mpv (MPVKit) and KSPlayer are
-Expo modules in their own plugins, autolinked into the build the way the
-Android halves already are — Phase 9 brings them, and until it does the
-built-in player is the only engine here. Face ID needs the app's usage text,
+expo-video on AVPlayer (Phase 7), and mpv is an Expo module in its adapter,
+autolinked the way the Android half already is. It builds and links but has not
+played here yet. **VLC was dropped in Phase 9** and KSPlayer never arrived. Face ID needs the app's usage text,
 which Expo Go cannot carry. The app has
 no native module of its own: Phase 4's key derivation went with its vault, so
 a build made before Phase 6 still carries it, and should be made again.
@@ -87,14 +86,14 @@ which is exactly the case the policy above exists for.
   inside HLS. So `players/system`'s `ios` profile omits `mpegts`, on purpose,
   and a channel that only offers `.ts` correctly says it needs another player.
   The IPTV plugin asks the portal for HLS where it can.
-- **No other engine is built here yet.** `players/vlc` and `players/mpv` have
-  Android halves only, and `players/ksplayer` is a manifest with no profile, so
-  the app never picks it. That is the gap Phase 9 closes, and until it does,
-  a portal's raw MPEG-TS channels have no player on an iPhone.
+- **mpv is the one engine here besides the built-in player.** It draws into an
+  `AVSampleBufferDisplayLayer`, which is also what lets the system take it for
+  picture in picture. `players/ksplayer` is a manifest with no profile and is
+  not registered. VLC was dropped: libVLC draws into a plain OpenGL view, which
+  gives the system no layer to take, and mpv plays everything it did.
 - **Licences are settled** (Phase 8): the app is GPL-3.0-or-later, so a player
-  may link a GPL engine. VLCKit is LGPL-2.1 and adds no constraint; libmpv's
-  and KSPlayer's builds are GPL. A closed or App Store build would need LGPL
-  engines instead — a plan of its own.
+  may link a GPL engine, and libmpv's build is one. A closed or App Store build
+  would need LGPL engines instead — a plan of its own.
 - Which players are on, and the default, are this device's settings.
 
 ## iCloud
