@@ -1,7 +1,6 @@
-import { Folder } from '@tamagui/lucide-icons-2/icons/Folder';
 import type { ReactNode } from 'react';
 import { ScrollView } from 'react-native';
-import { H3, SizableText, XStack, YStack, useMedia } from 'tamagui';
+import { H3, XStack, YStack, useMedia } from 'tamagui';
 
 /** Card widths follow the viewport, so the same shelf works from phone to TV. */
 export function usePosterWidth() {
@@ -61,22 +60,3 @@ export function ThumbnailSkeleton() {
   );
 }
 
-export function FileRowSkeleton() {
-  return (
-    <XStack gap="$3" items="center" py="$3" px="$4">
-      <Folder size={20} color="$color8" />
-      <YStack flex={1} gap="$2">
-        <SkeletonLine width="60%" />
-        <SkeletonLine width="30%" />
-      </YStack>
-    </XStack>
-  );
-}
-
-export function SectionTitle({ children }: { children: string }) {
-  return (
-    <SizableText size="$2" fontWeight="600" color="$color10" textTransform="uppercase">
-      {children}
-    </SizableText>
-  );
-}

@@ -1,82 +1,161 @@
+import type { ContentKind, MediaItem } from '@sc/api';
+import { FlashList } from '@shopify/flash-list';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { XStack, YStack, useMedia } from 'tamagui';
+import { useCallback, useState } from 'react';
+import { RefreshControl, useWindowDimensions } from 'react-native';
+import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
 
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listKinds, listNames } from '@/components/labels';
+import { LandscapeCard } from '@/components/media/landscape-card';
+import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
-import { FileRowSkeleton, SectionTitle, ThumbnailSkeleton } from '@/components/shelf';
+import { SearchField } from '@/components/search-field';
+import { useLandscapeWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
+import { useGrid, useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
+import type { TabSource } from '@/services/sources';
 import { TAB_CONTENT } from '@/services/tab-content';
 
-const PLACEHOLDERS = Array.from({ length: 8 }, (_, index) => index);
+const PADDING = 16;
+const GAP = 12;
 
 /**
  * Web video and plain files, one source at a time — a tab across the top for
- * each. What a source shows follows the kinds it brings, never its plugin.
+ * each, and a second row of tabs when one source brings more than one kind.
+ * What a source shows follows the kinds it brings, never its plugin.
  */
 export function VideosScreen() {
   const { data: sources } = useTabSources('videos');
-  const params = useLocalSearchParams<{ source?: string }>();
+  const params = useLocalSearchParams<{ source?: string; kind?: string }>();
 
   if (!sources) return <Screen>{null}</Screen>;
   if (sources.length === 0) return <VideosEmptyState />;
 
   const selected = sources.find((source) => source.connection.id === params.source) ?? sources[0];
   if (!selected) return null;
+  const kind = selected.kinds.find((candidate) => candidate === params.kind) ?? selected.kinds[0];
+  if (!kind) return null;
 
   return (
-    <Screen gap="$4">
-      <SourceTabs
-        tabs={sources.map((source) => ({ id: source.connection.id, label: source.connection.label }))}
-        selected={selected.connection.id}
-        onSelect={(id) => router.setParams({ source: id })}
-      />
-      {selected.kinds.map((kind) => (
-        <YStack key={kind} gap="$3">
-          {selected.kinds.length > 1 ? <SectionTitle>{CONTENT_KIND_LABELS[kind]}</SectionTitle> : null}
-          {kind === 'files' ? <FileList /> : <VideoGrid />}
-        </YStack>
-      ))}
-    </Screen>
+    <SourceVideos
+      // A different source or kind is a different list, not an update of the
+      // old one: remounting drops the previous term and scroll position.
+      key={`${selected.connection.id}:${kind}`}
+      sources={sources}
+      selected={selected}
+      kind={kind}
+    />
   );
 }
 
-function VideoGrid() {
-  const media = useMedia();
-  const columns = media.lg ? 4 : media.md ? 3 : media.sm ? 2 : 1;
-  const rows = Array.from({ length: Math.ceil(PLACEHOLDERS.length / columns) }, (_, row) =>
-    PLACEHOLDERS.slice(row * columns, row * columns + columns),
-  );
-  return (
-    <YStack gap="$4">
-      {rows.map((cells, row) => (
-        <XStack key={row} gap="$3">
-          {Array.from({ length: columns }, (_, column) => (
-            <YStack key={column} flex={1}>
-              {cells[column] === undefined ? null : <ThumbnailSkeleton />}
-            </YStack>
-          ))}
-        </XStack>
-      ))}
-    </YStack>
-  );
-}
+function SourceVideos({
+  sources,
+  selected,
+  kind,
+}: {
+  sources: readonly TabSource[];
+  selected: TabSource;
+  kind: ContentKind;
+}) {
+  const [term, setTerm] = useState('');
+  const searching = term.trim().length > 0;
+  const grid = useGrid({
+    kind,
+    sort: { by: 'addedAt', order: 'desc' },
+    connectionId: selected.connection.id,
+    ...(searching ? { term } : {}),
+  });
+  const onTerm = useCallback((next: string) => setTerm(next), []);
+  const refresh = useRefreshMedia();
+  const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const cardTarget = useLandscapeWidth();
+  const [refreshing, setRefreshing] = useState(false);
 
-function FileList() {
+  const columns = Math.min(12, Math.max(1, Math.floor((width - 2 * PADDING + GAP) / (cardTarget + GAP))));
+  const cardWidth = Math.floor((width - 2 * PADDING - (columns - 1) * GAP) / columns);
+  const items = grid.data?.pages.flatMap((page) => page.items) ?? [];
+  const errors = grid.data?.pages.flatMap((page) => page.sourceErrors) ?? [];
+  // Only a source that masters watch status has any to show.
+  const showWatch = selected.effective.media?.capabilities.has('watchStateRead') ?? false;
+  const canSearch = selected.effective.media?.capabilities.has('search') ?? false;
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
-    <YStack rounded="$6" borderWidth={1} borderColor="$borderColor" bg="$color2" overflow="hidden">
-      {PLACEHOLDERS.slice(0, 6).map((index) => (
-        <YStack key={index} borderTopWidth={index === 0 ? 0 : 1} borderColor="$borderColor">
-          <FileRowSkeleton />
+    <FlashList
+      // A new column count is a new layout, not an update of the old one.
+      key={columns}
+      data={items}
+      numColumns={columns}
+      keyExtractor={(item: MediaItem) => `${item.key.connectionId}:${item.key.externalId}`}
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={{ paddingHorizontal: PADDING - GAP / 2, paddingTop: 12, paddingBottom: 48 }}
+      renderItem={({ item }: { item: MediaItem }) => (
+        <YStack px={GAP / 2} pb="$5" items="center">
+          <LandscapeCard item={item} width={cardWidth} showWatch={showWatch} />
         </YStack>
-      ))}
-    </YStack>
+      )}
+      ListHeaderComponent={
+        <YStack px={GAP / 2} pb="$4" gap="$3">
+          {sources.length > 1 ? (
+            <SourceTabs
+              tabs={sources.map((source) => ({ id: source.connection.id, label: source.connection.label }))}
+              selected={selected.connection.id}
+              onSelect={(id) => router.setParams({ source: id, kind: undefined })}
+            />
+          ) : null}
+          {selected.kinds.length > 1 ? (
+            <SourceTabs
+              tabs={selected.kinds.map((candidate) => ({ id: candidate, label: CONTENT_KIND_LABELS[candidate] }))}
+              selected={kind}
+              onSelect={(next) => router.setParams({ kind: next })}
+            />
+          ) : null}
+          {canSearch ? (
+            <SearchField placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`} term={term} onTerm={onTerm} />
+          ) : null}
+          <SourceNotices errors={errors} onRetry={() => void onRefresh()} />
+        </YStack>
+      }
+      ListEmptyComponent={
+        grid.isPending ? (
+          <YStack py="$8" items="center">
+            <Spinner size="large" color="$accent9" />
+          </YStack>
+        ) : (
+          <SizableText px={GAP / 2} color="$color10">
+            {searching ? 'Nothing here matches that.' : 'Nothing here yet.'}
+          </SizableText>
+        )
+      }
+      ListFooterComponent={
+        grid.isFetchingNextPage ? (
+          <YStack py="$5" items="center">
+            <Spinner color="$accent9" />
+          </YStack>
+        ) : null
+      }
+      onEndReachedThreshold={0.6}
+      onEndReached={() => {
+        if (grid.hasNextPage && !grid.isFetchingNextPage) void grid.fetchNextPage();
+      }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={String(theme.color10.val)} />}
+    />
   );
 }
 

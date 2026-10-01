@@ -45,6 +45,12 @@ export interface RowSpec {
   readonly kind: ContentKind;
   readonly sort: ItemSort;
   /**
+   * One source only, for a tab that shows one at a time. Absent means every
+   * source that brings the kind, merged — which is what Media wants and Videos
+   * does not.
+   */
+  readonly connectionId?: ConnectionId;
+  /**
    * Only what matches, within this kind. Asked of the sources whose `search`
    * is in effect, and of no other — a source that cannot search is left out
    * rather than answered for. A searched page is never saved: what is kept for
@@ -165,9 +171,11 @@ const CHILDREN = 'children:';
 const GUIDE_KEPT_MS = 7 * 24 * 60 * 60 * 1000;
 
 const GUIDE = 'guide:';
+/** A grid scoped to one source keeps its own saved pages, apart from the merged ones. */
+const scope = (spec: RowSpec) => (spec.connectionId === undefined ? '' : `:@${spec.connectionId}`);
 const listKey = {
-  row: (spec: RowSpec) => `row:${spec.kind}:${spec.sort.by}:${spec.sort.order}`,
-  grid: (spec: RowSpec) => `grid:${spec.kind}:${spec.sort.by}:${spec.sort.order}`,
+  row: (spec: RowSpec) => `row:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
+  grid: (spec: RowSpec) => `grid:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
   resume: 'resume',
   children: (parent: MediaItem) => `${CHILDREN}${parent.key.externalId}`,
   source: (query: ItemQuery) => `source:${query.kind}:${query.sort.by}:${query.sort.order}`,
@@ -303,13 +311,14 @@ export function createMediaService(deps: {
       return showsOn('media', source.manifest.category, kinds) || showsOn('videos', source.manifest.category, kinds);
     });
 
-  const listing = async (userId: UserId, kind: ContentKind, searching = false) =>
+  const listing = async (userId: UserId, spec: Pick<RowSpec, 'kind' | 'connectionId'>, searching = false) =>
     (await libraryOf(userId)).filter(
       (source) =>
         can(source, 'browse') &&
-        (source.effective.media?.contentKinds.includes(kind) ?? false) &&
+        (source.effective.media?.contentKinds.includes(spec.kind) ?? false) &&
         // A term goes only to a source that promised to honour one.
-        (!searching || can(source, 'search')),
+        (!searching || can(source, 'search')) &&
+        (spec.connectionId === undefined || source.connection.id === spec.connectionId),
     );
 
   const listItems = (provider: ConnectedMediaProvider, query: ItemQuery, signal?: CancelSignal): Promise<ItemPage> => {
@@ -431,7 +440,7 @@ export function createMediaService(deps: {
 
   const saved: SavedMedia = {
     row: async (userId, spec, limit) => {
-      const found = await savedLists(userId, await listing(userId, spec.kind), listKey.row(spec));
+      const found = await savedLists(userId, await listing(userId, spec), listKey.row(spec));
       if (found.length === 0) return null;
       return { items: await watch.overlay(userId, mergeRows(found.map(({ saved: list }) => list.items), spec.sort, limit)), sourceErrors: [] };
     },
@@ -442,7 +451,7 @@ export function createMediaService(deps: {
       return found.length === 0 && items.length === 0 ? null : { items, sourceErrors: [] };
     },
     gridFirstPage: async (userId, spec, pageSize) => {
-      const found = await savedLists(userId, await listing(userId, spec.kind), listKey.grid(spec));
+      const found = await savedLists(userId, await listing(userId, spec), listKey.grid(spec));
       if (found.length === 0) return null;
       const cursors: SourceCursor[] = found.map(({ source, saved: list }) => ({
         connectionId: source.connection.id,
@@ -455,7 +464,7 @@ export function createMediaService(deps: {
 
   return {
     row: async (userId, spec, limit, signal) => {
-      const { lists, sourceErrors } = await fanOut(userId, await listing(userId, spec.kind), listKey.row(spec), async (provider) =>
+      const { lists, sourceErrors } = await fanOut(userId, await listing(userId, spec), listKey.row(spec), async (provider) =>
         (await listItems(provider, { kind: spec.kind, sort: spec.sort, limit }, signal)).items,
       );
       return { items: await watch.overlay(userId, mergeRows(lists, spec.sort, limit)), sourceErrors };
@@ -473,7 +482,7 @@ export function createMediaService(deps: {
     gridPage: async (userId, spec, state, pageSize, signal) => {
       const term = spec.term?.trim();
       const searching = term !== undefined && term.length > 0;
-      const list = await listing(userId, spec.kind, searching);
+      const list = await listing(userId, spec, searching);
       const byId = new Map(list.map((source) => [source.connection.id, source]));
       const key = listKey.grid(spec);
       // The sources of the first page stay fixed while scrolling; one gone since is dropped.
