@@ -645,6 +645,15 @@ Everything above describes the target; what runs today:
   app but have not played on a device yet. Each player has its switch, "Play
   with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
+- **Search is closed:** a term rides on a query that already names its kind,
+  so there is no screen that searches everything. `RowSpec.term` goes into the
+  merged grid and `ChannelQuery.term` into the TV sections; only sources whose
+  `search` is in effect see one. A search is never saved, and nothing saved
+  stands in for one.
+- **Settings → App:** what the app does by itself on this device, as against
+  what a plugin does. Force landscape on playback is its first setting, on by
+  default. Players also carry this device's own order (`players.order`), which
+  is the order they are listed *and* tried in.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages

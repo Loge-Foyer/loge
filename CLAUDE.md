@@ -83,6 +83,11 @@ What runs today:
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos still shows skeletons.
+- Search, closed: Media's grid searches the kind it shows, TV's Live searches
+  channels and its films and series each search their own. Only sources whose
+  `search` is in effect are asked, and nothing of a search is saved.
+- Settings → App, device-wide: Force landscape on playback, on by default.
+  Players can be reordered, and the order is the order they are tried in.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.
