@@ -213,8 +213,9 @@ export function createEngine(context: PlayerContext): MediaPlayer {
     setPictureInPicture: (on) => {
       if (disposed) throw playerReleased();
       // Android has none of this at the engine: the activity shrinks instead,
-      // and the app arranges it for every player at once.
-      mpv.setPictureInPicture(on);
+      // and the app arranges it for every player at once. Its module has no
+      // such function, and calling it there threw as soon as anything played.
+      mpv.setPictureInPicture?.(on);
     },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();

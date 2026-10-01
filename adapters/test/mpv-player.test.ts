@@ -48,6 +48,14 @@ async function playing(player: MediaPlayer, engine: FakeMpvPlayer) {
 }
 
 describe('mpv on Android (libmpv)', () => {
+  it('asks for picture in picture only where the module has it — Android’s never did', async () => {
+    const { player, engine } = mpv();
+    await playing(player, engine);
+    // As the Android module is: no such function.
+    Object.defineProperty(engine, 'setPictureInPicture', { value: undefined });
+    expect(() => player.setPictureInPicture?.(true)).not.toThrow();
+  });
+
   it('hands mpv the address, where to start, and every header the stream needs', async () => {
     const { player, engine, states } = mpv();
     await player.load({ source: source({ uri: 'http://portal/live.ts', protocol: 'mpegts', headersRef: headersRef('portal') }), startMs: 90_000 });
