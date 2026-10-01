@@ -66,6 +66,9 @@ export function MediaHomeScreen() {
     sources.filter((source) => source.effective.media?.capabilities.has('watchStateRead')).map((source) => source.connection.id),
   );
   const watchFrom = (item: MediaItem) => watching.has(item.key.connectionId);
+  const playing = new Set(sources.filter((source) => source.effective.media?.capabilities.has('playback')).map((source) => source.connection.id));
+  // Continuing is the one row whose picture plays: a film or an episode, from a source that can play it.
+  const resumesFrom = (item: MediaItem) => playing.has(item.key.connectionId) && (item.type === 'movie' || item.type === 'episode');
   const cannotList = sources.filter((source) => !source.effective.media?.capabilities.has('browse'));
   const errors: SourceError[] = [
     ...(showContinue ? (continuing.data?.sourceErrors ?? []) : []),
@@ -112,6 +115,7 @@ export function MediaHomeScreen() {
               card="landscape"
               width={landscapeWidth}
               watchFrom={watchFrom}
+              resumesFrom={resumesFrom}
             />
           );
         }

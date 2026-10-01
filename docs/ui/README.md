@@ -88,7 +88,10 @@ All of this only where the source may be kept on the device (`docs/data`).
 - *Landscape* (16:9) — for Continue Watching, or any row switched to scenes: the
   frame where playback stopped when a source provides one (none does yet), else
   the episode's still, else the backdrop; "S1 · E3 — Title" or "23 min left"
-  below.
+  below. In Continue Watching the two halves do different things: the picture,
+  marked with a play glyph, resumes it where it stopped, and the words open its
+  own page — an episode's, not its show's. A source that cannot play leaves the
+  whole card opening the page, as every other row does.
 
 **A row's title** opens its grid: a full-screen page over the tab bar, in the
 row's own sort, with as many columns as the width allows (`FlashList`, keyed by

@@ -29,6 +29,7 @@ export function MediaRow({
   card,
   width,
   watchFrom,
+  resumesFrom,
   onRetry,
 }: {
   title: string;
@@ -41,6 +42,8 @@ export function MediaRow({
   width: number;
   /** Whether an item's source reports watch status to this profile. */
   watchFrom: (item: MediaItem) => boolean;
+  /** Whether a landscape card's picture plays the item from where it stopped. */
+  resumesFrom?: (item: MediaItem) => boolean;
   onRetry?: () => void;
 }) {
   const heading: ReactNode = (
@@ -86,7 +89,7 @@ export function MediaRow({
             card === 'poster' ? (
               <PosterCard item={item} width={width} showWatch={watchFrom(item)} />
             ) : (
-              <LandscapeCard item={item} width={width} showWatch={watchFrom(item)} />
+              <LandscapeCard item={item} width={width} showWatch={watchFrom(item)} resumes={resumesFrom?.(item) ?? false} />
             )
           }
         />
