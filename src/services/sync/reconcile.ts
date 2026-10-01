@@ -226,6 +226,59 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     effects.changed = true;
   }
 
+  for (const record of ofKind('subscription')) {
+    const local = await tx.subscriptions.get(record.key);
+    if (record.deleted) {
+      if (local) {
+        await tx.subscriptions.remove(record.key);
+        effects.changed = true;
+      }
+      continue;
+    }
+    const { data } = record;
+    // A child whose parent is gone is skipped: a soft delete does not cascade.
+    if (!(await tx.users.get(data.userId)) || !(await tx.connections.get(data.connectionId))) continue;
+    const row = {
+      id: data.subscriptionId,
+      userId: data.userId,
+      connectionId: data.connectionId,
+      externalId: data.externalId,
+      title: data.title,
+      addedAt: data.addedAt,
+      version: (local?.version ?? 0) + 1,
+    };
+    if (local && stableJson({ ...local, version: 0 }) === stableJson({ ...row, version: 0 })) continue;
+    await tx.subscriptions.put(row);
+    effects.changed = true;
+  }
+
+  for (const record of ofKind('playlist')) {
+    const local = await tx.playlists.get(record.key);
+    if (record.deleted) {
+      if (local) {
+        await tx.playlists.remove(record.key);
+        effects.changed = true;
+      }
+      continue;
+    }
+    const { data } = record;
+    if (!(await tx.users.get(data.userId))) continue;
+    const row = {
+      id: data.playlistId,
+      userId: data.userId,
+      title: data.title,
+      ...(data.description === undefined ? {} : { description: data.description }),
+      items: data.items.map((item) => ({ connectionId: item.connectionId, externalId: item.externalId })),
+      ...(data.source === undefined ? {} : { source: { connectionId: data.source.connectionId, externalId: data.source.externalId } }),
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      version: (local?.version ?? 0) + 1,
+    };
+    if (local && stableJson({ ...local, version: 0 }) === stableJson({ ...row, version: 0 })) continue;
+    await tx.playlists.put(row);
+    effects.changed = true;
+  }
+
   // Rule 4: what the server has no record of, it lost.
   const here = new Set((await tx.users.list()).map((user) => user.id));
   // A profile held back and since deleted here has nothing left to wait for.
@@ -239,7 +292,7 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
       const owner = ownerOf(local);
       return owner === undefined || !heldBack.has(owner);
     });
-    await tx.journal.announce(lost.map((local): JournalAnnouncement => announcementOf(local.kind, local.key)));
+    await tx.journal.announce(lost.map((local): JournalAnnouncement => announcementOf(local.kind, local.key, local.owner)));
   }
   await tx.account.putSync({ ...state, heldBack: [...heldBack] });
 
@@ -404,13 +457,18 @@ function pick(credentials: Credentials, keys: readonly string[]): Credentials {
  * Every account-wide row this device holds, as the identity of its record. A
  * profile without a PIN has nothing to lose: no record of one says the same.
  */
-async function localIdentities(tx: Repositories): Promise<readonly Pick<AccountRecord, 'kind' | 'key'>[]> {
-  const identities: Pick<AccountRecord, 'kind' | 'key'>[] = [];
+async function localIdentities(tx: Repositories): Promise<readonly LocalIdentity[]> {
+  const identities: LocalIdentity[] = [];
   for (const user of await tx.users.list()) {
     identities.push({ kind: 'profile', key: user.id });
     if (user.pinCredentialRef) identities.push({ kind: 'pin', key: user.id });
     for (const name of Object.keys(await tx.preferences.get(user.id))) identities.push({ kind: 'preference', key: `${user.id}/${name}` });
   }
+  // Their key is a generated id and names no profile, so the owner is carried.
+  for (const subscription of await tx.subscriptions.listAll()) {
+    identities.push({ kind: 'subscription', key: subscription.id, owner: subscription.userId });
+  }
+  for (const playlist of await tx.playlists.listAll()) identities.push({ kind: 'playlist', key: playlist.id, owner: playlist.userId });
   for (const connection of await tx.connections.list()) {
     if (!accountWide(connection.pluginId)) continue;
     identities.push({ kind: 'connection', key: connection.id });
@@ -421,8 +479,14 @@ async function localIdentities(tx: Repositories): Promise<readonly Pick<AccountR
   return identities;
 }
 
+/** A local row's identity, with whose it is where the key does not say. */
+interface LocalIdentity extends Pick<AccountRecord, 'kind' | 'key'> {
+  readonly owner?: UserId;
+}
+
 /** The profile a record belongs to, if it is one's. */
-function ownerOf(record: Pick<AccountRecord, 'kind' | 'key'>): UserId | undefined {
+function ownerOf(record: LocalIdentity): UserId | undefined {
+  if (record.owner !== undefined) return record.owner;
   const [first, second] = record.key.split('/');
   if (record.kind === 'profile' || record.kind === 'pin' || record.kind === 'preference') return toUserId(first ?? '');
   return record.kind === 'profileValues' ? toUserId(second ?? '') : undefined;

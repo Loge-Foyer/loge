@@ -91,6 +91,53 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
       expect(row.items.length).toBeGreaterThan(0);
     });
 
+    it('brings a profile’s own lists, and a delete made elsewhere', async () => {
+      const { a, b, media, sam } = await onOneAccount();
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, sam));
+      await a.db.subscriptions.put({
+        id: 'sub-1',
+        userId: sam,
+        connectionId: home.id,
+        externalId: 'UC1',
+        title: 'Some Channel',
+        addedAt: '2026-10-01T12:00:00.000Z',
+        version: 1,
+      });
+      await a.db.playlists.put({
+        id: 'list-1',
+        userId: sam,
+        title: 'Rewatch',
+        items: [{ connectionId: home.id, externalId: 'm1' }],
+        createdAt: '2026-10-01T12:00:00.000Z',
+        updatedAt: '2026-10-01T12:00:00.000Z',
+        version: 1,
+      });
+      await sync(a);
+      await sync(b);
+      expect((await b.db.subscriptions.list(sam)).map((entry) => entry.title)).toEqual(['Some Channel']);
+      expect((await b.db.playlists.list(sam)).map((entry) => entry.title)).toEqual(['Rewatch']);
+      // Following twice follows once, whichever device asked.
+      expect((await b.db.subscriptions.forChannel(sam, home.id, 'UC1'))?.id).toBe('sub-1');
+
+      // Unfollowed on B, and the delete reaches A.
+      await b.db.subscriptions.remove('sub-1');
+      await sync(b);
+      await sync(a);
+      expect(await a.db.subscriptions.listAll()).toEqual([]);
+
+      // A list edited as a whole: the last push wins, items and all.
+      await b.db.playlists.put({
+        ...((await b.db.playlists.get('list-1')) ?? ({} as never)),
+        title: 'Rewatch, renamed',
+        items: [],
+        updatedAt: '2026-10-01T13:00:00.000Z',
+        version: 2,
+      });
+      await sync(b);
+      await sync(a);
+      expect(await a.db.playlists.get('list-1')).toMatchObject({ title: 'Rewatch, renamed', items: [] });
+    });
+
     it('writes nothing it applied into the journal, so nothing comes back for ever', async () => {
       const { a, b, server, sam } = await onOneAccount();
       await a.services.profiles.rename(sam, 'Renamed on A');
