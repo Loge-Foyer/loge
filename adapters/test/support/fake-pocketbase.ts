@@ -20,6 +20,8 @@ export const COLLECTION_KINDS: Readonly<Record<string, string>> = {
   preferences: 'preference',
   connections: 'connection',
   connection_profile_values: 'profileValues',
+  subscriptions: 'subscription',
+  playlists: 'playlist',
 };
 
 const json = (status: number, body?: unknown): Reply => ({ status, json: body ?? {} });

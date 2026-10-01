@@ -21,7 +21,7 @@ import type { ConnectionId, PluginId, UserId } from './ids';
 /** Profiles an account may hold unless the server says otherwise (`SC_MAX_PROFILES`). */
 export const DEFAULT_MAX_PROFILES = 10;
 
-export const RECORD_KINDS = ['profile', 'pin', 'preference', 'connection', 'profileValues'] as const;
+export const RECORD_KINDS = ['profile', 'pin', 'preference', 'connection', 'profileValues', 'subscription', 'playlist'] as const;
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -51,6 +51,40 @@ export interface RecordData {
     readonly settings: FieldValues;
     readonly secretKeys: readonly string[];
     readonly secrets: Credentials;
+  };
+  /**
+   * A channel a profile follows on one connection. One record each rather than
+   * one list, so two devices subscribing to different channels do not
+   * overwrite each other and a delete wins on its own.
+   */
+  readonly subscription: {
+    readonly subscriptionId: string;
+    readonly userId: UserId;
+    readonly connectionId: ConnectionId;
+    /** The channel's id on that source. */
+    readonly externalId: string;
+    /** As it was when followed, so a list reads while the source is away. */
+    readonly title: string;
+    /** ISO 8601. */
+    readonly addedAt: string;
+  };
+  /**
+   * A profile's own list, or a mirror of one a source holds. Edited as a
+   * whole, so the whole-entity rule (spec §10) is the right grain: two devices
+   * reordering the same list end on whichever pushed last.
+   */
+  readonly playlist: {
+    readonly playlistId: string;
+    readonly userId: UserId;
+    readonly title: string;
+    readonly description?: string;
+    /** In order. A list may mix sources: a Jellyfin film beside a web video. */
+    readonly items: readonly { readonly connectionId: ConnectionId; readonly externalId: string }[];
+    /** Set when this mirrors a list the source holds; absent when it is the profile's own. */
+    readonly source?: { readonly connectionId: ConnectionId; readonly externalId: string };
+    /** ISO 8601. */
+    readonly createdAt: string;
+    readonly updatedAt: string;
   };
 }
 
@@ -126,6 +160,8 @@ export const MAX_RECORD_LENGTH = 256 * 1024;
 
 const PIN = /^\d{4}$/;
 const MAX_SECRET = 4 * 1024;
+/** A list long enough for anyone, short enough that the whole account still reads in one go. */
+const MAX_LIST = 2_000;
 
 /** A record's key: the app's own id, or its natural key (`userId/name`, `connectionId/userId`). */
 export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): string {
@@ -138,6 +174,10 @@ export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): s
       return `${String(parts.userId)}/${String(parts.name)}`;
     case 'connection':
       return String(parts.connectionId);
+    case 'subscription':
+      return String((data as { subscriptionId?: string }).subscriptionId);
+    case 'playlist':
+      return String((data as { playlistId?: string }).playlistId);
     default:
       return `${String(parts.connectionId)}/${String(parts.userId)}`;
   }
@@ -180,6 +220,15 @@ function isKeyOf(kind: RecordKind, key: string): boolean {
   return parts.length === 1 && isId(parts[0]);
 }
 
+/** A list may mix sources, so each entry names its own connection. */
+function isMediaKeyList(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_LIST &&
+    value.every((entry) => isRecord(entry) && isId(entry.connectionId) && isId(entry.externalId))
+  );
+}
+
 function isData(kind: RecordKind, data: unknown): boolean {
   if (!isRecord(data)) return false;
   switch (kind) {
@@ -200,6 +249,28 @@ function isData(kind: RecordKind, data: unknown): boolean {
         isFieldValues(data.settings) &&
         isKeyList(data.secretKeys) &&
         isSecrets(data.secrets, data.secretKeys as readonly string[])
+      );
+    case 'subscription':
+      return (
+        isId(data.subscriptionId) &&
+        isId(data.userId) &&
+        isId(data.connectionId) &&
+        isId(data.externalId) &&
+        isText(data.title) &&
+        isText(data.addedAt)
+      );
+    case 'playlist':
+      return (
+        isId(data.playlistId) &&
+        isId(data.userId) &&
+        isText(data.title) &&
+        (data.title as string).trim() !== '' &&
+        (data.description === undefined || isText(data.description)) &&
+        isMediaKeyList(data.items) &&
+        (data.source === undefined ||
+          (isRecord(data.source) && isId(data.source.connectionId) && isId(data.source.externalId))) &&
+        isText(data.createdAt) &&
+        isText(data.updatedAt)
       );
     case 'profileValues':
       return (

@@ -7,6 +7,8 @@ export const COLLECTIONS: readonly (readonly [RecordKind, string])[] = [
   ['preference', 'preferences'],
   ['connection', 'connections'],
   ['profileValues', 'connection_profile_values'],
+  ['subscription', 'subscriptions'],
+  ['playlist', 'playlists'],
 ];
 
 export const collectionOf = (kind: RecordKind): string => COLLECTIONS.find(([of]) => of === kind)?.[1] ?? kind;
@@ -31,6 +33,16 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
   if (record.kind === 'profileValues') {
     body.connection = await idOf('connection', first);
     body.profile = await idOf('profile', second);
+  }
+  // Their own ids are their keys, so the parents come from the data rather
+  // than from the key — and a tombstone carries neither, which is why the
+  // server keeps the relations it already stored.
+  if (!record.deleted && record.kind === 'subscription') {
+    body.profile = await idOf('profile', record.data.userId);
+    body.connection = await idOf('connection', record.data.connectionId);
+  }
+  if (!record.deleted && record.kind === 'playlist') {
+    body.profile = await idOf('profile', record.data.userId);
   }
   if (record.deleted) return body;
 
@@ -59,6 +71,34 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
     case 'profileValues': {
       const { data } = record;
       return { ...body, off: data.off, fields: data.fields, settings: data.settings, secret_keys: data.secretKeys, secrets: data.secrets };
+    }
+    case 'subscription': {
+      const { data } = record;
+      return {
+        ...body,
+        // The parents' keys as well as their derived ids: a read has only the
+        // record's own key, which is a generated id and names nobody.
+        profile_key: data.userId,
+        connection_key: data.connectionId,
+        external_id: data.externalId,
+        title: data.title,
+        added_at: data.addedAt,
+      };
+    }
+    case 'playlist': {
+      const { data } = record;
+      return {
+        ...body,
+        profile_key: data.userId,
+        title: data.title,
+        description: data.description ?? '',
+        items: data.items,
+        // An empty object rather than null: PocketBase's JSON field has no
+        // null, and "not a mirror of anything" is what absent means here.
+        source: data.source ?? {},
+        created_at: data.createdAt,
+        updated_at: data.updatedAt,
+      };
     }
   }
 }
@@ -101,5 +141,37 @@ function dataOf(kind: RecordKind, key: string, stored: Readonly<Record<string, u
       };
     case 'profileValues':
       return { connectionId: first, userId: second, off: stored.off, ...values };
+    case 'subscription':
+      return {
+        subscriptionId: key,
+        userId: stored.profile_key,
+        connectionId: stored.connection_key,
+        externalId: stored.external_id,
+        title: stored.title,
+        addedAt: stored.added_at,
+      };
+    case 'playlist': {
+      const source = stored.source;
+      return {
+        playlistId: key,
+        userId: stored.profile_key,
+        title: stored.title,
+        ...(typeof stored.description === 'string' && stored.description !== '' ? { description: stored.description } : {}),
+        items: stored.items ?? [],
+        ...(isSource(source) ? { source } : {}),
+        createdAt: stored.created_at,
+        updatedAt: stored.updated_at,
+      };
+    }
   }
+}
+
+/** `{}` is how "not a mirror of anything" is stored, and is not a source. */
+function isSource(value: unknown): value is { connectionId: string; externalId: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { connectionId?: unknown }).connectionId === 'string' &&
+    typeof (value as { externalId?: unknown }).externalId === 'string'
+  );
 }
