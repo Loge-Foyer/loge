@@ -34,6 +34,9 @@ class ScVlcModule : Module() {
       Function("seek") { player: ScVlcPlayer, positionMs: Double ->
         appContext.mainQueue.launch { player.seek(positionMs) }
       }
+      Function("setRate") { player: ScVlcPlayer, rate: Double ->
+        appContext.mainQueue.launch { player.setRate(rate) }
+      }
       Function("setAudioTrack") { player: ScVlcPlayer, id: Int ->
         appContext.mainQueue.launch { player.setAudioTrack(id) }
       }

@@ -36,6 +36,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   /** Plays again from here: after the end mpv holds the last frame, so this is a seek. */
   replay(startMs: number): void;
   seek(positionMs: number): void;
+  /** How fast it plays, 1 being normal. */
+  setRate(rate: number): void;
   /** `-1` turns it off. */
   setAudioTrack(id: number): void;
   setSubtitleTrack(id: number): void;

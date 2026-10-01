@@ -32,6 +32,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   /** Opens the stream anew and plays it from here: after its end, libVLC plays a stream again no other way. */
   replay(startMs: number): void;
   seek(positionMs: number): void;
+  /** How fast it plays, 1 being normal. */
+  setRate(rate: number): void;
   setAudioTrack(id: number): void;
   /** `-1` turns subtitles off. */
   setSubtitleTrack(id: number): void;

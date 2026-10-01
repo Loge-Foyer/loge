@@ -1,5 +1,6 @@
 import {
   AppError,
+  clampRate,
   createPlayerEvents,
   playbackFailed,
   playerReleased,
@@ -263,6 +264,10 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       if (disposed) throw playerReleased();
       video.currentTime = Math.max(0, positionMs) / 1000;
       if (events.state() === 'ended') events.setState('paused');
+    },
+    setRate: (rate) => {
+      if (disposed) throw playerReleased();
+      video.playbackRate = clampRate(rate);
     },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();

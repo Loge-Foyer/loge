@@ -44,6 +44,10 @@ public final class ScMpvModule: Module {
         player.seek(positionMs)
       }
 
+      Function("setRate") { (player: ScMpvPlayer, rate: Double) in
+        player.setRate(rate)
+      }
+
       Function("setAudioTrack") { (player: ScMpvPlayer, id: Int) in
         player.setAudioTrack(id)
       }

@@ -1,5 +1,6 @@
 import {
   AppError,
+  clampRate,
   createPlayerEvents,
   playbackFailed,
   playerReleased,
@@ -181,6 +182,10 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       restartAt = at;
       events.setState('paused');
       events.emit({ type: 'position', positionMs: Math.round(at) });
+    },
+    setRate: (rate) => {
+      if (disposed) throw playerReleased();
+      vlc.setRate(clampRate(rate));
     },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();

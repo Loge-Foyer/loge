@@ -115,6 +115,10 @@ class ScVlcPlayer(context: Context, appContext: AppContext) : SharedObject(appCo
     mediaPlayer.setTime(positionMs.toLong())
   }
 
+  fun setRate(rate: Double) {
+    mediaPlayer.rate = rate.toFloat()
+  }
+
   fun setAudioTrack(id: Int) {
     mediaPlayer.setAudioTrack(id)
   }

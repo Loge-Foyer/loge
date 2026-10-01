@@ -148,6 +148,8 @@ class ScMpvPlayer(context: Context, appContext: AppContext) : SharedObject(appCo
     ScMpvNative.command(mpv, arrayOf("seek", (positionMs / 1000.0).toString(), "absolute+exact"))
   }
 
+  fun setRate(rate: Double) = onMpv { ScMpvNative.setPropertyDouble(mpv, "speed", rate) }
+
   fun setAudioTrack(id: Int) = onMpv {
     if (id < 0) ScMpvNative.setPropertyString(mpv, "aid", "no") else ScMpvNative.setPropertyInt(mpv, "aid", id)
   }

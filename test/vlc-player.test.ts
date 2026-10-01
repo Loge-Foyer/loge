@@ -195,4 +195,16 @@ describe('VLC on Android (libVLC)', () => {
     // There is no VLC for a browser.
     expect(PROFILES.web).toBeUndefined();
   });
+
+  it('plays faster and slower, and clamps a rate no engine honours', async () => {
+    const { player, engine } = vlc();
+    await playing(player, engine);
+    player.setRate?.(1.5);
+    expect(engine.rate).toBe(1.5);
+    // Outside what an engine will play, every engine clamps the same way.
+    player.setRate?.(99);
+    expect(engine.rate).toBe(4);
+    player.setRate?.(0);
+    expect(engine.rate).toBe(0.25);
+  });
 });

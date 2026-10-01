@@ -34,6 +34,12 @@ export interface MediaPlayer {
   pause(): void;
   seek(positionMs: number): void;
   setAudioTrack(id: string): void;
+  /**
+   * How fast it plays, 1 being normal. Optional: an engine that cannot change
+   * its rate leaves it out, and the app offers no speed for that player rather
+   * than offering one that does nothing.
+   */
+  setRate?(rate: number): void;
   /** `null` turns subtitles off. */
   setSubtitleTrack(id: string | null): void;
   subscribe(listener: (event: PlayerEvent) => void): () => void;
@@ -56,6 +62,15 @@ export interface PlayerRole {
  * the current one at once, so a screen that subscribes after `load` still
  * knows where things are.
  */
+/**
+ * Rates outside this do not play: an engine either refuses or garbles the
+ * sound. Every engine clamps with this rather than inventing its own bounds.
+ */
+export function clampRate(rate: number): number {
+  if (!Number.isFinite(rate)) return 1;
+  return Math.min(4, Math.max(0.25, rate));
+}
+
 export function createPlayerEvents() {
   const listeners = new Set<(event: PlayerEvent) => void>();
   let state: PlayerState = 'idle';

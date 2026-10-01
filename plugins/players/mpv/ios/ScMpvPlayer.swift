@@ -362,6 +362,10 @@ public final class ScMpvPlayer: SharedObject {
     onMpv { [weak self] in self?.command(["seek", "\(positionMs / 1000.0)", "absolute+exact"]) }
   }
 
+  func setRate(_ rate: Double) {
+    onMpv { [weak self] in self?.setDouble("speed", rate) }
+  }
+
   func setAudioTrack(_ id: Int) {
     onMpv { [weak self] in
       guard let self else { return }
