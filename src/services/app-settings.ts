@@ -6,6 +6,9 @@ import { PLAYER_BUTTONS, type AppSettings, type DeviceSettingsRepository, type P
  * journaled, never carried to your server, never in a backup.
  */
 export const APP_DEFAULTS: AppSettings = {
+  openOn: 'media',
+  // A phone is its owner's: it opens on the profile chosen first.
+  alwaysChooseProfile: false,
   // On: a film fills a phone held either way up, and the viewer does not have
   // to keep it level for the picture to stay the right way round.
   forceLandscape: true,
@@ -29,6 +32,15 @@ export const APP_DEFAULTS: AppSettings = {
   softwareFallback: true,
 };
 
+/**
+ * The defaults on this kind of device. A TV belongs to whoever picks up the
+ * remote, so it asks who is watching every time; anything else is one
+ * person's, and opens on their profile.
+ */
+export function appDefaults(device: { readonly tv: boolean }): AppSettings {
+  return { ...APP_DEFAULTS, alwaysChooseProfile: device.tv };
+}
+
 /** What a press and hold may be set to. 1 is off. */
 export const HOLD_RATES = [1, 1.5, 2, 2.5, 3, 4] as const;
 
@@ -45,16 +57,20 @@ export interface AppSettingsService {
   setButton(row: ButtonRow, button: PlayerButton, shown: boolean): Promise<void>;
 }
 
-export function createAppSettingsService(deps: { readonly deviceSettings: DeviceSettingsRepository }): AppSettingsService {
-  const { deviceSettings } = deps;
+export function createAppSettingsService(deps: {
+  readonly deviceSettings: DeviceSettingsRepository;
+  /** This device's defaults, from `appDefaults`. */
+  readonly defaults?: AppSettings;
+}): AppSettingsService {
+  const { deviceSettings, defaults = APP_DEFAULTS } = deps;
   return {
-    get: async () => ({ ...APP_DEFAULTS, ...(await deviceSettings.get()).app }),
+    get: async () => ({ ...defaults, ...(await deviceSettings.get()).app }),
     set: async (change) => {
       await deviceSettings.update((current) => ({ ...current, app: { ...current.app, ...change } }));
     },
     setButton: async (row, button, shown) => {
       await deviceSettings.update((current) => {
-        const now = current.app?.[row] ?? APP_DEFAULTS[row];
+        const now = current.app?.[row] ?? defaults[row];
         // Kept in the order the list itself is in, so switching one off and on
         // again puts it back where it was rather than at the end.
         const next = shown ? PLAYER_BUTTONS.filter((each) => each === button || now.includes(each)) : now.filter((each) => each !== button);

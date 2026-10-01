@@ -139,6 +139,14 @@ export const PLAYER_SLIDERS = ['off', 'brightness', 'volume'] as const;
 export type PlayerSlider = (typeof PLAYER_SLIDERS)[number];
 
 export interface AppSettings {
+  /** The tab the app opens on when it starts. */
+  readonly openOn: ContentTab;
+  /**
+   * Ask who is watching every time the app starts, rather than opening the
+   * device's default profile. The default is still kept, for the day this is
+   * switched off.
+   */
+  readonly alwaysChooseProfile: boolean;
   /** Turn the phone on its side for the player and hold it there. */
   readonly forceLandscape: boolean;
   /** How far a `seek` moves, each way. */

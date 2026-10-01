@@ -12,20 +12,22 @@ import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
 import { SizableText } from 'tamagui';
 
-import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus, fileSize } from '@/components/labels';
+import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus, fileSize, TAB_LABELS } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
 import { useDownloadBudget } from '@/hooks/use-downloads';
 import type { DownloadBudget } from '@/services/downloads';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
-import { useProfiles } from '@/hooks/use-profiles';
+import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import { APP_DEFAULTS } from '@/services/app-settings';
+import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
 import { categoryHref } from './plugin-route';
 
@@ -49,8 +51,12 @@ export function SettingsScreen() {
   const user = profiles.find((profile) => profile.id === userId);
   const appSettings = useAppSettings();
   const { set } = useAppSettingActions();
+  const { data: defaultUserId } = useDefaultUserId();
   // While it is being read, show the default rather than a switch that flicks.
   const forceLandscape = appSettings.data?.forceLandscape ?? APP_DEFAULTS.forceLandscape;
+  const openOn = appSettings.data?.openOn ?? APP_DEFAULTS.openOn;
+  const asks = appSettings.data?.alwaysChooseProfile;
+  const defaultProfile = profiles.find((profile) => profile.id === defaultUserId);
 
   /** A list's line: what is set up in it, or what it is for. */
   const summaryOf = (category: PluginCategory) => {
@@ -94,6 +100,33 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">
+        <SettingsRow
+          title="Open on"
+          subtitle="The tab the app starts on"
+          trailing={
+            <SourceTabs
+              tabs={CONTENT_TABS.map((tab) => ({ id: tab, label: TAB_LABELS[tab] }))}
+              selected={openOn}
+              onSelect={(tab) => set.mutate({ openOn: tab as ContentTab })}
+            />
+          }
+        />
+        <SettingsRow
+          title="Always show profile selector"
+          subtitle={
+            asks
+              ? 'Asks who’s watching every time the app starts'
+              : `Opens ${defaultProfile ? defaultProfile.name : 'the default profile'} when the app starts`
+          }
+          trailing={
+            <AppSwitch
+              label="Always show profile selector"
+              checked={asks ?? false}
+              disabled={asks === undefined || set.isPending}
+              onCheckedChange={(next) => set.mutate({ alwaysChooseProfile: next })}
+            />
+          }
+        />
         <SettingsRow
           title="Force landscape on playback"
           subtitle={forceLandscape ? 'The player turns the phone on its side and holds it there' : 'The player turns with the phone'}

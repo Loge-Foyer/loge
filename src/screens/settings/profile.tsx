@@ -12,6 +12,7 @@ import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
+import { useAppSettings } from '@/hooks/use-app-settings';
 import { useDefaultUserId, useProfileActions, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { describeFailure } from '@/screens/unlock';
@@ -25,6 +26,7 @@ export function ProfileScreen({ userId }: { userId: UserId }) {
   const { pins } = useServices();
   const { data: profiles } = useProfiles();
   const { data: defaultUserId } = useDefaultUserId();
+  const asks = useAppSettings().data?.alwaysChooseProfile ?? false;
   const { rename, remove, setDefault } = useProfileActions();
   const profile = profiles?.find((candidate) => candidate.id === userId);
   const [unlocked, setUnlocked] = useState(false);
@@ -81,9 +83,15 @@ export function ProfileScreen({ userId }: { userId: UserId }) {
         </PrimaryButton>
       </XStack>
 
-      <SettingsSection footer="The default profile opens when the app starts on this device.">
+      <SettingsSection
+        footer={
+          asks
+            ? 'This device asks who’s watching every time it starts. The default profile is the one it opens once that is off.'
+            : 'The default profile opens when the app starts on this device.'
+        }
+      >
         <SettingsRow
-          title={isDefault ? 'Opens at launch' : 'Open this profile at launch'}
+          title={isDefault ? (asks ? 'The default profile' : 'Opens at launch') : asks ? 'Make this the default' : 'Open this profile at launch'}
           subtitle={isDefault ? 'This is the default profile on this device' : 'Make it the default on this device'}
           disabled={isDefault}
           onPress={() => setDefault.mutate(profile.id)}

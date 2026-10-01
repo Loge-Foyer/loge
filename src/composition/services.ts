@@ -12,7 +12,7 @@ import { uuidGenerator } from '@/platform/ids';
 import { consoleLogger } from '@/platform/log';
 import { createNetworkMonitor } from '@/platform/network';
 import { createOwnerAuthentication } from '@/platform/owner-authentication';
-import { currentPlatform } from '@/platform/platform-id';
+import { currentPlatform, isTV } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
 import { screenBrightness } from '@/platform/brightness';
 import { pictureInPicture } from '@/platform/picture-in-picture';
@@ -28,7 +28,7 @@ import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { createPlaybackService } from '@/services/playback';
-import { createAppSettingsService } from '@/services/app-settings';
+import { appDefaults, createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
@@ -85,7 +85,8 @@ export function createServices(): AppServices {
     log,
   });
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
-  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins });
+  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings, defaults: appDefaults({ tv: isTV() }) });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins, appSettings });
   const sources = createSourceService({ catalog, connections: db.connections });
   const pool = createProviderPool({ catalog, credentials, sessions, http, network, identity, clock, crypto, log });
   const connections = createConnectionService({
@@ -190,7 +191,6 @@ export function createServices(): AppServices {
     platform: currentPlatform(),
     shrinksAnything: () => pictureInPicture.available(),
   });
-  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
   const playback = createPlaybackService({
     players: playerPlugins,
     choosing: players.choosing,

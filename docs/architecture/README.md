@@ -108,9 +108,18 @@ rules, and why each exists, are in `docs/data`.
 `failed`. The first decision after launch is the pure function in
 `services/boot.ts`, which reads whether the device has an account as well as
 its profiles: with no account, it is `needs-account`; with an account that has
-no profile left, `needs-first-user`. Every root route sits behind exactly one
-`Stack.Protected` guard on that gate, so when the gate moves, the guards do the
-navigating.
+no profile left, `needs-first-user`. A device that always asks who is watching
+— Settings → App, on by default on a TV — goes to `needs-user-selection`
+whatever its default profile, and `session.refresh()` decides the same way, so
+a sync arriving while the picker is up never walks past it. Every root route
+sits behind exactly one `Stack.Protected` guard on that gate, so when the gate
+moves, the guards do the navigating.
+
+`index` is the first route behind the `ready` guard, so a guard flip lands
+there — after the picker, the PIN pad or Welcome — just as a cold start does,
+and it redirects to the tab this device opens on (`app.openOn`, Media unless
+Settings → App says otherwise). A link that opened the app never passes
+through it.
 
 Everything a signed-in profile can reach lives in the `(app)` group: the tabs,
 and the pages pushed over them — the full-screen grid, detail pages and the

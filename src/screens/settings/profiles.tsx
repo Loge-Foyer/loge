@@ -8,6 +8,7 @@ import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { TextInput } from '@/components/text-input';
 import { useHeldBackProfiles, useMaxProfiles } from '@/hooks/use-account';
+import { useAppSettings } from '@/hooks/use-app-settings';
 import { useDefaultUserId, useProfileActions, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 
@@ -20,6 +21,8 @@ export function ProfilesScreen() {
   const userId = useActiveUserId();
   const { data: profiles = [] } = useProfiles();
   const { data: defaultUserId } = useDefaultUserId();
+  // With the selector always shown, the default opens nothing by itself.
+  const asks = useAppSettings().data?.alwaysChooseProfile ?? false;
   const { data: maxProfiles } = useMaxProfiles();
   const { data: heldBack } = useHeldBackProfiles();
   const { create } = useProfileActions();
@@ -32,7 +35,7 @@ export function ProfilesScreen() {
     <Screen>
       <SettingsSection
         title="In your account"
-        footer={`The default profile opens at launch. Each profile has its own history and favourites; a PIN keeps it for its owner.${full ? ` Your account holds up to ${maxProfiles} profiles, and has no room for another.` : ''}`}
+        footer={`${asks ? 'Every launch asks who’s watching; the default is the profile that opens once that is off.' : 'The default profile opens at launch.'} Each profile has its own history and favourites; a PIN keeps it for its owner.${full ? ` Your account holds up to ${maxProfiles} profiles, and has no room for another.` : ''}`}
       >
         {profiles.map((profile) => (
           <SettingsRow
@@ -40,7 +43,7 @@ export function ProfilesScreen() {
             title={profile.name}
             {...subtitleOf([
               profile.id === userId ? 'You' : null,
-              profile.id === defaultUserId ? 'Opens at launch' : null,
+              profile.id === defaultUserId ? (asks ? 'Default' : 'Opens at launch') : null,
               heldBack?.has(profile.id) ? 'Only on this device: your server is full' : null,
             ])}
             icon={<ProfileAvatar user={profile} size={36} />}

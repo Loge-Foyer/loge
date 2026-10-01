@@ -26,10 +26,12 @@ export default function RootLayout() {
 
 /**
  * Every route sits behind exactly one guard, keyed on the session gate; when
- * the gate moves, the guards do the navigating. `(app)` comes first so it is
- * where a guard flip lands once the app is ready. It is reachable while the
- * app starts, too — behind the splash screen — so a link that opened the app
- * keeps its target instead of losing it to the boot screen.
+ * the gate moves, the guards do the navigating. `index` comes first so it is
+ * where a guard flip lands once the app is ready — after "Who's watching?",
+ * the PIN pad or Welcome — and it opens the tab this device chose, as it
+ * does at a cold start. `(app)` is reachable while the app starts, too —
+ * behind the splash screen — so a link that opened the app keeps its target
+ * instead of losing it to the boot screen.
  */
 function RootStack() {
   const gate = useGate();
@@ -43,8 +45,8 @@ function RootStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={gate.kind === 'ready' || gate.kind === 'starting'}>
-        <Stack.Screen name="(app)" />
         <Stack.Screen name="index" />
+        <Stack.Screen name="(app)" />
         <Stack.Screen name="who-is-watching" options={{ presentation: 'modal' }} />
         <Stack.Screen name="unlock/[userId]" options={{ presentation: 'modal' }} />
       </Stack.Protected>

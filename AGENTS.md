@@ -653,9 +653,13 @@ Everything above describes the target; what runs today:
   `search` is in effect see one. A search is never saved, and nothing saved
   stands in for one.
 - **Settings → App:** what the app does by itself on this device, as against
-  what a plugin does. Force landscape on playback is its first setting, on by
-  default. Players also carry this device's own order (`players.order`), which
-  is the order they are listed *and* tried in.
+  what a plugin does. The tab it opens on (`openOn`, Media by default —
+  `src/app/index.tsx` redirects there at a cold start and after a profile is
+  picked), whether it asks who is watching at every launch
+  (`alwaysChooseProfile`: off on a phone, on on a TV, from `appDefaults`), and
+  force landscape on playback, on by default. Players also carry this
+  device's own order (`players.order`), which is the order they are listed
+  *and* tried in.
 - **Watch status (database v5):** marking something watched and where
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages

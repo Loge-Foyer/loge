@@ -39,7 +39,7 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
-import { createAppSettingsService } from '@/services/app-settings';
+import { appDefaults, createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import type { FileExchange, FileStore, TransferRequest } from '@/services/ports';
@@ -288,6 +288,8 @@ export function buildServices(options: {
   backupDebounceMs?: number;
   /** Players with an engine, as the composition root lists them. */
   players?: readonly PlayerPlugin[];
+  /** A TV, which asks who is watching at every launch unless told otherwise. */
+  tv?: boolean;
 }) {
   const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
@@ -312,7 +314,8 @@ export function buildServices(options: {
     log: silentLog,
   });
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
-  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins });
+  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings, defaults: appDefaults({ tv: options.tv ?? false }) });
+  const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins, appSettings });
   const sources = createSourceService({ catalog, connections: db.connections });
   const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, crypto, log: silentLog });
   const connections = createConnectionService({
@@ -392,7 +395,6 @@ export function buildServices(options: {
     void session.refresh();
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
-  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
   // A file store entirely in memory: a test can say a film is kept without a disk.
   const files = fakeFileStore();
   const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });

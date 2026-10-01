@@ -18,6 +18,8 @@ export interface BootFacts {
   readonly users: readonly AppUser[];
   /** A device setting, not a profile attribute. */
   readonly defaultUserId: UserId | undefined;
+  /** This device asks who is watching at every launch, whatever its default. */
+  readonly alwaysChooseProfile: boolean;
 }
 
 export interface BootDecision {
@@ -27,7 +29,7 @@ export interface BootDecision {
 }
 
 /** The launch decision tree (spec §6), pure so it can be tested without a screen. */
-export function decideInitialGate({ hasAccount, users, defaultUserId }: BootFacts): BootDecision {
+export function decideInitialGate({ hasAccount, users, defaultUserId, alwaysChooseProfile }: BootFacts): BootDecision {
   if (!hasAccount) return { gate: { kind: 'needs-account' }, clearDefaultUser: defaultUserId !== undefined };
   if (users.length === 0) {
     return { gate: { kind: 'needs-first-user' }, clearDefaultUser: defaultUserId !== undefined };
@@ -37,6 +39,7 @@ export function decideInitialGate({ hasAccount, users, defaultUserId }: BootFact
   }
   const user = users.find((candidate) => candidate.id === defaultUserId);
   if (!user) return { gate: { kind: 'needs-user-selection' }, clearDefaultUser: true };
+  if (alwaysChooseProfile) return { gate: { kind: 'needs-user-selection' }, clearDefaultUser: false };
   return {
     gate: user.pinProtected
       ? { kind: 'needs-user-unlock', userId: user.id }

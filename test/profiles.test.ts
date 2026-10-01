@@ -28,6 +28,29 @@ describe.each(ENGINES)('profiles on %s', (engine: Engine) => {
     expect((await db.users.list()).map((user) => user.id)).toEqual([alex.id]);
   });
 
+  it('ask who is watching at every launch on a TV, until it is told to open the default', async () => {
+    const where = reopenable(engine);
+    const credentials = memoryCredentialStore();
+    const deviceBound = memoryCredentialStore();
+    const launch = async () => {
+      const services = buildServices({ plugins: [source.plugin], engine, where, credentials, deviceBound, tv: true }).services;
+      await services.account.ensureAccount();
+      await services.session.start();
+      return services;
+    };
+    const kids = await (await launch()).profiles.create('Kids');
+
+    // The first profile made is still the default; a TV asks anyway.
+    const tv = await launch();
+    expect(tv.session.getSnapshot()).toEqual({ kind: 'needs-user-selection' });
+    // A sync arriving while the picker is up does not walk past it.
+    await tv.session.refresh();
+    expect(tv.session.getSnapshot()).toEqual({ kind: 'needs-user-selection' });
+
+    await tv.appSettings.set({ alwaysChooseProfile: false });
+    expect((await launch()).session.getSnapshot()).toEqual({ kind: 'ready', userId: kids.id });
+  });
+
   it('come back after a restart: profiles, PINs, the default, connections and layouts', async () => {
     const where = reopenable(engine);
     const credentials = memoryCredentialStore();

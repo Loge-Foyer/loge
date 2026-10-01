@@ -142,6 +142,11 @@ portal, which has no portal to be refused by.
   and says so. A local copy kept after signing out that holds more than ten
   keeps them all, but adds none until there are fewer.
 - **PIN lock**, per profile.
+- **App** — how this device behaves, whoever is watching: the tab it opens on
+  (Media, Videos or TV), whether it asks who's watching every time it starts
+  (on by default on a TV, where whoever picks up the remote is someone else;
+  the default profile is kept for when it is off), and force landscape on
+  playback.
 - **Adapters** — four rows: Sources, IPTV, Players, Sync. Each opens that
   category's list for this platform (`settings/adapters/[category]`), and each
   plugin has its page (`settings/adapters/[category]/[name]`). There is no

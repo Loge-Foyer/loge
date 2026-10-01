@@ -7,10 +7,10 @@ import type { AppSettings, PlayerButton } from '@/services/ports';
 import { useServices } from './services-context';
 import { useRefreshLocalState } from './use-local-state';
 
-/** How this device behaves while something plays. Device state: every profile sees the same. */
-export function useAppSettings() {
+/** How this device behaves. Device state: every profile sees the same. */
+export function useAppSettings({ enabled = true }: { enabled?: boolean } = {}) {
   const { appSettings } = useServices();
-  return useQuery({ queryKey: deviceKey('app-settings'), queryFn: () => appSettings.get() });
+  return useQuery({ queryKey: deviceKey('app-settings'), queryFn: () => appSettings.get(), enabled });
 }
 
 export function useAppSettingActions() {
