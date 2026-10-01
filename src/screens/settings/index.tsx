@@ -14,12 +14,15 @@ import { SizableText } from 'tamagui';
 import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
+import { AppSwitch } from '@/components/app-switch';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
+import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
+import { APP_DEFAULTS } from '@/services/app-settings';
 
 import { categoryHref } from './plugin-route';
 
@@ -40,6 +43,10 @@ export function SettingsScreen() {
   const { data: profiles = [] } = useProfiles();
   const { data: sources = [] } = useSources();
   const user = profiles.find((profile) => profile.id === userId);
+  const appSettings = useAppSettings();
+  const { set } = useAppSettingActions();
+  // While it is being read, show the default rather than a switch that flicks.
+  const forceLandscape = appSettings.data?.forceLandscape ?? APP_DEFAULTS.forceLandscape;
 
   /** A list's line: what is set up in it, or what it is for. */
   const summaryOf = (category: PluginCategory) => {
@@ -79,6 +86,21 @@ export function SettingsScreen() {
           subtitle={user?.pinProtected ? 'On — this profile asks for its PIN' : 'Off'}
           icon={<Lock size={20} color="$color11" />}
           href="/settings/pin"
+        />
+      </SettingsSection>
+
+      <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">
+        <SettingsRow
+          title="Force landscape on playback"
+          subtitle={forceLandscape ? 'The player turns the phone on its side and holds it there' : 'The player turns with the phone'}
+          trailing={
+            <AppSwitch
+              label="Force landscape on playback"
+              checked={forceLandscape}
+              disabled={appSettings.data === undefined || set.isPending}
+              onCheckedChange={(next) => set.mutate({ forceLandscape: next })}
+            />
+          }
         />
       </SettingsSection>
 

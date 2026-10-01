@@ -6,4 +6,6 @@ import type { ScreenOrientationControl } from '@/services/ports';
 export const screenOrientation: ScreenOrientationControl = {
   upright: () => ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP),
   free: () => ScreenOrientation.unlockAsync(),
+  // Either way up, so the phone can still be turned end for end while it plays.
+  landscape: () => ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE),
 };

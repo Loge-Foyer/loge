@@ -37,6 +37,25 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     expect((await browser.services.players.list()).map((each) => each.manifest.id)).toEqual(['players/built-in']);
   });
 
+  it('are reordered by moving one, favourite first, and the ends do nothing', async () => {
+    const phone = buildServices({ plugins: [builtIn, phoneOnly, iosOnly], engine, platform: 'ios' });
+    const order = async () => (await phone.services.players.list()).map((each) => each.manifest.id);
+    const players = phone.services.players;
+
+    await players.move(pluginId('players/ios-only'), -1);
+    expect(await order()).toEqual(['players/built-in', 'players/ios-only', 'players/phone-only']);
+
+    await players.move(pluginId('players/ios-only'), -1);
+    expect(await order()).toEqual(['players/ios-only', 'players/built-in', 'players/phone-only']);
+    // Nothing says otherwise, so the one on top is the one that plays first.
+    expect((await players.list()).find((each) => each.preferred)?.manifest.id).toBe('players/ios-only');
+
+    // Already at the top, and already at the bottom: both do nothing.
+    await players.move(pluginId('players/ios-only'), -1);
+    await players.move(pluginId('players/phone-only'), 1);
+    expect(await order()).toEqual(['players/ios-only', 'players/built-in', 'players/phone-only']);
+  });
+
   it('keep which are off and which plays first — switching one on to play first, and passing the turn when it goes off', async () => {
     const { services } = buildServices({ plugins: [builtIn, phoneOnly, iosOnly], engine, platform: 'ios' });
     await services.players.setEnabled(iosOnly.manifest.id, false);

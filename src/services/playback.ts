@@ -65,7 +65,7 @@ export interface PlaybackService {
   /** The episode after this one — the next season's first, after a season's last. */
   nextEpisode(userId: UserId, episode: Episode, signal?: CancelSignal): Promise<Episode | undefined>;
   /** Where playing an item gets to, reported as it goes. One per session: made when it starts, stopped when it ends. */
-  reports(userId: UserId, item: MediaItem, live: boolean): PlaybackReports;
+  reports(userId: UserId, item: MediaItem, live: boolean, startMs?: number): PlaybackReports;
 }
 
 export function createPlaybackService(deps: {
@@ -125,6 +125,7 @@ export function createPlaybackService(deps: {
       return undefined;
     },
 
-    reports: (userId, item, live) => playbackReports({ watch: deps.watch, clock: deps.clock, userId, item, live }),
+    reports: (userId, item, live, startMs) =>
+      playbackReports({ watch: deps.watch, clock: deps.clock, userId, item, live, ...(startMs === undefined ? {} : { startMs }) }),
   };
 }

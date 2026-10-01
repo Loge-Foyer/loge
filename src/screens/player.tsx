@@ -20,7 +20,7 @@ import { clockTime, describeMissing, episodeCode } from '@/components/labels';
 import { PrimaryButton } from '@/components/primary-button';
 import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
-import { useFreeOrientation, useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, type PlayerSnapshot } from '@/hooks/use-playback';
+import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
 import { useServices } from '@/hooks/services-context';
 
 const HIDE_AFTER_MS = 3_500;
@@ -46,7 +46,7 @@ export function PlayerScreen({
   /** "Play with…": the player the user picked, for this item and the episodes after it. */
   player?: PluginId;
 }) {
-  useFreeOrientation();
+  usePlayerOrientation();
   const key = { connectionId, externalId: itemId };
   const detail = useItem(key, !live);
   const item = live ? undefined : detail.data?.detail.item;
@@ -55,7 +55,7 @@ export function PlayerScreen({
     ...(live ? { live: true } : {}),
     ...(player ? { player } : {}),
   });
-  const report = usePlaybackReports(item, live !== undefined);
+  const report = usePlaybackReports(item, live !== undefined, startMs);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;

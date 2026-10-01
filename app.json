@@ -15,7 +15,8 @@
         },
         "NSLocalNetworkUsageDescription": "Streaming Center reaches your media servers and sync server on this network."
       },
-      "bundleIdentifier": "com.fkg.streamingcenter"
+      "bundleIdentifier": "com.fkg.streamingcenter",
+      "appleTeamId": "UWDGY69RA7"
     },
     "android": {
       "adaptiveIcon": {

@@ -25,12 +25,17 @@ export function playbackReports(deps: {
   readonly userId: UserId;
   readonly item: MediaItem;
   readonly live: boolean;
+  /** Where this session begins — a resume, or zero from the top. */
+  readonly startMs?: number;
 }): PlaybackReports {
   const { watch, userId, item } = deps;
   const key = item.key;
   let started = false;
   let stopped = false;
-  let positionMs = 0;
+  // Where the session begins, not zero: most engines say they are playing
+  // before they say where, so a `started` seeded with zero would report the
+  // top of the episode — and overwrite the very position it resumed from.
+  let positionMs = deps.startMs ?? 0;
   let durationMs: number | undefined;
   let lastProgressAt = 0;
   let queue = Promise.resolve();

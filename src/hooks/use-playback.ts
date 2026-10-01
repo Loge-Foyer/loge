@@ -2,6 +2,7 @@ import type { AppError, AudioTrack, ConnectionId, Episode, GlobalMediaKey, Media
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
+import { APP_DEFAULTS } from '@/services/app-settings';
 import type { PlaybackPlan } from '@/services/playback';
 import type { PlaybackReports } from '@/services/playback-reports';
 import { remoteKey } from '@/services/query-keys';
@@ -124,11 +125,11 @@ export function usePlayer(plan: PlaybackPlan | undefined, connectionId: Connecti
 }
 
 /** Where playing gets to, reported as it goes — one session per item, made in the effect for the reason `usePlayer` gives. */
-export function usePlaybackReports(item: MediaItem | undefined, live: boolean) {
+export function usePlaybackReports(item: MediaItem | undefined, live: boolean, startMs?: number) {
   const userId = useActiveUserId();
   const { playback } = useServices();
   const reports = useRef<PlaybackReports | undefined>(undefined);
-  const begin = useEffectEvent(() => (item ? playback.reports(userId, item, live) : undefined));
+  const begin = useEffectEvent(() => (item ? playback.reports(userId, item, live, startMs) : undefined));
   const connectionId = item?.key.connectionId;
   const externalId = item?.key.externalId;
 
@@ -158,12 +159,19 @@ export function useNextEpisode(episode: Episode | undefined) {
 }
 
 /** Any way the device is held while this screen is open; upright again after. */
-export function useFreeOrientation() {
-  const { orientation } = useServices();
+export function usePlayerOrientation() {
+  const { orientation, appSettings } = useServices();
   useEffect(() => {
-    void orientation.free().catch(() => undefined);
+    let left = false;
+    void (async () => {
+      const { forceLandscape } = await appSettings.get().catch(() => APP_DEFAULTS);
+      // The screen may have been left while the setting was being read.
+      if (left) return;
+      await (forceLandscape ? orientation.landscape() : orientation.free()).catch(() => undefined);
+    })();
     return () => {
+      left = true;
       void orientation.upright().catch(() => undefined);
     };
-  }, [orientation]);
+  }, [orientation, appSettings]);
 }

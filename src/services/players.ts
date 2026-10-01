@@ -40,6 +40,11 @@ export interface PlayerService {
   setPreferred(id: PluginId): Promise<void>;
   /** Makes it, or stops it being, the one that plays first on a tab. Making it switches it on. */
   setFirstOn(id: PluginId, tab: ContentTab, first: boolean): Promise<void>;
+  /**
+   * Moves it one place up (`-1`) or down (`1`) in this device's order, which
+   * is the order they are listed and tried in. At either end, nothing happens.
+   */
+  move(id: PluginId, by: -1 | 1): Promise<void>;
 }
 
 export function createPlayerService(deps: {
@@ -48,21 +53,39 @@ export function createPlayerService(deps: {
   readonly platform: PlatformId;
 }): PlayerService {
   const { catalog, deviceSettings, platform } = deps;
-  const players = () => catalog.inCategory('players');
+
+  /**
+   * This device's order: the ones it names, in that order, then everything
+   * else in the catalogue's. A player an update adds therefore appears at the
+   * end rather than vanishing, and no stored id is ever required to exist.
+   */
+  const players = (order?: readonly PluginId[]) => {
+    const all = catalog.inCategory('players');
+    if (!order || order.length === 0) return all;
+    const rest = new Map(all.map((manifest) => [manifest.id, manifest]));
+    const named = order.flatMap((id) => {
+      const manifest = rest.get(id);
+      if (!manifest) return [];
+      rest.delete(id);
+      return [manifest];
+    });
+    return [...named, ...rest.values()];
+  };
 
   const standing = async () => {
     const settings = (await deviceSettings.get()).players ?? {};
     const off = new Set(settings.off ?? []);
-    const enabled = players().filter((manifest) => !off.has(manifest.id));
-    // The chosen one while it is on; otherwise the first that is — in the catalogue's order, never by name.
+    const listed = players(settings.order);
+    const enabled = listed.filter((manifest) => !off.has(manifest.id));
+    // The chosen one while it is on; otherwise the first that is — in this device's order, never by name.
     const preferred = enabled.find((manifest) => manifest.id === settings.preferred) ?? enabled[0];
-    return { off, enabled, preferred, tabs: settings.tabs ?? {} };
+    return { off, listed, enabled, preferred, tabs: settings.tabs ?? {} };
   };
 
   return {
     list: async () => {
-      const { off, preferred, tabs } = await standing();
-      return players().map((manifest) => ({
+      const { off, listed, preferred, tabs } = await standing();
+      return listed.map((manifest) => ({
         manifest,
         enabled: !off.has(manifest.id),
         preferred: manifest.id === preferred?.id,
@@ -94,6 +117,20 @@ export function createPlayerService(deps: {
         ...current,
         players: { ...current.players, off: (current.players?.off ?? []).filter((other) => other !== id), preferred: id },
       }));
+    },
+    move: async (id, by) => {
+      const listed = players((await deviceSettings.get()).players?.order).map((manifest) => manifest.id);
+      const from = listed.indexOf(id);
+      const to = from + by;
+      if (from < 0 || to < 0 || to >= listed.length) return;
+      const order = [...listed];
+      const moved = order[from];
+      const displaced = order[to];
+      if (moved === undefined || displaced === undefined) return;
+      order[to] = moved;
+      order[from] = displaced;
+      // The whole list is stored, so the order holds even as the catalogue changes.
+      await deviceSettings.update((current) => ({ ...current, players: { ...current.players, order } }));
     },
     setFirstOn: async (id, tab, first) => {
       await deviceSettings.update((current) => {

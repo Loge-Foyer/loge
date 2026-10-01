@@ -1,6 +1,8 @@
-import type { PluginCategory, PluginManifest } from '@sc/api';
+import type { PluginCategory, PluginId, PluginManifest } from '@sc/api';
+import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Stack } from 'expo-router';
-import { Paragraph, SizableText } from 'tamagui';
+import { Button, Paragraph, SizableText, XStack } from 'tamagui';
 
 import { Chip, ChipRow } from '@/components/chip';
 import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
@@ -9,7 +11,7 @@ import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
-import { usePlayers } from '@/hooks/use-players';
+import { usePlayerActions, usePlayers } from '@/hooks/use-players';
 import type { PlayerSummary } from '@/services/players';
 
 import { BackupSection } from './backup';
@@ -19,7 +21,7 @@ import { pluginHref } from './plugin-route';
 const FOOTERS: Readonly<Record<PluginCategory, string>> = {
   sources: 'Films, series and anime appear on Media; videos and files on Videos. A connection can keep a separate sign-in, or everything, for each profile.',
   iptv: 'Live TV, and a provider’s films and series, appear on TV — never in your library.',
-  players: 'Players are set up on each device: which are on, and which plays first.',
+  players: 'Players are set up on each device: which are on, and which plays first. Move one up to try it before the others.',
   sync: 'Where your account lives — on this device, or on your own server — and where its backups go. Each device chooses its own.',
 };
 
@@ -37,6 +39,7 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
   const { data: connected } = useConnectedPlugins();
   const { data: account } = useAccount();
   const { data: players = [] } = usePlayers();
+  const { move } = usePlayerActions();
 
   if (!category) {
     return (
@@ -47,25 +50,31 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
     );
   }
 
-  const shown = catalog.inCategory(category);
+  // Players are listed in this device's own order, which is also the order
+  // they are tried in; every other category keeps the catalogue's.
+  const shown: readonly PluginManifest[] = category === 'players' ? players.map((player) => player.manifest) : catalog.inCategory(category);
+  const orderable = category === 'players' && shown.length > 1;
   return (
     <Screen gap="$4">
       <Stack.Screen options={{ title: CATEGORY_LABELS[category] }} />
       {shown.length > 0 ? (
         <SettingsSection footer={FOOTERS[category]}>
-          {shown.map((manifest) => (
+          {shown.map((manifest, index) => (
             <SettingsRow
               key={manifest.id}
               title={manifest.displayName}
               subtitle={manifest.description}
               trailing={
-                account?.kind === 'server' && account.connection.pluginId === manifest.id ? (
-                  <Chip label="Your account" tone="accent" />
-                ) : connected?.has(manifest.id) ? (
-                  <Chip label="Connected" tone="accent" />
-                ) : manifest.player ? (
-                  <PlayerChip state={players.find((player) => player.manifest.id === manifest.id)} />
-                ) : null
+                <XStack items="center" gap="$2">
+                  {account?.kind === 'server' && account.connection.pluginId === manifest.id ? (
+                    <Chip label="Your account" tone="accent" />
+                  ) : connected?.has(manifest.id) ? (
+                    <Chip label="Connected" tone="accent" />
+                  ) : manifest.player ? (
+                    <PlayerChip state={players.find((player) => player.manifest.id === manifest.id)} />
+                  ) : null}
+                  {orderable ? <Reorder id={manifest.id} index={index} count={shown.length} disabled={move.isPending} onMove={move.mutate} /> : null}
+                </XStack>
               }
               href={pluginHref(manifest.id)}
             />
@@ -98,5 +107,45 @@ export function PluginChips({ manifest }: { manifest: PluginManifest }) {
         <Chip key={kind} label={CONTENT_KIND_LABELS[kind]} tone="accent" />
       ))}
     </ChipRow>
+  );
+}
+
+/** Moves a player up or down this device's order. The ends are inert, and say so by being disabled. */
+function Reorder({
+  id,
+  index,
+  count,
+  disabled,
+  onMove,
+}: {
+  id: PluginId;
+  index: number;
+  count: number;
+  disabled: boolean;
+  onMove: (move: { id: PluginId; by: -1 | 1 }) => void;
+}) {
+  return (
+    <XStack gap="$1">
+      <Button
+        size="$2"
+        chromeless
+        circular
+        icon={ChevronUp}
+        aria-label="Move up"
+        disabled={disabled || index === 0}
+        opacity={index === 0 ? 0.3 : 1}
+        onPress={() => onMove({ id, by: -1 })}
+      />
+      <Button
+        size="$2"
+        chromeless
+        circular
+        icon={ChevronDown}
+        aria-label="Move down"
+        disabled={disabled || index === count - 1}
+        opacity={index === count - 1 ? 0.3 : 1}
+        onPress={() => onMove({ id, by: 1 })}
+      />
+    </XStack>
   );
 }

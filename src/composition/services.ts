@@ -25,6 +25,7 @@ import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { createPlaybackService } from '@/services/playback';
+import { createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import { createProfileService } from '@/services/profiles';
@@ -152,6 +153,7 @@ export function createServices(): AppServices {
     log,
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: currentPlatform() });
+  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
   const playback = createPlaybackService({
     players: playerPlugins,
     choosing: players.choosing,
@@ -194,6 +196,7 @@ export function createServices(): AppServices {
       backupTargets,
       files: createFileExchange(log),
       players,
+      appSettings,
       watch,
       playback,
       orientation: screenOrientation,

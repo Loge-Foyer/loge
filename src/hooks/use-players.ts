@@ -26,5 +26,9 @@ export function usePlayerActions() {
       mutationFn: ({ id, tab, first }: { id: PluginId; tab: ContentTab; first: boolean }) => players.setFirstOn(id, tab, first),
       onSuccess: () => refresh(),
     }),
+    move: useMutation({
+      mutationFn: ({ id, by }: { id: PluginId; by: -1 | 1 }) => players.move(id, by),
+      onSuccess: () => refresh(),
+    }),
   };
 }

@@ -4,4 +4,5 @@ import type { ScreenOrientationControl } from '@/services/ports';
 export const screenOrientation: ScreenOrientationControl = {
   upright: async () => undefined,
   free: async () => undefined,
+  landscape: async () => undefined,
 };

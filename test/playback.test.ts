@@ -187,7 +187,7 @@ describe('pressing Play', () => {
 });
 
 describe('reporting what is played', () => {
-  function session(options: { live?: boolean } = {}) {
+  function session(options: { live?: boolean; startMs?: number } = {}) {
     const clock = fakeClock();
     const reports: string[] = [];
     const item = movie('c1' as ConnectionId, 'm1', 2020);
@@ -196,7 +196,14 @@ describe('reporting what is played', () => {
         reports.push(`${report.kind} ${report.positionMs}${report.paused ? ' paused' : ''}`);
       },
     };
-    const tracked = playbackReports({ watch, clock, userId: 'u1' as never, item, live: options.live ?? false });
+    const tracked = playbackReports({
+      watch,
+      clock,
+      userId: 'u1' as never,
+      item,
+      live: options.live ?? false,
+      ...(options.startMs === undefined ? {} : { startMs: options.startMs }),
+    });
     const send = (...events: PlayerEvent[]) => events.forEach((event) => tracked.event(event));
     const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     return { clock, reports, tracked, send, settle };
@@ -214,6 +221,17 @@ describe('reporting what is played', () => {
     await t.tracked.stop();
     await t.tracked.stop();
     expect(t.reports).toEqual(['started 0', 'progress 15000', 'progress 19000 paused', 'stopped 19000']);
+  });
+
+  it('a resumed session starts where it resumed, not at the top', async () => {
+    // Engines say they are playing before they say where. Seeded with zero, a
+    // `started` would report the top of the episode — writing 0 over the very
+    // position it resumed from, locally and at the source, before a frame
+    // played. Jellyfin then drops it from Continue Watching.
+    const t = session({ startMs: 540_000 });
+    t.send(state('loading'), state('playing'));
+    await t.tracked.stop();
+    expect(t.reports).toEqual(['started 540000', 'stopped 540000']);
   });
 
   it('stops at the end, once', async () => {

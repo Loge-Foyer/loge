@@ -78,7 +78,27 @@ export interface DeviceSettings {
     readonly off?: readonly PluginId[];
     readonly preferred?: PluginId;
     readonly tabs?: Readonly<Partial<Record<ContentTab, PluginId>>>;
+    /**
+     * The order this device lists and tries them in, favourite first. Ids it
+     * does not name follow, in the catalogue's order — so a player added by an
+     * update appears without rewriting anything.
+     */
+    readonly order?: readonly PluginId[];
   };
+  /** How this device behaves, whoever is watching. Never journaled, never backed up. */
+  readonly app?: {
+    /** Turn the phone on its side for the player and hold it there. On unless set otherwise. */
+    readonly forceLandscape?: boolean;
+  };
+}
+
+/**
+ * How this device behaves, whoever is watching — resolved, with every default
+ * applied, so nothing downstream has to know what the default was.
+ */
+export interface AppSettings {
+  /** Turn the phone on its side for the player and hold it there. */
+  readonly forceLandscape: boolean;
 }
 
 export interface DeviceSettingsRepository {
@@ -389,6 +409,8 @@ export interface OwnerAuthentication {
 export interface ScreenOrientationControl {
   upright(): Promise<void>;
   free(): Promise<void>;
+  /** On its side, and held there: a film fills the screen without the viewer holding the phone level. */
+  landscape(): Promise<void>;
 }
 
 /** Whether the app is in front of someone. */
