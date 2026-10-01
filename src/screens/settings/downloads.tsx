@@ -74,18 +74,6 @@ export function DownloadsScreen() {
         </Paragraph>
       ) : null}
 
-      <SettingsSection
-        title="Make a copy smaller on this device"
-        footer="Not yet. A phone would still have to pull the whole film down to shrink it, so only the bandwidth of the original is saved — and on iPhone the video layer cannot read Matroska at all, which is what most large films are. Asking the server to make a smaller one, above, costs nothing and sends less."
-      >
-        <SettingsRow
-          title="Convert while downloading"
-          subtitle="Not available"
-          disabled
-          trailing={<AppSwitch label="Convert while downloading" checked={false} disabled onCheckedChange={() => undefined} />}
-        />
-      </SettingsSection>
-
       {entries.length > 0 ? (
         <SettingsSection title={entries.length === 1 ? '1 download' : `${entries.length} downloads`}>
           {entries.map((entry) => (
