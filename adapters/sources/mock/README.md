@@ -5,15 +5,15 @@ built and exercised with no network at all. Development builds only.
 
 ## Category
 
-**Source** — `sources/mock`, in `plugins/sources/mock`. The mock's other jobs
+**Source** — `sources/mock`, in `adapters/sources/mock`. The mock's other jobs
 are plugins of their own:
 
 | Plugin | Job |
 | --- | --- |
 | `sources/mock` | the catalogue below |
-| `sync/mock` | a pretend account (`plugins/sync/mock`) |
-| `sync/mock-backup` | a pretend backup target (`plugins/sync/mock-backup`) |
-| `iptv/mock` | channels, groups, a guide and a little VOD for the TV tab (`plugins/iptv/mock`) |
+| `sync/mock` | a pretend account (`adapters/sync/mock`) |
+| `sync/mock-backup` | a pretend backup target (`adapters/sync/mock-backup`) |
+| `iptv/mock` | channels, groups, a guide and a little VOD for the TV tab (`adapters/iptv/mock`) |
 
 ## Brings
 

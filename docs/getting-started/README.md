@@ -1,19 +1,21 @@
 # Getting started
 
 ```bash
-cd ../streaming_center_plugins && npm install   # first: plugins resolve @sc/api from here
-cd ../streaming_center_app && npm install
-npm run android                                 # or npm run ios: builds the development client, the first time
-npm start                                       # later: Metro alone, for the build already installed
-npm run web                                     # the browser needs no build
+npm install          # the adapters are workspaces of this package; nothing else to link
+npm run android      # or npm run ios: builds the development client, the first time
+npm start            # later: Metro alone, for the build already installed
+npm run web          # the browser needs no build
 ```
 
 Phones and simulators run a **development build**, not Expo Go. The app
-carries native code — today a small module for deriving keys, which Phase 6
-retires; from Phase 7, the video players — and Face ID needs the app's own
-usage text. Building it needs the Android SDK or Xcode, and takes a few minutes
-the first time; after that, JavaScript changes load as usual. See
-`docs/platforms/`.
+carries native code — mpv's engine, picture in picture, and the keychain — and
+Face ID needs the app's own usage text. Building it needs the Android SDK or
+Xcode, and takes several minutes the first time; after that, JavaScript changes
+load as usual. See `docs/platforms/`.
+
+A native change — a new package with native code, anything in `app.json` that
+a config plugin reads — means building again. A stale build looks exactly like
+code that did not change.
 
 ## The first launch
 

@@ -47,7 +47,7 @@ client, that client becomes a package of its own.
 **Media servers are media-only.** A media server masters what its users
 watched. The app reads it (`watchStateRead`) and later writes progress back
 (`watchStateWrite`) through the media role — never through the account. Do not
-create `plugins/sync/jellyfin`.
+create `adapters/sync/jellyfin`.
 
 ## Boundaries
 

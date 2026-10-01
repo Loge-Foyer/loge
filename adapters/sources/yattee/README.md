@@ -4,7 +4,7 @@ Backend for YouTube and other web video, presented in the same vocabulary as a f
 
 ## Category
 
-**Source** — `sources/yattee`, in `plugins/sources/yattee`. Its connections belong to the account, and each can be switched off without being removed.
+**Source** — `sources/yattee`, in `adapters/sources/yattee`. Its connections belong to the account, and each can be switched off without being removed.
 
 ## Brings
 

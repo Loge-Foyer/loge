@@ -15,18 +15,18 @@ npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web
 ```
 
-The exports are not optional. They are the only proof that Metro resolves the
-plugins across the repository boundary, and that each platform's bundle holds
-only its own storage — SQLite and the keychain for iOS, IndexedDB for the web —
-and, once backups exist, that sql.js stays out of the native bundles and in a
+The exports are not optional. They are the only proof that Metro bundles one
+copy of every package the adapters share with the app, that each platform's
+bundle holds only its own storage — SQLite and the keychain for iOS, IndexedDB
+for the web — and that sql.js stays out of the native bundles and sits in a
 chunk of its own on the web. The `sc-verify` skill has the full pass, with the
 checks for each.
 
-After changing the plugins repository, run `npm run typecheck && npm test`
-there as well. After a change to the account contract, run the sync
-repository's tests too: `npm test` today, and from Phase 6 `go test ./...` and
-its harness, which drives the real `sync/custom-server` plugin against the real
-PocketBase binary.
+`npm run typecheck` and `npm test` cover the adapters as well as `src/`: five
+TypeScript programs and two vitest projects, from this one package. After a
+change to the account contract, run the sync repository's tests too —
+`go test ./...` and its harness, which drives the real `sync/custom-server`
+adapter against the real PocketBase binary.
 
 Typechecking is two programs. `tsconfig.json` covers the app, which runs on
 Hermes and never sees Node's types. `test/tsconfig.json` covers the tests,
@@ -94,10 +94,10 @@ else is real, including the database engine:
   file. `test/players.test.ts`: players per platform, on and off, which plays
   first, and nothing journaled.
 
-The real account plugin meets the real server in the sync repository's
-harness (Phase 6's S4). The scheduler runs on
-fake timers against a scripted engine. Choosing a player is a pure function in
-`@sc/api`, tested there over a matrix of descriptors and profiles.
+The real account adapter meets the real server in the sync repository's
+harness. The scheduler runs on fake timers against a scripted engine. Choosing
+a player is a pure function in `@sc/api`, tested there over a matrix of
+descriptors and profiles.
 
 `test/support/services.ts` builds the service graph as the app wires it, and
 stays in step with `composition/`. `test/support/engines.ts` opens a fresh

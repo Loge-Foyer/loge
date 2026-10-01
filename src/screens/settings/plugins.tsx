@@ -375,7 +375,7 @@ function PlayerControlsSection() {
   );
 }
 
-/** "VLC", or "VLC and mpv", or "VLC, mpv and the built-in player". */
+/** "mpv", or "mpv and the built-in player". */
 function listed(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? '';
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;

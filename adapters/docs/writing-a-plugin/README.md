@@ -4,7 +4,7 @@ One plugin, one job. First decide its category (`../categories/`): a source,
 an IPTV provider, a player, or a place for the account. A service that does two
 jobs becomes two plugins, one in each folder.
 
-1. **Create the package** — `plugins/<category>/<name>/`.
+1. **Create the package** — `adapters/<category>/<name>/`.
    - Its `package.json` is named for the category: `@sc/source-<name>`,
      `@sc/iptv-<name>`, `@sc/player-<name>` or `@sc/sync-<name>`.
    - It has `"exports": "./src/index.ts"`, and `@sc/api` as a **peer**

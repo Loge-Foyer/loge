@@ -11,7 +11,7 @@ Every plugin does one job, in one folder:
 | --- | --- | --- | --- | --- |
 | `sources` | brings films, series, anime, videos, files | `media` | account | Jellyfin, Plex, WebDAV, Google Drive's files |
 | `iptv` | brings live TV, and a provider's films and series | `media` with `live` | account | Stalker, Xtream, M3U |
-| `players` | plays | `player` | device | the built-in player, KSPlayer, mpv, VLC |
+| `players` | plays | `player` | device | the built-in player, and mpv |
 | `sync` | keeps the account, or its backup | `account` or `backup` | device | your own server, iCloud or Drive backups |
 
 ## The service already has a plugin, and should do a second job
@@ -21,8 +21,8 @@ refuses it, and the conformance test does too. Create a second plugin in the
 second job's folder:
 
 ```
-plugins/sources/google-drive/     files from Drive          @sc/source-google-drive
-plugins/sync/google-drive/        the backup file on Drive  @sc/sync-google-drive
+adapters/sources/google-drive/     files from Drive          @sc/source-google-drive
+adapters/sync/google-drive/        the backup file on Drive  @sc/sync-google-drive
 ```
 
 Why two plugins, when it is one service:
@@ -45,8 +45,8 @@ Jellyfin, Emby and Plex master what their users watched. Reading that is
 `watchStateRead`; writing progress back is `watchStateWrite`. Both are media
 capabilities, and both go through the media role.
 
-Never make `plugins/sync/jellyfin`: the account keeps profiles and sources, not
-a media server's watch status. Nothing is mastered twice.
+Never make `adapters/sync/jellyfin`: the account keeps profiles and sources,
+not a media server's watch status. Nothing is mastered twice.
 
 ## Between sources and IPTV
 

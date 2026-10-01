@@ -11,7 +11,7 @@ working checklist.
 
 ## The test of success
 
-One new folder under `plugins/<category>/`, and one line registering it in the
+One new folder under `adapters/<category>/`, and one line registering it in the
 app. If you find yourself editing the app's screens, services or database
 schema, the abstraction in `api` is wrong — fix that instead of working around
 it.
@@ -34,7 +34,7 @@ through the media role.
 
 ## Checklist
 
-1. **Create `plugins/<category>/<name>/`** with:
+1. **Create `adapters/<category>/<name>/`** with:
    - a `package.json`: `@sc/<source|iptv|player|sync>-<name>`,
      `"exports": "./src/index.ts"`, and `@sc/api` as a **peer** dependency, so
      the host supplies the one instance and branded IDs match. A player adds

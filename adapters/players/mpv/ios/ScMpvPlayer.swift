@@ -515,7 +515,7 @@ public final class ScMpvPlayer: SharedObject {
  A sample-buffer layer has no player behind it that the system can read, so it
  asks these instead: what is playing, how long it is, and what a skip means.
  It is an Objective-C protocol, so it needs an `NSObject` — `SharedObject` is
- not one, the same reason VLC's delegate is forwarded rather than conformed to.
+ not one, so the delegate is forwarded rather than conformed to.
  */
 private final class ScMpvPipDelegate: NSObject, AVPictureInPictureSampleBufferPlaybackDelegate {
   private weak var player: ScMpvPlayer?

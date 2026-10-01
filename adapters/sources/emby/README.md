@@ -4,7 +4,7 @@ Emby server. Closely related to Jellyfin — similar APIs without being identica
 
 ## Category
 
-**Source** — `sources/emby`, in `plugins/sources/emby`. Like Jellyfin, the server stays the master of what each of its users watched. The app will read that and, with playback, write progress back through the media role — never through the account.
+**Source** — `sources/emby`, in `adapters/sources/emby`. Like Jellyfin, the server stays the master of what each of its users watched. The app will read that and, with playback, write progress back through the media role — never through the account.
 
 ## Brings
 

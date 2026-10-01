@@ -49,7 +49,7 @@ page in a browser).
 ## Four tabs
 
 **Media, Videos, TV, Settings.** What appears on each is decided by category
-and kind in `services/tab-content.ts` (`docs/plugins`), never by a plugin's
+and kind in `services/tab-content.ts` (`docs/adapters`), never by a plugin's
 name.
 
 - **Media** — a source's movies, shows and anime, merged across every source.
@@ -155,7 +155,7 @@ portal, which has no portal to be refused by.
 The form is built from the plugin's manifest (`components/manifest-form/`),
 switching on `field.type` only; the app has no form of its own for any plugin.
 It has one switch of its own, `enabled`, for the whole account, and the
-per-profile tabs `docs/plugins` describes. A connection whose plugin cannot run
+per-profile tabs `docs/adapters` describes. A connection whose plugin cannot run
 on this device shows "not available on this device", and its values are kept
 for the devices that can.
 

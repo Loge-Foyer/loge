@@ -4,7 +4,7 @@ Plain files on a NAS. No media server supplies titles or artwork, so this one in
 
 ## Category
 
-**Source** — `sources/webdav`, in `plugins/sources/webdav`. Its connections belong to the account, and each can be switched off without being removed.
+**Source** — `sources/webdav`, in `adapters/sources/webdav`. Its connections belong to the account, and each can be switched off without being removed.
 
 ## Brings
 

@@ -7,7 +7,7 @@ with their passwords — so every device signed in to it has the same.
 
 ## Category
 
-**Sync**, with an `account` block — `sync/custom-server`, in `plugins/sync/custom-server`. Device-wide: each device chooses its own account.
+**Sync**, with an `account` block — `sync/custom-server`, in `adapters/sync/custom-server`. Device-wide: each device chooses its own account.
 
 ## Connection
 

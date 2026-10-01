@@ -5,7 +5,7 @@ tested with no portal at all. Development builds only.
 
 ## Category
 
-**IPTV** — `iptv/mock`, in `plugins/iptv/mock`. It runs in a browser too: it
+**IPTV** — `iptv/mock`, in `adapters/iptv/mock`. It runs in a browser too: it
 has no portal to send it no CORS headers.
 
 ## Brings

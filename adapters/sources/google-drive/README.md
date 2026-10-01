@@ -4,7 +4,7 @@ Video files from Google Drive.
 
 ## Category
 
-**Source** — `sources/google-drive`, in `plugins/sources/google-drive`. Its
+**Source** — `sources/google-drive`, in `adapters/sources/google-drive`. Its
 files show on the Videos tab, and its connections belong to the account.
 
 Keeping the account's backup in Drive is another plugin, `sync/google-drive`.

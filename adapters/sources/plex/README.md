@@ -4,7 +4,7 @@ Plex Media Server. Its own account and authentication model, which stays entirel
 
 ## Category
 
-**Source** — `sources/plex`, in `plugins/sources/plex`. The server stays the master of what each of its users watched. The app will read that and, with playback, write progress back through the media role — never through the account.
+**Source** — `sources/plex`, in `adapters/sources/plex`. The server stays the master of what each of its users watched. The app will read that and, with playback, write progress back through the media role — never through the account.
 
 ## Brings
 

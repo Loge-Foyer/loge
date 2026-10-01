@@ -85,10 +85,12 @@ Docs: https://docs.expo.dev/eas/index.md
 
 These are specific to Streaming Center and matter more than anything above.
 
-1. **Never define a domain type here.** `MediaItem`, `GlobalMediaKey`, the
-   capability types and every plugin contract live in `@sc/api`, and the React
-   half of the player contract in `@sc/player-kit` — both in the plugins
-   repository. Defining them here makes the dependency graph circular.
+1. **Never define a domain type in `src/`.** `MediaItem`, `GlobalMediaKey`,
+   the capability types and every adapter contract live in `@sc/api`, and the
+   React half of the player contract in `@sc/player-kit` — both under
+   `adapters/`, in this repository but compiled as programs of their own.
+   Defining them in `src/` makes the dependency graph circular, and one
+   repository makes that *easier* to do by accident, not harder.
 
 2. **No plugin names above the composition root.** There must never be an
    `if (providerId === 'jellyfin')` in a screen, component or service. Branch on
@@ -437,7 +439,7 @@ possibly `structuredClone`, `Promise.withResolvers` and
 works on the web, then throws on a phone: Continue Watching broke exactly like
 that. Lint rejects them in `src/`; copy and sort (`[...list].sort(compare)`)
 instead, and turn bytes into text with `@sc/api`'s helpers. Plugins run on
-Hermes too — the plugins repository's tests scan for the same gaps. The app's
+Hermes too — the adapters' own tests scan for the same gaps. The app's
 TypeScript program never sees Node's types; only `test/tsconfig.json` does.
 
 Hermes also has no JIT: cryptography written in JavaScript runs about a hundred
@@ -570,7 +572,7 @@ typecheck.
 
 - **`sc-verify`** — the full verification pass. Use before committing.
 - **`sc-run`** — launch on simulator, emulator or browser.
-- **`sc-use-plugin`** — wiring a plugin from the plugins repository.
+- **`sc-use-plugin`** — wiring an adapter into the app.
 
 Plus 13 official skills from [`expo/skills`](https://github.com/expo/skills) —
 `expo-router`, `expo-ui`, `expo-native-ui`, `expo-design-system`,

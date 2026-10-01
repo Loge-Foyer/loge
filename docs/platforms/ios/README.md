@@ -6,9 +6,9 @@ The app runs in a **development build**, not Expo Go. The built-in player is
 expo-video on AVPlayer (Phase 7), and mpv is an Expo module in its adapter,
 autolinked the way the Android half already is. It builds and links but has not
 played here yet. **VLC was dropped in Phase 9** and KSPlayer never arrived. Face ID needs the app's usage text,
-which Expo Go cannot carry. The app has
-no native module of its own: Phase 4's key derivation went with its vault, so
-a build made before Phase 6 still carries it, and should be made again.
+which Expo Go cannot carry. Picture in picture on
+iPhone belongs to mpv's own module, so `modules/sc-pip` is Android-only.
+Phase 4's key derivation module went with its vault.
 
 `npm run ios` builds the client and installs it on the simulator; after that,
 Metro serves the JavaScript as usual. Change native code, or add a player, and

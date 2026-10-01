@@ -4,7 +4,7 @@ Video files from iCloud Drive.
 
 ## Category
 
-**Source** — `sources/icloud-drive`, in `plugins/sources/icloud-drive`. Its
+**Source** — `sources/icloud-drive`, in `adapters/sources/icloud-drive`. Its
 files show on the Videos tab, and its connections belong to the account.
 
 Keeping the account's backup in iCloud Drive is another plugin, `sync/icloud`.

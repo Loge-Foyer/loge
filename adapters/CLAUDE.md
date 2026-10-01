@@ -29,8 +29,8 @@ own package, `player-kit`, for exactly that reason.
 ## One category per plugin
 
 A plugin does one job — serve media, bring IPTV, play, or keep the account —
-and lives in that job's folder: `plugins/sources`, `plugins/iptv`,
-`plugins/players`, `plugins/sync`. Its id is the path: `sources/jellyfin`.
+and lives in that job's folder: `adapters/sources`, `adapters/iptv`,
+`adapters/players`, `adapters/sync`. Its id is the path: `sources/jellyfin`.
 
 A service that does two jobs is two plugins. Google Drive's files are
 `sources/google-drive`; Google Drive as a backup place is `sync/google-drive`.

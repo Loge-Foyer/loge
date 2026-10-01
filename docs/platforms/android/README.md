@@ -3,13 +3,14 @@
 Building and running on emulator and device, native modules, and Android-specific configuration.
 
 The app runs in a **development build**, not Expo Go. The built-in player is
-expo-video on Media3 / ExoPlayer (Phase 7), and VLC (libVLC) and mpv (libmpv)
-are Expo modules in their own plugins (Phase 8), autolinked into the build.
-**Android 8 is the floor** (`minSdkVersion` 26, through
-`expo-build-properties`): libmpv's binaries ask for it.
-The app has no native module of its own: Phase 4's key derivation went with
-its vault, so a build made before Phase 6 still carries it, and should be made
-again.
+expo-video on Media3 / ExoPlayer, and mpv (libmpv) is an Expo module in its own
+adapter, autolinked into the build. **Android 8 is the floor**
+(`minSdkVersion` 26, through `expo-build-properties`): libmpv's binaries ask
+for it.
+The app's own native module is `modules/sc-pip`, which asks Android for
+picture in picture on behalf of whichever engine is playing — packaging and
+window management are the app's, not an adapter's. Phase 4's key derivation
+module went with its vault.
 
 `npm run android` builds the client and installs it; after that, Metro serves
 the JavaScript as usual. Change native code, or add a player, and build again.
@@ -55,11 +56,16 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
 
 ## Players
 
-- **ExoPlayer**, the built-in player through expo-video (Phase 7), plays HLS
-  and MPEG-TS, so IPTV channels play on it.
-- **VLC and mpv** are for what it cannot: some containers, codecs and
-  subtitle formats.
-- Which players are on, and the default, are this device's settings.
+- **ExoPlayer**, the built-in player through expo-video, plays HLS and
+  MPEG-TS, so IPTV channels play on it.
+- **mpv** is for what it cannot: some containers, codecs and subtitle formats
+  — Matroska with DTS or TrueHD as the file, with libass drawing the
+  subtitles the file styles. It decodes in software for now, so its profile
+  stops at 1080p; a real phone is what settles hardware decoding.
+- Which players are on, which plays first, and which plays first on each tab,
+  are this device's settings.
+- **VLC was dropped in Phase 9.** mpv already played everything it did, and a
+  second engine of that size cost 37 MB of framework. Git has it.
 
 ## The backup file
 

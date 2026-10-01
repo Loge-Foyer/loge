@@ -4,7 +4,7 @@ A privacy-respecting YouTube front end. Instance-based, so the connection form c
 
 ## Category
 
-**Source** — `sources/invidious`, in `plugins/sources/invidious`. Its connections belong to the account, and each can be switched off without being removed.
+**Source** — `sources/invidious`, in `adapters/sources/invidious`. Its connections belong to the account, and each can be switched off without being removed.
 
 ## Brings
 

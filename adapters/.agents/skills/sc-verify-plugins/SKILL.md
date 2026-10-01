@@ -1,14 +1,17 @@
 ---
 name: sc-verify-plugins
-description: Run the verification pass for the Streaming Center plugins repository — install, typecheck, boundary checks, and confirming the app and the sync server still build. Use before committing here, or after changing anything in api.
+description: Run the verification pass for the Streaming Center adapters — typecheck, boundary checks, and confirming the app and the sync server still build. Use before committing a change under adapters/, or after changing anything in api.
 ---
 
-# Verify the plugins repository
+# Verify the adapters
+
+The adapters are workspaces of the app, so everything runs from the app's
+root — there is no separate install:
 
 ```bash
-npm install
-npm run typecheck
-npm test
+cd ..            # streaming_center_app
+npm run typecheck    # five programs: the app, its tests, and the adapters' three
+npm test             # two vitest projects: the app's suite and the adapters'
 ```
 
 `npm run typecheck` runs three programs:
@@ -40,46 +43,54 @@ the server; **nothing else enforces cross-repository consistency**. Verify by
 hand, in this order:
 
 ```bash
-npm run typecheck && npm test                       # this repo
-cd ../streaming_center_app && npm run typecheck && npm test
-cd ../streaming_center_app && npx expo export --platform ios --output-dir /tmp/sc-ios
-cd ../streaming_center_app && npx expo export --platform web --output-dir /tmp/sc-web
+cd ..                                                      # streaming_center_app
+npm run typecheck && npm test
+npx expo export --platform ios --output-dir /tmp/sc-ios
+npx expo export --platform web --output-dir /tmp/sc-web
 ```
 
-The bundle matters because the app depends on this repository through `file:`
-paths. Metro resolution across the repository boundary fails in ways `tsc`
-cannot see.
+The bundle still matters: Metro resolves what `tsc` does not, and a player's
+`.web` and native files are only ever chosen at bundle time.
 
-**After changing an account record** (`api/src/account.ts` or its fixtures),
-run the sync server's tests too: `cd ../streaming_center_sync && go test ./...`
-reads the same fixtures. Its harness (`cd harness && npm test` there, from
-Phase 6's S4) drives this repository's `sync/custom-server` against the real
-server.
+**After changing an account record** (`api/src/account.ts` or
+`api/fixtures/account-records.json`), run the sync server's tests too:
+
+```bash
+cd ../../streaming_center_sync && go test ./... && (cd harness && npm test)
+```
+
+`internal/fixtures/fixtures.go` reads that fixtures file by path, and the
+harness aliases `@sc/api` and `@sc/sync-custom-server` to their source here.
+Both break the moment either side moves — as they did when the adapters moved
+in.
 
 ## Boundary checks
 
 These are rules, not lint, until someone writes the lint. Check by reading.
-Plugins sit at `plugins/<category>/<name>/src`.
+Adapters sit at `<category>/<name>/src`, relative to `adapters/`.
 
 ```bash
 # api must import nothing from this project or any framework
 grep -rn "from '" api/src/ | grep -v "from '\./" | grep -v "from '\.\./"
 
-# no plugin may import another plugin
-grep -rnE "(from|import\(|require\()\s*['\"]@sc/(plugin|source|iptv|player|sync)-" plugins/
+# no adapter may import another adapter — player-kit is a contract, not an adapter
+grep -rnE "(from|import\(|require\()\s*['\"]@sc/(source|iptv|player|sync)-" sources/ iptv/ players/ sync/ \
+  | grep -v "@sc/player-kit'"
+
 
 # no framework in api or any non-player plugin
-find api/src plugins -type f -name '*.ts' -path '*/src/*' -not -path '*/players/*' -not -path '*/node_modules/*' \
+find api/src sources iptv sync -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
   -exec grep -HnE "from 'react|from 'expo|react-native" {} +
 
 # no host globals outside players: everything goes through the injected context
-find api/src plugins -type f -name '*.ts' -path '*/src/*' -not -path '*/players/*' -not -path '*/node_modules/*' \
+find api/src sources iptv sync -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
   -exec grep -HnE "\bfetch\(|new URL\(|\bconsole\.|\bsetTimeout\(|\bbtoa\(|\batob\(" {} +
 ```
 
 All four should return nothing. The `find` form works in zsh and bash alike.
-A glob such as `plugins/*/*/src` would abort in zsh wherever it matches
-nothing.
+A glob such as `*/*/src` would abort in zsh wherever it matches nothing — and
+note that `grep` in some shells here is a function that skips gitignored
+paths; use `command grep` if a check returns suspiciously little.
 
 - The compiler already refuses host globals (`lib: ["esnext"]`); the last grep
   catches them in files it has not seen yet.

@@ -22,15 +22,14 @@ you want to.
 ## Running it
 
 ```bash
-(cd ../streaming_center_plugins && npm install)   # the plugins, which the app links to
-npm install
+npm install       # the adapters are workspaces here; nothing else to link
 npm run ios       # or: npm run android, npm run web
 ```
 
 On a phone or simulator this builds a development client first — the app
-carries native code, and will carry more once it plays video — so the first run
-takes a few minutes. After that, changes to the JavaScript load as usual. The
-web needs no build.
+carries native code, mpv's engine among it — so the first run takes several
+minutes. After that, changes to the JavaScript load as usual. The web needs no
+build.
 
 The first launch asks how to begin: create an account on this device, sign in
 to your own server, or restore a backup. To try it against your own Jellyfin
@@ -50,13 +49,14 @@ Four ideas, and the rest follows from them.
 what "halfway through episode 3" means. Every server it talks to gets translated
 into that vocabulary at the edge. The home screen has never heard of Jellyfin.
 
-**Everything it talks to is a plugin, and plugins live somewhere else.** They
-are in a separate repository entirely, so the app cannot accidentally grow a
-dependency on one. There are four kinds: *sources* bring your media, *IPTV*
+**Everything it talks to is an adapter, and adapters are kept at arm's
+length.** They live in `adapters/`, as workspaces of this package, compiled as
+programs of their own so the app cannot accidentally grow a dependency on one
+— nor they on it. There are four kinds: *sources* bring your media, *IPTV*
 brings a provider's live channels, films and series, *players* play them, and
-*sync* decides where your account lives. Adding Plex should mean one new
-folder over there and one line here. The app only shows the plugins that work
-on the device you are holding.
+*sync* decides where your account lives. Adding Plex should mean one new folder
+under `adapters/sources/` and one line in the composition root. The app only
+shows the adapters that work on the device you are holding.
 
 **Your data is yours and it is local.** What you have watched, what you have
 favourited, where you got to — the app keeps its own copy in a local database.
@@ -148,21 +148,28 @@ the design, and most of it runs today, built with
 - **Press Play** on a film or an episode from Jellyfin — on a phone, which
   turns the player with the device, or in a browser — and pick up where you
   left off. Progress and "watched" go back to the server, offline too: they
-  are written on the device first and delivered when it can. On Android, VLC
-  and mpv play too — the files the built-in player cannot, like Matroska with
-  DTS, as they are — and each device chooses which player goes first, on each
-  tab if you like; "Play with…" on a film or an episode picks one for it.
+  are written on the device first and delivered when it can. The controls are
+  the app's own, the same behind every engine: chapters, Skip intro, the next
+  episode when it is due, speed, volume and brightness on the edges of the
+  picture, and picture in picture. mpv plays too, on Android and iPhone alike
+  — the files the built-in player cannot, like Matroska with DTS, as they are
+  — and each device chooses which player goes first, on each tab if you like;
+  "Play with…" on a film or an episode picks one for it.
 - **Live TV** on the TV tab, from a Stalker portal: channels in their groups
   with what is on now and next, a day's guide, channel up and down, and the
   provider's films and series.
-- **Not yet:** KSPlayer, and VLC and mpv on iPhone; M3U and Xtream.
+- **Search**, on Media and on TV — each box searching what is in front of
+  you, never everything at once.
+- **Not yet:** M3U and Xtream, Plex and Emby, the drives, and downloads.
+  KSPlayer is a manifest with no engine behind it, and VLC was dropped in
+  Phase 9 — git has it.
 
 Development builds also have a pretend account, for trying things offline.
 
 ## Documentation
 
 `docs/` is broken down by topic — getting started, architecture, platforms, UI,
-playback, data, plugins, development. Each folder explains what belongs there.
+playback, data, adapters, development. Each folder explains what belongs there.
 
 The full architecture, with the reasoning, is in
 [`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).

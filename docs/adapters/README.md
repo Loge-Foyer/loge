@@ -1,15 +1,15 @@
-# Plugins
+# Adapters
 
-How the app discovers, registers and talks to plugins, and how to develop
-against the plugins repository locally.
+How the app discovers, registers and talks to its adapters, and how to work on
+them. They live in `adapters/`, beside `src/`, as workspaces of this package.
 
-This page describes the target. Players and backup targets have manifests
-and no role yet.
+This page describes the target. Several adapters are manifests with no role
+behind them yet.
 
 ## Four categories
 
-Every plugin has exactly one category, which is also its folder in the plugins
-repository and the first half of its id: `sources/jellyfin`, `iptv/stalker`,
+Every adapter has exactly one category, which is also its folder under
+`adapters/` and the first half of its id: `sources/jellyfin`, `iptv/stalker`,
 `players/system`, `sync/custom-server`.
 
 | Category | Its contract | Scope | Where it shows |
@@ -56,61 +56,66 @@ labelled "not available on this device", is never connected, and is kept as it
 is for the devices that can run it. A stored plugin id says its category even
 in a build without the plugin.
 
-## Linking the plugins repository
+## Where the adapters live
 
-The plugins live in `../streaming_center_plugins`, a separate repository, and
-are linked in with `file:` dependencies: `@sc/api`, `@sc/player-kit`, and one
-package per plugin at its category path —
-`file:../streaming_center_plugins/plugins/<category>/<name>`, named
-`@sc/source-<name>`, `@sc/iptv-<name>`, `@sc/player-<name>` or
-`@sc/sync-<name>`. Install that repository first: its own typecheck and tests
-need it.
+They are in `adapters/`, in this repository, as **npm workspaces** of this
+package: `adapters/api`, `adapters/player-kit`, and one folder per adapter at
+its category path — `adapters/<category>/<name>`, named `@sc/source-<name>`,
+`@sc/iptv-<name>`, `@sc/player-<name>` or `@sc/sync-<name>`. `npm install` here
+links every one of them; there is nothing else to install.
 
-**One copy of everything.** Each plugin takes `@sc/api` as a peer dependency —
-a player `@sc/player-kit`, React, React Native and its engine too — so the app
-supplies the one copy. The plugins repository installs its own React, React
-Native, expo and expo-video, for its typecheck and tests, and a plugin file's
-imports would find those first. Four things keep them out:
+They were a repository of their own between Phase 5 and Phase 9. The reason
+was sideloading adapters written by other people, which phones cannot do. What
+the split actually bought was a boundary the compiler and the linter already
+enforce; what it cost was two `node_modules`, a Metro resolver rewriting every
+import of every adapter file, a block list, and a duplicate-native-package
+hazard that once built that repository's `expo-modules-core` 57.0.20 under
+this app's 57.0.19. All of that machinery is gone.
 
-- **Metro** (`metro.config.js`) watches the plugins folder, resolves a plugin
-  file's bare imports from the app, and blocks that repository's
-  `node_modules` — so a request that slips past fails the build, rather than
-  bundling a second React (every hook breaks) or a second expo-video (its
-  views do).
-- **TypeScript** has `preserveSymlinks`: it sees a plugin where it is linked,
-  in the app's `node_modules`, and resolves its imports from there. Mapping
-  `react` in `paths` instead breaks the bundle: Expo's Metro applies tsconfig
-  paths too.
-- **vitest** dedupes the same packages, and stubs expo-video and expo, which
-  need a native runtime Node lacks.
-- **Autolinking** searches the app's `node_modules` first
-  (`expo.autolinking.searchPaths` in `package.json`). Left to follow a linked
-  player's peers, it walks into the plugins repository, and which of two
-  equally deep copies it builds depends on the order it happens to visit
-  them: it once built that repository's `expo-modules-core` under the app's
-  JavaScript. A player's own Expo module still comes from the plugins
-  repository — it lives nowhere else.
+**One copy of everything, by construction.** One `node_modules` means one
+React, one React Native, one expo, one expo-video. Each adapter takes `@sc/api`
+as a peer dependency — a player `@sc/player-kit`, React, React Native and its
+engine too — and the workspace root supplies it.
 
-A bundle can be checked: export with `--source-maps` and look for any source
-under `streaming_center_plugins/node_modules` — there must be none.
+**The boundary did not move**, and is still the point:
 
-`npm ls --all` reports `UNMET DEPENDENCY @sc/api@*` under each linked plugin,
-and `expo-doctor` "multiple copies" of React, React Native, expo and
-expo-video:
-npm resolves a link's peers from the link's own folder, so both see the
-plugins repository's copies, which the app never uses.
+- **`adapters/tsconfig.json`** compiles `api` and the sources, IPTV and sync
+  adapters with `lib: ["esnext"]` and `"types": []` — no `fetch`, no `URL`, no
+  `console`, no timers. They reach the host only through the context they are
+  handed.
+- **`adapters/tsconfig.players.json`** is the players' own program, with React
+  Native's types and the DOM's, because an engine has to draw.
+- **This package's `tsconfig.json` excludes `adapters/`.** Compiled into the
+  app's program they would inherit Expo's types, React Native's and the DOM's —
+  exactly what they must not have. One repository makes that mistake *easier*
+  to make by accident, so the exclusion is load-bearing.
+- **Lint** keeps a concrete adapter out of everything but `src/composition/`.
+- **`npm run typecheck`** runs all five programs; **vitest** runs two projects,
+  named explicitly in `vitest.config.mjs` so npm workspaces are not
+  auto-detected and this app's tests are not run under the wrong root.
+
+### Native code
 
 A player's engine is native code. expo-video, a published package, is
-installed by the app and autolinked from its `node_modules`. An Expo module in
-a player's own folder — VLC's and mpv's `android/` — is found through the
-`file:` link and built from the plugins repository; the players list in
-`composition/plugins.ts` names only players whose engine this build has.
+installed by this package and autolinked from `node_modules`. An Expo module in
+a player's own folder — mpv's `android/` and `ios/` — is autolinked from the
+workspace link, and is **the one native thing built from outside
+`node_modules`**. Check it after touching a player:
+
+```bash
+npx expo-modules-autolinking resolve --platform android --json
+npx expo-modules-autolinking resolve --platform apple --json
+```
+
+Nothing may report a `sourceDir` under `adapters/` but a player's own module.
+`expo.autolinking.searchPaths` in `package.json` pins the app's
+`node_modules` first, so its copies always win a tie.
 
 Where two engines carry the same native library, the app decides which one
 ships: `config-plugins/with-newest-libcxx.js` puts the newest
 `libc++_shared.so` — libmpv's — in a source set of the app's own, which wins
-the merge. That is the app's to settle, because no plugin can see what
-another plugin's engine brought.
+the merge. That is the app's to settle, because no adapter can see what
+another adapter's engine brought.
 
 ## Registering a plugin
 
@@ -244,8 +249,8 @@ still sign out of it.
 On iOS and Android, plugin code runs on Hermes, which lacks a few built-ins
 that Node and browsers have — `Array.prototype.toSorted`, `Object.groupBy`,
 `crypto.randomUUID`. Code using them typechecks and passes every test, then
-throws on a phone. App lint rejects them in `src/`, and the plugins repository's
-tests scan its sources for them.
+throws on a phone. App lint rejects them in `src/`, and the adapters' own
+tests scan their sources for them.
 
 ## The rules, enforced
 

@@ -6,7 +6,7 @@ back. Jellyfin stays the master of that watch status: the app keeps a cache.
 
 ## Category
 
-**Source** — `sources/jellyfin`, in `plugins/sources/jellyfin`. It runs everywhere: iOS,
+**Source** — `sources/jellyfin`, in `adapters/sources/jellyfin`. It runs everywhere: iOS,
 Android and the web, since Jellyfin answers a browser's CORS request.
 
 A source and nothing else: Jellyfin masters what its users watched, and that

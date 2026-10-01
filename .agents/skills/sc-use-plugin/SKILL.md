@@ -1,96 +1,84 @@
 ---
 name: sc-use-plugin
-description: Wire a Streaming Center plugin from the plugins repository into the app — the file dependency at its category path, the Metro watch folder, the registration line at the composition root, the platform filter, account-wide or device-wide scope, per-profile connection values, effective capabilities on resolved values, and how each category's role is called (media, player, account, backup). Use when connecting, registering or debugging a plugin inside the app.
+description: Wire a Streaming Center adapter into the app — where the adapters live as npm workspaces, the registration line at the composition root, the platform filter, account-wide or device-wide scope, per-profile connection values, effective capabilities on resolved values, and how each category's role is called (media, player, account, backup). Use when connecting, registering or debugging an adapter inside the app.
 ---
 
-# Using a plugin in the app
+# Using an adapter in the app
 
-Plugins live in a **separate repository** (`../streaming_center_plugins`), so
-npm workspaces cannot reach them. This is the fiddliest seam in the project.
+Adapters live in `adapters/`, in this repository, as **npm workspaces** of this
+package. They were a repository of their own until Phase 9, and that seam —
+`file:` dependencies, a Metro watch folder, a block list — is gone. If you find
+instructions to `cd ../streaming_center_plugins`, they are from before the
+move; that folder does not exist.
 
-**Phase 6 — the code is on the new architecture; players arrive in Phases 7
-and 8.** This skill describes the target. Where today differs, it says so; "Current state" at the end has
-the rest.
-
-## 0. Install the plugins repository first
-
-```bash
-cd ../streaming_center_plugins && npm install
-```
-
-Plugin files resolve `@sc/api` from that repository's `node_modules`. Skip it
-and both `tsc` and Metro fail to resolve `@sc/api` from inside a plugin.
+This skill describes the target. "Current state" at the end has what differs.
 
 ## 1. Know its category
 
-Every plugin has exactly one category, which is its folder, the first half of
+Every adapter has exactly one category, which is its folder, the first half of
 its id, and the one block its manifest declares:
 
 | Category | Folder and id | Block | Role it exports | Scope |
 | --- | --- | --- | --- | --- |
-| sources | `plugins/sources/<name>`, `sources/<name>` | `media` | `plugin.media` | account |
-| IPTV | `plugins/iptv/<name>`, `iptv/<name>` | `media`, with `live` among its kinds | `plugin.media` | account |
-| players | `plugins/players/<name>`, `players/<name>` | `player` | `plugin.player` | device |
-| sync | `plugins/sync/<name>`, `sync/<name>` | `account` or `backup` | `plugin.account` or `plugin.backup` | device |
+| sources | `adapters/sources/<name>`, `sources/<name>` | `media` | `plugin.media` | account |
+| IPTV | `adapters/iptv/<name>`, `iptv/<name>` | `media`, with `live` among its kinds | `plugin.media` | account |
+| players | `adapters/players/<name>`, `players/<name>` | `player` | `plugin.player` | device |
+| sync | `adapters/sync/<name>`, `sync/<name>` | `account` or `backup` | `plugin.account` or `plugin.backup` | device |
 
 `validateManifest` refuses a manifest with the wrong block for its category, an
 unknown platform, or an id that is not `<category>/<name>`. A service with two
-jobs is two plugins — Google Drive's files are `sources/google-drive`, its
+jobs is two adapters — Google Drive's files are `sources/google-drive`, its
 backups `sync/google-drive` — and the app wires each on its own. Never look for
-one plugin that does both.
+one adapter that does both.
 
 ## 2. Depend on it
 
 ```jsonc
-// package.json — edit by hand; `npx expo install` has nothing to pick for file: deps
+// package.json — the workspace globs already cover the folder
 "dependencies": {
-  "@sc/api": "file:../streaming_center_plugins/api",
-  "@sc/player-kit": "file:../streaming_center_plugins/player-kit",
-  "@sc/source-jellyfin": "file:../streaming_center_plugins/plugins/sources/jellyfin"
+  "@sc/api": "*",
+  "@sc/player-kit": "*",
+  "@sc/source-jellyfin": "*"
 }
 ```
 
 Package names follow the folders: `@sc/source-<name>`, `@sc/iptv-<name>`,
-`@sc/player-<name>`, `@sc/sync-<name>`. `player-kit` does not exist yet.
+`@sc/player-<name>`, `@sc/sync-<name>`. Then `npm install`, which links them
+into `node_modules/@sc/`.
 
-Then `npm install`. npm links the folders and never looks inside link targets
-outside the project, so it never reaches for a registry.
+Every adapter declares `@sc/api` as a **peer** dependency — players
+`@sc/player-kit`, React, React Native and their engine too — so this package
+supplies the one copy, and a `PluginId` from an adapter and one from `src/` are
+the same type. **A player's peers are installed here**: `npx expo install
+expo-video`, and `npm install` for a non-Expo one such as hls.js.
 
-Every plugin declares `@sc/api` as a **peer** dependency — players
-`@sc/player-kit`, React, React Native and their engine too — so the app
-supplies the one copy, and a `PluginId` from a plugin and one from the app are
-the same type. **A player's peers are installed in the app**:
-`npx expo install expo-video`, and `npm install` for a non-Expo one such as
-hls.js, at the version the plugins repository uses. `npm ls --all` still
-prints `UNMET DEPENDENCY @sc/api@*` under each linked plugin, and lists the
-plugins repository's own React under `@sc/player-kit`; `expo-doctor` calls
-those "multiple copies". npm resolves a link's dependencies from the link's
-folder. Both are cosmetic; `npm ls @sc/api` should show the single top-level
-link.
+## 3. One copy of everything
 
-## 3. Let Metro see it
+One `node_modules` means one React, one React Native, one expo, one
+expo-video. Nothing has to arrange it — which is most of why the adapters
+moved in.
 
-`metro.config.js` watches the plugins folder — Metro only serves files under
-the project root or a watch folder — and makes sure there is **one copy of
-everything a plugin imports**:
+What still needs care is **native** code. A player's own Expo module lives in
+its own package and is autolinked from the workspace link, so it is the one
+native thing built from outside `node_modules`. Check after touching a player:
 
-- A plugin file's bare imports resolve **from the app**, as a published
-  package's would (`resolver.resolveRequest`).
-- The plugins repository's `node_modules` are **blocked**. It installs React,
-  React Native, expo and expo-video for its own typecheck and tests; a second
-  React breaks every hook, a second expo-video its views. With the block, a
-  request that slips past fails the build instead.
+```bash
+npx expo-modules-autolinking resolve --platform android --json
+npx expo-modules-autolinking resolve --platform apple --json
+```
 
-TypeScript does the same with `preserveSymlinks`, and vitest with `dedupe`
-(and a stub for expo-video). Never map `react` in tsconfig `paths`: Expo's
-Metro applies those paths too, and React's types are not something it can
-bundle. babel-preset-expo imports its runtime helpers by absolute path, so
-plugin files never have to resolve `@babel/runtime` themselves.
+Nothing may report a `sourceDir` under `adapters/` but a player's own module.
+`expo.autolinking.searchPaths` pins this package's `node_modules` first, so its
+copies win a tie — before that, autolinking once built another copy of
+`expo-modules-core` under this app's JavaScript.
+
+Where two engines carry the same native library, **the app settles it**: no
+adapter can see what another adapter's engine put in the same build.
+`config-plugins/with-newest-libcxx.js` is that rule in code.
 
 **Check a bundle, not a typecheck:** `npx expo export --platform web
---source-maps`, then look through the maps' `sources` — nothing under
-`streaming_center_plugins/node_modules`, one `react/index.js`, and a player's
-`.web` files on the web, its native ones in an iOS export.
+--source-maps`, then look through the maps' `sources` — one `react/index.js`,
+and a player's `.web` files on the web, its native ones in an iOS export.
 
 ## 4. Register it — one line
 
@@ -169,11 +157,11 @@ globals. A declared capability means the provider implements its members:
 | `remoteImages` | `resolveImage`, `resolveHeaders` |
 | `channels` | `listChannelGroups`, `listChannels` |
 | `epg` | `getGuide` |
-| `playback` | `getPlaybackDescriptor` (Phase 7) |
+| `playback` | `getPlaybackDescriptor` |
 | `watchStateWrite` | reporting playback and played state, through the outbox (`services/watch/`) — never called from anywhere else |
 
-The plugins repository's conformance test enforces it, and the media service
-reports a missing member as `INVALID_STATE`.
+The adapters' conformance test (`adapters/test/manifests.test.ts`) enforces
+it, and the media service reports a missing member as `INVALID_STATE`.
 
 Screens never call a provider. They read `useHomeRowQueries`, `useGrid`,
 `useItem` and friends (`src/hooks/use-media.ts`), which go through the media
@@ -253,22 +241,33 @@ npx expo export --platform ios --output-dir /tmp/sc-ios
 npx expo export --platform web --output-dir /tmp/sc-web --source-maps
 ```
 
-In the web source map, each `streaming_center_plugins/api/src/*` file must
-appear exactly once — two copies would mean two brands and two vocabularies.
-A player plugin is only proven by a development build on a phone, playing.
+In the web source map, each `adapters/api/src/*` file must appear exactly
+once — two copies would mean two brands and two vocabularies. A player adapter
+is only proven by a development build on a phone, playing.
 
 ## Current state
 
-Twenty-two plugins are linked by their category paths and registered
-(`sources/mock` and `sync/mock` in development builds only), with qualified
-ids, and the catalogue keeps those that run on this platform; each declares
-its category's one block. `sources/jellyfin` and `sources/mock` implement the
-media role — browse, libraries, watch status read, and (Jellyfin) remote
-images and offline metadata. Your own server (`sync/custom-server`) and
-`sync/mock` implement the account role: records read whole and written in
-batches, the password typed again as the owner check, and sign-up with an
-invite (open, on the mock). `sync/mock-backup` implements the backup role,
-in development builds. The rest export manifests only — IPTV, the players, the backup targets
-and the other sources: the app lists them in their category, and says plainly
-that they cannot list titles, play or keep backups yet. The built-in player
-(`players/system`) plays.
+**Nineteen adapters are registered** in `src/composition/plugins.ts`
+(`sources/mock`, `iptv/mock`, `sync/mock` and `sync/mock-backup` in
+development builds only). Four packages exist and are deliberately *not*
+registered: `sources/google-drive`, `sources/icloud-drive` and
+`sources/onedrive`, which are not offered until they can do anything, and
+`players/ksplayer`, which has no engine to register — it is on no package
+manager, its own podspec pins a tag that does not exist, and its FFmpeg ships
+only as a 670 MB clone.
+
+Implemented roles:
+
+- **media** — `sources/jellyfin` (browse, search, libraries, watch status both
+  ways, remote images, offline metadata, playback with a `DeviceProfile` built
+  from the chosen player's profile, chapters and media segments),
+  `sources/mock`, `iptv/stalker` (channels, a guide, live links, films and
+  series) and `iptv/mock`.
+- **player** — `players/system` (expo-video on phones, `<video>` with hls.js
+  and mpegts.js in a browser) and `players/mpv` (libmpv's C API, this
+  project's JNI on Android and Swift on iOS).
+- **account** — `sync/custom-server` on PocketBase, and `sync/mock`.
+- **backup** — `sync/mock-backup`.
+
+The rest export manifests only: the app lists them in their category and says
+plainly that they cannot list titles, play or keep backups yet.

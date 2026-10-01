@@ -52,7 +52,7 @@ bundle.
 
 With `--source-maps` on the web export, also check the vocabulary is bundled
 once: the `sources` of the web map should list each
-`streaming_center_plugins/api/src/*` file exactly once.
+`adapters/api/src/*` file exactly once.
 
 ## sql.js only for backups, only on the web
 
@@ -121,8 +121,8 @@ iOS and Android run Hermes, which lacks `Array.prototype.toSorted`,
 `Intl.RelativeTimeFormat`. Tests run on Node and the
 web runs V8, so nothing else notices until a phone throws. Lint rejects all of
 them anywhere in `src/`; add `[1].toSorted()` to the throwaway file above and it
-must fail too. The plugins repository's `test/engine.test.ts` scans its sources
-for the same gaps.
+must fail too. The adapters' own `test/engine.test.ts` scans their sources for
+the same gaps.
 
 ## SQLite rules
 
@@ -147,17 +147,22 @@ An iOS bundle passing tells you nothing about web.
 
 ## Cross-repository check
 
-If you changed anything in `../streaming_center_plugins`, verify there too —
-nothing enforces consistency across the repositories:
+The adapters are verified by this package's own `npm run typecheck` and
+`npm test` — five TypeScript programs and two vitest projects — so there is
+nothing separate to run for them.
+
+**The sync server is the one repository still on the other side of a line.**
+After a change to the account contract — `adapters/api/src/account.ts` or
+`adapters/api/fixtures/account-records.json` — run its tests too:
 
 ```bash
-cd ../streaming_center_plugins && npm run typecheck && npm test
+cd ../streaming_center_sync && go test ./... && (cd harness && npm test)
 ```
 
-After a change to the account contract, run the sync repository's tests as
-well: `go test ./...` there, and `(cd harness && npm test)` from Phase 6's
-S4, which drives the real `sync/custom-server` plugin against the real
-PocketBase binary.
+`internal/fixtures/fixtures.go` reads that fixtures file by path, and the
+harness aliases `@sc/api` and `@sc/sync-custom-server` to their source here,
+so both break the moment either side moves. Nothing else enforces
+consistency across that line.
 
 ## Current state — read this before trusting a failure
 
@@ -180,9 +185,9 @@ phase apply once that phase has built what they check; the rest apply today.
   and the other players are still to come.
   The backup file, its import and export and backup targets are in place; the
   only backup target with a role is the dev-only mock.
-- `expo-doctor` reports "multiple copies" of React, React Native and
-  expo-video: it sees the plugins repository's own, which Metro blocks and the
-  app never uses (`docs/plugins`). A bundle's source maps are the real check.
+- `expo-doctor`'s "multiple copies" warning went with the adapter move: one
+  `node_modules` means one copy of each. If it ever returns, a bundle's source
+  maps are the real check (`docs/adapters`).
 - Tamagui 2.7.7 logs a dev-only "`AlertDialogContent` requires a description"
   warning on web even though the dialog is described — its check runs before
   the portal mounts. Confirm with the DOM (`aria-describedby` resolves) rather

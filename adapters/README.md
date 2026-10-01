@@ -25,10 +25,10 @@ Every plugin does one job, and lives in the folder for that job:
 
 | Folder | What its plugins do | Travels with | Examples |
 | --- | --- | --- | --- |
-| `plugins/sources/` | bring your films, series, videos and files | the account | Jellyfin, Plex, Emby, WebDAV, iCloud Drive, Google Drive, OneDrive, Yattee, Invidious |
-| `plugins/iptv/` | bring live TV — and a provider's films and series | the account | M3U playlists, Stalker portals, Xtream Codes |
-| `plugins/players/` | play it | the device | the phone's or browser's own player, KSPlayer, mpv, VLC |
-| `plugins/sync/` | keep the account somewhere | the device | your own server; a backup in iCloud, Google Drive or OneDrive |
+| `adapters/sources/` | bring your films, series, videos and files | the account | Jellyfin, Plex, Emby, WebDAV, iCloud Drive, Google Drive, OneDrive, Yattee, Invidious |
+| `adapters/iptv/` | bring live TV — and a provider's films and series | the account | M3U playlists, Stalker portals, Xtream Codes |
+| `adapters/players/` | play it | the device | the phone's or browser's own player, KSPlayer, mpv, VLC |
+| `adapters/sync/` | keep the account somewhere | the device | your own server; a backup in iCloud, Google Drive or OneDrive |
 
 The app's Settings has the same four lists, and shows only the plugins that
 work on the device in your hand: iCloud on an iPhone, not in a browser.

@@ -1,9 +1,9 @@
-# Documentation — Streaming Center plugins
+# Documentation — the Streaming Center adapters
 
-How to build a plugin, and the contracts every plugin implements.
+How to build an adapter, and the contracts every adapter implements.
 
 Start with `api/`. It is the vocabulary everything else is written in. Then
-`categories/` — which of the four kinds your plugin is — then
+`categories/` — which of the four kinds your adapter is — then
 `writing-a-plugin/`, then `capabilities/` and `settings/`. Those two together
 decide what the app will actually call.
 
