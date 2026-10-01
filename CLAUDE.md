@@ -91,7 +91,8 @@ What runs today:
   git has it. A browser plays raw MPEG-TS through mpegts.js.
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
-  item. Videos still shows skeletons.
+  item. Videos is real: one source at a time, a paging grid, and
+  `sources/yattee` — a Yattee Server instance — bringing web video to it.
 - Search, closed: Media's grid searches the kind it shows, TV's Live searches
   channels and its films and series each search their own. Only sources whose
   `search` is in effect are asked, and nothing of a search is saved.

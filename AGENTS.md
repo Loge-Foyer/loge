@@ -618,8 +618,13 @@ Everything above describes the target; what runs today:
 - **Media is real:** Continue Watching, one row per kind with per-profile
   order, sort and card style, a full-screen grid per row, and detail pages —
   from every live source, merged, and kept per profile where the source allows
-  it. Jellyfin and the mock implement the media role. Videos still shows
-  skeletons.
+  it. Jellyfin and the mock implement the media role.
+- **Videos is real too**, and shows one source at a time: source tabs, kind
+  tabs where a source brings more than one, a paging grid of landscape cards,
+  and a search box only where `search` is in effect. `RowSpec.connectionId`
+  is what scopes the merged grid to one source — Media merges, Videos does
+  not, and that is the whole difference. `sources/yattee` is the first source
+  that brings `videos`.
 - **The backup file:** Settings → Plugins → Sync exports it — the share sheet
   on a phone, a download in a browser — imports it, and shows its key behind
   the owner check; Welcome restores one. Backup targets keep it saved, asking

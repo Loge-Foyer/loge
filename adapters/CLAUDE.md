@@ -76,7 +76,8 @@ its quirks. Map inside the package, always.
 The manifest, the media contract, the player contract, the account role and the
 backup role are written. `mock` implements the media role so the app works
 offline, and deliberately declines some capabilities, so the app's capability
-handling stays genuinely tested. Jellyfin is the first real media source.
+handling stays genuinely tested. Jellyfin is the first real media source, and
+`sources/yattee` the first that brings `videos` rather than a library.
 
 ## Current state
 
@@ -106,6 +107,12 @@ Phase 8 added players; Phase 9 dropped VLC and left mpv.
   opens. Android decodes in software for now and so stops at 1080p; iOS uses
   VideoToolbox and claims 4K. libass draws the subtitles, and it is the one
   engine here that sends any header a stream needs.
+- **Yattee Server:** `sources/yattee` implements the media role against a
+  self-hosted yattee-server — HTTP Basic Auth, an Invidious-compatible API,
+  trending and search, channels and playlists as things with videos inside
+  them, and playback from the muxed renditions only, because `adaptiveFormats`
+  needs a manifest no engine here is handed. Tested against a fake of its
+  routes; not yet run against a real instance.
 - **Jellyfin:** implements the media role, tested with a fake HTTP client and
   recorded 12.x payloads — playback through `PlaybackInfo` with a
   `DeviceProfile` from the player's profile, and progress and watched state
