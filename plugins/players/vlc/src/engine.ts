@@ -187,6 +187,10 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       if (disposed) throw playerReleased();
       vlc.setRate(clampRate(rate));
     },
+    setVolume: (volume) => {
+      if (disposed) throw playerReleased();
+      vlc.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
+    },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();
       chooseAudio(id);

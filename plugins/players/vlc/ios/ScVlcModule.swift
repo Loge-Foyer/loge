@@ -41,6 +41,10 @@ public final class ScVlcModule: Module {
         player.setRate(rate)
       }
 
+      Function("setVolume") { (player: ScVlcPlayer, volume: Int) in
+        player.setVolume(volume)
+      }
+
       Function("setAudioTrack") { (player: ScVlcPlayer, id: Int) in
         player.setAudioTrack(id)
       }

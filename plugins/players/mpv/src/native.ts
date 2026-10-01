@@ -38,6 +38,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   seek(positionMs: number): void;
   /** How fast it plays, 1 being normal. */
   setRate(rate: number): void;
+  /** How loud, 0 to 100 — mpv's own scale. */
+  setVolume(volume: number): void;
   /** `-1` turns it off. */
   setAudioTrack(id: number): void;
   setSubtitleTrack(id: number): void;

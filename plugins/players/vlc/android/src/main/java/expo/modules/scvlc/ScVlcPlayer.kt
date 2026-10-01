@@ -119,6 +119,10 @@ class ScVlcPlayer(context: Context, appContext: AppContext) : SharedObject(appCo
     mediaPlayer.rate = rate.toFloat()
   }
 
+  fun setVolume(volume: Int) {
+    mediaPlayer.volume = volume
+  }
+
   fun setAudioTrack(id: Int) {
     mediaPlayer.setAudioTrack(id)
   }

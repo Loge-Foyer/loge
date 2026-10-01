@@ -22,9 +22,23 @@ import {
 /** The expo-video player behind each controller. This package's view draws it; nothing else touches it. */
 const engines = new WeakMap<MediaPlayer, VideoPlayer>();
 
+/**
+ * Picture in picture belongs to the view, not the player: the system takes
+ * over a layer, and only the view has one. The view lends the controller its
+ * handle while it is mounted, and takes it back when it goes.
+ */
+const wanted = new WeakMap<MediaPlayer, boolean>();
+
+/** Whether this controller's view should let the system take its picture. */
+export function pictureInPictureOf(player: MediaPlayer): boolean {
+  return wanted.get(player) ?? false;
+}
+
 export function engineOf(player: MediaPlayer): VideoPlayer | undefined {
   return engines.get(player);
 }
+
+
 
 const CONTENT_TYPES: Readonly<Record<StreamProtocol, ContentType>> = {
   progressive: 'progressive',
@@ -193,6 +207,18 @@ export function createEngine(context: PlayerContext): MediaPlayer {
     setRate: (rate) => {
       if (disposed) throw playerReleased();
       video.playbackRate = clampRate(rate);
+    },
+    setVolume: (volume) => {
+      if (disposed) throw playerReleased();
+      video.volume = Math.min(1, Math.max(0, volume));
+    },
+    setBackgroundPlayback: (on) => {
+      if (disposed) throw playerReleased();
+      video.staysActiveInBackground = on;
+    },
+    setPictureInPicture: (on) => {
+      if (disposed) throw playerReleased();
+      wanted.set(player, on);
     },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();

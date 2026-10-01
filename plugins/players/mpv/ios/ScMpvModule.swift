@@ -48,6 +48,10 @@ public final class ScMpvModule: Module {
         player.setRate(rate)
       }
 
+      Function("setVolume") { (player: ScMpvPlayer, volume: Int) in
+        player.setVolume(volume)
+      }
+
       Function("setAudioTrack") { (player: ScMpvPlayer, id: Int) in
         player.setAudioTrack(id)
       }

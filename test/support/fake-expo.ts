@@ -67,9 +67,14 @@ export class FakeVlcPlayer extends SharedObject {
   }
 
   rate = 1;
+  volume = 100;
 
   setRate(rate: number) {
     this.rate = rate;
+  }
+
+  setVolume(volume: number) {
+    this.volume = volume;
   }
 
   setAudioTrack(id: number) {
@@ -122,9 +127,14 @@ export class FakeMpvPlayer extends SharedObject {
   }
 
   rate = 1;
+  volume = 100;
 
   setRate(rate: number) {
     this.rate = rate;
+  }
+
+  setVolume(volume: number) {
+    this.volume = volume;
   }
 
   setAudioTrack(id: number) {

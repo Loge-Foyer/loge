@@ -172,6 +172,10 @@ public final class ScVlcPlayer: SharedObject {
     onMain { [weak self] in self?.vlc.rate = Float(rate) }
   }
 
+  func setVolume(_ volume: Int) {
+    onMain { [weak self] in self?.vlc.audio?.volume = Int32(volume) }
+  }
+
   func setAudioTrack(_ id: Int) {
     onMain { [weak self] in self?.vlc.currentAudioTrackIndex = Int32(id) }
   }

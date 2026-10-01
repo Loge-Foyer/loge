@@ -21,9 +21,16 @@ export interface WebEngineHost {
   loadHls(): Promise<typeof Hls>;
   /** mpegts.js, fetched the first time a raw MPEG-TS stream needs it. */
   loadMpegts(): Promise<typeof Mpegts>;
+  /** Whether the page is out of sight — when picture in picture is asked for. */
+  hidden(): boolean;
+  onVisibilityChange(listener: () => void): void;
+  offVisibilityChange(listener: () => void): void;
 }
 
 const page: WebEngineHost = {
+  hidden: () => document.hidden,
+  onVisibilityChange: (listener) => document.addEventListener('visibilitychange', listener),
+  offVisibilityChange: (listener) => document.removeEventListener('visibilitychange', listener),
   createVideo: () => document.createElement('video'),
   loadHls: async () => (await import('hls.js')).default,
   loadMpegts: async () => (await import('mpegts.js')).default,
@@ -175,6 +182,15 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
   };
   for (const [type, listener] of Object.entries(listeners)) video.addEventListener(type, listener);
 
+  // A browser has no "enter it by itself": the page being hidden is the same
+  // moment the phones choose, so that is when it is asked for.
+  let pictureInPicture = false;
+  const onHidden = () => {
+    if (!pictureInPicture || !host.hidden() || video.paused) return;
+    void video.requestPictureInPicture?.().catch(() => undefined);
+  };
+  host.onVisibilityChange(onHidden);
+
   const player: MediaPlayer = {
     load: async ({ source, startMs }) => {
       if (disposed) throw playerReleased();
@@ -269,6 +285,19 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       if (disposed) throw playerReleased();
       video.playbackRate = clampRate(rate);
     },
+    setVolume: (volume) => {
+      if (disposed) throw playerReleased();
+      video.volume = Math.min(1, Math.max(0, volume));
+    },
+    setPictureInPicture: (on) => {
+      if (disposed) throw playerReleased();
+      // A browser has no "do it by itself": it is entered when the page is
+      // hidden, which is the same moment the platforms choose. Not every
+      // browser has it, and Safari spells it differently; one without it does
+      // nothing rather than throwing at the viewer.
+      video.disablePictureInPicture = !on;
+      pictureInPicture = on;
+    },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();
       const index = indexOf(id, 'audio');
@@ -295,6 +324,7 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
       if (disposed) return;
       disposed = true;
       for (const [type, listener] of Object.entries(listeners)) video.removeEventListener(type, listener);
+      host.offVisibilityChange(onHidden);
       events.clear();
       detach();
       video.remove();

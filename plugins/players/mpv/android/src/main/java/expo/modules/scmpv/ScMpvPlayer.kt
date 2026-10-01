@@ -150,6 +150,8 @@ class ScMpvPlayer(context: Context, appContext: AppContext) : SharedObject(appCo
 
   fun setRate(rate: Double) = onMpv { ScMpvNative.setPropertyDouble(mpv, "speed", rate) }
 
+  fun setVolume(volume: Int) = onMpv { ScMpvNative.setPropertyDouble(mpv, "volume", volume.toDouble()) }
+
   fun setAudioTrack(id: Int) = onMpv {
     if (id < 0) ScMpvNative.setPropertyString(mpv, "aid", "no") else ScMpvNative.setPropertyInt(mpv, "aid", id)
   }

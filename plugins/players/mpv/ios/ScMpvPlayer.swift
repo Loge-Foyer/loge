@@ -366,6 +366,10 @@ public final class ScMpvPlayer: SharedObject {
     onMpv { [weak self] in self?.setDouble("speed", rate) }
   }
 
+  func setVolume(_ volume: Int) {
+    onMpv { [weak self] in self?.setDouble("volume", Double(volume)) }
+  }
+
   func setAudioTrack(_ id: Int) {
     onMpv { [weak self] in
       guard let self else { return }

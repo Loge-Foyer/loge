@@ -40,6 +40,22 @@ export interface MediaPlayer {
    * than offering one that does nothing.
    */
   setRate?(rate: number): void;
+  /**
+   * How loud, 0 to 1. Absent where the engine has no volume of its own, and
+   * the app then offers no volume slider for that player.
+   */
+  setVolume?(volume: number): void;
+  /**
+   * Allow the picture to shrink into a window that floats over everything
+   * else, and to do so by itself when the app goes behind something — which
+   * is how the platform models it, rather than something to be called at the
+   * moment of leaving. Absent where the engine or the platform cannot: it
+   * needs the picture to reach a layer the system can take over, which not
+   * every engine draws into.
+   */
+  setPictureInPicture?(on: boolean): void;
+  /** Whether the sound carries on with the app behind something else. */
+  setBackgroundPlayback?(on: boolean): void;
   /** `null` turns subtitles off. */
   setSubtitleTrack(id: string | null): void;
   subscribe(listener: (event: PlayerEvent) => void): () => void;

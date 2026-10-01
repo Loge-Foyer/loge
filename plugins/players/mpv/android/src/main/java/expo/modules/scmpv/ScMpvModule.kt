@@ -37,6 +37,9 @@ class ScMpvModule : Module() {
       Function("setRate") { player: ScMpvPlayer, rate: Double ->
         appContext.mainQueue.launch { player.setRate(rate) }
       }
+      Function("setVolume") { player: ScMpvPlayer, volume: Int ->
+        appContext.mainQueue.launch { player.setVolume(volume) }
+      }
       Function("setAudioTrack") { player: ScMpvPlayer, id: Int ->
         appContext.mainQueue.launch { player.setAudioTrack(id) }
       }

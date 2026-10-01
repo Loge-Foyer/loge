@@ -185,8 +185,22 @@ describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => 
       if (options.mpegtsFails) throw new Error('chunk failed');
       return transport.Mpegts;
     });
-    const player = createWebEngine(context, { createVideo: () => video as unknown as HTMLVideoElement, loadHls, loadMpegts });
-    return { player, video, hls, transport, loadHls, loadMpegts, log: record(player) };
+    // The page's own visibility, which is when a browser is asked for picture in picture.
+    const watchers = new Set<() => void>();
+    let hidden = false;
+    const player = createWebEngine(context, {
+      createVideo: () => video as unknown as HTMLVideoElement,
+      loadHls,
+      loadMpegts,
+      hidden: () => hidden,
+      onVisibilityChange: (listener) => watchers.add(listener),
+      offVisibilityChange: (listener) => watchers.delete(listener),
+    });
+    const hide = () => {
+      hidden = true;
+      for (const listener of [...watchers]) listener();
+    };
+    return { player, video, hls, transport, loadHls, loadMpegts, hide, watchers, log: record(player) };
   }
   const liveTs = (overrides: Partial<PlaybackSource> = {}) => source({ uri: 'https://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true, ...overrides });
 
@@ -354,6 +368,33 @@ describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => 
     expect(video.src).toBe('');
     expect(video.removed).toBe(true);
     expect(() => player.play()).toThrow(expect.objectContaining({ code: 'INVALID_STATE' }));
+  });
+
+  it('shrinks into a window when the page goes out of sight, and only when it is asked to', async () => {
+    const { player, video, hide } = web();
+    await player.load({ source: source() });
+    player.play();
+    // Nothing asked for it: hiding the page does nothing.
+    hide();
+    expect(video.pictureInPictureRequests).toBe(0);
+
+    player.setPictureInPicture?.(true);
+    expect(video.disablePictureInPicture).toBe(false);
+    hide();
+    expect(video.pictureInPictureRequests).toBe(1);
+
+    // Switched off again, the browser is told not to offer it either.
+    player.setPictureInPicture?.(false);
+    expect(video.disablePictureInPicture).toBe(true);
+    hide();
+    expect(video.pictureInPictureRequests).toBe(1);
+  });
+
+  it('stops listening for the page when it is let go', async () => {
+    const { player, watchers } = web();
+    expect(watchers.size).toBe(1);
+    await player.dispose();
+    expect(watchers.size).toBe(0);
   });
 });
 

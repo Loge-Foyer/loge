@@ -34,6 +34,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   seek(positionMs: number): void;
   /** How fast it plays, 1 being normal. */
   setRate(rate: number): void;
+  /** How loud, 0 to 100 — libVLC's own scale. */
+  setVolume(volume: number): void;
   setAudioTrack(id: number): void;
   /** `-1` turns subtitles off. */
   setSubtitleTrack(id: number): void;
