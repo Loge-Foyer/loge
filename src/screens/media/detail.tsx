@@ -1,5 +1,6 @@
-import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
+import type { ConnectionId, DownloadOption, Episode, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
+import { Download as DownloadIcon } from '@tamagui/lucide-icons-2/icons/Download';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { useMutation } from '@tanstack/react-query';
@@ -20,6 +21,7 @@ import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
+import { useDownloadActions, useDownloadBudget, useDownloadOf, useDownloadOptions } from '@/hooks/use-downloads';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
@@ -57,6 +59,8 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
       showWatch={showWatch}
       canPlay={can('playback')}
       canMarkWatched={can('watchStateWrite')}
+      canDownload={can('downloads')}
+      offersChoices={can('downloadOptions')}
       {...(season ? { season } : {})}
       {...(detail.data.sourceError ? { sourceError: detail.data.sourceError } : {})}
     />
@@ -68,6 +72,8 @@ function Detail({
   showWatch,
   canPlay,
   canMarkWatched,
+  canDownload,
+  offersChoices,
   season,
   sourceError,
 }: {
@@ -75,6 +81,9 @@ function Detail({
   showWatch: boolean;
   canPlay: boolean;
   canMarkWatched: boolean;
+  canDownload: boolean;
+  /** The source will offer versions to choose between, rather than one copy. */
+  offersChoices: boolean;
   season?: string;
   /** The source could not answer; this page shows what was saved from it. */
   sourceError?: SourceError;
@@ -87,7 +96,7 @@ function Detail({
       <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={1100} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
-        <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} />
+        <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} canDownload={canDownload} offersChoices={offersChoices} />
         {showWatch ? <WatchState item={item} /> : null}
         {tagline ? (
           <SizableText size="$5" color="$color11" fontStyle="italic">
@@ -179,17 +188,31 @@ function Meta({ item }: { item: MediaItem }) {
  * episode, where the source can play. Watched and unwatched, where it keeps
  * what was watched: written here first, the source hears later.
  */
-function Actions({ item, canPlay, canMarkWatched }: { item: MediaItem; canPlay: boolean; canMarkWatched: boolean }) {
+function Actions({
+  item,
+  canPlay,
+  canMarkWatched,
+  canDownload,
+  offersChoices,
+}: {
+  item: MediaItem;
+  canPlay: boolean;
+  canMarkWatched: boolean;
+  canDownload: boolean;
+  offersChoices: boolean;
+}) {
   const userId = useActiveUserId();
   const { watch } = useServices();
   const { data: players = [] } = usePlayers();
   const [choosing, setChoosing] = useState(false);
   const mark = useMutation({ mutationFn: (played: boolean) => watch.setPlayed(userId, item, played), networkMode: 'always' });
   const playable = canPlay && (item.type === 'movie' || item.type === 'episode');
+  // Only a single playable thing is worth keeping: a series is its episodes.
+  const keepable = canDownload && (item.type === 'movie' || item.type === 'episode');
   const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
   // "Play with…" offers the players that are on and can play here — and only when there is a choice.
   const here = players.filter((player) => player.enabled && player.playsHere);
-  if (!playable && !canMarkWatched) return null;
+  if (!playable && !canMarkWatched && !keepable) return null;
   const play = (startMs?: number, player?: PluginId) =>
     router.push({
       pathname: '/play/[connectionId]/[itemId]',
@@ -224,6 +247,7 @@ function Actions({ item, canPlay, canMarkWatched }: { item: MediaItem; canPlay: 
             {played ? 'Mark unwatched' : 'Mark watched'}
           </Button>
         ) : null}
+        {keepable ? <DownloadButton item={item} offersChoices={offersChoices} /> : null}
       </XStack>
       {playable && choosing ? (
         <XStack gap="$2" flexWrap="wrap" items="center">
@@ -236,6 +260,98 @@ function Actions({ item, canPlay, canMarkWatched }: { item: MediaItem; canPlay: 
       ) : null}
     </YStack>
   );
+}
+
+/**
+ * Keep a copy, and say where it has got to. Where the source offers versions
+ * it opens a sheet of them with their sizes; where it does not, one press
+ * takes whatever the source hands over.
+ */
+function DownloadButton({ item, offersChoices }: { item: MediaItem; offersChoices: boolean }) {
+  const { data: entry } = useDownloadOf(item.key);
+  const { data: budget } = useDownloadBudget();
+  const { start, remove } = useDownloadActions();
+  const [choosing, setChoosing] = useState(false);
+  const { data: options = [], isPending: loadingOptions } = useDownloadOptions(item.key, choosing);
+
+  // A browser has nowhere to keep it.
+  if (budget?.limitBytes === 0) return null;
+
+  if (entry?.state === 'done') {
+    return (
+      <Button size="$4" icon={<Check size={18} />} onPress={() => remove.mutate(entry.id)} aria-label="Downloaded — press to delete">
+        Downloaded
+      </Button>
+    );
+  }
+  if (entry) {
+    const percent =
+      entry.bytesTotal === undefined || entry.bytesTotal === 0 ? undefined : Math.round((entry.bytesDone / entry.bytesTotal) * 100);
+    return (
+      <Button size="$4" disabled aria-label="Downloading">
+        {entry.state === 'failed' ? 'Download failed' : percent === undefined ? 'Downloading…' : `Downloading ${percent}%`}
+      </Button>
+    );
+  }
+  if (budget?.full) {
+    return (
+      <Button size="$4" disabled aria-label="No room for downloads">
+        No room left
+      </Button>
+    );
+  }
+
+  return (
+    <>
+      <Button
+        size="$4"
+        icon={<DownloadIcon size={18} />}
+        disabled={start.isPending}
+        onPress={() => (offersChoices ? setChoosing(!choosing) : start.mutate({ item }))}
+        aria-expanded={offersChoices ? choosing : undefined}
+      >
+        Download
+      </Button>
+      {choosing ? (
+        <XStack gap="$2" flexWrap="wrap" items="center" width="100%">
+          {loadingOptions ? (
+            <SizableText size="$2" color="$color10">
+              Asking the server…
+            </SizableText>
+          ) : options.length === 0 ? (
+            <Button size="$3" onPress={() => start.mutate({ item })}>
+              Download as it is
+            </Button>
+          ) : (
+            options.map((option) => (
+              <Button
+                key={option.id}
+                size="$3"
+                aria-label={optionLabel(option)}
+                onPress={() => {
+                  setChoosing(false);
+                  start.mutate({ item, optionId: option.id });
+                }}
+              >
+                {optionLabel(option)}
+              </Button>
+            ))
+          )}
+        </XStack>
+      ) : null}
+    </>
+  );
+}
+
+/** "1080p · 4.2 GB", with an estimate marked as one. */
+function optionLabel(option: DownloadOption): string {
+  const size = fileSize(option.estimatedBytes);
+  return [
+    option.label ?? resolutionName(option.height) ?? 'Original',
+    size === undefined ? undefined : option.transcoded ? `about ${size}` : size,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function WatchState({ item }: { item: MediaItem }) {

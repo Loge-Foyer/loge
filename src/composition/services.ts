@@ -198,6 +198,7 @@ export function createServices(): AppServices {
     },
     media,
     watch,
+    downloads,
     clock,
   });
   // What the account brought: running providers let changed connections and removed profiles go, and the gate looks again.

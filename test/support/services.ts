@@ -18,6 +18,7 @@ import {
   type ConnectionId,
   type ProgressReport,
   type PlaybackDescriptor,
+  type DownloadRequest,
   type PlaybackRequest,
   type PlayerProfile,
   type MediaPlayer,
@@ -41,7 +42,7 @@ import { createPinService } from '@/services/pins';
 import { createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
-import type { FileExchange } from '@/services/ports';
+import type { FileExchange, FileStore, TransferRequest } from '@/services/ports';
 import { createProfileService } from '@/services/profiles';
 import { createSecretJanitor } from '@/services/secrets';
 import { createSessionService } from '@/services/session';
@@ -51,6 +52,8 @@ import type { SyncParts } from '@/services/sync/parts';
 import { createSyncEngine } from '@/services/sync/engine';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
+import { createDownloadService } from '@/services/downloads';
+import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createPlaybackService } from '@/services/playback';
 import { createWatchService } from '@/services/watch';
 import { createOutboxDrainer } from '@/services/watch/drainer';
@@ -103,6 +106,8 @@ export interface FakeSourceOptions {
   readonly withImages?: boolean;
   /** Honours `ItemQuery.term`, and declares that it does. */
   readonly searches?: boolean;
+  /** Will hand over a copy to keep, and declares that it does. */
+  readonly downloads?: boolean;
   /** Reads its credentials before every call, the way a real source signs in. */
   readonly signsIn?: boolean;
   /** A field that says nothing of where or as whom it signs in — as Jellyfin's "local only". */
@@ -128,6 +133,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     /** What reached the source, in order: `started 0`, `stopped 90000`, `played true`. */
     reports: [] as string[],
     playbackRequests: [] as PlaybackRequest[],
+    downloadRequests: [] as DownloadRequest[],
     /** The term each `listItems` was given — `undefined` where it was asked to browse. */
     terms: [] as (string | undefined)[],
   };
@@ -146,6 +152,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
         ...(options.playback ? (['playback'] as const) : []),
         ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
         ...(options.searches ? (['search'] as const) : []),
+        ...(options.downloads ? (['downloads'] as const) : []),
       ],
     },
     connectionFields: [
@@ -216,6 +223,22 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
                   return options.playback?.(request) as PlaybackDescriptor;
                 },
                 resolveHeaders: async (ref: string) => (ref === 'stream' ? { Authorization: 'Token t' } : undefined),
+              }
+            : {}),
+          ...(options.downloads
+            ? {
+                getDownloadDescriptor: async (request: DownloadRequest) => {
+                  await fail();
+                  stats.downloadRequests.push(request);
+                  return {
+                    key: request.key,
+                    uri: 'https://home/file.mkv',
+                    container: 'mkv',
+                    transcoded: false,
+                    expectedBytes: 1_000,
+                    subtitles: [],
+                  };
+                },
               }
             : {}),
           ...(options.writesWatchState
@@ -369,6 +392,20 @@ export function buildServices(options: {
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
   const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
+  // A file store entirely in memory: a test can say a film is kept without a disk.
+  const files = fakeFileStore();
+  const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });
+  const downloads = createDownloadService({
+    downloads: db.downloads,
+    files,
+    sources,
+    pool,
+    limitBytes: async () => (await downloadSettings.get()).maxBytes,
+    ids,
+    clock,
+    log: silentLog,
+    onQueued: () => undefined,
+  });
   const playback = createPlaybackService({
     players: options.players ?? [],
     choosing: players.choosing,
@@ -378,6 +415,7 @@ export function buildServices(options: {
     },
     media,
     watch,
+    downloads,
     clock,
   });
   const orientation = { turns: [] as string[], upright: async () => void orientation.turns.push('upright'), free: async () => void orientation.turns.push('free') };
@@ -397,6 +435,7 @@ export function buildServices(options: {
     drainer,
     pool,
     orientation,
+    fileStore: files,
     services: {
       catalog,
       session,
@@ -415,10 +454,37 @@ export function buildServices(options: {
       players,
       appSettings,
       watch,
+      downloads,
+      downloadSettings,
       playback,
       orientation,
     },
   };
+}
+
+/**
+ * A file store with no disk behind it: what a test writes is what it reads.
+ * `fetch` is what a test overrides to make a download finish, fail or stall.
+ */
+export function fakeFileStore(): FileStore & { readonly kept: Map<string, number>; limit: number } {
+  const kept = new Map<string, number>();
+  const store = {
+    kept,
+    limit: 64 * 1024 * 1024 * 1024,
+    available: true,
+    fetch: async ({ fileName }: TransferRequest) => {
+      kept.set(fileName, 1_000);
+      return { bytesDone: 1_000, bytesTotal: 1_000 };
+    },
+    used: async () => [...kept.values()].reduce((total, size) => total + size, 0),
+    free: async () => store.limit,
+    remove: async (fileName: string) => void kept.delete(fileName),
+    sweep: async (keep: ReadonlySet<string>) => {
+      for (const name of [...kept.keys()]) if (!keep.has(name)) kept.delete(name);
+    },
+    uriOf: (fileName: string) => `file:///downloads/${fileName}`,
+  };
+  return store;
 }
 
 /** A player plugin with a fake engine: every controller it made, and the context each got. */

@@ -48,6 +48,7 @@ async function setUp(options: { players?: ReturnType<typeof fakePlayerPlugin>[];
         : parent.type === 'season'
           ? [1, 2].map((number) => episode(parent.key.connectionId, Number(parent.key.externalId.slice(1)), number))
           : [],
+    downloads: true,
     ...(options.canPlay === false ? {} : { playback: options.describe ?? ((request) => ({ key: request.key, sources: [hls], audioTracks: [], subtitleTracks: [] })) }),
   });
   const players = options.players ?? [fakePlayerPlugin('first', { ios: hlsOnly }), fakePlayerPlugin('second', { ios: everything })];
@@ -101,6 +102,29 @@ describe('pressing Play', () => {
     const plan = await t.services.playback.plan(t.kids, t.item.key, { startMs: 90_000 });
     expect(t.source.stats.playbackRequests).toEqual([{ key: t.item.key, profile: hlsOnly, startMs: 90_000 }]);
     expect(plan).toMatchObject({ kind: 'play', player: 'players/first', source: hls });
+  });
+
+  it('plays a copy kept on this device, and asks the source nothing at all', async () => {
+    const t = await setUp();
+    // The source says it can hand over a copy, and the queue has finished one.
+    const entry = await t.services.downloads.start(t.kids, t.item);
+    await t.db.downloads.put({ ...entry, state: 'done', fileName: `${entry.id}.mkv`, container: 'mkv', bytesDone: 1_000 });
+
+    const plan = await t.services.playback.plan(t.kids, t.item.key);
+    expect(plan).toMatchObject({
+      kind: 'play',
+      descriptor: { sources: [{ uri: `file:///downloads/${entry.id}.mkv`, protocol: 'progressive', container: 'mkv' }] },
+    });
+    // Nothing was asked of the server: this is what airplane mode means.
+    expect(t.source.stats.playbackRequests).toEqual([]);
+  });
+
+  it('asks the source while a copy is still coming down', async () => {
+    const t = await setUp();
+    // Queued, not finished: a half-written file is not something to hand a player.
+    await t.services.downloads.start(t.kids, t.item);
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play', source: hls });
+    expect(t.source.stats.playbackRequests).toHaveLength(1);
   });
 
   it('asks with the profile of the player first on the item’s tab: a channel plays from TV', async () => {

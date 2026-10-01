@@ -75,6 +75,10 @@ export function createPlaybackService(deps: {
   readonly categoryOf: (connectionId: ConnectionId) => Promise<PluginCategory | undefined>;
   readonly media: Pick<MediaService, 'playbackDescriptor' | 'children' | 'artworkHeaders'>;
   readonly watch: Pick<WatchService, 'report'>;
+  /** What is already on this device, which plays before anything is asked of a source. */
+  readonly downloads: {
+    ready(userId: UserId, key: GlobalMediaKey): Promise<PlaybackDescriptor | undefined>;
+  };
   readonly clock: Pick<Clock, 'now'>;
 }): PlaybackService {
   const { media } = deps;
@@ -91,7 +95,11 @@ export function createPlaybackService(deps: {
       const preferred = picked?.id ?? choosing.preferred;
       const first = candidates.find((candidate) => candidate.id === preferred) ?? candidates[0];
       if (!first) return { kind: 'no-player' };
-      const descriptor = await media.playbackDescriptor(userId, { key, profile: first.profile, ...wanted }, signal);
+      // A copy on this device comes first: it plays in airplane mode, costs the
+      // server nothing, and is what the user asked for by keeping it. Only when
+      // one is finished — a half-written file is not something to open.
+      const kept = await deps.downloads.ready(userId, key);
+      const descriptor = kept ?? (await media.playbackDescriptor(userId, { key, profile: first.profile, ...wanted }, signal));
       const choice = choosePlayer(descriptor.sources, candidates, preferred);
       if (choice.kind === 'play') return { kind: 'play', player: choice.player, source: choice.source, descriptor };
       const best = descriptor.sources[0];

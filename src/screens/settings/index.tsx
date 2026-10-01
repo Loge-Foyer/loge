@@ -1,6 +1,7 @@
 import { PLUGIN_CATEGORIES, type PluginCategory } from '@sc/api';
 import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
+import { Download } from '@tamagui/lucide-icons-2/icons/Download';
 import { CloudOff } from '@tamagui/lucide-icons-2/icons/CloudOff';
 import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Info } from '@tamagui/lucide-icons-2/icons/Info';
@@ -11,10 +12,12 @@ import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
 import { SizableText } from 'tamagui';
 
-import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus } from '@/components/labels';
+import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus, fileSize } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
+import { useDownloadBudget } from '@/hooks/use-downloads';
+import type { DownloadBudget } from '@/services/downloads';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
@@ -35,6 +38,7 @@ const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
 
 /** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
 export function SettingsScreen() {
+  const budget = useDownloadBudget();
   const userId = useActiveUserId();
   const { catalog } = useServices();
   const { data: account } = useAccount();
@@ -104,6 +108,15 @@ export function SettingsScreen() {
         />
       </SettingsSection>
 
+      <SettingsSection title="Downloads" footer="What this device keeps to watch with no network at all.">
+        <SettingsRow
+          title="Downloads"
+          subtitle={downloadsSummary(budget.data)}
+          icon={<Download size={20} color="$color11" />}
+          href="/settings/downloads"
+        />
+      </SettingsSection>
+
       <SettingsSection
         title="Plugins"
         footer="Sources and IPTV go with your account. Players, and where your account and its backups live, are set up on each device."
@@ -131,4 +144,13 @@ export function SettingsScreen() {
       </SettingsSection>
     </Screen>
   );
+}
+
+/** How full this device is, in the fewest words. */
+function downloadsSummary(budget: DownloadBudget | undefined): string {
+  if (!budget) return 'What this device keeps';
+  if (budget.limitBytes === 0) return 'Not available in a browser';
+  const used = fileSize(budget.usedBytes) ?? '0 B';
+  const limit = fileSize(budget.limitBytes) ?? '—';
+  return budget.full ? `Full — ${used} of ${limit}` : `${used} of ${limit}`;
 }

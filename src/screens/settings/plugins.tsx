@@ -13,8 +13,10 @@ import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
+import { useDownloadActions, useDownloadBudget, useDownloadSettings } from '@/hooks/use-downloads';
 import { usePlayerActions, usePlayers } from '@/hooks/use-players';
 import { APP_DEFAULTS, HOLD_RATES, SEEK_CHOICES, type ButtonRow } from '@/services/app-settings';
+import { BITRATE_CHOICES, HEIGHT_CHOICES } from '@/services/downloads/settings';
 import { PLAYER_BUTTONS, PLAYER_JUMPS, PLAYER_SLIDERS, type PlayerButton, type PlayerJump, type PlayerSlider } from '@/services/ports';
 import type { PlayerSummary } from '@/services/players';
 
@@ -88,8 +90,74 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
         <Paragraph color="$color10">{NONE_HERE[category]}</Paragraph>
       )}
       {category === 'players' ? <PlayerControlsSection /> : null}
+      {category === 'sources' ? <DownloadQualitySection /> : null}
       {category === 'sync' ? <BackupSection /> : null}
     </Screen>
+  );
+}
+
+/**
+ * What to ask a source for when keeping a copy. It sits under the sources
+ * rather than inside any one connection: it is this device's preference about
+ * every source at once, and a connection belongs to the account.
+ *
+ * A source that cannot make something smaller simply hands over what it has —
+ * these settings then do nothing for it, which is why the footer says so
+ * rather than the rows being hidden.
+ */
+function DownloadQualitySection() {
+  const { data: settings } = useDownloadSettings();
+  const { data: budget } = useDownloadBudget();
+  const { set } = useDownloadActions();
+  // A browser has nowhere to keep a film, so there is nothing to set up.
+  if (!settings || budget?.limitBytes === 0) return null;
+  return (
+    <SettingsSection
+      title="Downloads"
+      footer="What to ask for when you keep a copy. Jellyfin, Emby and Plex can make a smaller one; a source that cannot simply hands over the file it has. How much room downloads may take is in Settings → Downloads."
+    >
+      <SettingsRow
+        title="Ask for a smaller copy"
+        subtitle="An 80 GB film becomes a few GB. The server does the work."
+        trailing={
+          <AppSwitch
+            label="Ask for a smaller copy"
+            checked={settings.askForSmaller}
+            onCheckedChange={(askForSmaller) => set.mutate({ askForSmaller })}
+          />
+        }
+      />
+      <ChoiceRow
+        title="Resolution"
+        options={HEIGHT_CHOICES}
+        label={(height) => (height >= 2160 ? '4K' : `${height}p`)}
+        value={settings.maxHeight}
+        disabled={!settings.askForSmaller}
+        onChoose={(maxHeight) => set.mutate({ maxHeight })}
+      />
+      <ChoiceRow
+        title="Quality"
+        subtitle="Higher looks better and takes more room."
+        options={BITRATE_CHOICES}
+        label={(bitrate) => `${Math.round(bitrate / 1_000_000)} Mbps`}
+        value={settings.maxBitrate}
+        disabled={!settings.askForSmaller}
+        onChoose={(maxBitrate) => set.mutate({ maxBitrate })}
+      />
+      <SettingsRow
+        title="Keep HDR"
+        subtitle="Only where the source has it. Most phones show an SDR copy more faithfully."
+        disabled={!settings.askForSmaller}
+        trailing={
+          <AppSwitch
+            label="Keep HDR"
+            checked={settings.hdr}
+            disabled={!settings.askForSmaller}
+            onCheckedChange={(hdr) => set.mutate({ hdr })}
+          />
+        }
+      />
+    </SettingsSection>
   );
 }
 

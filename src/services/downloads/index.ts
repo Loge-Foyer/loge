@@ -1,4 +1,4 @@
-import { AppError, type DownloadOption, type GlobalMediaKey, type MediaItem, type UserId } from '@sc/api';
+import { AppError, type DownloadOption, type GlobalMediaKey, type MediaItem, type PlaybackDescriptor, type UserId } from '@sc/api';
 
 import type { Clock, DownloadEntry, DownloadRepository, FileStore, IdGenerator, Logger } from '../ports';
 import type { SourceService } from '../sources';
@@ -31,6 +31,12 @@ export interface DownloadService {
   /** Pauses a running one, or restarts a failed one. */
   pause(id: string): Promise<void>;
   resume(id: string): Promise<void>;
+  /**
+   * A finished copy as something to play — a `file://` source, which every
+   * engine opens and which needs no network at all. Only when it is finished:
+   * a half-written file is not something to hand a player.
+   */
+  ready(userId: UserId, key: GlobalMediaKey): Promise<PlaybackDescriptor | undefined>;
 }
 
 /** Warn here rather than at the ceiling: there is still time to delete something. */
@@ -120,6 +126,31 @@ export function createDownloadService(deps: {
 
     list: (userId) => downloads.list(userId),
     forItem: (userId, key) => downloads.forItem(userId, key),
+
+    ready: async (userId, key) => {
+      if (!files.available) return undefined;
+      const entry = await downloads.forItem(userId, key);
+      if (!entry || entry.state !== 'done') return undefined;
+      return {
+        key,
+        sources: [
+          {
+            uri: files.uriOf(entry.fileName),
+            // One file on disk: nothing to negotiate, nothing to fetch.
+            protocol: 'progressive',
+            container: entry.container,
+            transcoded: false,
+            live: false,
+          },
+        ],
+        audioTracks: [],
+        subtitleTracks: [],
+        ...(entry.item.runtimeMs === undefined ? {} : { durationMs: entry.item.runtimeMs }),
+        ...(entry.item.watch?.played === false && entry.item.watch.positionMs !== undefined
+          ? { startMs: entry.item.watch.positionMs }
+          : {}),
+      };
+    },
 
     remove: async (id) => {
       const entry = await downloads.get(id);
