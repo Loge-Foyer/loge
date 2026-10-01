@@ -9,12 +9,9 @@ import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
 import { plugin as vlc } from '@sc/player-vlc';
 import { plugin as emby } from '@sc/source-emby';
-import { plugin as googleDrive } from '@sc/source-google-drive';
-import { plugin as icloudDrive } from '@sc/source-icloud-drive';
 import { plugin as invidious } from '@sc/source-invidious';
 import { plugin as jellyfin } from '@sc/source-jellyfin';
 import { plugin as mockSource } from '@sc/source-mock';
-import { plugin as onedrive } from '@sc/source-onedrive';
 import { plugin as plex } from '@sc/source-plex';
 import { plugin as webdav } from '@sc/source-webdav';
 import { plugin as yattee } from '@sc/source-yattee';
@@ -35,9 +32,10 @@ export const plugins: readonly Plugin[] = [
   emby,
   plex,
   webdav,
-  icloudDrive,
-  googleDrive,
-  onedrive,
+  // The three drives are not registered as *sources* for now: nothing reads
+  // files from them yet, so listing them only offers a connection that cannot
+  // do anything. Their adapters are still here, and so are the same three as
+  // *backup targets*, which is a different job and does work.
   yattee,
   invidious,
   stalker,
