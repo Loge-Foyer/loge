@@ -1,7 +1,7 @@
 {
-  // Players draw, so player-kit and the player plugins get React and React
-  // Native's types — and the DOM's, for the web engine's <video>. Everything
-  // else in this repository compiles with no host types at all (tsconfig.json).
+  // Players draw, so player-kit and the player adapters get React and React
+  // Native's types — and the DOM's, for the web engine's <video>. Every other
+  // adapter compiles with no host types at all (tsconfig.json).
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["esnext", "dom"],
@@ -12,5 +12,5 @@
       "@sc/player-kit": ["./player-kit/src/index.ts"]
     }
   },
-  "include": ["player-kit/src/**/*.ts", "player-kit/src/**/*.tsx", "plugins/players/*/src/**/*.ts", "plugins/players/*/src/**/*.tsx"]
+  "include": ["player-kit/src/**/*.ts", "player-kit/src/**/*.tsx", "players/*/src/**/*.ts", "players/*/src/**/*.tsx"]
 }

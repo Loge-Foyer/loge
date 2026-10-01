@@ -13,11 +13,17 @@ export default defineConfig({
       { find: /^expo-video$/, replacement: fileURLToPath(new URL('./test/support/expo-video.ts', import.meta.url)) },
       { find: /^expo$/, replacement: fileURLToPath(new URL('./test/support/expo.ts', import.meta.url)) },
     ],
-    // As in metro.config.js: what a plugin file imports is the app's copy, never the plugins repository's.
+    // One copy of each, whichever workspace asks for it.
     dedupe: ['react', 'react-native', 'expo', 'expo-video', 'hls.js', 'mpegts.js'],
   },
   define: { __DEV__: 'true' },
   test: {
+    // Named explicitly, because the adapters are npm workspaces now and vitest
+    // would otherwise take each of them for a project of its own and run this
+    // app's tests under the wrong root. There are two suites here, and these
+    // are they.
+    projects: ['./vitest.config.mjs', './adapters/vitest.config.ts'],
+    name: 'app',
     include: ['test/**/*.test.ts'],
     setupFiles: ['test/support/setup.ts'],
     environment: 'node',

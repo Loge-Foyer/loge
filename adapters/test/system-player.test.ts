@@ -9,9 +9,9 @@ import {
 } from '@sc/api';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createEngine as createNativeEngine, engineOf } from '../plugins/players/system/src/engine';
-import { createEngine as createWebEngine } from '../plugins/players/system/src/engine.web';
-import { PROFILES } from '../plugins/players/system/src/profiles';
+import { createEngine as createNativeEngine, engineOf } from '../players/system/src/engine';
+import { createEngine as createWebEngine } from '../players/system/src/engine.web';
+import { PROFILES } from '../players/system/src/profiles';
 import { created, type FakeVideoPlayer } from './support/fake-expo-video';
 import { fakeHls, fakeMpegts, FakeVideoElement } from './support/fake-video';
 

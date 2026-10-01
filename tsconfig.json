@@ -4,10 +4,8 @@
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
-    // A plugin is seen where it is linked, in this app's node_modules, so what
-    // it imports is this app's copy — as Metro resolves it (metro.config.js).
-    // Followed to the plugins repository, its imports would find that
-    // repository's own React.
+    // An adapter is seen where it is linked, in node_modules, so what it
+    // imports is resolved from there rather than from its own folder.
     "preserveSymlinks": true,
     "paths": {
       "@/*": [
@@ -27,6 +25,10 @@
   "exclude": [
     "node_modules",
     "test",
+    // The adapters are three programs of their own, and the strictest of them
+    // sees no host types at all. Compiled in here they would get Expo's,
+    // React Native's and the DOM's — which is exactly what they must not have.
+    "adapters",
     "babel.config.js",
     "metro.config.js",
     "android",

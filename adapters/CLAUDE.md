@@ -1,13 +1,13 @@
-# CLAUDE.md — streaming_center_plugins
+# CLAUDE.md — adapters
 
 Every adapter Streaming Center has to the outside world, plus `api` — the
 vocabulary the app and all plugins are written in.
 
 ## Reading protocol — before you plan, edit or run anything
 
-1. `../.claude/streaming-center-architecture.md` — the architecture
+1. `../../.claude/streaming-center-architecture.md` — the architecture
    specification. Section 7 defines the plugin model; section 8 is the roster.
-2. `../CLAUDE.md` — how the three repositories relate.
+2. `../CLAUDE.md` — the app this folder lives in.
 3. `AGENTS.md` here — imported below, read it fully.
 4. `docs/` for the area you are touching, then the target plugin's `README.md`.
 
@@ -15,13 +15,13 @@ Only then start work.
 
 @AGENTS.md
 
-## Why this repository is the centre
+## Why this folder is the centre
 
 `api` is what the app and every plugin agree on. Both sides need `MediaItem`,
 `GlobalMediaKey` and the capability types, so those cannot live in the app —
 that would make plugins depend on the app and the dependency graph circular.
 
-So this repository depends on nothing, and everything else points at it. An
+So this folder depends on nothing, and everything else points at it. An
 `import` of React, Expo or the app anywhere in `api` breaks the property the
 whole split exists to provide. The React half of the player contract has its
 own package, `player-kit`, for exactly that reason.
@@ -147,5 +147,5 @@ Phase 8 adds players — VLC and mpv on Android are in.
 
 ## Git
 
-This repository has **no remote and should not get one**. Commit here; never at
+This folder has **no remote and should not get one**. Commit here; never at
 the workspace root. Conventional commit style.

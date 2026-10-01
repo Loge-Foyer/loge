@@ -1,8 +1,8 @@
-# AGENTS.md — streaming_center_plugins
+# AGENTS.md — adapters
 
 Every adapter Streaming Center has to the outside world, plus the vocabulary
 they are written in. Read the workspace root `AGENTS.md` and
-`../.claude/streaming-center-architecture.md` first.
+`../../.claude/streaming-center-architecture.md` first.
 
 ---
 
@@ -21,7 +21,7 @@ test/                    vitest — api rules, plugins against fake HTTP, confor
 docs/
 ```
 
-npm workspaces (`["api", "player-kit", "plugins/*/*"]`), source-only —
+npm workspaces (`the app's `workspaces``), source-only —
 `"exports": "./src/index.ts"`, no build step. Every plugin lists `@sc/api` as
 a **peer** dependency: the host supplies the one instance, so branded IDs from
 the app and from a plugin are the same type.
@@ -59,9 +59,9 @@ create `plugins/sync/jellyfin`.
 | a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder, reached through `expo`) | the app, another plugin |
 
 A player's React, React Native and published engine are **peers**, which the
-app installs; this repository has them as development dependencies, for the
+app installs; this folder has them as development dependencies, for the
 players' TypeScript program and the tests only. The app resolves every import
-of a plugin file from its own `node_modules` and blocks this repository's —
+of a plugin file from its own `node_modules` and blocks this folder's —
 never rely on a copy here being the one that runs.
 
 `lib: ["esnext"]` gives `api` and every non-player plugin **no host globals**:
@@ -203,7 +203,7 @@ nothing else. The file's format and encryption are the app's.
 
 ## Declared versus effective capabilities
 
-The distinction that matters most in this repository.
+The distinction that matters most in this folder.
 
 - **Declared** — static, in the manifest. What the plugin *can* do.
 - **Effective** — per connection and per profile. Declared ∩ what the user
@@ -301,7 +301,7 @@ the test of whether this architecture is real.
 
 ## Skills
 
-`.agents/skills/` in this repository:
+`.agents/skills/` in this folder:
 
 - **`sc-add-plugin`** — create a new plugin, in the folder for its category.
 - **`sc-plugin-categories`** — which category a plugin belongs in, and how to

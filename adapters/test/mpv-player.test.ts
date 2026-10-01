@@ -1,8 +1,8 @@
 import { canPlay, headersRef, type MediaPlayer, type PlaybackSource, type PlayerContext, type PlayerEvent } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import { createEngine, engineOf } from '../plugins/players/mpv/src/engine';
-import { PROFILES } from '../plugins/players/mpv/src/profiles';
+import { createEngine, engineOf } from '../players/mpv/src/engine';
+import { PROFILES } from '../players/mpv/src/profiles';
 import { createdMpv, type FakeMpvPlayer } from './support/fake-expo';
 
 const context: PlayerContext = {

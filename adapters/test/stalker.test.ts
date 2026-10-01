@@ -2,7 +2,7 @@ import { connectionId, type ConnectedMediaProvider, type FieldValues } from '@sc
 import { plugin } from '@sc/iptv-stalker';
 import { describe, expect, it } from 'vitest';
 
-import { endpointsFor } from '../plugins/iptv/stalker/src/portal';
+import { endpointsFor } from '../iptv/stalker/src/portal';
 import { fakeContext, fakeHttp, target, type RecordedRequest, type Reply } from './support/fake-http';
 
 const MAC = '00:1A:79:12:34:56';

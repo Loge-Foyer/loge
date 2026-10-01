@@ -7,7 +7,7 @@ Android and web.
 
 1. `../.claude/streaming-center-architecture.md` — the architecture
    specification, and the source of truth for every rule below.
-2. `../CLAUDE.md` — how the three repositories relate.
+2. `../CLAUDE.md` — how the app and the server relate.
 3. `AGENTS.md` in this repository — imported below, read it fully.
 4. `README.md` and `docs/` here, for whichever area you are touching.
 
@@ -22,20 +22,30 @@ the account, profiles and PINs, the sync engine, backups — the local database
 and the backup file's format, platform access (keychain, biometrics, crypto,
 files), and the composition root that wires everything together.
 
-**Does not own:** domain types, plugin contracts, the player view contract, or
-any plugin. Those are in `../streaming_center_plugins` — `@sc/api`,
-`@sc/player-kit`, and `plugins/<category>/<name>`. If you find yourself writing
-a `MediaItem` interface here, stop — it belongs in `@sc/api`.
+**`src/` does not own:** domain types, adapter contracts, the player view
+contract, or any adapter. Those are in `adapters/` — `@sc/api`,
+`@sc/player-kit`, and `<category>/<name>` — which live in this repository but
+compile as programs of their own, with no host types. If you find yourself
+writing a `MediaItem` interface in `src/`, stop: it belongs in `@sc/api`.
+
+**The adapters moved in during Phase 9**, from a repository of their own. They
+are npm workspaces, so there is one `node_modules` and one copy of React,
+expo-video and everything else — which is what the split could never
+guarantee. The boundary is unchanged, and is kept by `adapters/tsconfig.json`
+(no host types), this repository's `tsconfig.json` (which excludes
+`adapters/`), and lint.
 
 ## The three mistakes to avoid
 
-**Defining domain types here.** The app and every plugin both need them. Putting
-them in the app makes plugins depend on the app, and the dependency graph goes
-circular. This is expensive to undo later.
+**Defining domain types in `src/`.** `src/` and every adapter both need them.
+Putting them in `src/` makes the adapters depend on the app, and the dependency
+graph goes circular. One repository makes this *easier* to do by accident, not
+harder — which is why `adapters/` is excluded from the app's TypeScript
+program.
 
-**Naming a plugin above the composition root.** An `if (providerId ===
+**Naming an adapter above the composition root.** An `if (providerId ===
 'jellyfin')` in a screen means the abstraction has already failed. Branch on
-the plugin's category and its effective capabilities.
+the adapter's category and its effective capabilities.
 
 **Reaching for the network in a write path.** Local database plus journal entry
 in one transaction, then return. The sync engine carries the journal to the

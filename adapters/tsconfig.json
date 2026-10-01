@@ -1,15 +1,17 @@
 {
-  // api and the plugins run on Hermes and in browsers, and take everything
-  // host-side from their context: this program sees no host types at all.
-  // The tests are a program of their own (test/tsconfig.json), with Node's.
+  // api and the adapters run on Hermes and in browsers, and take everything
+  // host-side from their context: this program sees no host types at all. It
+  // is what keeps `fetch`, `URL`, `console` and the rest out of them now that
+  // they live beside an app that has all three. The tests are a program of
+  // their own (test/tsconfig.json), with Node's.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": []
   },
   "include": [
     "api/src/**/*.ts",
-    "plugins/*/*/src/**/*.ts"
-  ],
-  // Players have a program of their own, with React Native's types: tsconfig.players.json.
-  "exclude": ["plugins/players/**"]
+    "sources/*/src/**/*.ts",
+    "iptv/*/src/**/*.ts",
+    "sync/*/src/**/*.ts"
+  ]
 }

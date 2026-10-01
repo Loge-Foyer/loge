@@ -20,9 +20,9 @@ import {
 import { plugin } from '@sc/source-jellyfin';
 import { describe, expect, it } from 'vitest';
 
-import { fnv1a64 } from '../plugins/sources/jellyfin/src/hash';
-import { bucket } from '../plugins/sources/jellyfin/src/images';
-import { normalizeBaseUrl } from '../plugins/sources/jellyfin/src/url';
+import { fnv1a64 } from '../sources/jellyfin/src/hash';
+import { bucket } from '../sources/jellyfin/src/images';
+import { normalizeBaseUrl } from '../sources/jellyfin/src/url';
 import * as fixtures from './fixtures/jellyfin';
 import { fakeContext, fakeHttp, target, type Route } from './support/fake-http';
 

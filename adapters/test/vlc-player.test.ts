@@ -1,8 +1,8 @@
 import { canPlay, headersRef, type MediaPlayer, type PlaybackSource, type PlayerContext, type PlayerEvent } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import { createEngine, engineOf } from '../plugins/players/vlc/src/engine';
-import { PROFILES } from '../plugins/players/vlc/src/profiles';
+import { createEngine, engineOf } from '../players/vlc/src/engine';
+import { PROFILES } from '../players/vlc/src/profiles';
 import { created, type FakeVlcPlayer } from './support/fake-expo';
 
 const context: PlayerContext = {
