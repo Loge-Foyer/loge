@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import ExpoModulesCore
 import MPVKit
 
@@ -24,6 +25,12 @@ import MPVKit
 public final class ScMpvPlayer: SharedObject {
   /// Where mpv draws. The view puts it on screen; it belongs to the player.
   let displayLayer = AVSampleBufferDisplayLayer()
+
+  // Picture in picture is the system taking over that layer. It is set up the
+  // first time it is allowed, and only then: a controller built for a layer
+  // nothing has drawn into yet is refused.
+  private var pip: AVPictureInPictureController?
+  private var pipDelegate: ScMpvPipDelegate?
 
   private var mpv: OpaquePointer?
   private let work = DispatchQueue(label: "sc-mpv", qos: .userInitiated)
@@ -365,6 +372,43 @@ public final class ScMpvPlayer: SharedObject {
     onMpv { [weak self] in self?.setDouble("speed", rate) }
   }
 
+  /**
+   Allow the system to shrink the picture into a floating window, and to do it
+   by itself when the app is left. Android does this at the activity, so every
+   engine there gets it whatever it draws with; here it needs a layer the
+   system can take over, which is why only an engine with one offers it.
+   */
+  func setPictureInPicture(_ on: Bool) {
+    // AVKit is the main thread's, and the layer belongs to the view hierarchy.
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
+      if self.pip == nil {
+        let delegate = ScMpvPipDelegate(player: self)
+        let source = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: self.displayLayer, playbackDelegate: delegate)
+        self.pipDelegate = delegate
+        self.pip = AVPictureInPictureController(contentSource: source)
+      }
+      self.pip?.canStartPictureInPictureAutomaticallyFromInline = on
+    }
+  }
+
+  /// What the floating window's own controls act on.
+  func pipSetPlaying(_ playing: Bool) {
+    onMpv { [weak self] in self?.setFlag("pause", !playing) }
+  }
+
+  func pipSkip(_ seconds: Double) {
+    onMpv { [weak self] in
+      guard let self else { return }
+      self.command(["seek", "\(seconds)", "relative"])
+    }
+  }
+
+  var pipPaused: Bool { paused }
+
+  var pipDurationMs: Int64 { durationMs }
+
   func setSoftwareFallback(_ on: Bool) {
     onMpv { [weak self] in self?.setString("hwdec-software-fallback", on ? "yes" : "no") }
   }
@@ -464,5 +508,51 @@ public final class ScMpvPlayer: SharedObject {
     DispatchQueue.main.async {
       self.releasePlayer()
     }
+  }
+}
+
+/**
+ A sample-buffer layer has no player behind it that the system can read, so it
+ asks these instead: what is playing, how long it is, and what a skip means.
+ It is an Objective-C protocol, so it needs an `NSObject` — `SharedObject` is
+ not one, the same reason VLC's delegate is forwarded rather than conformed to.
+ */
+private final class ScMpvPipDelegate: NSObject, AVPictureInPictureSampleBufferPlaybackDelegate {
+  private weak var player: ScMpvPlayer?
+
+  init(player: ScMpvPlayer) {
+    self.player = player
+  }
+
+  func pictureInPictureController(_ controller: AVPictureInPictureController, setPlaying playing: Bool) {
+    player?.pipSetPlaying(playing)
+  }
+
+  /// Live has no end, and the system draws a scrubber only when it is given one.
+  func pictureInPictureControllerTimeRangeForPlayback(_ controller: AVPictureInPictureController) -> CMTimeRange {
+    guard let player, player.pipDurationMs > 0 else {
+      return CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+    }
+    return CMTimeRange(
+      start: CMTime(value: 0, timescale: 1),
+      duration: CMTime(value: CMTimeValue(player.pipDurationMs), timescale: 1000),
+    )
+  }
+
+  func pictureInPictureControllerIsPlaybackPaused(_ controller: AVPictureInPictureController) -> Bool {
+    player?.pipPaused ?? true
+  }
+
+  func pictureInPictureController(_ controller: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) {
+    // mpv draws into the same layer whatever size the system gives it.
+  }
+
+  func pictureInPictureController(
+    _ controller: AVPictureInPictureController,
+    skipByInterval skipInterval: CMTime,
+    completion completionHandler: @escaping () -> Void
+  ) {
+    player?.pipSkip(CMTimeGetSeconds(skipInterval))
+    completionHandler()
   }
 }

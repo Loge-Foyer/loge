@@ -42,6 +42,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   setVolume(volume: number): void;
   /** Whether to decode in software when the hardware decoder refuses a stream. */
   setSoftwareFallback(on: boolean): void;
+  /** Let the system shrink the picture into a floating window. iPhone only; Android shrinks the whole app. */
+  setPictureInPicture(on: boolean): void;
   /** `-1` turns it off. */
   setAudioTrack(id: number): void;
   setSubtitleTrack(id: number): void;

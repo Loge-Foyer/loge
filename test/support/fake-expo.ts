@@ -78,9 +78,14 @@ export class FakeVlcPlayer extends SharedObject {
   }
 
   softwareFallback = true;
+  pictureInPicture = false;
 
   setSoftwareFallback(on: boolean) {
     this.softwareFallback = on;
+  }
+
+  setPictureInPicture(on: boolean) {
+    this.pictureInPicture = on;
   }
 
   setAudioTrack(id: number) {
@@ -144,9 +149,14 @@ export class FakeMpvPlayer extends SharedObject {
   }
 
   softwareFallback = true;
+  pictureInPicture = false;
 
   setSoftwareFallback(on: boolean) {
     this.softwareFallback = on;
+  }
+
+  setPictureInPicture(on: boolean) {
+    this.pictureInPicture = on;
   }
 
   setAudioTrack(id: number) {

@@ -210,6 +210,12 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       if (disposed) throw playerReleased();
       mpv.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
     },
+    setPictureInPicture: (on) => {
+      if (disposed) throw playerReleased();
+      // Android has none of this at the engine: the activity shrinks instead,
+      // and the app arranges it for every player at once.
+      mpv.setPictureInPicture(on);
+    },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();
       chooseAudio(id);

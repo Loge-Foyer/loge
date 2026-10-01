@@ -124,6 +124,16 @@ export interface PlayerProfile {
   readonly subtitleFormats: readonly string[];
   readonly hdr?: readonly HdrFormat[];
   readonly maxHeight?: number;
+  /**
+   * Whether this engine can hand its picture to the system as a floating
+   * window *by itself* on this platform. It needs a layer the system can take
+   * over, which not every engine draws into.
+   *
+   * Android is the exception and is not described here: there the activity
+   * shrinks, so every engine gets it whatever it draws with, and the app
+   * arranges it for all of them at once.
+   */
+  readonly pictureInPicture?: boolean;
 }
 
 /** `getPlaybackDescriptor`'s question: this item, for this engine. */

@@ -48,6 +48,10 @@ public final class ScMpvModule: Module {
         player.setRate(rate)
       }
 
+      Function("setPictureInPicture") { (player: ScMpvPlayer, on: Bool) in
+        player.setPictureInPicture(on)
+      }
+
       Function("setSoftwareFallback") { (player: ScMpvPlayer, on: Bool) in
         player.setSoftwareFallback(on)
       }

@@ -199,8 +199,14 @@ describe('mpv on Android (libmpv)', () => {
     // VideoToolbox does H.264 and HEVC in hardware on every iPhone this app
     // runs on, and mpv falls back to software for the rest.
     expect(canPlay(ios, source({ videoCodec: 'hevc', height: 2160 }))).toBe(true);
-    // The height is the only thing the two differ on.
-    expect({ ...ios, maxHeight: 0 }).toEqual({ ...android, maxHeight: 0 });
+    // Only an iPhone draws into a layer the system can take over; on Android
+    // the activity shrinks instead, which is the app's to arrange.
+    expect(ios.pictureInPicture).toBe(true);
+    expect(android.pictureInPicture).toBeUndefined();
+    // Those two apart, the engine plays the same things either side.
+    const { maxHeight: _iosHeight, pictureInPicture: _iosPip, ...iosPlays } = ios;
+    const { maxHeight: _androidHeight, pictureInPicture: _androidPip, ...androidPlays } = android;
+    expect(iosPlays).toEqual(androidPlays);
   });
 
   it('plays faster and slower, and clamps a rate no engine honours', async () => {
