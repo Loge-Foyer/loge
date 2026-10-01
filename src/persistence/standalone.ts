@@ -68,6 +68,21 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       put: (userId, entry) => write((r) => r.watchStatus.put(userId, entry)),
       prune: (before) => write((r) => r.watchStatus.prune(before)),
     },
+    subscriptions: {
+      list: (userId) => read((r) => r.subscriptions.list(userId)),
+      listAll: () => read((r) => r.subscriptions.listAll()),
+      get: (id) => read((r) => r.subscriptions.get(id)),
+      forChannel: (userId, connectionId, externalId) => read((r) => r.subscriptions.forChannel(userId, connectionId, externalId)),
+      put: (subscription) => write((r) => r.subscriptions.put(subscription)),
+      remove: (id) => write((r) => r.subscriptions.remove(id)),
+    },
+    playlists: {
+      list: (userId) => read((r) => r.playlists.list(userId)),
+      listAll: () => read((r) => r.playlists.listAll()),
+      get: (id) => read((r) => r.playlists.get(id)),
+      put: (playlist) => write((r) => r.playlists.put(playlist)),
+      remove: (id) => write((r) => r.playlists.remove(id)),
+    },
     downloads: {
       get: (id) => read((r) => r.downloads.get(id)),
       forItem: (userId, key) => read((r) => r.downloads.forItem(userId, key)),

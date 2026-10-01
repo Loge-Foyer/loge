@@ -151,6 +151,7 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   { version: 4, up: accountModel },
   { version: 5, up: (tx) => tx.exec(V5) },
   { version: 6, up: (tx) => tx.exec(V6) },
+  { version: 7, up: (tx) => tx.exec(V7) },
 ];
 
 // Watch status, for sources that master it (Phase 7): a cache per profile,
@@ -161,6 +162,39 @@ export const MIGRATIONS: readonly SqlMigration[] = [
 // backup — a copy on this phone is this phone's. It cascades from both parents
 // so removing a profile or a connection takes its downloads' rows; the files
 // themselves are swept separately, since a cascade cannot delete from disk.
+// Lists a profile owns (Phase 10): channels it follows, and lists it made.
+// Unlike `downloads` beside them, these are account-wide — journaled, carried
+// to your own server, written into backups — because they are the profile's
+// own and belong wherever it signs in. A subscription cascades from its
+// connection too: unfollowing is implied by the source going away.
+const V7 = `
+CREATE TABLE subscriptions (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  added_at TEXT NOT NULL,
+  version INTEGER NOT NULL
+) STRICT;
+CREATE UNIQUE INDEX subscriptions_channel ON subscriptions (user_id, connection_id, external_id);
+CREATE INDEX subscriptions_connection ON subscriptions (connection_id);
+
+CREATE TABLE playlists (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  items TEXT NOT NULL,
+  source_connection_id TEXT,
+  source_external_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  version INTEGER NOT NULL
+) STRICT;
+CREATE INDEX playlists_user ON playlists (user_id);
+`;
+
 const V6 = `
 CREATE TABLE downloads (
   id TEXT PRIMARY KEY NOT NULL,

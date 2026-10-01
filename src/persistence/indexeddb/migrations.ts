@@ -20,6 +20,8 @@ export const STORES = [
   'watchStatus',
   'outbox',
   'downloads',
+  'subscriptions',
+  'playlists',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -130,6 +132,16 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     downloads.createIndex('byConnection', 'connectionId');
     downloads.createIndex('byItem', ['userId', 'connectionId', 'externalId'], { unique: true });
     downloads.createIndex('byState', 'state');
+  },
+
+  // A profile's own lists: as SQLite's v7.
+  (db) => {
+    const subscriptions = db.createObjectStore('subscriptions', { keyPath: 'id' });
+    subscriptions.createIndex('byUser', 'userId');
+    subscriptions.createIndex('byConnection', 'connectionId');
+    subscriptions.createIndex('byChannel', ['userId', 'connectionId', 'externalId'], { unique: true });
+    const playlists = db.createObjectStore('playlists', { keyPath: 'id' });
+    playlists.createIndex('byUser', 'userId');
   },
 ];
 

@@ -1,7 +1,7 @@
 import { connectionId, credentialsRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { DownloadEntry, LocalDatabase, ProfileValues, StoredAccount } from '@/services/ports';
+import type { DownloadEntry, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -609,6 +609,79 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: true }, updatedAt: 1 });
       await db.outbox.add(alex.id, played('m1'));
       expect(await db.journal.head()).toBe(head);
+    });
+  });
+
+  describe('a profile’s own lists', () => {
+    const now = '2026-10-01T12:00:00.000Z';
+    const sub = (id: string, channel: string, user = alex.id): Subscription => ({
+      id,
+      userId: user,
+      connectionId: connectionId('c-home'),
+      externalId: channel,
+      title: `Channel ${channel}`,
+      addedAt: now,
+      version: 1,
+    });
+    const list = (id: string, title: string, items: readonly { connectionId: string; externalId: string }[] = []): Playlist => ({
+      id,
+      userId: alex.id,
+      title,
+      items: items.map((item) => ({ connectionId: connectionId(item.connectionId), externalId: item.externalId })),
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    });
+
+    it('follows a channel once, however often it is asked', async () => {
+      const { db } = open();
+      await household(db);
+      await db.subscriptions.put(sub('s1', 'UC1'));
+      expect((await db.subscriptions.forChannel(alex.id, connectionId('c-home'), 'UC1'))?.id).toBe('s1');
+      expect(await db.subscriptions.forChannel(alex.id, connectionId('c-home'), 'UC2')).toBeUndefined();
+      expect(await db.subscriptions.list(kids.id)).toEqual([]);
+    });
+
+    it('keeps a list as a whole, items and all', async () => {
+      const { db } = open();
+      await household(db);
+      await db.playlists.put(list('p1', 'Rewatch', [{ connectionId: 'c-home', externalId: 'm1' }]));
+      await db.playlists.put({ ...list('p1', 'Rewatch, longer'), items: [
+        { connectionId: connectionId('c-home'), externalId: 'm1' },
+        { connectionId: connectionId('c-home'), externalId: 'm2' },
+      ], version: 2 });
+      const stored = await db.playlists.get('p1');
+      expect(stored?.title).toBe('Rewatch, longer');
+      expect(stored?.items.map((item) => item.externalId)).toEqual(['m1', 'm2']);
+      expect(stored?.version).toBe(2);
+    });
+
+    it('is journaled, unlike the downloads beside it: the profile’s own travels', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.subscriptions.put(sub('s1', 'UC1'));
+      await db.playlists.put(list('p1', 'Rewatch'));
+      const entries = (await db.journal.entries(head)).map((entry) => `${entry.entity}/${entry.entityId}/${entry.operation}`);
+      expect(entries).toEqual(['subscription/s1/upsert', 'playlist/p1/upsert']);
+
+      const since = await db.journal.head();
+      await db.subscriptions.remove('s1');
+      expect((await db.journal.entries(since)).map((entry) => entry.operation)).toEqual(['delete']);
+    });
+
+    it('goes with its profile; a subscription goes with its connection too', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.subscriptions.put(sub('s1', 'UC1'));
+      await db.playlists.put(list('p1', 'Rewatch'));
+      await db.connections.delete(home.id);
+      // Unfollowing is implied by the source going away; a list is not.
+      expect(await db.subscriptions.listAll()).toEqual([]);
+      expect(await db.playlists.listAll()).toHaveLength(1);
+
+      await db.users.delete(alex.id);
+      expect(await db.playlists.listAll()).toEqual([]);
     });
   });
 

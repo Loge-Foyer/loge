@@ -33,12 +33,16 @@ import type {
   MediaCacheRepository,
   OutboxEntry,
   OutboxRepository,
+  Playlist,
+  PlaylistRepository,
   PreferencesRepository,
   ProfileValues,
   Repositories,
   StaleSecretQueue,
   StoredAccount,
   StoredUser,
+  Subscription,
+  SubscriptionRepository,
   UserPreferences,
   UserRepository,
   WatchEntry,
@@ -502,6 +506,91 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  // Account-wide, so every write is journaled — unlike the downloads below.
+  const subscriptions: SubscriptionRepository = {
+    list: async (user) =>
+      (await sql.all<SubscriptionRow>('SELECT * FROM subscriptions WHERE user_id = ? ORDER BY added_at DESC, id', [user])).map(toSubscription),
+    listAll: async () => (await sql.all<SubscriptionRow>('SELECT * FROM subscriptions ORDER BY added_at DESC, id')).map(toSubscription),
+    get: async (id) => {
+      const row = await sql.get<SubscriptionRow>('SELECT * FROM subscriptions WHERE id = ?', [id]);
+      return row && toSubscription(row);
+    },
+    forChannel: async (user, connection, external) => {
+      const row = await sql.get<SubscriptionRow>(
+        'SELECT * FROM subscriptions WHERE user_id = ? AND connection_id = ? AND external_id = ?',
+        [user, connection, external],
+      );
+      return row && toSubscription(row);
+    },
+    put: async (subscription) => {
+      await sql.run(
+        `INSERT INTO subscriptions (id, user_id, connection_id, external_id, title, added_at, version) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET title = excluded.title, added_at = excluded.added_at, version = excluded.version`,
+        [
+          subscription.id,
+          subscription.userId,
+          subscription.connectionId,
+          subscription.externalId,
+          subscription.title,
+          subscription.addedAt,
+          subscription.version,
+        ],
+      );
+      await record({
+        userId: subscription.userId,
+        entity: 'subscription',
+        entityId: subscription.id,
+        operation: 'upsert',
+        localVersion: subscription.version,
+      });
+    },
+    remove: async (id) => {
+      const row = await sql.get<SubscriptionRow>('SELECT * FROM subscriptions WHERE id = ?', [id]);
+      if (!row) return;
+      await sql.run('DELETE FROM subscriptions WHERE id = ?', [id]);
+      await record({ userId: userId(row.user_id), entity: 'subscription', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
+  const playlists: PlaylistRepository = {
+    list: async (user) =>
+      (await sql.all<PlaylistRow>('SELECT * FROM playlists WHERE user_id = ? ORDER BY updated_at DESC, id', [user])).map(toPlaylist),
+    listAll: async () => (await sql.all<PlaylistRow>('SELECT * FROM playlists ORDER BY updated_at DESC, id')).map(toPlaylist),
+    get: async (id) => {
+      const row = await sql.get<PlaylistRow>('SELECT * FROM playlists WHERE id = ?', [id]);
+      return row && toPlaylist(row);
+    },
+    put: async (playlist) => {
+      await sql.run(
+        `INSERT INTO playlists (id, user_id, title, description, items, source_connection_id, source_external_id, created_at, updated_at, version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           title = excluded.title, description = excluded.description, items = excluded.items,
+           source_connection_id = excluded.source_connection_id, source_external_id = excluded.source_external_id,
+           updated_at = excluded.updated_at, version = excluded.version`,
+        [
+          playlist.id,
+          playlist.userId,
+          playlist.title,
+          playlist.description ?? null,
+          JSON.stringify(playlist.items),
+          playlist.source?.connectionId ?? null,
+          playlist.source?.externalId ?? null,
+          playlist.createdAt,
+          playlist.updatedAt,
+          playlist.version,
+        ],
+      );
+      await record({ userId: playlist.userId, entity: 'playlist', entityId: playlist.id, operation: 'upsert', localVersion: playlist.version });
+    },
+    remove: async (id) => {
+      const row = await sql.get<PlaylistRow>('SELECT * FROM playlists WHERE id = ?', [id]);
+      if (!row) return;
+      await sql.run('DELETE FROM playlists WHERE id = ?', [id]);
+      await record({ userId: userId(row.user_id), entity: 'playlist', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
   const downloads: DownloadRepository = {
     get: async (id) => {
       const row = await sql.get<DownloadRow>('SELECT * FROM downloads WHERE id = ?', [id]);
@@ -671,7 +760,7 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, subscriptions, playlists, journal };
 }
 
 interface WatchRow {
@@ -689,6 +778,59 @@ function toWatchEntry(row: WatchRow): WatchEntry {
     status: parse<WatchStatus>(row.status),
     ...(row.item === null ? {} : { item: parse<MediaItem>(row.item) }),
     updatedAt: row.updated_at,
+  };
+}
+
+interface SubscriptionRow {
+  readonly id: string;
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly title: string;
+  readonly added_at: string;
+  readonly version: number;
+}
+
+function toSubscription(row: SubscriptionRow): Subscription {
+  return {
+    id: row.id,
+    userId: userId(row.user_id),
+    connectionId: connectionId(row.connection_id),
+    externalId: row.external_id,
+    title: row.title,
+    addedAt: row.added_at,
+    version: row.version,
+  };
+}
+
+interface PlaylistRow {
+  readonly id: string;
+  readonly user_id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly items: string;
+  readonly source_connection_id: string | null;
+  readonly source_external_id: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly version: number;
+}
+
+function toPlaylist(row: PlaylistRow): Playlist {
+  const source =
+    row.source_connection_id === null || row.source_external_id === null
+      ? undefined
+      : { connectionId: connectionId(row.source_connection_id), externalId: row.source_external_id };
+  return {
+    id: row.id,
+    userId: userId(row.user_id),
+    title: row.title,
+    ...(row.description === null ? {} : { description: row.description }),
+    items: parse<GlobalMediaKey[]>(row.items),
+    ...(source === undefined ? {} : { source }),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    version: row.version,
   };
 }
 

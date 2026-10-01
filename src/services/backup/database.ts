@@ -16,7 +16,11 @@ import type { BackupSql, BackupSqlDatabase } from '../ports';
  * server account, and backups: a field added to a record is added here once.
  */
 
-export const BACKUP_SCHEMA_VERSION = 1;
+/**
+ * v2 added a profile's own lists. A file at v1 still opens — it simply has
+ * none — so only a *newer* schema is refused, never an older one.
+ */
+export const BACKUP_SCHEMA_VERSION = 2;
 // 'SCBK', so a stray SQLite file is never taken for a backup's database.
 const APPLICATION_ID = 0x5343424b;
 
@@ -46,6 +50,24 @@ CREATE TABLE profile_values (
   secret_keys TEXT NOT NULL,
   secrets TEXT NOT NULL,
   PRIMARY KEY (connection_id, user_id)
+) STRICT;
+CREATE TABLE subscriptions (
+  subscription_id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL,
+  connection_id TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  added_at TEXT NOT NULL
+) STRICT;
+CREATE TABLE playlists (
+  playlist_id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  items TEXT NOT NULL,
+  source TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 ) STRICT;
 `;
 
@@ -115,7 +137,50 @@ async function insert(db: BackupSqlDatabase, record: Extract<AccountRecord, { de
         [data.connectionId, data.userId, data.off ? 1 : 0, json(data.fields), json(data.settings), json(data.secretKeys), json(data.secrets)],
       );
     }
+    case 'subscription': {
+      const { data } = record;
+      return db.run(
+        'INSERT INTO subscriptions (subscription_id, user_id, connection_id, external_id, title, added_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [data.subscriptionId, data.userId, data.connectionId, data.externalId, data.title, data.addedAt],
+      );
+    }
+    case 'playlist': {
+      const { data } = record;
+      return db.run(
+        'INSERT INTO playlists (playlist_id, user_id, title, description, items, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          data.playlistId,
+          data.userId,
+          data.title,
+          data.description ?? null,
+          json(data.items),
+          data.source === undefined ? null : json(data.source),
+          data.createdAt,
+          data.updatedAt,
+        ],
+      );
+    }
   }
+}
+
+interface SubscriptionRow {
+  readonly subscription_id: string;
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly title: string;
+  readonly added_at: string;
+}
+
+interface PlaylistRow {
+  readonly playlist_id: string;
+  readonly user_id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly items: string;
+  readonly source: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 interface ConnectionRow {
@@ -215,6 +280,44 @@ export async function readBackupDatabase(sql: BackupSql, bytes: Uint8Array): Pro
           secrets: JSON.parse(row.secrets) as Live<'profileValues'>['data']['secrets'],
         },
       } satisfies Live<'profileValues'>);
+    }
+    // A v1 file has neither table. It is still a backup, and still opens: an
+    // older schema is read for what it holds, and only a newer one is refused.
+    if ((version?.user_version ?? 0) >= 2) {
+      for (const row of await db.all<SubscriptionRow>('SELECT * FROM subscriptions')) {
+        records.push({
+          kind: 'subscription',
+          key: row.subscription_id,
+          deleted: false,
+          data: {
+            subscriptionId: row.subscription_id,
+            userId: toUserId(row.user_id),
+            connectionId: toConnectionId(row.connection_id),
+            externalId: row.external_id,
+            title: row.title,
+            addedAt: row.added_at,
+          },
+        } satisfies Live<'subscription'>);
+      }
+      for (const row of await db.all<PlaylistRow>('SELECT * FROM playlists')) {
+        records.push({
+          kind: 'playlist',
+          key: row.playlist_id,
+          deleted: false,
+          data: {
+            playlistId: row.playlist_id,
+            userId: toUserId(row.user_id),
+            title: row.title,
+            ...(row.description === null ? {} : { description: row.description }),
+            items: JSON.parse(row.items) as Live<'playlist'>['data']['items'],
+            ...(row.source === null
+              ? {}
+              : { source: JSON.parse(row.source) as NonNullable<Live<'playlist'>['data']['source']> }),
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        } satisfies Live<'playlist'>);
+      }
     }
     // The file came from outside: what the contract refuses, the app never stores.
     if (!records.every(isAccountRecord)) return 'damaged';

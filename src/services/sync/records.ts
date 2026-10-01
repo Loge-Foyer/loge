@@ -18,6 +18,8 @@ const KIND_OF: Readonly<Record<JournalEntity, RecordKind>> = {
   preferences: 'preference',
   connection: 'connection',
   connectionProfileValues: 'profileValues',
+  subscription: 'subscription',
+  playlist: 'playlist',
 };
 
 const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
@@ -26,10 +28,21 @@ const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
   preference: 'preferences',
   connection: 'connection',
   profileValues: 'connectionProfileValues',
+  subscription: 'subscription',
+  playlist: 'playlist',
 };
 
 /** Parents first: a batch writes a profile before its PIN, a connection before its profiles' values. */
-export const PARENTS_FIRST: readonly RecordKind[] = ['profile', 'pin', 'preference', 'connection', 'profileValues'];
+export const PARENTS_FIRST: readonly RecordKind[] = [
+  'profile',
+  'pin',
+  'preference',
+  'connection',
+  'profileValues',
+  // A subscription points at a profile and a connection; a playlist at a profile.
+  'subscription',
+  'playlist',
+];
 
 /** A record's identity across the journal and the account: its kind and key. Journal ids are record keys already. */
 export const identityOf = (record: Pick<AccountRecord, 'kind' | 'key'>): string => `${record.kind}/${record.key}`;
@@ -37,9 +50,16 @@ export const identityOf = (record: Pick<AccountRecord, 'kind' | 'key'>): string 
 export const identityOfEntry = (entry: Pick<JournalEntry, 'entity' | 'entityId'>): string => `${KIND_OF[entry.entity]}/${entry.entityId}`;
 
 /** A local row, announced as if just changed: how a sign-up uploads, and how a row a server lost goes back. */
-export function announcementOf(kind: RecordKind, key: string): JournalAnnouncement {
+export function announcementOf(kind: RecordKind, key: string, owner?: string): JournalAnnouncement {
   const [first] = key.split('/');
-  const userId = kind === 'profile' || kind === 'pin' || kind === 'preference' ? first : kind === 'profileValues' ? key.split('/')[1] : undefined;
+  const userId =
+    kind === 'profile' || kind === 'pin' || kind === 'preference'
+      ? first
+      : kind === 'profileValues'
+        ? key.split('/')[1]
+        : // A subscription's and a playlist's key is a generated id and names
+          // nobody, so whose it is comes from the row.
+          owner;
   return { ...(userId ? { userId: toUserId(userId) } : {}), entity: ENTITY_OF[kind], entityId: key, operation: 'upsert', localVersion: 0 };
 }
 
@@ -114,6 +134,44 @@ export async function recordFor(
           secretKeys,
           // A password this device lacks is still listed: the server keeps the one another device saved.
           secrets: secrets ?? {},
+        },
+      };
+      break;
+    }
+    case 'subscription': {
+      if (entry.operation === 'delete') return tombstone;
+      const subscription = await deps.db.subscriptions.get(key);
+      record = subscription && {
+        kind: 'subscription',
+        key,
+        deleted: false,
+        data: {
+          subscriptionId: subscription.id,
+          userId: subscription.userId,
+          connectionId: subscription.connectionId,
+          externalId: subscription.externalId,
+          title: subscription.title,
+          addedAt: subscription.addedAt,
+        },
+      };
+      break;
+    }
+    case 'playlist': {
+      if (entry.operation === 'delete') return tombstone;
+      const playlist = await deps.db.playlists.get(key);
+      record = playlist && {
+        kind: 'playlist',
+        key,
+        deleted: false,
+        data: {
+          playlistId: playlist.id,
+          userId: playlist.userId,
+          title: playlist.title,
+          ...(playlist.description === undefined ? {} : { description: playlist.description }),
+          items: playlist.items,
+          ...(playlist.source === undefined ? {} : { source: playlist.source }),
+          createdAt: playlist.createdAt,
+          updatedAt: playlist.updatedAt,
         },
       };
       break;

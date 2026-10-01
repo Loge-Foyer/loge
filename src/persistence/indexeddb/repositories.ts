@@ -11,6 +11,10 @@ import type {
   DownloadEntry,
   DownloadRepository,
   DownloadState,
+  Playlist,
+  PlaylistRepository,
+  Subscription,
+  SubscriptionRepository,
   JournalAnnouncement,
   JournalEntry,
   JournalRepository,
@@ -86,6 +90,10 @@ interface WatchRecord {
   readonly item?: MediaItem;
   readonly updatedAt: number;
 }
+
+/** Newest first, with the id breaking a tie so the order is total. */
+const byAdded = (a: Subscription, b: Subscription) => b.addedAt.localeCompare(a.addedAt) || a.id.localeCompare(b.id);
+const byUpdated = (a: Playlist, b: Playlist) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
 
 interface DownloadRecord {
   readonly id: string;
@@ -201,7 +209,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<UserRecord>('users', id);
       if (!row) return;
       await request(store('users').delete(id));
-      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads'] as const) {
+      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'playlists'] as const) {
         await deleteWhere(name, 'byUser', id);
       }
       await record({ userId: id, entity: 'user', entityId: id, operation: 'delete', localVersion: row.version + 1 });
@@ -236,7 +244,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<ConnectionRecord>('connections', id);
       if (!row) return;
       await request(store('connections').delete(id));
-      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads'] as const) {
+      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
       await request(store('backupState').delete(id));
@@ -448,6 +456,47 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  const subscriptions: SubscriptionRepository = {
+    list: async (user) =>
+      (await request(store('subscriptions').index('byUser').getAll(user) as IDBRequest<Subscription[]>)).sort(byAdded),
+    listAll: async () => (await request(store('subscriptions').getAll() as IDBRequest<Subscription[]>)).sort(byAdded),
+    get: (id) => get<Subscription>('subscriptions', id),
+    forChannel: async (user, connection, external) =>
+      request(store('subscriptions').index('byChannel').get([user, connection, external]) as IDBRequest<Subscription | undefined>),
+    put: async (subscription) => {
+      await request(store('subscriptions').put(subscription));
+      await record({
+        userId: subscription.userId,
+        entity: 'subscription',
+        entityId: subscription.id,
+        operation: 'upsert',
+        localVersion: subscription.version,
+      });
+    },
+    remove: async (id) => {
+      const row = await get<Subscription>('subscriptions', id);
+      if (!row) return;
+      await request(store('subscriptions').delete(id));
+      await record({ userId: row.userId, entity: 'subscription', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
+  const playlists: PlaylistRepository = {
+    list: async (user) => (await request(store('playlists').index('byUser').getAll(user) as IDBRequest<Playlist[]>)).sort(byUpdated),
+    listAll: async () => (await request(store('playlists').getAll() as IDBRequest<Playlist[]>)).sort(byUpdated),
+    get: (id) => get<Playlist>('playlists', id),
+    put: async (playlist) => {
+      await request(store('playlists').put(playlist));
+      await record({ userId: playlist.userId, entity: 'playlist', entityId: playlist.id, operation: 'upsert', localVersion: playlist.version });
+    },
+    remove: async (id) => {
+      const row = await get<Playlist>('playlists', id);
+      if (!row) return;
+      await request(store('playlists').delete(id));
+      await record({ userId: row.userId, entity: 'playlist', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
   const downloads: DownloadRepository = {
     get: async (id) => {
       const row = await get<DownloadRecord>('downloads', id);
@@ -585,7 +634,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, subscriptions, playlists, journal };
 }
 
 function toWatchEntry(row: WatchRecord) {

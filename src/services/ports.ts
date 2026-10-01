@@ -334,6 +334,60 @@ export interface FileStore {
   uriOf(fileName: string): string;
 }
 
+/**
+ * A channel a profile follows on one source (v7). Account-wide, unlike the
+ * downloads beside it: the profile's own, and so wherever it signs in.
+ */
+export interface Subscription {
+  readonly id: string;
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  /** The channel's id on that source. */
+  readonly externalId: string;
+  /** As it was when followed, so a list reads while the source is away. */
+  readonly title: string;
+  /** ISO 8601. */
+  readonly addedAt: string;
+  readonly version: number;
+}
+
+/**
+ * A profile's own list, or a mirror of one a source holds. Edited as a whole,
+ * which is why its items are one column rather than rows of their own.
+ */
+export interface Playlist {
+  readonly id: string;
+  readonly userId: UserId;
+  readonly title: string;
+  readonly description?: string;
+  /** In order. A list may mix sources: a Jellyfin film beside a web video. */
+  readonly items: readonly GlobalMediaKey[];
+  /** Set when this mirrors a list the source holds. */
+  readonly source?: GlobalMediaKey;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly version: number;
+}
+
+export interface SubscriptionRepository {
+  list(userId: UserId): Promise<readonly Subscription[]>;
+  /** For the sync engine and the backup, which take every profile's. */
+  listAll(): Promise<readonly Subscription[]>;
+  get(id: string): Promise<Subscription | undefined>;
+  /** The one for this channel, so following twice follows once. */
+  forChannel(userId: UserId, connectionId: ConnectionId, externalId: string): Promise<Subscription | undefined>;
+  put(subscription: Subscription): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface PlaylistRepository {
+  list(userId: UserId): Promise<readonly Playlist[]>;
+  listAll(): Promise<readonly Playlist[]>;
+  get(id: string): Promise<Playlist | undefined>;
+  put(playlist: Playlist): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
 /** One report waiting for the source that masters the item's watch state. */
 export interface OutboxEntry {
   readonly seq: number;
@@ -379,7 +433,7 @@ export interface StaleSecretQueue {
 }
 
 /** A profile's PIN is journaled apart from its name, so a rename never carries a PIN away. */
-export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues';
+export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues' | 'subscription' | 'playlist';
 
 /**
  * One local change, for the sync engine to carry later: a pointer to the
@@ -487,6 +541,8 @@ export interface Repositories {
   readonly watchStatus: WatchStatusRepository;
   readonly outbox: OutboxRepository;
   readonly downloads: DownloadRepository;
+  readonly subscriptions: SubscriptionRepository;
+  readonly playlists: PlaylistRepository;
   readonly journal: JournalRepository;
 }
 

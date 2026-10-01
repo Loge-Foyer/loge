@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createSqlJsBackup } from '@/persistence/backup/sql-js';
 import { OwnerNotVerifiedError } from '@/services/account';
 import { deriveBackupKeys, HEADER_BYTES, MAX_BACKUP_BYTES, openBackup, sealBackup } from '@/services/backup/container';
-import { readBackupDatabase, writeBackupDatabase } from '@/services/backup/database';
+import { BACKUP_SCHEMA_VERSION, readBackupDatabase, writeBackupDatabase } from '@/services/backup/database';
 import { decodeBase32, encodeBase32, formatBackupKey, parseBackupKey } from '@/services/backup/key';
 
 import { testCrypto } from './support/crypto';
@@ -120,7 +120,11 @@ describe('the database inside', () => {
     expect(await readBackupDatabase(sql, other)).toBe('damaged');
 
     const later = await sql.create();
-    await later.exec(`PRAGMA application_id = ${0x5343424b}; PRAGMA user_version = 2; CREATE TABLE meta (key TEXT, value TEXT);`);
+    // One past whatever this build writes, so the next schema bump does not
+    // quietly turn this case into "the current one".
+    await later.exec(
+      `PRAGMA application_id = ${0x5343424b}; PRAGMA user_version = ${BACKUP_SCHEMA_VERSION + 1}; CREATE TABLE meta (key TEXT, value TEXT);`,
+    );
     const newer = await later.serialize();
     await later.close();
     expect(await readBackupDatabase(sql, newer)).toBe('newer');
