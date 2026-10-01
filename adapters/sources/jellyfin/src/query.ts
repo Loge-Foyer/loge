@@ -17,6 +17,9 @@ export const DETAIL_FIELDS = [
   'Studios',
   'Taglines',
   'ProviderIds',
+  // What the file actually is — codecs, languages, size — for the summary a
+  // detail page shows. `MediaStreams` arrive inside each source.
+  'MediaSources',
 ] as const;
 export const IMAGE_TYPES = ['Primary', 'Backdrop', 'Thumb', 'Logo'] as const;
 

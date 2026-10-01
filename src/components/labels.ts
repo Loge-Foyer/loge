@@ -2,6 +2,7 @@ import type {
   AppErrorCode,
   ContentKind,
   Episode,
+  HdrFormat,
   ItemSort,
   ItemSortKey,
   MediaItem,
@@ -9,6 +10,7 @@ import type {
   PlaybackSource,
   PlayerRequirement,
   PluginCategory,
+  SpatialAudio,
 } from '@sc/api';
 
 import type { BackupProblem } from '@/services/backup';
@@ -143,12 +145,119 @@ const FORMAT_NAMES: Readonly<Record<string, string>> = {
   hevc: 'HEVC',
   av1: 'AV1',
   vp9: 'VP9',
+  mpeg2video: 'MPEG-2',
+  vc1: 'VC-1',
+  aac: 'AAC',
   ac3: 'AC-3',
   eac3: 'E-AC-3',
   dts: 'DTS',
+  dtshd: 'DTS-HD',
   truehd: 'TrueHD',
+  flac: 'FLAC',
+  opus: 'Opus',
+  mp3: 'MP3',
+  subrip: 'SubRip',
+  srt: 'SubRip',
+  ass: 'ASS',
+  ssa: 'SSA',
+  pgssub: 'PGS',
+  pgs: 'PGS',
+  vtt: 'WebVTT',
+  webvtt: 'WebVTT',
+  dvdsub: 'VobSub',
+  mkv: 'Matroska',
+  matroska: 'Matroska',
+  mp4: 'MP4',
+  mov: 'QuickTime',
+  webm: 'WebM',
+  avi: 'AVI',
+  ts: 'MPEG-TS',
 };
-const formatName = (name: string) => FORMAT_NAMES[name] ?? name.toUpperCase();
+export const formatName = (name: string) => FORMAT_NAMES[name] ?? name.toUpperCase();
+
+const HDR_NAMES: Readonly<Record<HdrFormat, string>> = {
+  hdr10: 'HDR10',
+  'hdr10+': 'HDR10+',
+  hlg: 'HLG',
+  'dolby-vision': 'Dolby Vision',
+};
+export const hdrName = (hdr: HdrFormat) => HDR_NAMES[hdr];
+
+const SPATIAL_NAMES: Readonly<Record<SpatialAudio, string>> = {
+  'dolby-atmos': 'Dolby Atmos',
+  'dts-x': 'DTS:X',
+  // The source said there is one and did not say which.
+  other: 'Spatial audio',
+};
+export const spatialName = (spatial: SpatialAudio) => SPATIAL_NAMES[spatial];
+
+/**
+ * A resolution as people name it rather than as pixels. The thresholds are
+ * generous downwards because a 1920×804 scope film is still "1080p".
+ */
+export function resolutionName(height: number | undefined, width?: number): string | undefined {
+  const lines = height ?? 0;
+  const across = width ?? 0;
+  if (lines >= 2000 || across >= 3600) return '4K';
+  if (lines >= 1400 || across >= 2400) return '1440p';
+  if (lines >= 900 || across >= 1800) return '1080p';
+  if (lines >= 700 || across >= 1200) return '720p';
+  if (lines >= 540 || across >= 900) return '576p';
+  if (lines > 0) return `${lines}p`;
+  return undefined;
+}
+
+/**
+ * Bytes as a person reads them, in the units a file manager uses — powers of
+ * 1024, which is what "68 GB" means when a server reports 68,719,476,736.
+ */
+export function fileSize(bytes: number | undefined): string | undefined {
+  if (bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return undefined;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  // Whole bytes and kilobytes; one decimal above that, until it stops earning one.
+  const rounded = unit <= 1 ? Math.round(value) : value >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded} ${units[unit]}`;
+}
+
+/** Bits per second as Mbps, which is how every player and server states it. */
+export function bitrateName(bitsPerSecond: number | undefined): string | undefined {
+  if (bitsPerSecond === undefined || bitsPerSecond <= 0) return undefined;
+  const mbps = bitsPerSecond / 1_000_000;
+  return `${mbps >= 10 ? Math.round(mbps) : Math.round(mbps * 10) / 10} Mbps`;
+}
+
+/**
+ * A channel count as a layout, when the source did not name one. 8 channels is
+ * 7.1, 6 is 5.1 — the two that matter; anything else says the number.
+ */
+export function channelName(channels: number | undefined, layout: string | undefined): string | undefined {
+  if (layout) return layout;
+  if (channels === undefined || channels <= 0) return undefined;
+  if (channels === 8) return '7.1';
+  if (channels === 6) return '5.1';
+  if (channels === 2) return 'Stereo';
+  if (channels === 1) return 'Mono';
+  return `${channels} channels`;
+}
+
+/** A BCP 47 or ISO code as the language's own name, where this device knows one. */
+export function languageName(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  // Hermes has Intl.DisplayNames from RN 0.73; where it does not, the code is
+  // still better than nothing, and never worse than a wrong guess.
+  try {
+    const names = new Intl.DisplayNames(undefined, { type: 'language' });
+    return names.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 /** "This needs a player that plays MPEG-TS." — what no player on this device can do, in the order the engine lacks it. */
 export function describeMissing(needs: readonly PlayerRequirement[], source: PlaybackSource | undefined): string {

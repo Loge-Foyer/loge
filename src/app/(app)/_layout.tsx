@@ -25,6 +25,7 @@ export default function AppLayout() {
         <Stack.Screen name="browse/[rowId]" options={fullScreenOptions} />
         <Stack.Screen name="item/[connectionId]/[itemId]" options={detailOptions} />
         <Stack.Screen name="customize-home" options={sheetOptions} />
+        <Stack.Screen name="media-info/[connectionId]/[itemId]" options={sheetOptions} />
         <Stack.Screen name="play/[connectionId]/[itemId]" options={playerOptions} />
       </Stack>
     </ActiveUserContext>

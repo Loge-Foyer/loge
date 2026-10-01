@@ -121,6 +121,85 @@ export interface Person {
   readonly image?: ImageRef;
 }
 
+/**
+ * What a picture carries beyond its resolution. Lives here rather than in
+ * `playback.ts` because a detail page says it long before anything plays, and
+ * `playback.ts` already depends on this module.
+ */
+export type HdrFormat = 'hdr10' | 'hdr10+' | 'hlg' | 'dolby-vision';
+
+/**
+ * Sound placed in a room rather than in channels. Named rather than inferred:
+ * Atmos rides inside E-AC-3 and TrueHD alike, and DTS:X inside DTS-HD, so a
+ * codec can never say which — only a source that reports it outright can.
+ */
+export type SpatialAudio = 'dolby-atmos' | 'dts-x' | 'other';
+
+/** How a subtitle reaches the picture. */
+export type SubtitleDelivery = 'embedded' | 'external' | 'burned';
+
+export interface VideoStreamInfo {
+  /** Lower-case — `h264`, `hevc`, `av1`, `vp9`. */
+  readonly codec?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly frameRate?: number;
+  /** 8 or 10, where the source knows. 10 is what an HDR picture needs. */
+  readonly bitDepth?: number;
+  readonly hdr?: HdrFormat;
+  /** Bits per second. */
+  readonly bitrate?: number;
+  /** The codec's own profile, as the source names it: `Main 10`, `High`. */
+  readonly profile?: string;
+}
+
+export interface AudioStreamInfo {
+  /** Lower-case — `aac`, `eac3`, `truehd`, `dts`. */
+  readonly codec?: string;
+  /** BCP 47 where the source gives one. */
+  readonly language?: string;
+  /** What the source calls this track, in its own words. */
+  readonly label?: string;
+  readonly channels?: number;
+  /** `5.1`, `7.1`, `stereo` — as the source names it. */
+  readonly channelLayout?: string;
+  readonly bitrate?: number;
+  /** Set only where the source names it; absent is "not said", not "no". */
+  readonly spatial?: SpatialAudio;
+  readonly default?: boolean;
+}
+
+export interface SubtitleStreamInfo {
+  /** Lower-case — `srt`, `vtt`, `ass`, `pgs`. */
+  readonly format?: string;
+  readonly language?: string;
+  readonly label?: string;
+  readonly forced?: boolean;
+  readonly delivery: SubtitleDelivery;
+}
+
+/**
+ * One file behind an item, as the source describes it — a server may hold
+ * several of the same film. It is description, not a way to play: a
+ * `PlaybackDescriptor` is still what playing asks for, and still lives in
+ * memory only. Nothing here can reach a stream.
+ */
+export interface MediaVersion {
+  /** The source's own id for this file, opaque above the adapter. */
+  readonly id: string;
+  /** What the source calls it, where it has several: `Director's Cut`, `1080p`. */
+  readonly label?: string;
+  /** Lower-case — `mkv`, `mp4`, `ts`. */
+  readonly container?: string;
+  readonly sizeBytes?: number;
+  readonly durationMs?: number;
+  /** The whole file's bitrate, bits per second. */
+  readonly bitrate?: number;
+  readonly video?: VideoStreamInfo;
+  readonly audio: readonly AudioStreamInfo[];
+  readonly subtitles: readonly SubtitleStreamInfo[];
+}
+
 export interface MediaDetail {
   readonly item: MediaItem;
   readonly tagline?: string;
@@ -128,6 +207,13 @@ export interface MediaDetail {
   readonly studios: readonly string[];
   /** Ids in public catalogues, keyed by catalogue: `imdb`, `tmdb`, `tvdb`. */
   readonly externalIds: Readonly<Record<string, string>>;
+  /**
+   * The files behind this item, where the source reports them. Absent means
+   * the source does not say — not that there are none — so a screen shows
+   * nothing rather than guessing. `browse` already promises `getItem`; this is
+   * optional data on its answer, not a capability of its own.
+   */
+  readonly versions?: readonly MediaVersion[];
 }
 
 export interface Library {

@@ -11,6 +11,7 @@ import {
   type MediaContext,
   type MediaDetail,
   type MediaTarget,
+  type MediaVersion,
   type PlaybackDescriptor,
   type PlaybackSource,
   type SubtitleTrack,
@@ -115,6 +116,44 @@ function toSubtitles(video: VideoDto, baseUrl: string): readonly SubtitleTrack[]
   );
 }
 
+/**
+ * The renditions as versions of the same video — which is what they are: one
+ * upload, several encodes. Deduped by height, tallest first, so a detail page
+ * lists a handful rather than every itag. `adaptiveFormats` is included here
+ * even though it cannot be played as it stands, because this is description:
+ * it is what the site holds, and what a download can ask the server to mux.
+ */
+function toVersions(video: VideoDto): readonly MediaVersion[] {
+  const byHeight = new Map<number, MediaVersion>();
+  for (const format of [...video.formatStreams, ...video.adaptiveFormats]) {
+    const height = heightOf(format);
+    // An audio-only rendition has no height, and is not a version of the video.
+    if (height === undefined || byHeight.has(height)) continue;
+    const { container, videoCodec, audioCodecs } = codecsOf(format);
+    byHeight.set(height, {
+      id: format.itag ?? String(height),
+      label: format.qualityLabel ?? `${height}p`,
+      ...(container === undefined ? {} : { container }),
+      ...(format.contentLength === undefined ? {} : { sizeBytes: format.contentLength }),
+      ...(format.bitrate === undefined ? {} : { bitrate: format.bitrate }),
+      ...(video.lengthSeconds === undefined ? {} : { durationMs: video.lengthSeconds * 1000 }),
+      video: {
+        ...(videoCodec === undefined ? {} : { codec: videoCodec }),
+        height,
+        ...(format.fps === undefined ? {} : { frameRate: format.fps }),
+      },
+      audio: (audioCodecs ?? []).map((codec) => ({ codec })),
+      subtitles: video.captions.map((caption) => ({
+        format: 'vtt',
+        ...(caption.languageCode === undefined ? {} : { language: caption.languageCode }),
+        label: caption.label,
+        delivery: 'external' as const,
+      })),
+    });
+  }
+  return [...byHeight.values()].sort((a, b) => (b.video?.height ?? 0) - (a.video?.height ?? 0));
+}
+
 export function createProvider(target: MediaTarget, context: MediaContext): ConnectedMediaProvider {
   const { connectionId, fields, settings } = target;
   const baseUrl = normalizeBaseUrl(typeof fields.serverUrl === 'string' ? fields.serverUrl : '');
@@ -171,7 +210,9 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         if (!playlist) throw new AppError('NOT_FOUND', 'The server no longer has this playlist.');
         return { item: playlistToItem(playlist, connectionId), people: [], studios: [], externalIds: {} };
       }
-      return toDetail(await videoOf(parsed.id, signal), connectionId);
+      const video = await videoOf(parsed.id, signal);
+      const versions = toVersions(video);
+      return { ...toDetail(video, connectionId), ...(versions.length === 0 ? {} : { versions }) };
     },
 
     getChildren: async (parent, signal): Promise<ItemPage> => {

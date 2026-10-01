@@ -1,4 +1,4 @@
-import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, Person, PluginId, Show } from '@sc/api';
+import type { ConnectionId, Episode, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
@@ -11,11 +11,12 @@ import { Button, H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 
 import { Artwork, ArtworkLogo } from '@/components/artwork';
 import { PrimaryButton } from '@/components/primary-button';
 import { Chip, ChipRow } from '@/components/chip';
-import { episodeCode, formatCommunityRating, formatRuntime, timeLeft } from '@/components/labels';
+import { episodeCode, fileSize, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
 import { itemHref } from '@/components/media/item-link';
 import { SourceNotices } from '@/components/media/source-notices';
 import { Scrim } from '@/components/scrim';
+import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
@@ -78,7 +79,7 @@ function Detail({
   /** The source could not answer; this page shows what was saved from it. */
   sourceError?: SourceError;
 }) {
-  const { item, people, studios, tagline } = detail;
+  const { item, people, studios, tagline, versions } = detail;
   const refresh = useRefreshMedia();
   return (
     <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
@@ -101,6 +102,7 @@ function Detail({
         {item.type === 'episode' ? <ShowLink episode={item} /> : null}
         {item.type === 'show' ? <Seasons show={item} showWatch={showWatch} {...(season ? { initial: season } : {})} /> : null}
         {people.length > 0 ? <People people={people} connectionId={item.key.connectionId} /> : null}
+        <MediaSummary item={item} versions={versions} />
         {studios.length > 0 ? (
           <SizableText size="$2" color="$color9">
             {studios.join(' · ')}
@@ -267,6 +269,46 @@ function WatchState({ item }: { item: MediaItem }) {
       ) : null}
     </YStack>
   );
+}
+
+/**
+ * What the file is, in one line, opening the whole of it. Absent where the
+ * source does not say — Stalker and the mocks never will, and a screen must
+ * not guess.
+ */
+function MediaSummary({ item, versions }: { item: MediaItem; versions: readonly MediaVersion[] | undefined }) {
+  const version = versions?.[0];
+  if (!version) return null;
+  const summary = summarise(version, versions.length);
+  if (!summary) return null;
+  return (
+    <SettingsSection>
+      <SettingsRow
+        title="Media details"
+        subtitle={summary}
+        href={{
+          pathname: '/media-info/[connectionId]/[itemId]',
+          params: { connectionId: item.key.connectionId, itemId: item.key.externalId },
+        }}
+      />
+    </SettingsSection>
+  );
+}
+
+/** "4K · Dolby Vision · Dolby Atmos · 64 GB" — the things worth knowing before pressing Play. */
+function summarise(version: MediaVersion, count: number): string {
+  const spatial = version.audio.find((track) => track.spatial !== undefined)?.spatial;
+  return [
+    count > 1 ? `${count} versions` : undefined,
+    resolutionName(version.video?.height, version.video?.width),
+    version.video?.hdr === undefined ? undefined : hdrName(version.video.hdr),
+    version.video?.codec === undefined ? undefined : formatName(version.video.codec),
+    // Named only where the source said so: Atmos cannot be read off a codec.
+    spatial === undefined ? undefined : spatialName(spatial),
+    fileSize(version.sizeBytes),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function ShowLink({ episode }: { episode: Episode }) {

@@ -23,7 +23,7 @@ import { isLimited, scopeFor } from './libraries';
 import { toDetail, toLibrary, toMediaItem } from './map';
 import { pageAcross, readCursor, writeCursor } from './merge';
 import { deviceProfile, TICKS_PER_MS, toDescriptor, type PlaySession } from './playback';
-import { IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
+import { DETAIL_FIELDS, IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
 import { normalizeBaseUrl } from './url';
 
 // Libraries change rarely; a limited selection needs them on every page.
@@ -140,7 +140,12 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     getItem: async (externalId, signal) => {
       const userId = await client.userId(signal);
-      const dto = readItem(await client.get(`/Items/${encodeURIComponent(externalId)}`, { userId }, signal));
+      // DETAIL_FIELDS was written and never passed: a single item answers in
+      // full by default, but `MediaSources` is the one part that is not
+      // guaranteed, and the summary at the foot of a detail page needs it.
+      const dto = readItem(
+        await client.get(`/Items/${encodeURIComponent(externalId)}`, { userId, fields: DETAIL_FIELDS }, signal),
+      );
       const detail = dto && toDetail(dto, connectionId);
       if (!detail) throw new AppError('NOT_FOUND', 'The server no longer has this item.');
       return detail;

@@ -245,7 +245,7 @@ function subtitleTrack(stream: MediaStreamDto, baseUrl: string, token: string): 
   };
 }
 
-function deliveryOf(method: string | undefined): SubtitleDelivery | undefined {
+export function deliveryOf(method: string | undefined): SubtitleDelivery | undefined {
   switch (method) {
     case 'External':
       return 'external';
@@ -259,7 +259,7 @@ function deliveryOf(method: string | undefined): SubtitleDelivery | undefined {
   }
 }
 
-function hdrOf(rangeType: string | undefined): HdrFormat | undefined {
+export function hdrOf(rangeType: string | undefined): HdrFormat | undefined {
   if (!rangeType) return undefined;
   if (rangeType.startsWith('DOVI') && rangeType !== 'DOVIWithSDR') return 'dolby-vision';
   if (rangeType === 'HDR10Plus') return 'hdr10+';
@@ -280,7 +280,7 @@ function requestedIndex(id: string | undefined): number | undefined {
   return Number.isInteger(index) ? index : undefined;
 }
 
-function ours(codec: string): string {
+export function ours(codec: string): string {
   const name = codec.toLowerCase();
   return OURS[name] ?? name;
 }

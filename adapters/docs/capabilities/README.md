@@ -33,6 +33,15 @@ Players and sync plugins have no capabilities of this kind.
 | Capability | Means | Provider members |
 | --- | --- | --- |
 | `browse` | It lists titles of the kinds it brings, and opens them | `listItems`, `getItem`, `getChildren` |
+
+`getItem` may also fill `MediaDetail.versions` — what the file is: codecs,
+resolution, HDR, languages, size. **That is not a capability**, and
+deliberately so: `browse` already promises `getItem`, and `versions` is
+optional data on its answer. A screen shows the summary when there is
+something to say and nothing when there is not, so a source that cannot report
+files costs nothing. Absent is "the source did not say", never "there are
+none" — which is why an empty list is wrong and `undefined` is right.
+
 | `libraries` | It has libraries the user can choose between | `getLibraries` |
 | `watchStateRead` | Items carry what the user watched there; there is a resume list | `getResume` |
 | `remoteImages` | Items carry artwork | `resolveImage`, `resolveHeaders` |

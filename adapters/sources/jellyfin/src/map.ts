@@ -1,4 +1,5 @@
 import type {
+  AudioStreamInfo,
   ConnectionId,
   ContentKind,
   GlobalMediaKey,
@@ -8,14 +9,20 @@ import type {
   MediaImages,
   MediaItem,
   MediaItemType,
+  MediaVersion,
   Person,
   PersonKind,
   Show,
+  SpatialAudio,
+  SubtitleStreamInfo,
+  VideoStreamInfo,
   WatchStatus,
 } from '@sc/api';
 
-import type { ItemDto } from './dto';
+import type { ItemDto, MediaSourceDto, MediaStreamDto } from './dto';
 import { itemImage, type ImageKind } from './images';
+import { bcp47 } from './languages';
+import { deliveryOf, hdrOf, ours } from './playback';
 
 const TICKS_PER_MS = 10_000;
 
@@ -126,7 +133,80 @@ export function toDetail(dto: ItemDto, connectionId: ConnectionId): MediaDetail 
     externalIds: Object.fromEntries(
       Object.entries(dto.providerIds).map(([catalogue, id]) => [catalogue.toLowerCase(), id]),
     ),
+    // Absent rather than empty when the server said nothing: a screen must be
+    // able to tell "no files reported" from "a file with nothing in it".
+    ...(dto.mediaSources.length === 0 ? {} : { versions: dto.mediaSources.map(toVersion) }),
   };
+}
+
+/** Jellyfin tells the truth about a file only in `MediaSources`; this is that, as the domain says it. */
+function toVersion(source: MediaSourceDto): MediaVersion {
+  const streams = source.mediaStreams;
+  const video = streams.find((stream) => stream.type === 'Video');
+  return {
+    id: source.id,
+    ...optional('label', source.name),
+    // ffprobe answers with a list for a family of containers; the first is the one.
+    ...optional('container', source.container?.split(',')[0]?.toLowerCase()),
+    ...optional('sizeBytes', source.size),
+    ...optional('bitrate', source.bitrate),
+    ...optional('durationMs', source.runTimeTicks === undefined ? undefined : Math.round(source.runTimeTicks / TICKS_PER_MS)),
+    ...(video ? { video: toVideoInfo(video) } : {}),
+    audio: streams.filter((stream) => stream.type === 'Audio').map(toAudioInfo),
+    subtitles: streams.filter((stream) => stream.type === 'Subtitle').map(toSubtitleInfo),
+  };
+}
+
+function toVideoInfo(stream: MediaStreamDto): VideoStreamInfo {
+  return {
+    ...optional('codec', stream.codec === undefined ? undefined : ours(stream.codec)),
+    ...optional('width', stream.width),
+    ...optional('height', stream.height),
+    ...optional('frameRate', stream.averageFrameRate),
+    ...optional('bitDepth', stream.bitDepth),
+    ...optional('hdr', hdrOf(stream.videoRangeType)),
+    ...optional('bitrate', stream.bitRate),
+    ...optional('profile', stream.profile),
+  };
+}
+
+function toAudioInfo(stream: MediaStreamDto): AudioStreamInfo {
+  // Atmos and DTS:X ride inside E-AC-3 and TrueHD alike, so the codec cannot
+  // say: only the server's own field can, and only from Jellyfin 10.9.
+  const spatial = spatialOf(stream.audioSpatialFormat);
+  return {
+    ...optional('codec', stream.codec === undefined ? undefined : ours(stream.codec)),
+    ...optional('language', stream.language === undefined ? undefined : bcp47(stream.language)),
+    ...optional('label', stream.displayTitle ?? stream.title),
+    ...optional('channels', stream.channels),
+    ...optional('channelLayout', stream.channelLayout),
+    ...optional('bitrate', stream.bitRate),
+    ...(spatial === undefined ? {} : { spatial }),
+    ...(stream.isDefault ? { default: true } : {}),
+  };
+}
+
+function toSubtitleInfo(stream: MediaStreamDto): SubtitleStreamInfo {
+  return {
+    ...optional('format', stream.codec?.toLowerCase()),
+    ...optional('language', stream.language === undefined ? undefined : bcp47(stream.language)),
+    ...optional('label', stream.displayTitle ?? stream.title),
+    ...(stream.isForced ? { forced: true } : {}),
+    delivery: (stream.isExternal ? 'external' : deliveryOf(stream.deliveryMethod)) ?? 'embedded',
+  };
+}
+
+function spatialOf(format: string | undefined): SpatialAudio | undefined {
+  if (format === undefined || format === 'None') return undefined;
+  if (format === 'DolbyAtmos') return 'dolby-atmos';
+  if (format === 'DTSX') return 'dts-x';
+  // A name this client does not know is still a report that there is one.
+  return 'other';
+}
+
+/** `{ key: value }` when the value is there, `{}` otherwise — for optional properties. */
+function optional<K extends string, V>(key: K, value: V | undefined): { readonly [P in K]?: V } {
+  return (value === undefined ? {} : { [key]: value }) as { readonly [P in K]?: V };
 }
 
 /** A library view as a library, if it holds films or series. */

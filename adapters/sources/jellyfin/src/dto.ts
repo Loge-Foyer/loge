@@ -65,6 +65,8 @@ export interface TrickplayInfoDto {
 
 export interface ItemDto {
   readonly id: string;
+  /** Only present when `fields` asked for them — the detail page does. */
+  readonly mediaSources: readonly MediaSourceDto[];
   readonly type?: string;
   readonly name?: string;
   readonly sortName?: string;
@@ -113,6 +115,7 @@ export function readItem(value: unknown): ItemDto | undefined {
   if (!item || !id) return undefined;
   return {
     id,
+    mediaSources: list(item.MediaSources).flatMap((source) => readMediaSource(source) ?? []),
     ...present('type', text(item.Type)),
     ...present('name', text(item.Name)),
     ...present('sortName', text(item.SortName)),
@@ -283,8 +286,17 @@ export interface MediaStreamDto {
   readonly title?: string;
   readonly isDefault: boolean;
   readonly isForced: boolean;
+  readonly isExternal: boolean;
   readonly channels?: number;
+  readonly channelLayout?: string;
+  readonly width?: number;
   readonly height?: number;
+  readonly bitDepth?: number;
+  readonly bitRate?: number;
+  readonly averageFrameRate?: number;
+  readonly profile?: string;
+  /** `DolbyDigitalPlus`, `DolbyAtmos`, `DTSX`, `None` — Jellyfin 10.9 and later. */
+  readonly audioSpatialFormat?: string;
   readonly videoRangeType?: string;
   /** How a subtitle reaches the player: `Embed`, `Hls`, `External`, `Encode` or `Drop`. */
   readonly deliveryMethod?: string;
@@ -293,8 +305,12 @@ export interface MediaStreamDto {
 
 export interface MediaSourceDto {
   readonly id: string;
+  /** What the server calls this file where an item has several. */
+  readonly name?: string;
   /** ffprobe's names, sometimes several: `mov,mp4,m4a,3gp,3g2,mj2`. */
   readonly container?: string;
+  readonly size?: number;
+  readonly bitrate?: number;
   readonly eTag?: string;
   readonly supportsDirectPlay: boolean;
   readonly supportsDirectStream: boolean;
@@ -325,13 +341,16 @@ export function readPlaybackInfo(value: unknown): PlaybackInfoDto | undefined {
   };
 }
 
-function readMediaSource(value: unknown): MediaSourceDto | undefined {
+export function readMediaSource(value: unknown): MediaSourceDto | undefined {
   const source = record(value);
   const id = text(source?.Id);
   if (!source || !id) return undefined;
   return {
     id,
+    ...present('name', text(source.Name)),
     ...present('container', text(source.Container)),
+    ...present('size', number(source.Size)),
+    ...present('bitrate', number(source.Bitrate)),
     ...present('eTag', text(source.ETag)),
     supportsDirectPlay: source.SupportsDirectPlay === true,
     supportsDirectStream: source.SupportsDirectStream === true,
@@ -359,8 +378,16 @@ function readMediaStream(value: unknown): MediaStreamDto | undefined {
     ...present('title', text(stream.Title)),
     isDefault: stream.IsDefault === true,
     isForced: stream.IsForced === true,
+    isExternal: stream.IsExternal === true,
     ...present('channels', number(stream.Channels)),
+    ...present('channelLayout', text(stream.ChannelLayout)),
+    ...present('width', number(stream.Width)),
     ...present('height', number(stream.Height)),
+    ...present('bitDepth', number(stream.BitDepth)),
+    ...present('bitRate', number(stream.BitRate)),
+    ...present('averageFrameRate', number(stream.AverageFrameRate) ?? number(stream.RealFrameRate)),
+    ...present('profile', text(stream.Profile)),
+    ...present('audioSpatialFormat', text(stream.AudioSpatialFormat)),
     ...present('videoRangeType', text(stream.VideoRangeType)),
     ...present('deliveryMethod', text(stream.DeliveryMethod)),
     ...present('deliveryUrl', text(stream.DeliveryUrl)),

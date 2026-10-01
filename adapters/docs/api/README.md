@@ -20,7 +20,7 @@ without learning about the others.
 | `user.ts` | `AppUser` — a profile. |
 | `effective.ts` | What a connection may actually do: declared capabilities, less what a toggle switched off. |
 | `validate.ts` | `validateManifest()` — the rules every manifest must satisfy. |
-| `media.ts` | `MediaItem` (movie, show, season, episode), `GlobalMediaKey`, `MediaDetail`, `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. |
+| `media.ts` | `MediaItem` (movie, show, season, episode), `GlobalMediaKey`, `MediaDetail`, `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. Also what a file *is* — `MediaVersion` with its video, audio and subtitle streams, plus the `HdrFormat`, `SpatialAudio` and `SubtitleDelivery` vocabularies that `playback.ts` shares. |
 | `live.ts` | `ChannelGroup`, `Channel`, `Programme`, and the queries for channels and the guide. |
 | `query.ts` | `ItemQuery`, `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `playback.ts` | What to play: `PlaybackDescriptor` and its sources, audio and subtitle tracks; `PlayerProfile`, what an engine plays; `PlaybackRequest`; and `PlaybackReport`, what playing reports back to a source. |

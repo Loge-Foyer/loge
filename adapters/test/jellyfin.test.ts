@@ -380,6 +380,75 @@ describe('Jellyfin — mapping', () => {
     expect(detail?.item.genres).toEqual(['Drama', 'Science Fiction']);
   });
 
+  it('asks for the file itself, and says what it is', async () => {
+    const { provider, http } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail } } });
+    const detail = await provider.getItem?.('m-arrival');
+    // Without `fields`, a server is free to leave MediaSources out.
+    expect(http.to('GET /Items/m-arrival')[0]?.query.fields).toContain('MediaSources');
+
+    const version = detail?.versions?.[0];
+    expect(version?.id).toBe('source-4k');
+    expect(version?.label).toBe('2160p HDR');
+    expect(version?.container).toBe('mkv');
+    expect(version?.sizeBytes).toBe(68_719_476_736);
+    expect(version?.durationMs).toBe(7_098_000);
+    expect(version?.video).toMatchObject({
+      codec: 'hevc',
+      width: 3840,
+      height: 2160,
+      bitDepth: 10,
+      frameRate: 23.976,
+      profile: 'Main 10',
+      hdr: 'dolby-vision',
+    });
+  });
+
+  it('calls Atmos Atmos, and only where the server does', async () => {
+    const { provider } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail } } });
+    const audio = (await provider.getItem?.('m-arrival'))?.versions?.[0]?.audio ?? [];
+    // Atmos rides inside TrueHD and E-AC-3 alike, so the codec cannot say:
+    // only AudioSpatialFormat can, and `None` means no.
+    expect(audio[0]).toMatchObject({ codec: 'truehd', language: 'en', channels: 8, channelLayout: '7.1', spatial: 'dolby-atmos', default: true });
+    expect(audio[1]).toMatchObject({ codec: 'eac3', language: 'de', channelLayout: '5.1' });
+    expect(audio[1]?.spatial).toBeUndefined();
+  });
+
+  it('tells DTS:X from Atmos, and keeps an unknown report as a report', async () => {
+    const spatialSource = (format: string) => ({
+      ...fixtures.movieDetail,
+      MediaSources: [
+        {
+          Id: 's',
+          MediaStreams: [{ Index: 0, Type: 'Audio', Codec: 'dts', AudioSpatialFormat: format, IsDefault: true, IsForced: false }],
+        },
+      ],
+    });
+    for (const [format, expected] of [
+      ['DTSX', 'dts-x'],
+      ['DolbyAtmos', 'dolby-atmos'],
+      // A name this client does not know is still a report that there is one.
+      ['SomethingNew', 'other'],
+    ] as const) {
+      const { provider } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: spatialSource(format) } } });
+      expect((await provider.getItem?.('m-arrival'))?.versions?.[0]?.audio[0]?.spatial).toBe(expected);
+    }
+  });
+
+  it('separates an embedded subtitle from a sidecar one', async () => {
+    const { provider } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail } } });
+    const subtitles = (await provider.getItem?.('m-arrival'))?.versions?.[0]?.subtitles ?? [];
+    expect(subtitles[0]).toMatchObject({ format: 'pgssub', language: 'en', delivery: 'embedded' });
+    expect(subtitles[1]).toMatchObject({ format: 'subrip', language: 'de', forced: true, delivery: 'external' });
+  });
+
+  it('says nothing rather than nothing-at-all when the server reports no files', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /Items/m-arrival': { status: 200, json: { ...fixtures.movieDetail, MediaSources: [] } } },
+    });
+    // Absent, not an empty list: "the server did not say" is not "there are none".
+    expect((await provider.getItem?.('m-arrival'))?.versions).toBeUndefined();
+  });
+
   it('turns a missing item into NOT_FOUND', async () => {
     const { provider } = await connect({ routes: { 'GET /Items/gone': { status: 404 } } });
     await expect(provider.getItem?.('gone')).rejects.toMatchObject({ code: 'NOT_FOUND' });

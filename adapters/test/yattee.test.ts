@@ -199,6 +199,41 @@ describe('Yattee — browsing', () => {
   });
 });
 
+describe('Yattee — what the file is', () => {
+  it('lists the renditions as versions, tallest first and one per height', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const getItem = provider.getItem;
+    if (!getItem) throw new Error('getItem is missing');
+    const versions = (await getItem('dQw4w9WgXcQ'))?.versions ?? [];
+    // 1080p comes from adaptiveFormats: it cannot be played as it stands, but
+    // it is what the site holds, and a download can ask for it.
+    expect(versions.map((version) => version.video?.height)).toEqual([1080, 720, 360]);
+    expect(versions[0]).toMatchObject({
+      label: '1080p',
+      container: 'mp4',
+      sizeBytes: 112_328_704,
+      bitrate: 4_200_000,
+      durationMs: 213_000,
+    });
+    expect(versions[0]?.video).toMatchObject({ codec: 'h264', frameRate: 30 });
+    // The audio-only rendition has no height and is not a version of the video.
+    expect(versions).toHaveLength(3);
+  });
+
+  it('carries the captions onto every version', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const getItem = provider.getItem;
+    if (!getItem) throw new Error('getItem is missing');
+    const version = (await getItem('dQw4w9WgXcQ'))?.versions?.[0];
+    expect(version?.subtitles.map((track) => track.language)).toEqual(['en', 'de']);
+    expect(version?.subtitles[0]?.delivery).toBe('external');
+  });
+});
+
 describe('Yattee — artwork', () => {
   it('builds a thumbnail address from the size asked for, with a header ref', async () => {
     const { provider } = await connect({

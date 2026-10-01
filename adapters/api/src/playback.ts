@@ -1,4 +1,4 @@
-import type { GlobalMediaKey, HeadersRef } from './media';
+import type { GlobalMediaKey, HdrFormat, HeadersRef, SubtitleDelivery } from './media';
 
 /**
  * What to play, as a source describes it — never how. Engines are players'
@@ -12,8 +12,6 @@ import type { GlobalMediaKey, HeadersRef } from './media';
 export const STREAM_PROTOCOLS = ['progressive', 'hls', 'dash', 'mpegts'] as const;
 
 export type StreamProtocol = (typeof STREAM_PROTOCOLS)[number];
-
-export type HdrFormat = 'hdr10' | 'hdr10+' | 'hlg' | 'dolby-vision';
 
 /** One way to reach a stream. A descriptor lists its best first. */
 export interface PlaybackSource {
@@ -49,7 +47,6 @@ export interface AudioTrack {
 }
 
 /** Inside the stream, a file of its own, or painted into the picture by the server. */
-export type SubtitleDelivery = 'embedded' | 'external' | 'burned';
 
 export interface SubtitleTrack {
   readonly id: string;
