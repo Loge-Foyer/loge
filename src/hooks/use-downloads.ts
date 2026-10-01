@@ -29,7 +29,8 @@ export function useDownloadOf(key: GlobalMediaKey | undefined) {
   const { downloads } = useServices();
   return useQuery({
     queryKey: userKey(userId, DOWNLOADS, key?.connectionId, key?.externalId),
-    queryFn: () => (key ? downloads.forItem(userId, key) : null),
+    // Nothing kept is null: a query may not answer undefined.
+    queryFn: async () => (key ? ((await downloads.forItem(userId, key)) ?? null) : null),
     enabled: key !== undefined,
     refetchInterval: (query) => {
       const entry = query.state.data;
