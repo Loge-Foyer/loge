@@ -4,8 +4,9 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Database v5 — the account model, and watch
-status with its outbox — and the backup file are in place. Phase 4's model —
+This page describes the target. Database v6 — the account model, watch status
+with its outbox, and what this device keeps — and the backup file are in
+place. Phase 4's model —
 the account as one of the device's connections,
 synced through a log, with passwords sealed on the device — is in this page's
 history in git.
@@ -294,6 +295,18 @@ The steps, the same on both engines:
     to your server or written into a backup. A phone restored from another's
     backup clears the outbox: its old positions would overwrite newer ones.
     Watch state nothing waits for is pruned after 30 days.
+- **v6** (Phase 10) — `downloads`: what this device keeps, one row per item
+  per profile, cascading from `users` and `connections` the same way.
+  - Device state like the watch cache: never journaled, never carried to your
+    server, never written into a backup — a file on this phone is this
+    phone's, and nothing on another device can play it.
+  - **No address is stored.** A download's URL can carry an `api_key`, an HMAC
+    signature or a session token, so the row holds the item, the chosen option
+    and the file name, and the address is asked for again when a download
+    starts and when it resumes — exactly as playback asks again.
+  - The file itself lives in the document directory, not the cache, which the
+    system empties under pressure. A cascade cannot delete from disk, so the
+    queue sweeps files no row points at on every pass.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the

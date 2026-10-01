@@ -26,6 +26,32 @@ to:
   `PlayerEvent`. The app loads a source, plays, pauses, seeks, chooses tracks
   and listens; the engine does the rest.
 
+## Keeping a copy
+
+A download is the same question as playback asked differently: not "what can
+this engine open right now" but "what one file, small enough to be worth the
+space, will any engine on this device still open in a month".
+
+- **Two capabilities.** `downloads` means a source will hand over a copy;
+  `downloadOptions` means there is a choice of versions — because the server
+  will make one (Jellyfin transcoding) or because several already exist (a
+  site's own renditions). A source with the first alone hands over what it
+  has, and no sheet of choices is shown.
+- **A `DownloadDescriptor` is as secret as a `PlaybackDescriptor`**: its
+  address can hold an `api_key`, an HMAC signature or a session token. Memory
+  only, never a row, never a log.
+- **One file, never a playlist.** Jellyfin's download profile says `http` and
+  `Static`; HLS would be a manifest and a folder of segments, which is not
+  something to keep.
+- **A copy plays before the source is asked.** `PlaybackService.plan` looks in
+  the downloads first and synthesises a `file://` progressive source — which
+  every engine opens, and which needs no network at all. Only a finished one:
+  a half-written file is not something to hand a player.
+- **On-device conversion is not built**, and the switch says why: a phone
+  would still pull the whole film down to shrink it, so only disk is saved and
+  not bandwidth, and on iPhone AVFoundation cannot read Matroska — which is
+  what most large films are. Asking the server costs nothing and sends less.
+
 ## Players are plugins
 
 A player plugin is in the `players` category, and has three parts:
