@@ -13,6 +13,12 @@ export interface PlayerSummary {
   readonly firstOn: readonly ContentTab[];
   /** It has an engine on this platform: a profile for it. One without never plays. */
   readonly playsHere: boolean;
+  /**
+   * It can shrink into a floating window here. On Android the activity does
+   * that for every engine, so this is the platform's answer; elsewhere it is
+   * the engine's own, as its profile states.
+   */
+  readonly canShrink: boolean;
 }
 
 /**
@@ -51,6 +57,8 @@ export function createPlayerService(deps: {
   readonly catalog: PluginCatalog;
   readonly deviceSettings: DeviceSettingsRepository;
   readonly platform: PlatformId;
+  /** Whether this device shrinks the whole app, which gives every engine one. */
+  readonly shrinksAnything?: () => boolean;
 }): PlayerService {
   const { catalog, deviceSettings, platform } = deps;
 
@@ -91,6 +99,7 @@ export function createPlayerService(deps: {
         preferred: manifest.id === preferred?.id,
         firstOn: off.has(manifest.id) ? [] : CONTENT_TABS.filter((tab) => tabs[tab] === manifest.id),
         playsHere: manifest.player?.profiles[platform] !== undefined,
+        canShrink: (deps.shrinksAnything?.() ?? false) || manifest.player?.profiles[platform]?.pictureInPicture === true,
       }));
     },
     choosing: async (tab) => {

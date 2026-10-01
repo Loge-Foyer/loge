@@ -103,7 +103,8 @@
     "autolinking": {
       "searchPaths": [
         "./node_modules"
-      ]
+      ],
+      "nativeModulesDir": "./modules"
     }
   }
 }

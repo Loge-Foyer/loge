@@ -247,8 +247,11 @@ function ButtonRows({ row, title, footer }: { row: ButtonRow; title: string; foo
 function PlayerControlsSection() {
   const { data } = useAppSettings();
   const { set } = useAppSettingActions();
+  const { data: players = [] } = usePlayers();
   const settings = data ?? APP_DEFAULTS;
   const busy = set.isPending;
+  // Named from their manifests, so no player is named in this file.
+  const cannotShrink = players.filter((player) => player.playsHere && !player.canShrink).map((player) => player.manifest.displayName);
   return (
     <>
       <SettingsSection title="Controls" footer="The same on every player: a player is the engine, and the controls are the app’s. Play itself is always in the middle.">
@@ -341,7 +344,11 @@ function PlayerControlsSection() {
       <SettingsSection title="Leaving the player" footer="Both are asked of the engine. A player whose engine has neither simply carries on as before — the built-in player has both.">
         <SettingsRow
           title="Picture in picture"
-          subtitle="Shrink to a floating window when the app goes behind something else."
+          subtitle={
+            cannotShrink.length > 0
+              ? `Shrink to a floating window when the app goes behind something else. ${listed(cannotShrink)} cannot on this device: ${cannotShrink.length === 1 ? 'its picture never reaches a layer the system can take over' : 'their pictures never reach a layer the system can take over'}.`
+              : 'Shrink to a floating window when the app goes behind something else.'
+          }
           trailing={
             <AppSwitch
               label="Picture in picture"
@@ -366,4 +373,10 @@ function PlayerControlsSection() {
       </SettingsSection>
     </>
   );
+}
+
+/** "VLC", or "VLC and mpv", or "VLC, mpv and the built-in player". */
+function listed(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }

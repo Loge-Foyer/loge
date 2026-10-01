@@ -66,7 +66,7 @@ export function PlayerScreen({
   });
   const report = usePlaybackReports(item, live !== undefined, startMs);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
-  usePlayerLeaving(controller, live !== undefined);
+  const shrunk = usePlayerLeaving(controller, live !== undefined);
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;
   const next = useNextEpisode(item?.type === 'episode' ? item : undefined);
@@ -87,7 +87,7 @@ export function PlayerScreen({
     <YStack flex={1} bg="black">
       <StatusBar hidden />
       {View && controller ? <Surface view={View} controller={controller} /> : null}
-      {problem ? (
+      {shrunk ? null : problem ? (
         <Notice
           message={problem}
           {...(plan?.kind === 'none' || plan?.kind === 'no-player' ? { players: true } : { onRetry: retry })}
@@ -713,11 +713,24 @@ function chapterBeside(chapters: readonly Chapter[] | undefined, positionMs: num
  */
 function usePlayerLeaving(controller: MediaPlayer | undefined, live: boolean) {
   const { data } = useAppSettings();
-  const pictureInPicture = (data ?? APP_DEFAULTS).pictureInPicture && !live;
+  const { pictureInPicture: platform } = useServices();
+  const wanted = (data ?? APP_DEFAULTS).pictureInPicture && !live;
   const backgroundPlayback = (data ?? APP_DEFAULTS).backgroundPlayback;
+  const [shrunk, setShrunk] = useState(false);
+
   useEffect(() => {
     if (!controller) return;
-    controller.setPictureInPicture?.(pictureInPicture);
+    // Two ways in, and a platform may have both. On Android the activity
+    // shrinks, so it is asked once for whatever is playing; on iPhone only an
+    // engine that draws into a layer the system can take has anything to give.
+    controller.setPictureInPicture?.(wanted);
     controller.setBackgroundPlayback?.(backgroundPlayback);
-  }, [controller, pictureInPicture, backgroundPlayback]);
+    platform.setAutoEnter(wanted);
+    return () => platform.setAutoEnter(false);
+  }, [controller, wanted, backgroundPlayback, platform]);
+
+  // In that window there is room for the picture and nothing else.
+  useEffect(() => platform.subscribe(setShrunk), [platform]);
+
+  return shrunk;
 }

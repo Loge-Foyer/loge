@@ -14,6 +14,7 @@ import { createOwnerAuthentication } from '@/platform/owner-authentication';
 import { currentPlatform } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
 import { screenBrightness } from '@/platform/brightness';
+import { pictureInPicture } from '@/platform/picture-in-picture';
 import { screenOrientation } from '@/platform/screen-orientation';
 import { createAccountService } from '@/services/account';
 import { createBackupService } from '@/services/backup';
@@ -153,7 +154,12 @@ export function createServices(): AppServices {
     ids,
     log,
   });
-  const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: currentPlatform() });
+  const players = createPlayerService({
+    catalog,
+    deviceSettings: db.deviceSettings,
+    platform: currentPlatform(),
+    shrinksAnything: () => pictureInPicture.available(),
+  });
   const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
   const playback = createPlaybackService({
     players: playerPlugins,
@@ -202,6 +208,7 @@ export function createServices(): AppServices {
       playback,
       orientation: screenOrientation,
       brightness: screenBrightness,
+      pictureInPicture,
     },
     start: async () => {
       // Upright, as every screen but the player's is laid out; iOS starts that way already.

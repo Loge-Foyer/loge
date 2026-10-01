@@ -456,6 +456,18 @@ export interface OwnerAuthentication {
 }
 
 /**
+ * Picture in picture where the *platform* provides it rather than an engine:
+ * Android, which shrinks the whole activity, so every player has it there.
+ */
+export interface PictureInPicture {
+  available(): boolean;
+  /** Let the system shrink the app by itself when it is left. */
+  setAutoEnter(on: boolean): void;
+  /** Told whenever the app enters or leaves that window. */
+  subscribe(listener: (inPictureInPicture: boolean) => void): () => void;
+}
+
+/**
  * The screen's own brightness, 0 to 1, for the slider down an edge of the
  * player. `undefined` from `get` means the device will not say, and the
  * slider starts from the middle.

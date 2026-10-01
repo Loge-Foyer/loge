@@ -54,7 +54,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow $(PRODUCT_NAME) to confirm it’s you when a PIN is forgotten."
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to confirm it\u2019s you when a PIN is forgotten."
         }
       ],
       "expo-sharing",
@@ -83,7 +83,8 @@
           }
         }
       ],
-      "./config-plugins/with-newest-libcxx"
+      "./config-plugins/with-newest-libcxx",
+      "./config-plugins/with-picture-in-picture"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { Button, Paragraph, SizableText, YStack } from 'tamagui';
 
 import { AppSwitch } from '@/components/app-switch';
+import { Chip } from '@/components/chip';
 import { ConfirmButton } from '@/components/confirm-button';
 import { CONTENT_KIND_LABELS, describeBackupProblem, describeTargetStatus, PER_PROFILE_SUMMARY, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
@@ -236,6 +237,17 @@ function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
             disabled={player.preferred || setPreferred.isPending}
             onPress={() => setPreferred.mutate(manifest.id)}
           />
+          {player.playsHere ? (
+            <SettingsRow
+              title="Picture in picture"
+              subtitle={
+                player.canShrink
+                  ? 'It can shrink into a floating window when the app is left.'
+                  : 'Not with this engine here: its picture never reaches a layer the system can take over. Another player can.'
+              }
+              trailing={<Chip label={player.canShrink ? 'Yes' : 'No'} {...(player.canShrink ? ({ tone: 'accent' } as const) : {})} />}
+            />
+          ) : null}
         </SettingsSection>
       ) : null}
       {player?.playsHere ? (
