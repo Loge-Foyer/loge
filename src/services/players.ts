@@ -1,7 +1,7 @@
 import type { PlatformId, PlayerCandidate, PluginId, PluginManifest } from '@sc/api';
 
 import type { PluginCatalog } from './plugin-catalog';
-import type { DeviceSettingsRepository } from './ports';
+import type { DeviceSettings, DeviceSettingsRepository } from './ports';
 import { CONTENT_TABS, type ContentTab } from './tab-content';
 
 export interface PlayerSummary {
@@ -33,6 +33,20 @@ export interface PlayerChoice {
   readonly preferred?: PluginId;
 }
 
+/**
+ * What a device plays with until it chooses for itself. Its own order and its
+ * own firsts, once stored, win; until then these stand in for them. Ids that
+ * name no player on this platform are passed over, as any stored id is.
+ */
+export interface PlayerDefaults {
+  /** The order they are listed and tried in. Ids it does not name follow, in the catalogue's order. */
+  readonly order: readonly PluginId[];
+  /** The one that plays first on a tab. */
+  readonly tabs: Readonly<Partial<Record<ContentTab, PluginId>>>;
+}
+
+const NO_DEFAULTS: PlayerDefaults = { order: [], tabs: {} };
+
 export interface PlayerService {
   list(): Promise<readonly PlayerSummary[]>;
   /**
@@ -59,8 +73,13 @@ export function createPlayerService(deps: {
   readonly platform: PlatformId;
   /** Whether this device shrinks the whole app, which gives every engine one. */
   readonly shrinksAnything?: () => boolean;
+  /** What a device that has not chosen plays with: the composition root's, which may name players. */
+  readonly defaults?: PlayerDefaults;
 }): PlayerService {
-  const { catalog, deviceSettings, platform } = deps;
+  const { catalog, deviceSettings, platform, defaults = NO_DEFAULTS } = deps;
+  // A device's own choice, where it has made one; the defaults where it has not.
+  const orderOf = (settings: DeviceSettings['players']) => settings?.order ?? defaults.order;
+  const tabsOf = (settings: DeviceSettings['players']) => settings?.tabs ?? defaults.tabs;
 
   /**
    * This device's order: the ones it names, in that order, then everything
@@ -83,11 +102,11 @@ export function createPlayerService(deps: {
   const standing = async () => {
     const settings = (await deviceSettings.get()).players ?? {};
     const off = new Set(settings.off ?? []);
-    const listed = players(settings.order);
+    const listed = players(orderOf(settings));
     const enabled = listed.filter((manifest) => !off.has(manifest.id));
     // The chosen one while it is on; otherwise the first that is — in this device's order, never by name.
     const preferred = enabled.find((manifest) => manifest.id === settings.preferred) ?? enabled[0];
-    return { off, listed, enabled, preferred, tabs: settings.tabs ?? {} };
+    return { off, listed, enabled, preferred, tabs: tabsOf(settings) };
   };
 
   return {
@@ -128,7 +147,7 @@ export function createPlayerService(deps: {
       }));
     },
     move: async (id, by) => {
-      const listed = players((await deviceSettings.get()).players?.order).map((manifest) => manifest.id);
+      const listed = players(orderOf((await deviceSettings.get()).players)).map((manifest) => manifest.id);
       const from = listed.indexOf(id);
       const to = from + by;
       if (from < 0 || to < 0 || to >= listed.length) return;
@@ -143,7 +162,8 @@ export function createPlayerService(deps: {
     },
     setFirstOn: async (id, tab, first) => {
       await deviceSettings.update((current) => {
-        const { [tab]: now, ...others } = current.players?.tabs ?? {};
+        // From what stands now, defaults included, so taking one tab never drops another's.
+        const { [tab]: now, ...others } = tabsOf(current.players);
         if (!first && now !== id) return current;
         const tabs = first ? { ...others, [tab]: id } : others;
         return {

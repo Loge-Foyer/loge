@@ -40,7 +40,7 @@ import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { appDefaults, createAppSettingsService } from '@/services/app-settings';
-import { createPlayerService } from '@/services/players';
+import { createPlayerService, type PlayerDefaults } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import type { FileExchange, FileStore, TransferRequest } from '@/services/ports';
 import { createProfileService } from '@/services/profiles';
@@ -290,6 +290,8 @@ export function buildServices(options: {
   players?: readonly PlayerPlugin[];
   /** A TV, which asks who is watching at every launch unless told otherwise. */
   tv?: boolean;
+  /** What a new device plays with, as the composition root says. */
+  playerDefaults?: PlayerDefaults;
 }) {
   const device = options.device ?? 'device';
   const clock = options.clock ?? fakeClock();
@@ -394,7 +396,12 @@ export function buildServices(options: {
     for (const id of applied.removedProfiles) media.forgetUser(id);
     void session.refresh();
   });
-  const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
+  const players = createPlayerService({
+    catalog,
+    deviceSettings: db.deviceSettings,
+    platform: options.platform ?? 'ios',
+    ...(options.playerDefaults ? { defaults: options.playerDefaults } : {}),
+  });
   // A file store entirely in memory: a test can say a film is kept without a disk.
   const files = fakeFileStore();
   const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });

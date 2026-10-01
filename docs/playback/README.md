@@ -102,9 +102,14 @@ by a capability: a source that has none sends none. Jellyfin reads them from
 either still plays.
 
 **Which players are on, and which plays first, are device settings**
-(`DeviceSettings.players: { off, preferred }`, `services/players.ts`): never
-journaled, never on your server, never in a backup. With none chosen, the
-first one on plays first, in the catalogue's order — never by name.
+(`DeviceSettings.players: { off, preferred, order, tabs }`,
+`services/players.ts`): never journaled, never on your server, never in a
+backup. A device that has chosen nothing starts on the composition root's
+`playerDefaults` — the one place that may name players: mpv first, and first
+on Media; VLC next, and first on TV, where the raw MPEG-TS channels are; the
+built-in player on, and first nowhere. A stored order or set of firsts wins
+over them, and taking one tab never drops another's default. In a browser
+neither mpv nor VLC is here, so the built-in player plays everything.
 `choosePlayer` takes these as they stand.
 
 **Only the composition root imports a player** — its package, its view, and
@@ -155,6 +160,8 @@ switch and settings, and which plays first. A player's page also makes it
 first on a tab — Media, Videos, TV — which goes before the device's choice
 there (`DeviceSettings.players.tabs`). Channels, and everything an IPTV
 provider brings, play from TV (`tabOfPlaying` in `services/tab-content.ts`).
+Videos does not choose yet: `tabOfPlaying` counts a source's items as Media's,
+so "first on Videos" is kept, and shown, but plays nothing first.
 A player with no engine on this platform says so, and never plays.
 
 **"Play with…"** on a detail page lists the players that are on and can play

@@ -21,6 +21,8 @@ import { plugin as mockAccount } from '@sc/sync-mock';
 import { plugin as mockBackups } from '@sc/sync-mock-backup';
 import { plugin as onedriveBackup } from '@sc/sync-onedrive';
 
+import type { PlayerDefaults } from '@/services/players';
+
 /**
  * Every plugin the app ships. The only file that names one: adding a plugin
  * is an import and an entry here. The catalogue sorts them by category, and
@@ -56,3 +58,14 @@ export const plugins: readonly Plugin[] = [
 
 /** The players with an engine, and the view that draws it — what the player screen is handed. */
 export const players: readonly PlayerPlugin[] = [systemPlayer, mpv, vlc];
+
+/**
+ * What a new device plays with until someone chooses: mpv first, and first on
+ * Media; VLC next, and first on TV, where raw MPEG-TS channels are; the
+ * built-in player on, and first nowhere. Where mpv and VLC do not run — a
+ * browser — the built-in player is all there is, and plays everything.
+ */
+export const playerDefaults: PlayerDefaults = {
+  order: [mpv.manifest.id, vlc.manifest.id, systemPlayer.manifest.id],
+  tabs: { media: mpv.manifest.id, tv: vlc.manifest.id },
+};

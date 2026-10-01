@@ -48,7 +48,7 @@ import { createDownloadQueue } from '@/services/downloads/queue';
 import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createOutboxDrainer } from '@/services/watch/drainer';
 
-import { players as playerPlugins, plugins } from './plugins';
+import { playerDefaults, players as playerPlugins, plugins } from './plugins';
 import { createStorage } from './storage';
 
 export interface AppServices {
@@ -190,6 +190,7 @@ export function createServices(): AppServices {
     deviceSettings: db.deviceSettings,
     platform: currentPlatform(),
     shrinksAnything: () => pictureInPicture.available(),
+    defaults: playerDefaults,
   });
   const playback = createPlaybackService({
     players: playerPlugins,
