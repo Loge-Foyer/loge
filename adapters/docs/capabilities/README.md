@@ -33,6 +33,7 @@ Players and sync plugins have no capabilities of this kind.
 | Capability | Means | Provider members |
 | --- | --- | --- |
 | `browse` | It lists titles of the kinds it brings, and opens them | `listItems`, `getItem`, `getChildren` |
+| `feed` | It can answer with the newest from a set of channels, in one call | `listFeed` |
 
 `getItem` may also fill `MediaDetail.versions` — what the file is: codecs,
 resolution, HDR, languages, size. **That is not a capability**, and

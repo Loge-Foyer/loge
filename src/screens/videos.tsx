@@ -1,11 +1,12 @@
 import type { ContentKind, MediaItem } from '@sc/api';
 import { FlashList } from '@shopify/flash-list';
+import { ListMusic } from '@tamagui/lucide-icons-2/icons/ListMusic';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
-import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
+import { Button, SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listKinds, listNames } from '@/components/labels';
@@ -129,6 +130,13 @@ function SourceVideos({
           {canSearch ? (
             <SearchField placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`} term={term} onTerm={onTerm} />
           ) : null}
+          <XStack>
+            <Link href="/lists" asChild>
+              <Button size="$3" icon={<ListMusic size={16} />}>
+                Following and lists
+              </Button>
+            </Link>
+          </XStack>
           <SourceNotices errors={errors} onRetry={() => void onRefresh()} />
         </YStack>
       }

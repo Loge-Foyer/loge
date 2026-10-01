@@ -1,6 +1,7 @@
 import type { ConnectionId, DownloadOption, Episode, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { Download as DownloadIcon } from '@tamagui/lucide-icons-2/icons/Download';
+import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { useMutation } from '@tanstack/react-query';
@@ -22,6 +23,7 @@ import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useDownloadActions, useDownloadBudget, useDownloadOf, useDownloadOptions } from '@/hooks/use-downloads';
+import { useFollows, useListActions, usePlaylists } from '@/hooks/use-lists';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
@@ -61,6 +63,7 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
       canMarkWatched={can('watchStateWrite')}
       canDownload={can('downloads')}
       offersChoices={can('downloadOptions')}
+      canFollow={can('feed')}
       {...(season ? { season } : {})}
       {...(detail.data.sourceError ? { sourceError: detail.data.sourceError } : {})}
     />
@@ -74,6 +77,7 @@ function Detail({
   canMarkWatched,
   canDownload,
   offersChoices,
+  canFollow,
   season,
   sourceError,
 }: {
@@ -84,6 +88,8 @@ function Detail({
   canDownload: boolean;
   /** The source will offer versions to choose between, rather than one copy. */
   offersChoices: boolean;
+  /** The source brings a feed, so following a channel means something. */
+  canFollow: boolean;
   season?: string;
   /** The source could not answer; this page shows what was saved from it. */
   sourceError?: SourceError;
@@ -96,7 +102,14 @@ function Detail({
       <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={1100} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
-        <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} canDownload={canDownload} offersChoices={offersChoices} />
+        <Actions
+          item={item}
+          canPlay={canPlay}
+          canMarkWatched={canMarkWatched}
+          canDownload={canDownload}
+          offersChoices={offersChoices}
+          canFollow={canFollow}
+        />
         {showWatch ? <WatchState item={item} /> : null}
         {tagline ? (
           <SizableText size="$5" color="$color11" fontStyle="italic">
@@ -194,12 +207,14 @@ function Actions({
   canMarkWatched,
   canDownload,
   offersChoices,
+  canFollow,
 }: {
   item: MediaItem;
   canPlay: boolean;
   canMarkWatched: boolean;
   canDownload: boolean;
   offersChoices: boolean;
+  canFollow: boolean;
 }) {
   const userId = useActiveUserId();
   const { watch } = useServices();
@@ -212,7 +227,10 @@ function Actions({
   const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
   // "Play with…" offers the players that are on and can play here — and only when there is a choice.
   const here = players.filter((player) => player.enabled && player.playsHere);
-  if (!playable && !canMarkWatched && !keepable) return null;
+  // A channel or a playlist is a `show`: something you open to find things
+  // inside it, and the only shape worth following.
+  const followable = canFollow && item.type === 'show';
+  if (!playable && !canMarkWatched && !keepable && !followable) return null;
   const play = (startMs?: number, player?: PluginId) =>
     router.push({
       pathname: '/play/[connectionId]/[itemId]',
@@ -248,6 +266,8 @@ function Actions({
           </Button>
         ) : null}
         {keepable ? <DownloadButton item={item} offersChoices={offersChoices} /> : null}
+        {followable ? <FollowButton channel={item} /> : null}
+        {playable ? <AddToListButton item={item} /> : null}
       </XStack>
       {playable && choosing ? (
         <XStack gap="$2" flexWrap="wrap" items="center">
@@ -259,6 +279,72 @@ function Actions({
         </XStack>
       ) : null}
     </YStack>
+  );
+}
+
+/** Follow a channel, so its newest reaches this profile's feed. */
+function FollowButton({ channel }: { channel: MediaItem }) {
+  const { data: following } = useFollows(channel.key.connectionId, channel.key.externalId);
+  const { follow, unfollow } = useListActions();
+  const busy = follow.isPending || unfollow.isPending;
+  return following ? (
+    <Button size="$4" icon={<Check size={18} />} disabled={busy} onPress={() => unfollow.mutate(following.id)}>
+      Following
+    </Button>
+  ) : (
+    <Button size="$4" icon={<Plus size={18} />} disabled={busy} onPress={() => follow.mutate(channel)}>
+      Follow
+    </Button>
+  );
+}
+
+/**
+ * Put this in one of the profile's own lists. A list may hold anything
+ * playable from any source, so this is offered wherever Play is.
+ */
+function AddToListButton({ item }: { item: MediaItem }) {
+  const { data: lists = [] } = usePlaylists();
+  const { add, create } = useListActions();
+  const [choosing, setChoosing] = useState(false);
+  const inAList = lists.some((list) =>
+    list.items.some((entry) => entry.connectionId === item.key.connectionId && entry.externalId === item.key.externalId),
+  );
+  return (
+    <>
+      <Button size="$4" aria-expanded={choosing} onPress={() => setChoosing(!choosing)}>
+        {inAList ? 'In a list' : 'Add to list'}
+      </Button>
+      {choosing ? (
+        <XStack gap="$2" flexWrap="wrap" items="center" width="100%">
+          {lists.map((list) => (
+            <Button
+              key={list.id}
+              size="$3"
+              aria-label={`Add to ${list.title}`}
+              onPress={() => {
+                setChoosing(false);
+                add.mutate({ id: list.id, key: item.key });
+              }}
+            >
+              {list.title}
+            </Button>
+          ))}
+          <Button
+            size="$3"
+            icon={<Plus size={14} />}
+            disabled={create.isPending}
+            onPress={() => {
+              setChoosing(false);
+              // Named after what starts it, which is nearly always right and
+              // always renameable.
+              create.mutate(item.title, { onSuccess: (list) => add.mutate({ id: list.id, key: item.key }) });
+            }}
+          >
+            New list
+          </Button>
+        </XStack>
+      ) : null}
+    </>
   );
 }
 

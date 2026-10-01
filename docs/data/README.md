@@ -4,9 +4,9 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Database v6 — the account model, watch status
-with its outbox, and what this device keeps — and the backup file are in
-place. Phase 4's model —
+This page describes the target. Database v7 — the account model, watch status
+with its outbox, what this device keeps, and the lists a profile owns — and
+the backup file are in place. Phase 4's model —
 the account as one of the device's connections,
 synced through a log, with passwords sealed on the device — is in this page's
 history in git.
@@ -307,6 +307,18 @@ The steps, the same on both engines:
   - The file itself lives in the document directory, not the cache, which the
     system empties under pressure. A cascade cannot delete from disk, so the
     queue sweeps files no row points at on every pass.
+- **v7** (Phase 10) — `subscriptions` and `playlists`: the first state the app
+  owns itself, as against state a media server masters.
+  - **Account-wide**, unlike the `downloads` beside them: journaled, carried to
+    your own server, written into backups, because a channel someone follows is
+    the profile's and belongs wherever it signs in.
+  - A subscription cascades from its connection as well as its profile —
+    unfollowing is implied by the source going away. A playlist does not: it
+    may mix sources, and losing one connection is no reason to lose the list.
+  - A playlist's items are one column, not rows: a list is edited as a whole,
+    which is also why the whole-entity conflict rule is the right one for it.
+  - **Backup schema 2** adds both. A file written at 1 still opens — it simply
+    has neither — because only a *newer* schema is refused.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the
