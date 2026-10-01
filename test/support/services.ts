@@ -38,6 +38,7 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
+import { createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
 import type { FileExchange } from '@/services/ports';
@@ -367,6 +368,7 @@ export function buildServices(options: {
     void session.refresh();
   });
   const players = createPlayerService({ catalog, deviceSettings: db.deviceSettings, platform: options.platform ?? 'ios' });
+  const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings });
   const playback = createPlaybackService({
     players: options.players ?? [],
     choosing: players.choosing,
@@ -411,6 +413,7 @@ export function buildServices(options: {
       backupTargets,
       files: options.files ?? unusedFiles,
       players,
+      appSettings,
       watch,
       playback,
       orientation,

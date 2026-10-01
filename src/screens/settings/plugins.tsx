@@ -4,6 +4,7 @@ import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Stack } from 'expo-router';
 import { Button, Paragraph, SizableText, XStack } from 'tamagui';
 
+import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
 import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
@@ -11,7 +12,10 @@ import { SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
+import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
 import { usePlayerActions, usePlayers } from '@/hooks/use-players';
+import { APP_DEFAULTS, SEEK_CHOICES } from '@/services/app-settings';
+import { PLAYER_BUTTONS, type PlayerButton } from '@/services/ports';
 import type { PlayerSummary } from '@/services/players';
 
 import { BackupSection } from './backup';
@@ -83,6 +87,7 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
       ) : (
         <Paragraph color="$color10">{NONE_HERE[category]}</Paragraph>
       )}
+      {category === 'players' ? <PlayerControlsSection /> : null}
       {category === 'sync' ? <BackupSection /> : null}
     </Screen>
   );
@@ -147,5 +152,73 @@ function Reorder({
         onPress={() => onMove({ id, by: 1 })}
       />
     </XStack>
+  );
+}
+
+/** What the buttons are called where they are switched on and off. */
+const BUTTON_LABELS: Readonly<Record<PlayerButton, string>> = {
+  audio: 'Audio tracks',
+  subtitles: 'Subtitles',
+  speed: 'Speed',
+  chapters: 'Chapters',
+  nextEpisode: 'Next episode, always',
+};
+
+const BUTTON_NOTES: Readonly<Partial<Record<PlayerButton, string>>> = {
+  speed: 'Hidden on a player whose engine cannot change its rate.',
+  chapters: 'Shown only where the source marks them.',
+  nextEpisode: 'It appears at the end of an episode whether this is on or not.',
+};
+
+/**
+ * The controls, which belong to the app rather than to any player: a player is
+ * the engine, not the buttons. Arranged once here, and the same on every one.
+ */
+function PlayerControlsSection() {
+  const { data } = useAppSettings();
+  const { set, setButton } = useAppSettingActions();
+  const settings = data ?? APP_DEFAULTS;
+  return (
+    <>
+      <SettingsSection title="Controls" footer="The same on every player: a player is the engine, and the controls are the app’s. Back, play and forward are always in the middle.">
+        <SettingsRow
+          title="Skip by"
+          subtitle="How far the two buttons either side of play move."
+          trailing={
+            <XStack gap="$1">
+              {SEEK_CHOICES.map((seconds) => (
+                <Button
+                  key={seconds}
+                  size="$2"
+                  aria-label={`Skip by ${seconds} seconds`}
+                  disabled={set.isPending}
+                  {...(settings.seekMs === seconds * 1000 ? ({ theme: 'accent' } as const) : {})}
+                  onPress={() => set.mutate({ seekMs: seconds * 1000 })}
+                >
+                  <Button.Text>{seconds}s</Button.Text>
+                </Button>
+              ))}
+            </XStack>
+          }
+        />
+      </SettingsSection>
+      <SettingsSection title="Buttons" footer="What sits in the row beneath the picture, in this order.">
+        {PLAYER_BUTTONS.map((button) => (
+          <SettingsRow
+            key={button}
+            title={BUTTON_LABELS[button]}
+            {...(BUTTON_NOTES[button] ? { subtitle: BUTTON_NOTES[button] } : {})}
+            trailing={
+              <AppSwitch
+                label={BUTTON_LABELS[button]}
+                checked={settings.buttons.includes(button)}
+                disabled={setButton.isPending}
+                onCheckedChange={(shown) => setButton.mutate({ button, shown })}
+              />
+            }
+          />
+        ))}
+      </SettingsSection>
+    </>
   );
 }

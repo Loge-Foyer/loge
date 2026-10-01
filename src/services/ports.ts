@@ -89,6 +89,8 @@ export interface DeviceSettings {
   readonly app?: {
     /** Turn the phone on its side for the player and hold it there. On unless set otherwise. */
     readonly forceLandscape?: boolean;
+    readonly seekMs?: number;
+    readonly buttons?: readonly PlayerButton[];
   };
 }
 
@@ -96,9 +98,26 @@ export interface DeviceSettings {
  * How this device behaves, whoever is watching — resolved, with every default
  * applied, so nothing downstream has to know what the default was.
  */
+/**
+ * A button the player may show in its bottom row. The row beneath the picture
+ * is the user's to arrange; the three in the middle — back, play, forward —
+ * are the player itself and are always there.
+ */
+export const PLAYER_BUTTONS = ['audio', 'subtitles', 'speed', 'chapters', 'nextEpisode'] as const;
+
+export type PlayerButton = (typeof PLAYER_BUTTONS)[number];
+
 export interface AppSettings {
   /** Turn the phone on its side for the player and hold it there. */
   readonly forceLandscape: boolean;
+  /** How far the two seek buttons move, each way. */
+  readonly seekMs: number;
+  /**
+   * The bottom row, in order. The same for every player: a player is the
+   * engine, not the controls, so the controls are the app's and are arranged
+   * once for all of them.
+   */
+  readonly buttons: readonly PlayerButton[];
 }
 
 export interface DeviceSettingsRepository {

@@ -2,6 +2,9 @@ import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episo
 import type { PlayerView } from '@sc/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
+import { Gauge } from '@tamagui/lucide-icons-2/icons/Gauge';
+import { List } from '@tamagui/lucide-icons-2/icons/List';
+import { SkipForward } from '@tamagui/lucide-icons-2/icons/SkipForward';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Pause } from '@tamagui/lucide-icons-2/icons/Pause';
@@ -17,13 +20,16 @@ import { Button, SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
 import { PrimaryButton } from '@/components/primary-button';
+import { useAppSettings } from '@/hooks/use-app-settings';
 import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
 import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
+import { APP_DEFAULTS } from '@/services/app-settings';
+import type { PlayerButton } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
 
 const HIDE_AFTER_MS = 3_500;
-const SKIP_MS = 10_000;
+const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 /**
  * Full screen, over the tabs: the chosen player's own view underneath, the
@@ -135,7 +141,11 @@ function Controls({
 }) {
   const [visible, setVisible] = useState(true);
   const [touchedAt, setTouchedAt] = useState(0);
-  const [panel, setPanel] = useState<'audio' | 'subtitles'>();
+  const [panel, setPanel] = useState<'audio' | 'subtitles' | 'speed' | 'chapters'>();
+  const [rate, setRate] = useState(1);
+  const { data: settings } = useAppSettings();
+  const { seekMs, buttons } = settings ?? APP_DEFAULTS;
+  const seekSeconds = Math.round(seekMs / 1000);
   const [scrub, setScrub] = useState<number>();
   const { state, positionMs, durationMs } = snapshot;
   const playing = state === 'playing';
@@ -213,7 +223,7 @@ function Controls({
 
           <XStack items="center" justify="center" gap="$8">
             {live ? null : (
-              <IconButton label="Back ten seconds" onPress={() => skip(-SKIP_MS)} disabled={!controller}>
+              <IconButton label={`Back ${seekSeconds} seconds`} onPress={() => skip(-seekMs)} disabled={!controller}>
                 <RotateCcw size={30} color="white" />
               </IconButton>
             )}
@@ -225,14 +235,14 @@ function Controls({
               </IconButton>
             )}
             {live ? null : (
-              <IconButton label="Forward ten seconds" onPress={() => skip(SKIP_MS)} disabled={!controller}>
+              <IconButton label={`Forward ${seekSeconds} seconds`} onPress={() => skip(seekMs)} disabled={!controller}>
                 <RotateCw size={30} color="white" />
               </IconButton>
             )}
           </XStack>
 
           <YStack gap="$3">
-            {panel ? (
+            {panel === 'audio' || panel === 'subtitles' ? (
               <TrackPanel
                 kind={panel}
                 tracks={panel === 'audio' ? snapshot.audio : snapshot.subtitles}
@@ -243,6 +253,39 @@ function Controls({
                   touch();
                 }}
               />
+            ) : null}
+            {panel === 'speed' ? (
+              <Panel>
+                {RATES.map((each) => (
+                  <PanelRow
+                    key={each}
+                    label={each === 1 ? 'Normal' : `${each}×`}
+                    chosen={each === rate}
+                    onPress={() => {
+                      controller?.setRate?.(each);
+                      setRate(each);
+                      setPanel(undefined);
+                      touch();
+                    }}
+                  />
+                ))}
+              </Panel>
+            ) : null}
+            {panel === 'chapters' ? (
+              <Panel>
+                {(chapters ?? []).map((chapter, index) => (
+                  <PanelRow
+                    key={chapter.startMs}
+                    label={`${chapter.title ?? `Chapter ${index + 1}`} · ${clockTime(chapter.startMs)}`}
+                    chosen={segmentOfChapter(chapters, positionMs) === index}
+                    onPress={() => {
+                      controller?.seek(chapter.startMs);
+                      setPanel(undefined);
+                      touch();
+                    }}
+                  />
+                ))}
+              </Panel>
             ) : null}
             {/* A channel is never scrubbed, even when its stream reports a length. */}
             {durationMs && !live ? (
@@ -291,16 +334,44 @@ function Controls({
             ) : null}
             <XStack items="center" gap="$2">
               <XStack flex={1}>{skipAction ? <SkipButton label={skipAction.label} onPress={skipAction.run} /> : null}</XStack>
-              {snapshot.audio.length > 1 ? (
-                <IconButton label="Audio" onPress={() => setPanel(panel === 'audio' ? undefined : 'audio')}>
-                  <AudioLines size={24} color="white" />
-                </IconButton>
-              ) : null}
-              {snapshot.subtitles.length > 0 ? (
-                <IconButton label="Subtitles" onPress={() => setPanel(panel === 'subtitles' ? undefined : 'subtitles')}>
-                  <Captions size={24} color="white" />
-                </IconButton>
-              ) : null}
+              {buttons.map((button: PlayerButton) => {
+                // A button with nothing behind it is not shown: no second audio
+                // track, no subtitles, an engine that cannot change its rate.
+                const open = (which: typeof panel) => () => setPanel(panel === which ? undefined : which);
+                if (button === 'audio') {
+                  return snapshot.audio.length > 1 ? (
+                    <IconButton key={button} label="Audio" onPress={open('audio')}>
+                      <AudioLines size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'subtitles') {
+                  return snapshot.subtitles.length > 0 ? (
+                    <IconButton key={button} label="Subtitles" onPress={open('subtitles')}>
+                      <Captions size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'speed') {
+                  return controller?.setRate && !live ? (
+                    <IconButton key={button} label="Speed" onPress={open('speed')}>
+                      <Gauge size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'chapters') {
+                  return (chapters?.length ?? 0) > 1 && !live ? (
+                    <IconButton key={button} label="Chapters" onPress={open('chapters')}>
+                      <List size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                return next ? (
+                  <IconButton key={button} label="Next episode" onPress={playNext}>
+                    <SkipForward size={24} color="white" />
+                  </IconButton>
+                ) : null;
+              })}
             </XStack>
           </YStack>
         </YStack>
@@ -454,5 +525,33 @@ function SkipButton({ label, onPress }: { label: string; onPress: () => void }) 
         {label}
       </Button.Text>
     </Button>
+  );
+}
+
+/** Which chapter a position is in, for marking the one playing. */
+function segmentOfChapter(chapters: readonly Chapter[] | undefined, positionMs: number): number {
+  let at = -1;
+  (chapters ?? []).forEach((chapter, index) => {
+    if (chapter.startMs <= positionMs) at = index;
+  });
+  return at;
+}
+
+/** The sheet a button opens over the controls: speed, chapters, tracks. */
+function Panel({ children }: { children: ReactNode }) {
+  return (
+    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={220} maxW={360} maxH={260} overflow="scroll">
+      {children}
+    </YStack>
+  );
+}
+
+function PanelRow({ label, chosen, onPress }: { label: string; chosen: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      <SizableText size="$4" color={chosen ? '$accent9' : 'white'} fontWeight={chosen ? '700' : '400'} px="$3" py="$2" numberOfLines={1}>
+        {label}
+      </SizableText>
+    </Pressable>
   );
 }

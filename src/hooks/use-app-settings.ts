@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { deviceKey } from '@/services/query-keys';
-import type { AppSettings } from '@/services/ports';
+import type { AppSettings, PlayerButton } from '@/services/ports';
 
 import { useServices } from './services-context';
 import { useRefreshLocalState } from './use-local-state';
@@ -18,6 +18,10 @@ export function useAppSettingActions() {
   return {
     set: useMutation({
       mutationFn: (change: Partial<AppSettings>) => appSettings.set(change),
+      onSuccess: () => refresh(),
+    }),
+    setButton: useMutation({
+      mutationFn: ({ button, shown }: { button: PlayerButton; shown: boolean }) => appSettings.setButton(button, shown),
       onSuccess: () => refresh(),
     }),
   };
