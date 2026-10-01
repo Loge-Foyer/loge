@@ -1,10 +1,14 @@
 /**
- * Yattee Server — media only: YouTube and other web video.
+ * Yattee Server — media only: YouTube and other web video, from a server the
+ * household runs itself.
  *
- * Capabilities are declared together with their implementation. None exists
- * yet, so the list is empty and nothing will ask this plugin to act.
+ * It is not Invidious, though it answers in Invidious' vocabulary: a FastAPI
+ * service over yt-dlp, with HTTP Basic Auth on everything once it is set up.
+ * `sources/invidious` is a different sign-in against the same shapes.
  */
 import { pluginId, type Plugin } from '@sc/api';
+
+import { createProvider } from './provider';
 
 export const plugin: Plugin = {
   manifest: {
@@ -13,7 +17,10 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Yattee Server',
     description: 'Backend for YouTube and other web video.',
-    media: { contentKinds: ['videos'], capabilities: [] },
+    media: {
+      contentKinds: ['videos'],
+      capabilities: ['browse', 'search', 'playback', 'remoteImages', 'offlineMetadata'],
+    },
     connectionFields: [
       {
         key: 'serverUrl',
@@ -22,7 +29,49 @@ export const plugin: Plugin = {
         required: true,
         placeholder: 'https://yattee.example.com',
       },
+      {
+        key: 'username',
+        label: 'Username',
+        type: 'text',
+        required: true,
+        // Half of the Basic sign-in, so it stays with the password when a
+        // connection keeps credentials per profile.
+        credential: true,
+      },
+      { key: 'password', label: 'Password', type: 'password', required: true },
     ],
-    settings: [],
+    settings: [
+      {
+        key: 'proxyMode',
+        label: 'Stream through the server',
+        description:
+          'Relay keeps the site from seeing this device, and supports seeking. Off sends the player straight to the site, which is faster where it is reachable.',
+        type: 'select',
+        options: [
+          { value: 'relay', label: 'Relay' },
+          { value: 'off', label: 'Off' },
+        ],
+        default: 'relay',
+      },
+      {
+        key: 'region',
+        label: 'Trending from',
+        description: 'Which country’s trending list to show when nothing is searched for.',
+        type: 'text',
+        default: 'US',
+        placeholder: 'US',
+      },
+      {
+        key: 'cacheMetadata',
+        label: 'Keep metadata on this device',
+        description: 'Show videos you have opened before while the server is unreachable.',
+        type: 'boolean',
+        default: true,
+        gates: ['media.offlineMetadata'],
+      },
+    ],
+  },
+  media: {
+    connect: async (target, context) => createProvider(target, context),
   },
 };
