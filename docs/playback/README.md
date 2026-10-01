@@ -51,6 +51,23 @@ On the web there is only the built-in player. It plays raw MPEG-TS through
 mpegts.js, fetched as a chunk of its own the first time a stream needs it, as
 hls.js is for HLS; CORS still applies.
 
+**The controls are the app's, not a player's.** A player is the engine; the
+buttons over it are the same whichever one is playing, and are arranged once
+in Settings → Plugins → Players. Back, play and forward sit in the middle and
+are not configurable — they *are* the player — but how far the two seek
+(`app.seekMs`) and what sits in the row beneath (`app.buttons`) are the
+device's. A button with nothing behind it is not drawn: no second audio track,
+no subtitles, no chapters, or an engine with no rate to set. `setRate` is
+optional on `MediaPlayer` for exactly that reason.
+
+**Chapters and segments ride on the descriptor.** `PlaybackDescriptor.chapters`
+marks the scrubber; `PlaybackDescriptor.segments` says which stretches are an
+intro, outro, recap, preview or advert. Inside one the player offers a single
+button — skip to its end, or, in an outro, the next episode. Neither is gated
+by a capability: a source that has none sends none. Jellyfin reads them from
+`fields=Chapters` and `/MediaSegments/{id}`, best-effort, so a server without
+either still plays.
+
 **Which players are on, and which plays first, are device settings**
 (`DeviceSettings.players: { off, preferred }`, `services/players.ts`): never
 journaled, never on your server, never in a backup. With none chosen, the
