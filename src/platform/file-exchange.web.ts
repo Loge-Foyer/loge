@@ -8,6 +8,7 @@ const RELEASE_AFTER_MS = 60_000;
 /** Files in and out in a browser: a download, and a file input through the document picker's web build. */
 export function createFileExchange(_log: Logger): FileExchange {
   return {
+    available: true,
     save: async (name, bytes) => {
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }));
       const link = document.createElement('a');

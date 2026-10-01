@@ -2,8 +2,11 @@ import { Download } from '@tamagui/lucide-icons-2/icons/Download';
 import { Pause } from '@tamagui/lucide-icons-2/icons/Pause';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { Stack } from 'expo-router';
-import { Button, Paragraph, SizableText, XStack, YStack } from 'tamagui';
+import { Paragraph, SizableText, XStack, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
+import { isTV } from '@/components/remote';
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { ConfirmButton } from '@/components/confirm-button';
 import { fileSize } from '@/components/labels';
@@ -34,7 +37,9 @@ export function DownloadsScreen() {
 
       {budget && budget.freeBytes === 0 && budget.limitBytes === 0 ? (
         <Paragraph color="$color10">
-          A browser has nowhere to keep a film it could play again later. Downloads work in the app on your phone or tablet.
+          {isTV
+            ? 'A TV keeps nothing the system may not clear away, so it has nowhere to keep a film. Downloads work in the app on your phone or tablet.'
+            : 'A browser has nowhere to keep a film it could play again later. Downloads work in the app on your phone or tablet.'}
         </Paragraph>
       ) : null}
 
@@ -104,7 +109,7 @@ export function DownloadsScreen() {
         <YStack gap="$2" items="center" py="$6">
           <Download size={24} color="$color9" />
           <SizableText color="$color10">Nothing kept on this device yet.</SizableText>
-          <SizableText size="$2" color="$color9" text="center" maxW={420}>
+          <SizableText size="$2" color="$color9" text="center" maxW={px(420)}>
             Open a film or an episode and choose Download. What you keep plays with no network at all.
           </SizableText>
         </YStack>
@@ -151,7 +156,7 @@ function ChoiceRow<T extends number>({
       title={title}
       {...(subtitle ? { subtitle } : {})}
       trailing={
-        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={260}>
+        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={px(260)}>
           {options.map((option) => (
             <Button
               key={String(option)}

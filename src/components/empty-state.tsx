@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Circle, H2, Paragraph, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
+
 /** The hero a tab shows while nothing feeds it. */
 export function EmptyState({
   icon,
@@ -28,7 +30,7 @@ export function EmptyState({
       <Circle size={56} bg="$accent4">
         {icon}
       </Circle>
-      <YStack gap="$2" maxW={560}>
+      <YStack gap="$2" maxW={px(560)}>
         <H2 size="$9" color="$color12">
           {title}
         </H2>

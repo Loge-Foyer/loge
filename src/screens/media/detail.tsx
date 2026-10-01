@@ -8,10 +8,13 @@ import { useMutation } from '@tanstack/react-query';
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
-import { Button, H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
 import { Artwork, ArtworkLogo } from '@/components/artwork';
 import { PrimaryButton } from '@/components/primary-button';
+import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
 import { Chip, ChipRow } from '@/components/chip';
 import { episodeCode, fileSize, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
@@ -99,7 +102,7 @@ function Detail({
   return (
     <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
       <Hero item={item} />
-      <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={1100} self="center">
+      <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={px(1100)} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
         <Actions
@@ -117,7 +120,7 @@ function Detail({
           </SizableText>
         ) : null}
         {item.overview ? (
-          <Paragraph size="$4" color="$color11" maxW={760}>
+          <Paragraph size="$4" color="$color11" maxW={px(760)}>
             {item.overview}
           </Paragraph>
         ) : null}
@@ -154,7 +157,7 @@ function Hero({ item }: { item: MediaItem }) {
       <Artwork connectionId={item.key.connectionId} image={image} width={width} aspect={aspect} label={item.title} rounded="$0" />
       <Scrim from="top" strength={0.35} />
       <Scrim from="bottom" />
-      <YStack position="absolute" l="$4" r="$4" b="$4" gap="$2" maxW={680}>
+      <YStack position="absolute" l="$4" r="$4" b="$4" gap="$2" maxW={px(680)}>
         {item.type === 'episode' ? (
           <SizableText size="$3" fontWeight="600" color="$color11">
             {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
@@ -266,7 +269,7 @@ function Actions({
     <YStack gap="$3">
       <XStack gap="$3" flexWrap="wrap" items="center">
         {playable ? (
-          <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)}>
+          <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)} hasTVPreferredFocus>
             {resumeAt ? 'Resume' : 'Play'}
           </PrimaryButton>
         ) : null}
@@ -480,7 +483,7 @@ function WatchState({ item }: { item: MediaItem }) {
         : `${item.watch.unplayedCount} ${item.watch.unplayedCount === 1 ? 'episode' : 'episodes'} left`
       : timeLeft(item);
   return (
-    <YStack gap="$2" maxW={420}>
+    <YStack gap="$2" maxW={px(420)}>
       <YStack height={4} rounded={2} bg="$color4" overflow="hidden">
         <YStack height="100%" width={`${Math.round(progress * 100)}%`} bg="$accent9" />
       </YStack>
@@ -534,11 +537,12 @@ function summarise(version: MediaVersion, count: number): string {
 }
 
 function ShowLink({ episode }: { episode: Episode }) {
+  const { focused, handlers } = useRemoteFocus();
   return (
     <Link href={keyHref(episode.show)} asChild>
-      <Pressable accessibilityRole="link">
+      <Pressable accessibilityRole="link" {...handlers}>
         <XStack gap="$1" items="center">
-          <SizableText size="$4" color="$accent11" fontWeight="600">
+          <SizableText size="$4" color="$accent11" fontWeight="600" textDecorationLine={focused ? 'underline' : 'none'}>
             {`All episodes of ${episode.showTitle}`}
           </SizableText>
           <ChevronRight size={18} color="$accent11" />
@@ -578,13 +582,14 @@ function Seasons({ show, initial, showWatch }: { show: Show; initial?: string; s
 
 function EpisodeRow({ episode, showWatch }: { episode: Episode; showWatch: boolean }) {
   const progress = showWatch ? progressOf(episode) : undefined;
+  const { focused, handlers } = useRemoteFocus();
   const facts = [episode.runtimeMs ? formatRuntime(episode.runtimeMs) : undefined, episode.airDate].filter(Boolean).join(' · ');
   return (
     <Link href={itemHref(episode)} asChild>
-      <Pressable accessibilityRole="link" accessibilityLabel={`${episodeCode(episode)} ${episode.title}`}>
+      <Pressable accessibilityRole="link" accessibilityLabel={`${episodeCode(episode)} ${episode.title}`} {...handlers}>
         {({ pressed }) => (
           <XStack gap="$3" opacity={pressed ? 0.8 : 1}>
-            <YStack position="relative">
+            <YStack position="relative" {...(focused ? CARD_FOCUSED : {})}>
               <Artwork
                 connectionId={episode.key.connectionId}
                 image={episode.images.thumb ?? episode.images.backdrop}
@@ -597,7 +602,7 @@ function EpisodeRow({ episode, showWatch }: { episode: Episode; showWatch: boole
               {progress === undefined ? null : <ProgressBar value={progress} />}
             </YStack>
             <YStack flex={1} gap="$1">
-              <SizableText size="$4" color="$color12" numberOfLines={2}>
+              <SizableText size="$4" color={focused ? '$accent11' : '$color12'} numberOfLines={2}>
                 {episode.episodeNumber === undefined ? episode.title : `${episode.episodeNumber}. ${episode.title}`}
               </SizableText>
               {facts ? (

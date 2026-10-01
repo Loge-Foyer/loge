@@ -1,7 +1,9 @@
 import { EyeOff } from '@tamagui/lucide-icons-2/icons/EyeOff';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { ScrollView } from 'react-native';
-import { Button, Circle, XStack } from 'tamagui';
+import { Circle, XStack } from 'tamagui';
+
+import { Button } from '@/components/button';
 
 export interface SourceTab {
   readonly id: string;

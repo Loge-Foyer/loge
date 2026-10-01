@@ -1,8 +1,9 @@
 import type { Credentials, UserId } from '@sc/api';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Button, SizableText, YStack } from 'tamagui';
+import { SizableText, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { describeOwnerVerdict, describeProofVerdict } from '@/components/labels';
 import { OwnerProofForm } from '@/components/owner-proof-form';
 import { PinPad } from '@/components/pin-pad';

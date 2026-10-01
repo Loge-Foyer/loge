@@ -109,8 +109,8 @@ Not every plugin runs everywhere, and the app only lists those that run here:
 iCloud is an iPhone thing, and IPTV runs on phones, because most providers do
 not let a browser talk to them.
 
-TV layouts are a later goal. The design system is built so those would be new
-screens rather than a new app.
+It runs on Apple TV too, from the same code — `npm run tvos` builds it for the
+simulator — sized for a room and driven by the remote. Android TV is next.
 
 ## Current state
 

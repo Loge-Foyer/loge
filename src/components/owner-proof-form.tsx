@@ -1,7 +1,8 @@
 import type { Credentials, PasswordField } from '@sc/api';
 import { useState } from 'react';
-import { Button, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { FieldInput } from '@/components/manifest-form';
 import { PrimaryButton } from '@/components/primary-button';
 

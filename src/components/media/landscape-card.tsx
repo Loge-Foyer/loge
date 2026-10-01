@@ -6,6 +6,7 @@ import { SizableText, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { episodeCode, timeLeft } from '@/components/labels';
+import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
 
 import { progressOf, ProgressBar, WatchedBadge } from './badges';
 import { itemHref, playHref } from './item-link';
@@ -23,11 +24,17 @@ export function LandscapeCard({
   width,
   showWatch,
   resumes = false,
+  onFocusItem,
+  preferred = false,
 }: {
   item: MediaItem;
   width: number;
   showWatch: boolean;
   resumes?: boolean;
+  /** On a TV: the remote is on it now. */
+  onFocusItem?: (item: MediaItem) => void;
+  /** On a TV: where the focus starts. */
+  preferred?: boolean;
 }) {
   const title = item.type === 'episode' ? item.showTitle || item.title : item.title;
   const subtitle =
@@ -35,39 +42,55 @@ export function LandscapeCard({
       ? [episodeCode(item), item.title].filter(Boolean).join(' · ')
       : (timeLeft(item) ?? (item.year === undefined ? '' : String(item.year)));
 
-  if (!resumes) {
-    return (
-      <Link href={itemHref(item)} asChild>
-        <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`}>
-          {({ pressed }) => (
-            <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>
-              <Picture item={item} width={width} title={title} showWatch={showWatch} />
-              <Words item={item} title={title} subtitle={subtitle} />
-            </YStack>
-          )}
-        </Pressable>
-      </Link>
-    );
-  }
+  const card = { item, width, title, subtitle, showWatch, preferred, onFocus: () => onFocusItem?.(item) };
+  return resumes ? <SplitCard {...card} /> : <WholeCard {...card} />;
+}
+
+/** One link: the page. */
+function WholeCard({ item, width, title, subtitle, showWatch, preferred, onFocus }: CardProps) {
+  const { focused, handlers } = useRemoteFocus(onFocus);
+  return (
+    <Link href={itemHref(item)} asChild>
+      <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hasTVPreferredFocus={preferred} {...handlers}>
+        {({ pressed }) => (
+          <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>
+            <Picture item={item} width={width} title={title} showWatch={showWatch} focused={focused} />
+            <Words item={item} title={title} subtitle={subtitle} focused={focused} />
+          </YStack>
+        )}
+      </Pressable>
+    </Link>
+  );
+}
+
+/** Two links: the picture plays it from where it stopped, the words open its page. */
+function SplitCard({ item, width, title, subtitle, showWatch, preferred, onFocus }: CardProps) {
+  const picture = useRemoteFocus(onFocus);
+  const words = useRemoteFocus(onFocus);
 
   const position = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
   const startMs = position !== undefined && position > 0 ? position : undefined;
   return (
     <YStack width={width} gap="$1.5">
       <Link href={playHref(item.key, startMs ? { startMs } : {})} asChild>
-        <Pressable accessibilityRole="button" accessibilityLabel={`${startMs ? 'Resume' : 'Play'} ${title}, ${subtitle}`}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${startMs ? 'Resume' : 'Play'} ${title}, ${subtitle}`}
+          hasTVPreferredFocus={preferred}
+          {...picture.handlers}
+        >
           {({ pressed }) => (
             <YStack opacity={pressed ? 0.8 : 1}>
-              <Picture item={item} width={width} title={title} showWatch={showWatch} plays />
+              <Picture item={item} width={width} title={title} showWatch={showWatch} focused={picture.focused} plays />
             </YStack>
           )}
         </Pressable>
       </Link>
       <Link href={itemHref(item)} asChild>
-        <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hitSlop={{ top: 4, bottom: 8 }}>
+        <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hitSlop={{ top: 4, bottom: 8 }} {...words.handlers}>
           {({ pressed }) => (
             <YStack opacity={pressed ? 0.8 : 1}>
-              <Words item={item} title={title} subtitle={subtitle} />
+              <Words item={item} title={title} subtitle={subtitle} focused={words.focused} />
             </YStack>
           )}
         </Pressable>
@@ -76,11 +99,35 @@ export function LandscapeCard({
   );
 }
 
-function Picture({ item, width, title, showWatch, plays = false }: { item: MediaItem; width: number; title: string; showWatch: boolean; plays?: boolean }) {
+interface CardProps {
+  readonly item: MediaItem;
+  readonly width: number;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly showWatch: boolean;
+  readonly preferred: boolean;
+  readonly onFocus: () => void;
+}
+
+function Picture({
+  item,
+  width,
+  title,
+  showWatch,
+  focused,
+  plays = false,
+}: {
+  item: MediaItem;
+  width: number;
+  title: string;
+  showWatch: boolean;
+  focused: boolean;
+  plays?: boolean;
+}) {
   const progress = showWatch ? progressOf(item) : undefined;
   const image = item.images.frame ?? item.images.thumb ?? item.images.backdrop ?? item.images.poster;
   return (
-    <YStack position="relative">
+    <YStack position="relative" {...(focused ? CARD_FOCUSED : {})}>
       <Artwork connectionId={item.key.connectionId} image={image} width={width} aspect={16 / 9} label={title} />
       {plays ? (
         // Says what a press on the picture does, which is not what it did before.
@@ -96,11 +143,11 @@ function Picture({ item, width, title, showWatch, plays = false }: { item: Media
   );
 }
 
-function Words({ item, title, subtitle }: { item: MediaItem; title: string; subtitle: string }) {
+function Words({ item, title, subtitle, focused }: { item: MediaItem; title: string; subtitle: string; focused: boolean }) {
   const left = item.type === 'episode' ? timeLeft(item) : undefined;
   return (
     <YStack gap="$0.5">
-      <SizableText size="$3" color="$color12" numberOfLines={1}>
+      <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
         {title}
       </SizableText>
       <XStack gap="$2">

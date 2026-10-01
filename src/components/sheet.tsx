@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ScrollView } from 'react-native';
-import { Button, H2, XStack, YStack } from 'tamagui';
+import { H2, XStack, YStack } from 'tamagui';
+
+import { Button } from '@/components/button';
 
 /**
  * A sheet's page: its title and Done, then what scrolls under them. The

@@ -2,22 +2,28 @@ import type { ReactNode } from 'react';
 import { ScrollView } from 'react-native';
 import { H3, XStack, YStack, useMedia } from 'tamagui';
 
-/** Card widths follow the viewport, so the same shelf works from phone to TV. */
+import { px } from './density';
+
+/**
+ * Card widths follow the viewport, so the same shelf works from phone to TV —
+ * and grow on a TV with the type beneath them (`density.ts`): about seven
+ * posters across 1920 points.
+ */
 export function usePosterWidth() {
   const media = useMedia();
-  if (media.xl) return 200;
-  if (media.lg) return 176;
-  if (media.md) return 150;
-  return 120;
+  if (media.xl) return px(200);
+  if (media.lg) return px(176);
+  if (media.md) return px(150);
+  return px(120);
 }
 
 /** The width of a landscape card, for continuing and for rows shown as scenes. */
 export function useLandscapeWidth() {
   const media = useMedia();
-  if (media.xl) return 380;
-  if (media.lg) return 340;
-  if (media.md) return 300;
-  return 260;
+  if (media.xl) return px(380);
+  if (media.lg) return px(340);
+  if (media.md) return px(300);
+  return px(260);
 }
 
 export function Shelf({ title, children }: { title: string; children: ReactNode }) {

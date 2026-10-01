@@ -1,5 +1,8 @@
 import type { ComponentProps } from 'react';
-import { AlertDialog, Button, XStack, YStack } from 'tamagui';
+import { AlertDialog, XStack, YStack } from 'tamagui';
+
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
 
 /**
  * A destructive action behind a confirmation. `native` makes it the system
@@ -31,7 +34,7 @@ export function ConfirmButton({
       </AlertDialog.Trigger>
       <AlertDialog.Portal>
         <AlertDialog.Overlay key="overlay" bg="$shadowColor" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
-        <AlertDialog.Content key="content" bordered elevate maxW={420} p="$5">
+        <AlertDialog.Content key="content" bordered elevate maxW={px(420)} p="$5">
           <YStack gap="$4">
             <AlertDialog.Title size="$7">{title}</AlertDialog.Title>
             <AlertDialog.Description>{description}</AlertDialog.Description>

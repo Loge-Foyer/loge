@@ -64,7 +64,8 @@ export function createDownloadService(deps: {
   };
 
   const budget = async (): Promise<DownloadBudget> => {
-    const [usedBytes, freeBytes, limitBytes] = await Promise.all([files.used(), files.free(), deps.limitBytes()]);
+    // A device with nowhere to keep anything — a browser, a TV — has no room at all, whatever the setting says.
+    const [usedBytes, freeBytes, limitBytes] = await Promise.all([files.used(), files.free(), files.available ? deps.limitBytes() : 0]);
     return {
       usedBytes,
       limitBytes,

@@ -14,6 +14,7 @@ import { SizableText } from 'tamagui';
 
 import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus, fileSize, TAB_LABELS } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
 import { useDownloadBudget } from '@/hooks/use-downloads';
@@ -124,18 +125,20 @@ export function SettingsScreen() {
             />
           }
         />
-        <SettingsRow
-          title="Force landscape on playback"
-          subtitle={forceLandscape ? 'The player turns the phone on its side and holds it there' : 'The player turns with the phone'}
-          trailing={
-            <AppSwitch
-              label="Force landscape on playback"
-              checked={forceLandscape}
-              disabled={appSettings.data === undefined || set.isPending}
-              onCheckedChange={(next) => set.mutate({ forceLandscape: next })}
-            />
-          }
-        />
+        {isTV ? null : (
+          <SettingsRow
+            title="Force landscape on playback"
+            subtitle={forceLandscape ? 'The player turns the phone on its side and holds it there' : 'The player turns with the phone'}
+            trailing={
+              <AppSwitch
+                label="Force landscape on playback"
+                checked={forceLandscape}
+                disabled={appSettings.data === undefined || set.isPending}
+                onCheckedChange={(next) => set.mutate({ forceLandscape: next })}
+              />
+            }
+          />
+        )}
       </SettingsSection>
 
       <SettingsSection title="Downloads" footer="What this device keeps to watch with no network at all.">
@@ -179,7 +182,7 @@ export function SettingsScreen() {
 /** How full this device is, in the fewest words. */
 function downloadsSummary(budget: DownloadBudget | undefined): string {
   if (!budget) return 'What this device keeps';
-  if (budget.limitBytes === 0) return 'Not available in a browser';
+  if (budget.limitBytes === 0) return 'Not available on this device';
   const used = fileSize(budget.usedBytes) ?? '0 B';
   const limit = fileSize(budget.limitBytes) ?? '—';
   return budget.full ? `Full — ${used} of ${limit}` : `${used} of ${limit}`;

@@ -4,8 +4,9 @@ import { ArrowUp } from '@tamagui/lucide-icons-2/icons/ArrowUp';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
-import { Button, SizableText, XStack, YStack } from 'tamagui';
+import { SizableText, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { ConfirmButton } from '@/components/confirm-button';
 import { CONTENT_KIND_LABELS, rowTitle, SORT_LABELS, sortDirectionLabel } from '@/components/labels';

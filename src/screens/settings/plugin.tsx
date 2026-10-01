@@ -3,8 +3,9 @@ import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { Stack } from 'expo-router';
-import { Button, Paragraph, SizableText, YStack } from 'tamagui';
+import { Paragraph, SizableText, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { Chip } from '@/components/chip';
 import { ConfirmButton } from '@/components/confirm-button';

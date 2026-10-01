@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { FlatList, Pressable } from 'react-native';
 import { H3, XStack, YStack } from 'tamagui';
 
+import { GUTTER, px } from '@/components/density';
+import { useRemoteFocus } from '@/components/remote';
 import { PosterSkeleton, ThumbnailSkeleton } from '@/components/shelf';
 import type { CardStyle } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
@@ -13,7 +15,7 @@ import { LandscapeCard } from './landscape-card';
 import { PosterCard } from './poster-card';
 import { SourceNotices } from './source-notices';
 
-const GAP = 12;
+const GAP = px(12);
 const SKELETONS = [0, 1, 2, 3, 4, 5];
 
 /**
@@ -30,6 +32,8 @@ export function MediaRow({
   width,
   watchFrom,
   resumesFrom,
+  onFocusItem,
+  preferFirst = false,
   onRetry,
 }: {
   title: string;
@@ -44,22 +48,27 @@ export function MediaRow({
   watchFrom: (item: MediaItem) => boolean;
   /** Whether a landscape card's picture plays the item from where it stopped. */
   resumesFrom?: (item: MediaItem) => boolean;
+  /** On a TV: the card the remote is on now. */
+  onFocusItem?: (item: MediaItem) => void;
+  /** On a TV: the focus starts on this row's first card. */
+  preferFirst?: boolean;
   onRetry?: () => void;
 }) {
+  const { focused, handlers } = useRemoteFocus();
   const heading: ReactNode = (
     <XStack items="center" gap="$1">
-      <H3 size="$6" color="$color12">
+      <H3 size="$6" color={focused ? '$accent11' : '$color12'}>
         {title}
       </H3>
-      {href ? <ChevronRight size={20} color="$color10" /> : null}
+      {href ? <ChevronRight size={20} color={focused ? '$accent11' : '$color10'} /> : null}
     </XStack>
   );
   return (
     <YStack gap="$3">
-      <XStack px="$4">
+      <XStack px={GUTTER}>
         {href ? (
           <Link href={href} asChild>
-            <Pressable accessibilityRole="link" accessibilityLabel={`${title}, show all`} hitSlop={8}>
+            <Pressable accessibilityRole="link" accessibilityLabel={`${title}, show all`} hitSlop={8} {...handlers}>
               {heading}
             </Pressable>
           </Link>
@@ -68,7 +77,7 @@ export function MediaRow({
         )}
       </XStack>
       {loading ? (
-        <XStack gap={GAP} px="$4" overflow="hidden">
+        <XStack gap={GAP} px={GUTTER} overflow="hidden">
           {SKELETONS.map((index) =>
             card === 'poster' ? <PosterSkeleton key={index} width={width} /> : (
               <YStack key={index} width={width}>
@@ -83,18 +92,19 @@ export function MediaRow({
           data={items}
           keyExtractor={(item) => `${item.key.connectionId}:${item.key.externalId}`}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: GAP }}
+          contentContainerStyle={{ paddingHorizontal: GUTTER, gap: GAP }}
           getItemLayout={(_data, index) => ({ length: width + GAP, offset: (width + GAP) * index, index })}
-          renderItem={({ item }) =>
-            card === 'poster' ? (
-              <PosterCard item={item} width={width} showWatch={watchFrom(item)} />
+          renderItem={({ item, index }) => {
+            const focus = { ...(onFocusItem ? { onFocusItem } : {}), preferred: preferFirst && index === 0 };
+            return card === 'poster' ? (
+              <PosterCard item={item} width={width} showWatch={watchFrom(item)} {...focus} />
             ) : (
-              <LandscapeCard item={item} width={width} showWatch={watchFrom(item)} resumes={resumesFrom?.(item) ?? false} />
-            )
-          }
+              <LandscapeCard item={item} width={width} showWatch={watchFrom(item)} resumes={resumesFrom?.(item) ?? false} {...focus} />
+            );
+          }}
         />
       )}
-      <YStack px="$4">
+      <YStack px={GUTTER}>
         <SourceNotices errors={sourceErrors} {...(onRetry ? { onRetry } : {})} />
       </YStack>
     </YStack>

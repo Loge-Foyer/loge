@@ -4,14 +4,16 @@ import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Button, Circle, H1, SizableText, XStack, YStack } from 'tamagui';
+import { Circle, H1, SizableText, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
+import { px } from '@/components/density';
 import { PrimaryButton } from '@/components/primary-button';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
 import { useMaxProfiles } from '@/hooks/use-account';
-import { useProfileActions, useProfiles } from '@/hooks/use-profiles';
+import { useDefaultUserId, useProfileActions, useProfiles } from '@/hooks/use-profiles';
 import { useGate } from '@/hooks/use-session';
 
 /**
@@ -22,6 +24,7 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
   const { session } = useServices();
   const gate = useGate();
   const activeId = gate.kind === 'ready' ? gate.userId : undefined;
+  const { data: defaultUserId } = useDefaultUserId();
   const { data: profiles = [] } = useProfiles();
   const { create } = useProfileActions();
   const { data: maxProfiles } = useMaxProfiles();
@@ -53,7 +56,7 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
       <H1 size="$9" color="$color12" text="center">
         Who’s watching?
       </H1>
-      <XStack flexWrap="wrap" justify="center" gap="$5" maxW={720}>
+      <XStack flexWrap="wrap" justify="center" gap="$5" maxW={px(720)}>
         {profiles.map((profile) => (
           <Button
             key={profile.id}
@@ -61,8 +64,10 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
             onPress={() => choose.mutate(profile.id)}
             disabled={choose.isPending}
             aria-label={profile.pinProtected ? `${profile.name}, PIN required` : profile.name}
+            // On a TV the remote starts on whoever this device opens by default.
+            hasTVPreferredFocus={profile.id === (activeId ?? defaultUserId)}
           >
-            <YStack items="center" gap="$2" width={104}>
+            <YStack items="center" gap="$2" width={px(104)}>
               <YStack>
                 <YStack
                   rounded={999}
@@ -70,7 +75,7 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
                   borderColor={profile.id === activeId ? '$accent9' : 'transparent'}
                   p="$1"
                 >
-                  <ProfileAvatar user={profile} size={84} />
+                  <ProfileAvatar user={profile} size={px(84)} />
                 </YStack>
                 {profile.pinProtected ? (
                   <Circle size={26} bg="$color3" position="absolute" b={0} r={0} borderWidth={2} borderColor="$background">
@@ -86,8 +91,8 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
         ))}
         {full ? null : (
           <Button unstyled onPress={() => setAdding(true)} aria-label="Add a profile">
-            <YStack items="center" gap="$2" width={104}>
-              <Circle size={92} borderWidth={2} borderStyle="dashed" borderColor="$color7">
+            <YStack items="center" gap="$2" width={px(104)}>
+              <Circle size={px(92)} borderWidth={2} borderStyle="dashed" borderColor="$color7">
                 <Plus size={32} color="$color10" />
               </Circle>
               <SizableText size="$4" color="$color10">
@@ -98,7 +103,7 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
         )}
       </XStack>
       {adding && !full ? (
-        <XStack gap="$2" width="100%" maxW={420}>
+        <XStack gap="$2" width="100%" maxW={px(420)}>
           <TextInput
             flex={1}
             value={name}

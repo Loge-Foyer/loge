@@ -1,7 +1,8 @@
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { WifiOff } from '@tamagui/lucide-icons-2/icons/WifiOff';
-import { Button, SizableText, XStack, YStack } from 'tamagui';
+import { SizableText, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { describeSourceError } from '@/components/labels';
 import type { SourceError } from '@/services/media';
 

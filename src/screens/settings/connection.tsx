@@ -17,8 +17,9 @@ import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Button, Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { ConfirmButton } from '@/components/confirm-button';
 import { describeProbeError, listAll, listKinds, PER_PROFILE_DESCRIPTIONS, PER_PROFILE_LABELS } from '@/components/labels';
 import { FieldInput, type FormField, type LibrariesProbe } from '@/components/manifest-form';

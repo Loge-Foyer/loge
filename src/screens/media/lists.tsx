@@ -4,8 +4,9 @@ import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Rss } from '@tamagui/lucide-icons-2/icons/Rss';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Button, Paragraph, SizableText, XStack, YStack } from 'tamagui';
+import { Paragraph, SizableText, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { ConfirmButton } from '@/components/confirm-button';
 import { EmptyState } from '@/components/empty-state';
 import { episodeCode } from '@/components/labels';

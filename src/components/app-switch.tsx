@@ -1,4 +1,6 @@
-import { Switch, useTheme } from 'tamagui';
+import { SizableText, Switch, XStack, useTheme } from 'tamagui';
+
+import { FOCUSED, isTV, Remote } from '@/components/remote';
 
 /**
  * The platform's own switch on iOS and Android, Tamagui's in a browser — in
@@ -18,6 +20,29 @@ export function AppSwitch({
   label?: string;
 }) {
   const theme = useTheme();
+  // UIKit has no switch on tvOS, and a remote cannot slide one: On and Off,
+  // pressed to change.
+  if (isTV) {
+    return (
+      <Remote onPress={() => onCheckedChange(!checked)} disabled={disabled}>
+        {(focused) => (
+          <XStack
+            px="$3"
+            py="$1.5"
+            rounded="$10"
+            bg={checked ? '$accentBackground' : '$color4'}
+            opacity={disabled ? 0.5 : 1}
+            {...(label ? { 'aria-label': label } : {})}
+            {...(focused ? FOCUSED : {})}
+          >
+            <SizableText size="$3" fontWeight="600" color={checked ? '$accentColor' : '$color11'}>
+              {checked ? 'On' : 'Off'}
+            </SizableText>
+          </XStack>
+        )}
+      </Remote>
+    );
+  }
   const accent = String(theme.accentBackground.val);
   // iOS keeps its white thumb; Material colours the thumb as well as the track.
   const colours =

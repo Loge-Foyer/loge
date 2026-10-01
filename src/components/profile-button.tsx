@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
-import { Button } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 

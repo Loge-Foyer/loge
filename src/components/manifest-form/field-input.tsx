@@ -3,8 +3,9 @@ import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { useId, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Adapt, Button, Label, Select, Sheet, SizableText, XStack, YStack } from 'tamagui';
+import { Adapt, Label, Select, Sheet, SizableText, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { TextInput } from '@/components/text-input';
 

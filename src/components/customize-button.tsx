@@ -1,6 +1,7 @@
 import { SlidersHorizontal } from '@tamagui/lucide-icons-2/icons/SlidersHorizontal';
 import { Link, type Href } from 'expo-router';
-import { Button } from 'tamagui';
+
+import { Button } from '@/components/button';
 
 /** Opens the sheet that edits the home's rows — or one row's, from its full list. */
 export function CustomizeButton({ href = '/customize-home', label = 'Customize the home screen' }: { href?: Href; label?: string }) {

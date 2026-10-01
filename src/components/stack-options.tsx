@@ -3,6 +3,7 @@ import type { Stack } from 'expo-router';
 import { XStack } from 'tamagui';
 
 import { ProfileButton } from './profile-button';
+import { isTV } from './remote';
 
 // The object form of the options, not the per-route callback.
 type StackOptions = Exclude<
@@ -20,12 +21,13 @@ export const tabStackOptions: StackOptions = {
 /**
  * A tab's first screen: a large native title with the profile switcher beside
  * it, and anything else the screen offers there. In a browser the top
- * navigation bar already is the header.
+ * navigation bar already is the header, and on a TV the tab bar names the tab
+ * — what sat beside the title is in the screen there.
  */
 export function tabRootOptions(title: string, options: { right?: ReactNode } = {}): StackOptions {
   return {
     title,
-    headerShown: !isWeb,
+    headerShown: !isWeb && !isTV,
     headerLargeTitleEnabled: true,
     headerRight: () => (
       <XStack gap="$3" items="center">
@@ -43,9 +45,9 @@ export const fullScreenOptions: StackOptions = {
   headerBackButtonDisplayMode: 'minimal',
 };
 
-/** A detail page: the header floats over the artwork. */
+/** A detail page: the header floats over the artwork — on a TV there is none, and Menu goes back. */
 export const detailOptions: StackOptions = {
-  headerShown: true,
+  headerShown: !isTV,
   headerTransparent: true,
   headerShadowVisible: false,
   headerBackButtonDisplayMode: 'minimal',
@@ -62,11 +64,14 @@ export const playerOptions: StackOptions = {
 
 /**
  * A native sheet on iOS and Android, a plain page in a browser. What it shows
- * must be inline — a Tamagui portal would render behind the native sheet.
+ * must be inline — a Tamagui portal would render behind the native sheet. A
+ * TV has no sheets: it takes the whole screen, and Menu or Done closes it.
  */
-export const sheetOptions: StackOptions = {
-  presentation: 'formSheet',
-  sheetAllowedDetents: [0.7, 1],
-  sheetGrabberVisible: true,
-  headerShown: false,
-};
+export const sheetOptions: StackOptions = isTV
+  ? { presentation: 'fullScreenModal', headerShown: false }
+  : {
+      presentation: 'formSheet',
+      sheetAllowedDetents: [0.7, 1],
+      sheetGrabberVisible: true,
+      headerShown: false,
+    };

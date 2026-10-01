@@ -5,14 +5,17 @@ import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { Link } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { Button, Paragraph, SizableText, XStack, YStack, useTheme } from 'tamagui';
+import { Paragraph, SizableText, XStack, YStack, useTheme } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { CustomizeButton } from '@/components/customize-button';
 import { EmptyState } from '@/components/empty-state';
 import { listKinds, listNames, rowTitle } from '@/components/labels';
 import { MediaRow } from '@/components/media/media-row';
+import { Spotlight } from '@/components/media/spotlight';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
+import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useServices } from '@/hooks/services-context';
@@ -49,6 +52,8 @@ export function MediaHomeScreen() {
   const showContinue = visible.some((row) => row.type === 'continue');
   const results = useHomeRowQueries(kindRows.map((row) => ({ kind: row.kind, sort: row.sort })));
   const continuing = useContinueWatching(showContinue);
+  // On a TV: the card the remote is on, shown large above the rows.
+  const [spotlit, setSpotlit] = useState<MediaItem>();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -75,6 +80,11 @@ export function MediaHomeScreen() {
     ...results.flatMap((result) => result.data?.sourceErrors ?? []),
   ];
 
+  // The first row with something in it takes the focus first on a TV, and fills the spotlight until the remote moves.
+  const firstRow = visible.find((row) => (row.type === 'continue' ? (continuing.data?.items.length ?? 0) > 0 : (results[kindRows.indexOf(row)]?.data?.items.length ?? 0) > 0));
+  const firstItems = firstRow?.type === 'continue' ? continuing.data?.items : firstRow ? results[kindRows.indexOf(firstRow)]?.data?.items : undefined;
+  const tv = (row: HomeRowView) => (isTV ? { onFocusItem: setSpotlit, preferFirst: row.id === firstRow?.id } : {});
+
   return (
     <Screen
       flush
@@ -82,8 +92,8 @@ export function MediaHomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={String(theme.color10.val)} />
       }
     >
-      {isWeb ? (
-        // The top bar is the header in a browser, and a browser cannot pull to refresh.
+      {isWeb || isTV ? (
+        // The top bar is the header in a browser, and the tab bar on a TV, and neither can pull to refresh.
         <XStack px="$4" gap="$2" justify="flex-end" items="center">
           <Button size="$3" chromeless icon={RefreshCw} disabled={refreshing} onPress={() => void onRefresh()}>
             Refresh
@@ -91,6 +101,8 @@ export function MediaHomeScreen() {
           <CustomizeButton />
         </XStack>
       ) : null}
+
+      {isTV ? <Spotlight item={spotlit ?? firstItems?.[0]} /> : null}
 
       {pending.length > 0 || errors.length > 0 ? (
         <YStack px="$4" gap="$3">
@@ -116,6 +128,7 @@ export function MediaHomeScreen() {
               width={landscapeWidth}
               watchFrom={watchFrom}
               resumesFrom={resumesFrom}
+              {...tv(row)}
             />
           );
         }
@@ -133,6 +146,7 @@ export function MediaHomeScreen() {
             card={row.card}
             width={row.card === 'poster' ? posterWidth : landscapeWidth}
             watchFrom={watchFrom}
+            {...tv(row)}
           />
         );
       })}

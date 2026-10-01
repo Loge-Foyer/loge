@@ -33,20 +33,24 @@ export function BackupSection() {
       title="Backup file"
       footer="One encrypted file with your whole account — its profiles and PINs, settings, and sources with their passwords. It opens only with its key; keep the key somewhere safe."
     >
-      <SettingsRow
-        title="Export a backup"
-        {...(exporting.isPending
-          ? { subtitle: 'Preparing…' }
-          : exporting.error
-            ? { subtitle: exporting.error.message }
-            : exported
-              ? { subtitle: exported }
-              : {})}
-        icon={<Download size={18} color="$accent10" />}
-        disabled={exporting.isPending}
-        onPress={() => exporting.mutate()}
-      />
-      <SettingsRow title="Import a backup" icon={<Upload size={18} color="$accent10" />} href="/settings/backup/import" />
+      {files.available ? (
+        <SettingsRow
+          title="Export a backup"
+          {...(exporting.isPending
+            ? { subtitle: 'Preparing…' }
+            : exporting.error
+              ? { subtitle: exporting.error.message }
+              : exported
+                ? { subtitle: exported }
+                : {})}
+          icon={<Download size={18} color="$accent10" />}
+          disabled={exporting.isPending}
+          onPress={() => exporting.mutate()}
+        />
+      ) : null}
+      {files.available ? (
+        <SettingsRow title="Import a backup" icon={<Upload size={18} color="$accent10" />} href="/settings/backup/import" />
+      ) : null}
       <SettingsRow title="Show the backup key" icon={<KeyRound size={18} color="$accent10" />} href="/settings/backup/key" />
     </SettingsSection>
   );

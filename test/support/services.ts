@@ -70,6 +70,7 @@ export { counterIds, fakeClock, fakeNetwork, silentLog } from './fakes';
 const backupSql = createSqlJsBackup(() => initSqlJs());
 
 const unusedFiles: FileExchange = {
+  available: true,
   save: async () => {
     throw new Error('This test moves no files.');
   },

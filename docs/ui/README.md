@@ -252,6 +252,27 @@ resolver.
 which takes resolved colours. `pointerEvents` goes in its style: React Native
 deprecated the prop.
 
+## On a TV
+
+The same screens, read from across a room and driven by a remote
+(`docs/platforms/tvos`). Every branch is behind `isTV`, so a phone and a
+browser are untouched.
+
+- **The theme scales** (`tamagui.config.ts`): type about 1.6×, spaces, sizes
+  and corners 1.5×; breakpoints stay. `components/density.ts` matches it for
+  sizes written by hand (`px`), and sets the title-safe gutter (80 points of
+  1920) and a wider column.
+- **Focus is shown**: a focused button or card lifts and wears an accent ring,
+  a settings row lights up, a switch is an On/Off pill.
+- **No headers on tab roots or detail pages** — the tvOS tab bar names the
+  tab, and Menu goes back — and sheets take the whole screen. Customize and
+  Refresh sit at the top of the Media home.
+- **The home's spotlight**: above the rows, whatever card the remote is on,
+  large — its picture, title, a line of facts and two of overview — following
+  the focus. The focus starts on the first card.
+- **The player** answers the remote: play/pause, and with its controls hidden,
+  left and right seek; its scrubber is a progress bar.
+
 ## On the web
 
 `src/app/_layout.tsx` imports `@tamagui/core/reset.css`. Without it the

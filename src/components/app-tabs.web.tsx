@@ -4,8 +4,9 @@ import { SquarePlay } from '@tamagui/lucide-icons-2/icons/SquarePlay';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabListProps, type TabTriggerSlotProps } from 'expo-router/ui';
 import type { ComponentProps } from 'react';
-import { Button, SizableText, XStack, YStack, useMedia } from 'tamagui';
+import { SizableText, XStack, YStack, useMedia } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { ProfileButton } from './profile-button';
 
 /** In a browser the tabs are a top navigation bar, which is also each tab's header. */

@@ -1,7 +1,8 @@
 import { isAppError, type ConnectionId, type Credentials, type FieldValue, type FieldValues, type PluginId, type PluginManifest } from '@sc/api';
 import { useState } from 'react';
-import { Button, H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { describeProofVerdict, listAll } from '@/components/labels';
 import { FieldInput } from '@/components/manifest-form';
 import { OwnerProofForm } from '@/components/owner-proof-form';

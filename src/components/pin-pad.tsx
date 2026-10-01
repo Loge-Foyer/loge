@@ -1,6 +1,9 @@
 import { Delete } from '@tamagui/lucide-icons-2/icons/Delete';
 import { useEffect, useState } from 'react';
-import { Button, Circle, H3, SizableText, XStack, YStack } from 'tamagui';
+import { Circle, H3, SizableText, XStack, YStack } from 'tamagui';
+
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
 
 const PIN_LENGTH = 4;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
@@ -48,7 +51,7 @@ export function PinPad({ title, message, tone = 'hint', disabled = false, onComp
   });
 
   return (
-    <YStack items="center" gap="$5" width="100%" maxW={320} self="center">
+    <YStack items="center" gap="$5" width="100%" maxW={px(320)} self="center">
       <H3 size="$7" color="$color12" text="center">
         {title}
       </H3>

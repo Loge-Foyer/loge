@@ -6,8 +6,9 @@ import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
-import { Button, SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
+import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listKinds, listNames } from '@/components/labels';
 import { LandscapeCard } from '@/components/media/landscape-card';

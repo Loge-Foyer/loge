@@ -707,6 +707,11 @@ export interface PickedFile {
 
 /** Files the user moves in and out: the share sheet or a download, the document picker or a file input. */
 export interface FileExchange {
+  /**
+   * Whether this device can hand a file out and take one in at all. A TV
+   * cannot — no share sheet, no files, no picker — so it offers neither.
+   */
+  readonly available: boolean;
   save(name: string, bytes: Uint8Array): Promise<'saved' | 'cancelled'>;
   /** Nothing when the user backed out. */
   pick(): Promise<PickedFile | undefined>;

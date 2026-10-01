@@ -1,7 +1,8 @@
 import type { Credentials } from '@sc/api';
 import { useState } from 'react';
-import { Button, H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { describeBackupProblem, describeOwnerVerdict, describeProofVerdict, listAll } from '@/components/labels';
 import { OwnerProofForm } from '@/components/owner-proof-form';
 import { PrimaryButton } from '@/components/primary-button';

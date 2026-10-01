@@ -1,4 +1,5 @@
 import { Directory, DownloadTask, File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import type { FileStore, TransferProgress, TransferRequest } from '@/services/ports';
 
@@ -18,6 +19,15 @@ function folder(): Directory {
 }
 
 export function createFileStore(): FileStore {
+  // A TV keeps nothing it may not lose: tvOS gives an app no storage the
+  // system will not empty, so a download there would vanish under the user.
+  // It says so, as a browser does, and nothing is ever queued.
+  if (Platform.isTV) {
+    const refuse = () => {
+      throw new Error('Downloads are not available on a TV.');
+    };
+    return { available: false, fetch: refuse, used: async () => 0, free: async () => 0, remove: async () => undefined, sweep: async () => undefined, uriOf: () => refuse() };
+  }
   return {
     available: true,
 

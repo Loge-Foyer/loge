@@ -1,5 +1,6 @@
-# libmpv on iPhone, as an Expo module in this package — the other half of
-# `android/`.
+# libmpv on iPhone and Apple TV, as an Expo module in this package — the
+# other half of `android/`. MPVKit's xcframework carries tvOS slices beside its
+# iOS ones, so one pod serves both.
 #
 # MPVKit is not on CocoaPods trunk in a usable state (every published version
 # points at a tag that no longer exists), and the installed autolinking reads
@@ -14,7 +15,7 @@
 Pod::Spec.new do |s|
   s.name             = 'ScMpv'
   s.version          = '1.0.0'
-  s.summary          = 'libmpv for Streaming Center, on iPhone.'
+  s.summary          = 'libmpv for Streaming Center, on iPhone and Apple TV.'
   s.description      = 'Streaming Center’s player plugin for mpv’s engine: the iOS half of @sc/player-mpv.'
   s.license          = 'GPL-3.0-or-later'
   s.author           = 'Streaming Center'
@@ -23,7 +24,7 @@ Pod::Spec.new do |s|
   # trunk, which never happens here.
   s.homepage         = 'https://example.invalid/streaming-center'
   s.source           = { git: 'https://example.invalid/streaming-center.git' }
-  s.platforms        = { :ios => '16.4' }
+  s.platforms        = { :ios => '16.4', :tvos => '16.4' }
   s.swift_version    = '5.9'
   s.static_framework = true
 

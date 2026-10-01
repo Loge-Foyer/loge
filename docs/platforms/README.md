@@ -1,8 +1,8 @@
 # Platforms
 
 What differs per target. Each page — [iOS](ios/README.md),
-[Android](android/README.md), [web](web/README.md) — covers build steps,
-native modules and platform-specific caveats.
+[Android](android/README.md), [Apple TV](tvos/README.md), [web](web/README.md)
+— covers build steps, native modules and platform-specific caveats.
 
 ## Plugins say where they run
 
@@ -37,5 +37,9 @@ code that did not change. The web needs no build.
 
 ## TV
 
-TV layouts, on tvOS and Android TV, come later as new screens rather than a new
-app. Density comes from the viewport, which is what keeps that possible.
+**Apple TV runs the app** — the same screens, built for tvOS through
+react-native-tvos, with branches where a television differs: the remote, the
+type and spacing read from across a room, and the things a TV does not have
+(files, Face ID, downloads). [`tvos/README.md`](tvos/README.md) has how to
+build it and what changed to get there. Android TV gets the same runtime
+branches (`Platform.isTV`) and has not been built yet.

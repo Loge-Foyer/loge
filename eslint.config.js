@@ -103,6 +103,16 @@ const playerEngines = [
   { name: 'mpegts.js', message: 'The app never imports an engine. The built-in player loads mpegts.js itself, on the web, when a stream needs it.' },
 ];
 
+// Tamagui's controls hear touches alone, and a TV remote's select arrives as a
+// click only React Native's Pressable hears. components/button.tsx wraps
+// Tamagui's Button so a remote can press it; one taken from Tamagui directly
+// takes the focus on a TV and ignores the select.
+const tamaguiButton = {
+  name: 'tamagui',
+  importNames: ['Button'],
+  message: 'Use Button from @/components/button: on a TV only that one can be pressed with the remote.',
+};
+
 // @sc/player-kit holds only types, the React half of the player contract. A
 // screen may name them; the views themselves come from the composition root,
 // through useServices() — so nothing else imports it for real.
@@ -137,7 +147,16 @@ module.exports = defineConfig([
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/composition/**', 'src/platform/**'],
+    ignores: ['src/composition/**', 'src/platform/**', 'src/components/button.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [...playerEngines, ownerAuthentication, sqlJs, tamaguiButton], patterns: [...implementations, compositionRoot, cryptography, sqlJsChunk] },
+      ],
+    },
+  },
+  {
+    files: ['src/components/button.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',

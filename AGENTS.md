@@ -430,6 +430,33 @@ Not an afterthought. Things to know:
 
 ---
 
+## Apple TV is iOS with a remote
+
+`npm run tvos` builds it; `docs/platforms/tvos` explains everything below.
+
+- **`react-native` is react-native-tvos, for every build.** Its prerelease
+  versions fall outside ordinary semver ranges, so `overrides: {
+  "react-native": "$react-native" }` keeps one copy — without it npm nested a
+  second and a third React Native — and `expo.autolinking.exclude` names
+  react-native-tvos, which autolinking otherwise links as a module of its own.
+  Run `npx expo-doctor` after touching either: it finds duplicates.
+- **`ios/` is an iPhone project or a TV one, never both.** `scripts/ios-target.js`
+  switches it with a clean prebuild. A build of the wrong kind fails to install
+  or builds the wrong thing; a stale one looks like code that did not change.
+- **The scene life cycle is required** from iOS and tvOS 27
+  (`config-plugins/with-scene-lifecycle.js`): an app that makes its window in
+  the app delegate traps at launch. Remove the plugin only when Expo's
+  template adopts scenes itself — it throws when the template changes.
+- **Never import, at the top of a platform module, an Expo module with no tvOS
+  build** — brightness, screen orientation, local authentication, the document
+  picker, sharing. Autolinking leaves them out of a TV build and their
+  JavaScript throws on import. Load them on first use (`await import(…)`) and
+  give the TV a stand-in, as `src/platform/` does. The TV is told apart at
+  runtime (`Platform.isTV`), never by file name, so one bundle serves both.
+- **A TV keeps nothing durable:** no downloads, no files to move, and a
+  database the system may clear on a real Apple TV. Do not build on local
+  storage surviving there.
+
 ## iOS and Android run Hermes
 
 Hermes lacks built-ins that Node and browsers have — `Array.prototype.toSorted`,
@@ -563,6 +590,15 @@ typecheck.
   global list.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
   `field.type` only. Never write a form for a specific plugin.
+- **A button comes from `@/components/button`, never from Tamagui** — lint
+  refuses it. Tamagui's controls hear touches alone, and a TV remote's select
+  arrives as a click only React Native's `Pressable` hears: `remotely()`
+  (`components/remote.tsx`) draws a control inside one on a TV, with a focus
+  ring. Something already a `Pressable` shows its focus with
+  `useRemoteFocus()`. Focus that is not shown is a remote that does not work.
+- **A size written by hand goes through `px()`** (`components/density.ts`):
+  on a TV the theme's tokens are 1.5 times a phone's, and a bare number stays
+  phone-sized beside them. Margins at the sides of a page are `GUTTER`.
 - **An adapter's id goes into a route through `routeId` and comes out through
   `fromRouteId`** (`components/media/item-link.ts`). expo-router decodes a
   param twice — parsing the path or query, then in `useLocalSearchParams` —
@@ -664,6 +700,11 @@ Everything above describes the target; what runs today:
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages
   and Continue Watching show this device's state.
+- **Apple TV:** the app builds, installs and runs on the tvOS 27 simulator
+  (`npm run tvos`), driven by the remote: every control focusable and
+  pressable, TV-sized type and spacing, a spotlight above the home's rows, and
+  the player on play/pause and the arrows. Brightness, orientation, Face ID,
+  files and downloads are stand-ins there.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on
   the web, on a secure page. No development seed: set things up once, and they

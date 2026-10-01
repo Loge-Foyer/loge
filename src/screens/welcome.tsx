@@ -3,8 +3,10 @@ import { Upload } from '@tamagui/lucide-icons-2/icons/Upload';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { ScrollView } from 'react-native';
-import { Button, H1, Paragraph, SizableText, Spinner, useTheme, YStack } from 'tamagui';
+import { H1, Paragraph, SizableText, Spinner, useTheme, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
 import { PrimaryButton } from '@/components/primary-button';
 import { TextInput } from '@/components/text-input';
 import { useServices } from '@/hooks/services-context';
@@ -21,7 +23,7 @@ type Step = 'choose' | 'local' | 'sign-in' | 'restore' | 'arriving';
  * watching?". And an account left with no profile asks for a first one.
  */
 export function WelcomeScreen() {
-  const { account, session } = useServices();
+  const { account, session, files } = useServices();
   const gate = useGate();
   const [step, setStep] = useState<Step>('choose');
   const servers = account.servers();
@@ -45,9 +47,11 @@ export function WelcomeScreen() {
                 Sign in to your server
               </Button>
             ) : null}
-            <Button size="$5" icon={<Upload size={18} />} onPress={() => setStep('restore')}>
-              Restore a backup
-            </Button>
+            {files.available ? (
+              <Button size="$5" icon={<Upload size={18} />} onPress={() => setStep('restore')}>
+                Restore a backup
+              </Button>
+            ) : null}
           </YStack>
         </Page>
       );
@@ -171,7 +175,7 @@ function Page({ children }: { children: ReactNode }) {
       keyboardShouldPersistTaps="handled"
     >
       <YStack flex={1} items="center" justify="center" p="$6">
-        <YStack width="100%" maxW={420} gap="$5">
+        <YStack width="100%" maxW={px(420)} gap="$5">
           {children}
         </YStack>
       </YStack>

@@ -389,7 +389,11 @@ public final class ScMpvPlayer: SharedObject {
         self.pipDelegate = delegate
         self.pip = AVPictureInPictureController(contentSource: source)
       }
+      #if os(iOS)
+      // Leaving the app on a phone shrinks the picture by itself; tvOS has no
+      // such thing — its picture in picture is asked for, never automatic.
       self.pip?.canStartPictureInPictureAutomaticallyFromInline = on
+      #endif
     }
   }
 

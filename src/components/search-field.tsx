@@ -1,8 +1,9 @@
 import { Search } from '@tamagui/lucide-icons-2/icons/Search';
 import { X } from '@tamagui/lucide-icons-2/icons/X';
 import { useEffect, useState } from 'react';
-import { Button, XStack } from 'tamagui';
+import { XStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { TextInput } from '@/components/text-input';
 
 /** Long enough that a key does not start a search, short enough not to feel slow. */

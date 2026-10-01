@@ -20,10 +20,13 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
-import { Button, SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
+import { SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
 import { liveHref, playHref } from '@/components/media/item-link';
+import { isTV } from '@/components/remote';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
@@ -32,6 +35,7 @@ import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlay
 import { APP_DEFAULTS } from '@/services/app-settings';
 import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
+import { useRemoteKeys } from '@/hooks/use-remote-keys';
 import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
@@ -193,6 +197,19 @@ function Controls({
     if (!next) return;
     router.replace(playHref(next.key, player ? { player } : {}));
   };
+
+  // A TV remote. Play/pause plays and pauses. With the controls out of the
+  // way, left and right seek as the buttons would — not on a channel, which
+  // is live — and up or down brings them back; with them up, the arrows move
+  // between them, and keep them up while they do. Select is the picture's own
+  // press, which shows and hides them as a tap does.
+  useRemoteKeys((key) => {
+    if (key === 'playPause') return toggle();
+    if (key === 'select') return;
+    if (shown) return touch();
+    if (key === 'up' || key === 'down') return touch();
+    if (!live) skip(key === 'left' ? -seekMs : seekMs);
+  });
 
   // What a drag down an edge is showing, while it is showing it.
   const [adjust, setAdjust] = useState<{ readonly kind: PlayerSlider; readonly value: number }>();
@@ -441,44 +458,51 @@ function Controls({
             {/* A channel is never scrubbed, even when its stream reports a length. */}
             {durationMs && !live ? (
               <XStack items="center" gap="$3">
-                <SizableText size="$2" color="white" minW={52}>
+                <SizableText size="$2" color="white" minW={px(52)}>
                   {clockTime(scrub ?? positionMs)}
                 </SizableText>
-                <Slider
-                  flex={1}
-                  size="$2"
-                  max={durationMs}
-                  step={1_000}
-                  value={[Math.min(durationMs, scrub ?? positionMs)]}
-                  onValueChange={(value) => setScrub(value[0])}
-                  onSlideEnd={(_event, value) => {
-                    controller?.seek(value);
-                    setScrub(undefined);
-                    touch();
-                  }}
-                  aria-label="Position"
-                >
-                  <Slider.Track bg="rgba(255,255,255,0.3)">
-                    <Slider.TrackActive bg="$accent9" />
-                    {/* Where each chapter begins, so the length of one can be seen. The first is the start of the file, which needs no mark. */}
-                    {(chapters ?? []).map((chapter) =>
-                      chapter.startMs <= 0 || chapter.startMs >= durationMs ? null : (
-                        <YStack
-                          key={chapter.startMs}
-                          position="absolute"
-                          l={`${(chapter.startMs / durationMs) * 100}%`}
-                          t={0}
-                          b={0}
-                          width={2}
-                          bg="rgba(0,0,0,0.55)"
-                          pointerEvents="none"
-                        />
-                      ),
-                    )}
-                  </Slider.Track>
-                  <Slider.Thumb index={0} circular size="$1" bg="white" />
-                </Slider>
-                <SizableText size="$2" color="white" minW={52} text="right">
+                {isTV ? (
+                  // A remote cannot drag a thumb: left and right seek, and this only says where it is.
+                  <YStack flex={1} height={6} rounded={3} bg="rgba(255,255,255,0.3)" overflow="hidden">
+                    <YStack height="100%" width={`${Math.min(100, ((scrub ?? positionMs) / durationMs) * 100)}%`} bg="$accent9" />
+                  </YStack>
+                ) : (
+                  <Slider
+                    flex={1}
+                    size="$2"
+                    max={durationMs}
+                    step={1_000}
+                    value={[Math.min(durationMs, scrub ?? positionMs)]}
+                    onValueChange={(value) => setScrub(value[0])}
+                    onSlideEnd={(_event, value) => {
+                      controller?.seek(value);
+                      setScrub(undefined);
+                      touch();
+                    }}
+                    aria-label="Position"
+                  >
+                    <Slider.Track bg="rgba(255,255,255,0.3)">
+                      <Slider.TrackActive bg="$accent9" />
+                      {/* Where each chapter begins, so the length of one can be seen. The first is the start of the file, which needs no mark. */}
+                      {(chapters ?? []).map((chapter) =>
+                        chapter.startMs <= 0 || chapter.startMs >= durationMs ? null : (
+                          <YStack
+                            key={chapter.startMs}
+                            position="absolute"
+                            l={`${(chapter.startMs / durationMs) * 100}%`}
+                            t={0}
+                            b={0}
+                            width={2}
+                            bg="rgba(0,0,0,0.55)"
+                            pointerEvents="none"
+                          />
+                        ),
+                      )}
+                    </Slider.Track>
+                    <Slider.Thumb index={0} circular size="$1" bg="white" />
+                  </Slider>
+                )}
+                <SizableText size="$2" color="white" minW={px(52)} text="right">
                   {showRemaining ? `-${clockTime(Math.max(0, durationMs - (scrub ?? positionMs)))}` : clockTime(durationMs)}
                 </SizableText>
               </XStack>
@@ -576,7 +600,7 @@ function TrackPanel({
   onChoose: (id: string | null) => void;
 }) {
   return (
-    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={220} maxW={360}>
+    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={px(220)} maxW={px(360)}>
       {kind === 'subtitles' ? <TrackRow label="Off" onPress={() => onChoose(null)} /> : null}
       {tracks.map((track) => (
         <TrackRow key={track.id} label={track.label} onPress={() => onChoose(track.id)} />
@@ -630,7 +654,7 @@ function Notice({ message, onRetry, players }: { message: string; onRetry?: () =
           <X size={26} color="white" />
         </IconButton>
       </XStack>
-      <SizableText size="$5" color="white" text="center" maxW={520}>
+      <SizableText size="$5" color="white" text="center" maxW={px(520)}>
         {message}
       </SizableText>
       {onRetry ? <PrimaryButton onPress={onRetry}>Try again</PrimaryButton> : null}
@@ -674,7 +698,7 @@ function segmentOfChapter(chapters: readonly Chapter[] | undefined, positionMs: 
 /** The sheet a button opens over the controls: speed, chapters, tracks. */
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={220} maxW={360} maxH={260} overflow="scroll">
+    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={px(220)} maxW={px(360)} maxH={px(260)} overflow="scroll">
       {children}
     </YStack>
   );

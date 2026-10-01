@@ -1,7 +1,8 @@
 import { isLibrarySelection, type FieldValue, type LibrariesField as LibrariesDescriptor, type Library, type LibrarySelection } from '@sc/api';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
-import { Button, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
 import { CONTENT_KIND_LABELS } from '@/components/labels';

@@ -104,6 +104,10 @@ What runs today:
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.
+- Apple TV, from the same code: `npm run tvos` turns `ios/` into the TV
+  project and builds it. The remote reaches every control, the type and
+  spacing are sized for a room, the home has a spotlight, and what a TV lacks
+  — files, Face ID, downloads — has a stand-in (`docs/platforms/tvos`).
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

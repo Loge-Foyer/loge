@@ -84,7 +84,9 @@
         }
       ],
       "./config-plugins/with-newest-libcxx",
-      "./config-plugins/with-picture-in-picture"
+      "./config-plugins/with-picture-in-picture",
+      "./config-plugins/with-scene-lifecycle",
+      "@react-native-tvos/config-tv"
     ],
     "experiments": {
       "typedRoutes": true,

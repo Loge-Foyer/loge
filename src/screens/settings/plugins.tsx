@@ -2,8 +2,9 @@ import type { PluginCategory, PluginId, PluginManifest } from '@sc/api';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Stack } from 'expo-router';
-import { Button, Paragraph, SizableText, XStack } from 'tamagui';
+import { Paragraph, SizableText, XStack } from 'tamagui';
 
+import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
 import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';

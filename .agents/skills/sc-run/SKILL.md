@@ -7,10 +7,31 @@ description: Launch the Streaming Center app on the iOS simulator, Android emula
 
 ```bash
 npm run ios        # builds the development client, installs it on the simulator, opens it
+npm run tvos       # the same on an Apple TV simulator — ios/ becomes the TV project first
 npm run android    # the same on the emulator
 npm run web        # browser — no build
 npm start          # Metro alone, for a development client already installed
 ```
+
+**`ios/` is one kind at a time.** `npm run ios` and `npm run tvos` each turn it
+into the project they need (`scripts/ios-target.js`), with a clean prebuild,
+when it is the other kind — a few minutes and a full build. One Metro serves a
+phone and a TV at once: the TV asks for the same `ios` bundle.
+
+**Driving the Apple TV simulator.** From Xcode 27 the simulator is DeviceHub
+(`Xcode.app/Contents/Applications/DeviceHub.app`). Select the Apple TV in its
+sidebar and turn on Device › Keyboard › Keyboard Capture; then arrow keys
+move the focus, Return selects, Escape is Menu. Scripted, with the terminal
+allowed to control the computer:
+
+```bash
+osascript -e 'tell application "DeviceHub" to activate' -e 'tell application "System Events" to key code 125'   # down
+xcrun simctl io <tv-udid> screenshot /tmp/tv.png
+```
+
+`simctl openurl <tv-udid> "exp+streamingcenterapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"`
+points the TV's development build at Metro. Quitting DeviceHub shuts every
+simulator down.
 
 **Phase 7 is under way: Jellyfin plays on the built-in player; live TV comes next.**
 This skill describes the target, and says where today differs. "What you will see" at the end has

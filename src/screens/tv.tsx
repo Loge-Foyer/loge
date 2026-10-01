@@ -15,6 +15,7 @@ import { fromRouteId, liveHref, routeId } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
+import { useRemoteFocus } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { usePosterWidth } from '@/components/shelf';
@@ -208,6 +209,8 @@ function ChannelRow({
 }) {
   const { now, next } = nowAndNext(programmes, channel.key, at);
   const progress = now ? (at - Date.parse(now.startsAt)) / (Date.parse(now.endsAt) - Date.parse(now.startsAt)) : undefined;
+  const row = useRemoteFocus();
+  const guide = useRemoteFocus();
   return (
     <XStack gap="$3" items="center">
       <Pressable
@@ -215,9 +218,10 @@ function ChannelRow({
         onPress={() => playChannel(channel, group)}
         accessibilityRole="button"
         accessibilityLabel={`Watch ${channel.name}${now ? `, now ${now.title}` : ''}`}
+        {...row.handlers}
       >
         {({ pressed }) => (
-          <XStack gap="$3" items="center" opacity={pressed ? 0.75 : 1} bg="$color2" rounded="$4" p="$2.5">
+          <XStack gap="$3" items="center" opacity={pressed ? 0.75 : 1} bg={row.focused ? '$accent4' : '$color2'} rounded="$4" p="$2.5">
             <YStack width={72} height={42} rounded="$2" overflow="hidden" bg="$color3" items="center" justify="center">
               {channel.logo ? (
                 <Artwork connectionId={connectionId} image={channel.logo} width={72} aspect={72 / 42} label={channel.name} rounded="$3" fit="contain" />
@@ -260,8 +264,9 @@ function ChannelRow({
         accessibilityRole="button"
         accessibilityLabel={`Today on ${channel.name}`}
         hitSlop={8}
+        {...guide.handlers}
       >
-        <CalendarDays size={22} color="$color10" />
+        <CalendarDays size={22} color={guide.focused ? '$accent11' : '$color10'} />
       </Pressable>
     </XStack>
   );

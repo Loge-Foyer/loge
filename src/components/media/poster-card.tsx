@@ -4,6 +4,7 @@ import { Pressable } from 'react-native';
 import { SizableText, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
+import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
 
 import { progressOf, ProgressBar, RatingBadges, WatchedBadge } from './badges';
 import { itemHref } from './item-link';
@@ -13,21 +14,41 @@ import { itemHref } from './item-link';
  * right once watched, and a bar while partly watched. `showWatch` is false for
  * a source that does not report watch status to this profile.
  */
-export function PosterCard({ item, width, showWatch }: { item: MediaItem; width: number; showWatch: boolean }) {
+export function PosterCard({
+  item,
+  width,
+  showWatch,
+  onFocusItem,
+  preferred = false,
+}: {
+  item: MediaItem;
+  width: number;
+  showWatch: boolean;
+  /** On a TV: the remote is on it now. */
+  onFocusItem?: (item: MediaItem) => void;
+  /** On a TV: where the focus starts. */
+  preferred?: boolean;
+}) {
   const progress = showWatch ? progressOf(item) : undefined;
+  const { focused, handlers } = useRemoteFocus(() => onFocusItem?.(item));
   return (
     <Link href={itemHref(item)} asChild>
-      <Pressable accessibilityRole="link" accessibilityLabel={item.year ? `${item.title}, ${item.year}` : item.title}>
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={item.year ? `${item.title}, ${item.year}` : item.title}
+        hasTVPreferredFocus={preferred}
+        {...handlers}
+      >
         {({ pressed }) => (
           <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>
-            <YStack position="relative">
+            <YStack position="relative" {...(focused ? CARD_FOCUSED : {})}>
               <Artwork connectionId={item.key.connectionId} image={item.images.poster} width={width} aspect={2 / 3} label={item.title} />
               <RatingBadges ratings={item.ratings} />
               {showWatch && item.watch?.played ? <WatchedBadge /> : null}
               {progress === undefined ? null : <ProgressBar value={progress} />}
             </YStack>
             <YStack gap="$0.5">
-              <SizableText size="$3" color="$color12" numberOfLines={1}>
+              <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
                 {item.title}
               </SizableText>
               <SizableText size="$2" color="$color10" numberOfLines={1}>

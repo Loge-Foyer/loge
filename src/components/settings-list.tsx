@@ -1,7 +1,11 @@
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Link, type Href } from 'expo-router';
 import { Children, Fragment, type ReactNode } from 'react';
-import { Button, ListItem, Separator, SizableText, XStack, YGroup, YStack } from 'tamagui';
+import { ListItem, Separator, SizableText, XStack, YGroup, YStack } from 'tamagui';
+
+import { px } from '@/components/density';
+import { Button } from '@/components/button';
+import { remotely } from '@/components/remote';
 
 export function SettingsSection({
   title,
@@ -49,10 +53,13 @@ interface RowProps {
   disabled?: boolean;
 }
 
+// A row a TV remote can press too; focused, it lights up in the accent.
+const Row = remotely(ListItem, { bg: '$accent4' });
+
 export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, destructive, disabled }: RowProps) {
   const navigates = href !== undefined;
   const item = (
-    <ListItem
+    <Row
       bg="$color2"
       hoverStyle={{ bg: '$color3' }}
       pressStyle={{ bg: '$color4' }}
@@ -75,7 +82,7 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
       </YStack>
       {trailing}
       {navigates ? <ChevronRight size={18} color="$color9" /> : null}
-    </ListItem>
+    </Row>
   );
   return href !== undefined ? (
     <Link href={href} asChild>
@@ -109,7 +116,7 @@ export function ChoiceRow<T extends string | number>({
       title={title}
       {...(subtitle ? { subtitle } : {})}
       trailing={
-        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={240}>
+        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={px(240)}>
           {options.map((option) => (
             <Button
               key={String(option)}

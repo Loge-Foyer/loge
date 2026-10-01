@@ -1,5 +1,6 @@
 import { H3, Paragraph, Spinner, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
 import { PrimaryButton } from '@/components/primary-button';
 import { useServices } from '@/hooks/services-context';
 import { useGate } from '@/hooks/use-session';
@@ -13,7 +14,7 @@ export function BootScreen() {
       {gate.kind === 'failed' ? (
         <>
           <H3 color="$color12">Streaming Center could not start</H3>
-          <Paragraph color="$color10" text="center" maxW={420}>
+          <Paragraph color="$color10" text="center" maxW={px(420)}>
             {gate.message}
           </Paragraph>
           <PrimaryButton onPress={() => void session.start()}>Try again</PrimaryButton>
