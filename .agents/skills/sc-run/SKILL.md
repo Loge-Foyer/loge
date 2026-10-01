@@ -47,7 +47,7 @@ what a flow needs once and it is there on every later launch.
   `adb shell pm clear com.fkg.streamingcenter`. Welcome then offers three
   ways in: **Create an account on this device** (a name, which the first
   profile takes too), **Sign in to your server**, or **Restore a backup**.
-- **A real Jellyfin server**: Settings → Plugins → Sources → Jellyfin → Add
+- **A real Jellyfin server**: Settings → Adapters → Sources → Jellyfin → Add
   connection, filled in from the workspace's gitignored `jellyfin.env`
   (`web_ui` or `ip`, `username`, `password`). Read it in the driving script and
   type the values in; never echo them anywhere. A failed sign-in counts against
@@ -90,7 +90,7 @@ what a flow needs once and it is there on every later launch.
   endpoint is empty. It lives in the JavaScript runtime's memory: a reload
   forgets it, and the next run puts back what the device holds, as for a
   server restored from an old backup. Nothing local is lost.
-- **A backup**: Settings → Plugins → Sync → Export — the share sheet
+- **A backup**: Settings → Adapters → Sync → Export — the share sheet
   on a phone, a download in a browser — and Show the backup key, after the
   owner check. Import it on another device with the key: at first launch
   through Restore a backup, or from the same Sync page. Importing replaces
@@ -156,8 +156,8 @@ Deep links use the app's own scheme, `streamingcenterapp://<path>` (from
 the app starts. Only a profile with a PIN, or no default profile, drops it.
 
 Useful paths: `/media`, `/videos`, `/tv`, `/browse/<rowId>`
-(`movies`, `shows`, `anime`), `/customize-home`, `/settings/plugins/<category>`
-and `/settings/plugins/<category>/<name>`, `/settings/pin`. Item pages
+(`movies`, `shows`, `anime`), `/customize-home`, `/settings/adapters/<category>`
+and `/settings/adapters/<category>/<name>`, `/settings/pin`. Item pages
 (`/item/<connectionId>/<itemId>`) carry the connection's generated id, so reach
 them by tapping.
 
@@ -266,11 +266,11 @@ The target, once Phase 6 has landed:
 - **Videos** — one tab per source, skeleton shelves: nothing lists videos yet.
 - **TV** — one IPTV provider at a time: Live (group chips, channels with now
   and next, the calendar for a channel's day), Movies and Shows. With no IPTV
-  connection it points to Settings → Plugins → IPTV; in a browser only the
+  connection it points to Settings → Adapters → IPTV; in a browser only the
   development mock portal is offered.
 - **Settings** — the account first (local, or "Synced just now · 1 change
   waiting"), then the current profile, profiles (up to ten: "Add a profile"
-  goes at the limit), PIN lock, and Plugins as four rows — Sources, IPTV,
+  goes at the limit), PIN lock, and Adapters as four rows — Sources, IPTV,
   Players, Sync — each opening this platform's list. iCloud shows on iOS only.
 - **Playing** — a film or an episode's page has Play (or Resume, and From the
   beginning) and Mark watched; the player is full screen and turns with the
@@ -283,13 +283,13 @@ The target, once Phase 6 has landed:
   profiles lands on "Who's watching?".
 - Four tabs — Media, Videos, TV, Settings; TV shows IPTV once a provider is
   added.
-- Settings → Plugins is four lists — Sources, IPTV, Players, Sync — of what
+- Settings → Adapters is four lists — Sources, IPTV, Players, Sync — of what
   runs on this platform. Add a connection through a form built from its
   manifest, and choose what each profile keeps for itself.
 - Settings → Account shows a local account, or your server's with Sync now,
   what it keeps in step, Sign in again, Switch account and Sign out. Profiles
   stop at ten, or at the server's limit.
-- Settings → Plugins → Sync has the backup file — Export, Import, Show the
+- Settings → Adapters → Sync has the backup file — Export, Import, Show the
   backup key — and, in development, Mock backups as a target. Players each
   have a switch and "Play with it first".
 - Playing, driven: the controls hide three and a half seconds after a touch

@@ -556,9 +556,9 @@ typecheck.
   deprecated.
 - Screen kinds come from `src/components/stack-options.tsx`: tab root,
   full-screen page, detail (transparent header), sheet.
-- **Four tabs:** Media, Videos, TV, Settings. Settings → Plugins is four rows —
+- **Four tabs:** Media, Videos, TV, Settings. Settings → Adapters is four rows —
   Sources, IPTV, Players, Sync — each opening that category's list for this
-  platform (`settings/plugins/[category]`, then `[category]/[name]`: the id's
+  platform (`settings/adapters/[category]`, then `[category]/[name]`: the id's
   two parts are the two segments, so no id is ever URL-encoded). There is no
   global list.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
@@ -603,7 +603,7 @@ Everything above describes the target; what runs today:
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
   a time: Live with group chips, channels with now and next, a day guide per
   channel, channels played live with channel up and down; its films and
-  series as posters. Settings → Plugins is four lists, by category, of the
+  series as posters. Settings → Adapters is four lists, by category, of the
   plugins that run on this platform. Stored plugin ids are qualified by
   category (database v3).
 - **One account per device,** local or on your own server (database v4).
@@ -625,7 +625,7 @@ Everything above describes the target; what runs today:
   is what scopes the merged grid to one source — Media merges, Videos does
   not, and that is the whole difference. `sources/yattee` is the first source
   that brings `videos`.
-- **The backup file:** Settings → Plugins → Sync exports it — the share sheet
+- **The backup file:** Settings → Adapters → Sync exports it — the share sheet
   on a phone, a download in a browser — imports it, and shows its key behind
   the owner check; Welcome restores one. Backup targets keep it saved, asking
   before they overwrite a file another device changed; the dev-only mock

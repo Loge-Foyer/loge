@@ -12,7 +12,7 @@ category and declares that category's one block.
 | `players` | `player` | plays with it | the device |
 | `sync` | `account` or `backup` | keeps the account there, or its backup | the device |
 
-The app's Settings → Plugins has the same four lists, and shows only plugins
+The app's Settings → Adapters has the same four lists, and shows only plugins
 whose `platforms` include the one it runs on.
 
 ## Sources

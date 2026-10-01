@@ -17,7 +17,7 @@ export interface PluginCatalog {
   /** The platform the app runs on; the catalogue holds only plugins that run here. */
   readonly platform: PlatformId;
   list(): readonly PluginManifest[];
-  /** One category's plugins, for its list in Settings → Plugins. */
+  /** One category's plugins, for its list in Settings → Adapters. */
   inCategory(category: PluginCategory): readonly PluginManifest[];
   /**
    * A plugin that runs here. One the account holds a connection for, but that

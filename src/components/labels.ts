@@ -37,7 +37,7 @@ export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
   live: 'Live TV',
 };
 
-/** Settings → Plugins' four lists. */
+/** Settings → Adapters' four lists. */
 export const CATEGORY_LABELS: Readonly<Record<PluginCategory, string>> = {
   sources: 'Sources',
   iptv: 'IPTV',

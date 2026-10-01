@@ -118,7 +118,7 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection
-        title="Plugins"
+        title="Adapters"
         footer="Sources and IPTV go with your account. Players, and where your account and its backups live, are set up on each device."
       >
         {PLUGIN_CATEGORIES.map((category) => {

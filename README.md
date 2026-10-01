@@ -33,13 +33,13 @@ build.
 
 The first launch asks how to begin: create an account on this device, sign in
 to your own server, or restore a backup. To try it against your own Jellyfin
-server, add it once in Settings → Plugins → Sources → Jellyfin: its address and
+server, add it once in Settings → Adapters → Sources → Jellyfin: its address and
 an account. The app keeps it, like everything else. In a browser, open the app
 from `localhost` — `docs/getting-started/` explains why.
 
 Until the code catches up with the design (below), the first launch offers to
 sign in or to use the device on its own, and Jellyfin sits directly under
-Settings → Plugins.
+Settings → Adapters.
 
 ## How it is put together
 

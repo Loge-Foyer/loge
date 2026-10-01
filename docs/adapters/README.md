@@ -25,9 +25,9 @@ are `sources/google-drive`, and Google Drive as a place for backups is
 
 ## Four lists
 
-Settings → Plugins is four rows — Sources, IPTV, Players, Sync — and each opens
-that category's list for this platform (`settings/plugins/[category]`). A
-plugin's page is `settings/plugins/[category]/[name]`: the id's two parts are
+Settings → Adapters is four rows — Sources, IPTV, Players, Sync — and each opens
+that category's list for this platform (`settings/adapters/[category]`). A
+plugin's page is `settings/adapters/[category]/[name]`: the id's two parts are
 the two route segments, so no id is ever URL-encoded. There is no global list.
 
 - **Sources and IPTV** list their connections, each with an `enabled` switch,

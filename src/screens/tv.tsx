@@ -22,6 +22,7 @@ import { useServices } from '@/hooks/services-context';
 import { nowAndNext, useChannelGroups, useChannels, useGuide, useNow, useSourcePage } from '@/hooks/use-live';
 import { useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
+import { categoryHref } from '@/screens/settings/plugin-route';
 import type { SourceError } from '@/services/media';
 import type { TabSource } from '@/services/sources';
 
@@ -99,9 +100,9 @@ function TvEmptyState() {
       <EmptyState
         icon={<TvMinimalPlay size={26} color="$accent11" />}
         title="Live TV starts here"
-        body={`Add an IPTV source in Settings → Plugins → IPTV — ${listNames(providers)} — and its channels, films and series appear here.`}
+        body={`Add an IPTV source in Settings → Adapters → IPTV — ${listNames(providers)} — and its channels, films and series appear here.`}
       >
-        <Link href={{ pathname: '/settings/plugins/[category]', params: { category: 'iptv' } }} asChild>
+        <Link href={categoryHref('iptv')} asChild>
           <PrimaryButton size="$4" icon={Plus}>
             Add an IPTV source
           </PrimaryButton>

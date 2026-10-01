@@ -36,7 +36,7 @@ From then on the app opens where you left it: the account, its profiles and
 PINs, the connections and their passwords, and each profile's home are kept on
 the device.
 
-To add a server, go to Settings → Plugins → Sources, pick the plugin, and add a
+To add a server, go to Settings → Adapters → Sources, pick the plugin, and add a
 connection. The form comes from the plugin itself, and adding a connection is
 all it takes. For development against your own
 Jellyfin, a test account is the thing to use: a wrong password counts against
@@ -87,7 +87,7 @@ endpoint names the account.
 
 ## Backups
 
-Settings → Plugins → Sync has the backup file. Export it through the share
+Settings → Adapters → Sync has the backup file. Export it through the share
 sheet on a phone, or as a download in a browser; its backup key is shown after
 the app asks it's you. Restore it at a first launch, or import it from the same
 place, with the key. Importing replaces this device's account with the file's,

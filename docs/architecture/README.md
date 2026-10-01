@@ -155,7 +155,7 @@ is left out of a production one.
   that can. A stored plugin id names its category even in a build without the
   plugin.
 - **One list per category** — sources, IPTV, players, sync — for the four rows
-  of Settings → Plugins. There is no global list.
+  of Settings → Adapters. There is no global list.
 - **Each role goes to one service:** `media` to the media service, `player` to
   playback (Phase 7), `account` to the account service and its sync engine,
   `backup` to the backup service. Nothing else ever holds one.

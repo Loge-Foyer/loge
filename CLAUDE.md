@@ -57,7 +57,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 **Phase 7 — it plays. Phase 8 brought more players; Phase 9 took VLC out again.**
 
 The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
-categories, and Settings → Plugins shows one list per category for this
+categories, and Settings → Adapters shows one list per category for this
 platform. A device holds one account, local or on your own server
 (PocketBase), with up to ten profiles. Source and IPTV connections are
 account-wide; players and sync plugins are device-wide. A server account syncs
@@ -72,7 +72,7 @@ What runs today:
   signing up with an invite uploads it, and signing out keeps a local copy. A
   run pushes the journal, reads the whole account and reconciles; ten
   profiles at most, or the server's limit.
-- Four tabs, and Settings → Plugins as four lists by category, of the plugins
+- Four tabs, and Settings → Adapters as four lists by category, of the plugins
   that run on this platform. TV holds IPTV: live channels with now and next,
   a day guide, channels played live, and the provider's films and series —
   Stalker and, in development, the mock portal.

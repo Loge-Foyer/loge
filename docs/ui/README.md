@@ -3,7 +3,7 @@
 The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
-This page describes the target. Today the four tabs, Settings → Plugins' four
+This page describes the target. Today the four tabs, Settings → Adapters' four
 lists, Welcome with its three ways in, the sign-in and import flows, Settings →
 Account, the backup file, backup targets, the players' switches, and the
 player screen with Play, Resume and Mark watched on detail pages are in place.
@@ -135,9 +135,9 @@ portal, which has no portal to be refused by.
   and says so. A local copy kept after signing out that holds more than ten
   keeps them all, but adds none until there are fewer.
 - **PIN lock**, per profile.
-- **Plugins** — four rows: Sources, IPTV, Players, Sync. Each opens that
-  category's list for this platform (`settings/plugins/[category]`), and each
-  plugin has its page (`settings/plugins/[category]/[name]`). There is no
+- **Adapters** — four rows: Sources, IPTV, Players, Sync. Each opens that
+  category's list for this platform (`settings/adapters/[category]`), and each
+  plugin has its page (`settings/adapters/[category]/[name]`). There is no
   global list.
   - **Sources** and **IPTV** list their connections and add new ones.
   - **Players** list this device's engines, with "Plays first" or "Off": each

@@ -85,7 +85,7 @@ hls.js is for HLS; CORS still applies.
 
 **The controls are the app's, not a player's.** A player is the engine; the
 buttons over it are the same whichever one is playing, and are arranged once
-in Settings → Plugins → Players. Back, play and forward sit in the middle and
+in Settings → Adapters → Players. Back, play and forward sit in the middle and
 are not configurable — they *are* the player — but how far the two seek
 (`app.seekMs`) and what sits in the row beneath (`app.buttons`) are the
 device's. A button with nothing behind it is not drawn: no second audio track,
@@ -149,7 +149,7 @@ to the device. They are device settings: never journaled, never on your
 server, never in a backup. A phone and a browser on the same account choose
 their players apart.
 
-Settings → Plugins → Players lists this platform's players, each with its
+Settings → Adapters → Players lists this platform's players, each with its
 switch and settings, and which plays first. A player's page also makes it
 first on a tab — Media, Videos, TV — which goes before the device's choice
 there (`DeviceSettings.players.tabs`). Channels, and everything an IPTV
@@ -276,7 +276,7 @@ over the tabs, with `start` in milliseconds for a resume:
   the catalogue's order), the source asked for a stream fit for the one that
   plays first, and `choosePlayer` over the answer. Where no player can, the
   screen says which kind would ("This needs a player that plays MPEG-TS."),
-  with a way to Settings → Plugins → Players.
+  with a way to Settings → Adapters → Players.
 - **The chosen player's own view** draws underneath; the app's controls sit on
   top, the same for every engine: play and pause, ten seconds back and
   forward, a scrubber, the audio and subtitle tracks the stream carries, Next

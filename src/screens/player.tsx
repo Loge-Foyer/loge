@@ -31,6 +31,7 @@ import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlay
 import { APP_DEFAULTS } from '@/services/app-settings';
 import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
+import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -639,7 +640,7 @@ function Notice({ message, onRetry, players }: { message: string; onRetry?: () =
       </SizableText>
       {onRetry ? <PrimaryButton onPress={onRetry}>Try again</PrimaryButton> : null}
       {players ? (
-        <PrimaryButton onPress={() => router.push({ pathname: '/settings/plugins/[category]', params: { category: 'players' } })}>
+        <PrimaryButton onPress={() => router.push(categoryHref('players'))}>
           Players on this device
         </PrimaryButton>
       ) : null}

@@ -428,7 +428,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
           ) : null}
         </FormSection>
       ) : (
-        <Paragraph color="$color10">Nothing to fill in — this plugin needs no details to connect.</Paragraph>
+        <Paragraph color="$color10">Nothing to fill in — this adapter needs no details to connect.</Paragraph>
       )}
 
       {manifest.media ? (

@@ -18,18 +18,18 @@ export function pluginParam(category: string | undefined, name: string | undefin
 
 /** Where a category's list is. */
 export function categoryHref(category: PluginCategory) {
-  return { pathname: '/settings/plugins/[category]', params: { category } } as const;
+  return { pathname: '/settings/adapters/[category]', params: { category } } as const;
 }
 
 /** Where a plugin's page is. An id that names no category leads to "not part of this app". */
 export function pluginHref(id: PluginId) {
   const category = categoryOfPluginId(id);
   const name = category ? id.slice(category.length + 1) : id;
-  return { pathname: '/settings/plugins/[category]/[name]', params: { category: category ?? 'sources', name } } as const;
+  return { pathname: '/settings/adapters/[category]/[name]', params: { category: category ?? 'sources', name } } as const;
 }
 
 /** Where a new connection to a plugin is made. */
 export function newConnectionHref(id: PluginId) {
   const { params } = pluginHref(id);
-  return { pathname: '/settings/plugins/[category]/[name]/new', params } as const;
+  return { pathname: '/settings/adapters/[category]/[name]/new', params } as const;
 }

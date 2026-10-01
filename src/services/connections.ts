@@ -90,7 +90,7 @@ export class InvalidDraftError extends Error {
 
 export interface ConnectionService {
   list(pluginId: PluginId): Promise<readonly ConnectionSummary[]>;
-  /** The plugins with at least one connection, for the lists in Settings → Plugins. */
+  /** The plugins with at least one connection, for the lists in Settings → Adapters. */
   connected(): Promise<ReadonlySet<PluginId>>;
   edit(id: ConnectionId): Promise<ConnectionEditState | undefined>;
   create(pluginId: PluginId, draft: ConnectionDraft): Promise<Connection>;
@@ -159,7 +159,7 @@ export function createConnectionService(deps: {
 
   const manifestOf = (pluginId: PluginId) => {
     const manifest = catalog.get(pluginId);
-    if (!manifest) throw new Error(`Plugin "${pluginId}" is not registered.`);
+    if (!manifest) throw new Error(`Adapter "${pluginId}" is not available on this device.`);
     return manifest;
   };
 

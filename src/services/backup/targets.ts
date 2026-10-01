@@ -106,7 +106,7 @@ export function createBackupTargets(
   const connect = async (connection: Connection): Promise<ConnectedBackupTarget> => {
     const role = catalog.backupRole(connection.pluginId);
     const manifest = catalog.get(connection.pluginId);
-    if (!role || !manifest) throw new Error(`Plugin "${connection.pluginId}" is not here.`);
+    if (!role || !manifest) throw new Error(`Adapter "${connection.pluginId}" is not available on this device.`);
     return role.connect(
       { connectionId: connection.id, fields: connection.values.fields, settings: connection.values.settings },
       await pluginContext(

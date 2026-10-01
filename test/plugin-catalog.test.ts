@@ -42,7 +42,7 @@ describe('the plugin catalogue', () => {
     expect(browser.get(portal.manifest.id)).toBeUndefined();
   });
 
-  it('lists each category apart, for its list in Settings → Plugins', () => {
+  it('lists each category apart, for its list in Settings → Adapters', () => {
     const phone = createPluginCatalog([library, portal, player], { platform: 'ios', ...quiet });
     expect(phone.inCategory('iptv').map(({ id }) => id)).toEqual(['iptv/portal']);
     expect(phone.inCategory('sync')).toEqual([]);

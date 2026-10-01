@@ -50,8 +50,8 @@ export function CategoryScreen({ category }: { category: PluginCategory | undefi
   if (!category) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'Plugins' }} />
-        <SizableText color="$color10">There is no such list of plugins.</SizableText>
+        <Stack.Screen options={{ title: 'Adapters' }} />
+        <SizableText color="$color10">There is no such list of adapters.</SizableText>
       </Screen>
     );
   }

@@ -29,8 +29,8 @@ import { PluginChips } from './plugins';
 export function UnknownPlugin() {
   return (
     <Screen>
-      <Stack.Screen options={{ title: 'Plugin' }} />
-      <SizableText color="$color10">This plugin is not part of this app.</SizableText>
+      <Stack.Screen options={{ title: 'Adapter' }} />
+      <SizableText color="$color10">This adapter is not part of this app.</SizableText>
     </Screen>
   );
 }
@@ -138,7 +138,7 @@ function BackupTargetScreen({ manifest }: { manifest: PluginManifest }) {
   const resolveError = resolve.error
     ? resolve.error instanceof BackupError
       ? resolve.error.problem === 'wrong-key'
-        ? 'The backup there was saved with another key. Import it from Settings → Plugins → Sync, with its key.'
+        ? 'The backup there was saved with another key. Import it from Settings → Adapters → Sync, with its key.'
         : describeBackupProblem(resolve.error.problem)
       : resolve.error.message
     : undefined;

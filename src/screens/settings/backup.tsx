@@ -18,7 +18,7 @@ import { OwnerNotVerifiedError } from '@/services/account';
 
 import { ImportFlow } from '../import-flow';
 
-/** Export, import and the key, in Settings → Plugins → Sync: the backup file needs no plugin. */
+/** Export, import and the key, in Settings → Adapters → Sync: the backup file needs no plugin. */
 export function BackupSection() {
   const { backup, files } = useServices();
   const exporting = useMutation({
