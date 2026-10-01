@@ -14,6 +14,7 @@ that is not built yet, it says so.
 | [Adapters](adapters/README.md) | Where the adapters live and how the boundary is kept, the four categories and their lists, scopes, the platform filter, registration, what an adapter is given and where its content appears |
 | [Playback](playback/README.md) | Descriptors and players, choosing a player, device-wide selection, watch status and its outbox |
 | [UI](ui/README.md) | Tamagui, the four tabs, Settings, Welcome and the account screens, artwork, the web |
+| [Network](network/README.md) | Reaching a server: cleartext on both phones, and the client-certificate design that is not built yet |
 | [Platforms](platforms/README.md) | What differs per target: [iOS](platforms/ios/README.md), [Android](platforms/android/README.md), [web](platforms/web/README.md) |
 | [Development](development/README.md) | The verification pass, the tests, debugging on a device |
 
