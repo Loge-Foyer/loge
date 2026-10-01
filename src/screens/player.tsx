@@ -1,4 +1,4 @@
-import type { AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PluginId, SubtitleTrack } from '@sc/api';
+import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episode, type GlobalMediaKey, type MediaItem, type MediaPlayer, type MediaSegment, type PluginId, type SubtitleTrack } from '@sc/api';
 import type { PlayerView } from '@sc/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
@@ -8,7 +8,6 @@ import { Pause } from '@tamagui/lucide-icons-2/icons/Pause';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { RotateCw } from '@tamagui/lucide-icons-2/icons/RotateCw';
-import { SkipForward } from '@tamagui/lucide-icons-2/icons/SkipForward';
 import { X } from '@tamagui/lucide-icons-2/icons/X';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -88,6 +87,8 @@ export function PlayerScreen({
           controller={controller}
           snapshot={snapshot}
           starting={!plan || !controller}
+          {...(plan?.kind === 'play' && plan.descriptor.chapters ? { chapters: plan.descriptor.chapters } : {})}
+          {...(plan?.kind === 'play' && plan.descriptor.segments ? { segments: plan.descriptor.segments } : {})}
           {...(next.data ? { next: next.data } : {})}
           {...(player ? { player } : {})}
           {...(live ? { live: <LiveBar channel={key} title={live.title} {...(live.group ? { group: live.group } : {})} /> } : {})}
@@ -112,6 +113,8 @@ function Controls({
   controller,
   snapshot,
   starting,
+  chapters,
+  segments,
   next,
   player,
   live,
@@ -120,6 +123,10 @@ function Controls({
   controller: MediaPlayer | undefined;
   snapshot: PlayerSnapshot;
   starting: boolean;
+  /** Where the file is divided, for the scrubber. */
+  chapters?: readonly Chapter[];
+  /** What is worth offering to skip, as the source marked it. */
+  segments?: readonly MediaSegment[];
   next?: Episode;
   /** The player the user picked, which the next episode keeps. */
   player?: PluginId;
@@ -162,6 +169,22 @@ function Controls({
       params: { connectionId: next.key.connectionId, itemId: next.key.externalId, ...(player ? { player } : {}) },
     });
   };
+
+  // What the source marked this moment as, and what to offer for it. An outro
+  // is where the next episode belongs — so there is no button for it the rest
+  // of the time.
+  const here = live ? undefined : segmentAt(segments, scrub ?? positionMs);
+  const skipAction =
+    here === undefined
+      ? undefined
+      : here.kind === 'outro'
+        ? next
+          ? { label: 'Next episode', run: playNext }
+          : undefined
+        : { label: SKIP_LABELS[here.kind], run: () => {
+            touch();
+            controller?.seek(here.endMs);
+          } };
 
   return (
     <Pressable
@@ -243,6 +266,21 @@ function Controls({
                 >
                   <Slider.Track bg="rgba(255,255,255,0.3)">
                     <Slider.TrackActive bg="$accent9" />
+                    {/* Where each chapter begins, so the length of one can be seen. The first is the start of the file, which needs no mark. */}
+                    {(chapters ?? []).map((chapter) =>
+                      chapter.startMs <= 0 || chapter.startMs >= durationMs ? null : (
+                        <YStack
+                          key={chapter.startMs}
+                          position="absolute"
+                          l={`${(chapter.startMs / durationMs) * 100}%`}
+                          t={0}
+                          b={0}
+                          width={2}
+                          bg="rgba(0,0,0,0.55)"
+                          pointerEvents="none"
+                        />
+                      ),
+                    )}
                   </Slider.Track>
                   <Slider.Thumb index={0} circular size="$1" bg="white" />
                 </Slider>
@@ -251,7 +289,8 @@ function Controls({
                 </SizableText>
               </XStack>
             ) : null}
-            <XStack justify="flex-end" gap="$2">
+            <XStack items="center" gap="$2">
+              <XStack flex={1}>{skipAction ? <SkipButton label={skipAction.label} onPress={skipAction.run} /> : null}</XStack>
               {snapshot.audio.length > 1 ? (
                 <IconButton label="Audio" onPress={() => setPanel(panel === 'audio' ? undefined : 'audio')}>
                   <AudioLines size={24} color="white" />
@@ -261,11 +300,6 @@ function Controls({
                 <IconButton label="Subtitles" onPress={() => setPanel(panel === 'subtitles' ? undefined : 'subtitles')}>
                   <Captions size={24} color="white" />
                 </IconButton>
-              ) : null}
-              {next ? (
-                <Button size="$3" chromeless onPress={playNext} icon={<SkipForward size={20} color="white" />} aria-label="Next episode">
-                  <Button.Text color="white">Next episode</Button.Text>
-                </Button>
               ) : null}
             </XStack>
           </YStack>
@@ -401,5 +435,24 @@ function Notice({ message, onRetry, players }: { message: string; onRetry?: () =
         </PrimaryButton>
       ) : null}
     </YStack>
+  );
+}
+
+/** What each skippable stretch is called, where it is offered as a skip forward. */
+const SKIP_LABELS: Readonly<Record<Exclude<MediaSegment['kind'], 'outro'>, string>> = {
+  intro: 'Skip intro',
+  recap: 'Skip recap',
+  preview: 'Skip preview',
+  commercial: 'Skip advert',
+};
+
+/** The one button that comes and goes with the film: shown only inside the stretch it skips. */
+function SkipButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Button size="$3" bg="rgba(255,255,255,0.15)" borderColor="rgba(255,255,255,0.4)" borderWidth={1} onPress={onPress} aria-label={label}>
+      <Button.Text color="white" fontWeight="600">
+        {label}
+      </Button.Text>
+    </Button>
   );
 }
