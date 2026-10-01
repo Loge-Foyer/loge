@@ -64,8 +64,10 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
   stops at 1080p; a real phone is what settles hardware decoding.
 - Which players are on, which plays first, and which plays first on each tab,
   are this device's settings.
-- **VLC was dropped in Phase 9.** mpv already played everything it did, and a
-  second engine of that size cost 37 MB of framework. Git has it.
+- **VLC** is libVLC 3.7 (`org.videolan.android:libvlc-all`), quietened with
+  `--quiet`. It brings its own `libc++_shared.so` as libmpv does, and the
+  app's `with-newest-libcxx` still packages libmpv's, which libVLC loads too.
+  It plays first on TV on a new device.
 
 ## The backup file
 

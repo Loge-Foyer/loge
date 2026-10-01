@@ -604,7 +604,7 @@ because training data goes stale between SDK releases.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brought more players; Phase 9 took VLC out again.**
+**Phase 7 — it plays. Phase 8 brought more players; VLC left in Phase 9, and is back.**
 Everything above describes the target; what runs today:
 
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
@@ -643,8 +643,8 @@ Everything above describes the target; what runs today:
   app's controls, turns with the device, and reports progress through the
   outbox. The built-in player plays Jellyfin — a file as it is, or a
   transcode — on phones and in a browser; mpv plays too, an Expo module in its
-  adapter, on Android and (built, not yet played) on iPhone. VLC was dropped
-  in Phase 9. Each player has its switch, "Play
+  adapter, on Android and (built, not yet played) on iPhone, and so does VLC,
+  on Android, iPhone and Apple TV. Each player has its switch, "Play
   with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
 - **Search is closed:** a term rides on a query that already names its kind,

@@ -15,7 +15,7 @@ player-kit/              @sc/player-kit — the React half of the player contrac
 plugins/
   sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
   iptv/<name>/           m3u stalker xtream mock
-  players/<name>/        system ksplayer mpv
+  players/<name>/        system ksplayer mpv vlc
   sync/<name>/           custom-server icloud google-drive onedrive mock mock-backup
 test/                    vitest — api rules, plugins against fake HTTP, conformance
 docs/
@@ -316,7 +316,7 @@ the test of whether this architecture is real.
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, and the account is kept record by record
 on your own server, PocketBase. Phase 7 made it play; Phase 8 adds players —
-Phase 9 dropped VLC and left mpv.
+Phase 9 dropped VLC, which is back now on Android, iPhone and Apple TV.
 
 **`api` holds:**
 

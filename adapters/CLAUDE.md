@@ -84,7 +84,7 @@ handling stays genuinely tested. Jellyfin is the first real media source, and
 Phase 6 moved the code to the new architecture: the plugins are in their
 category folders, with qualified ids, categories and platforms, and the account
 is kept record by record on your own server, PocketBase. Phase 7 made it play;
-Phase 8 added players; Phase 9 dropped VLC and left mpv.
+Phase 8 added players; Phase 9 dropped VLC, and it is back.
 
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and

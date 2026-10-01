@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.scvlc'
+version = '0.0.0'
+
+android {
+  namespace "expo.modules.scvlc"
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+  }
+}
+
+dependencies {
+  // libVLC 3: LGPL, dynamically linked, every ABI.
+  implementation 'org.videolan.android:libvlc-all:3.7.7'
+}

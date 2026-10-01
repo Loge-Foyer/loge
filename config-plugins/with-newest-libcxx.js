@@ -3,7 +3,7 @@ const { withAppBuildGradle } = require('expo/config-plugins');
 /**
  * One libc++_shared.so, and the newest.
  *
- * React Native and libmpv each carry one, and an APK holds a single
+ * React Native, libVLC and libmpv each carry one, and an APK holds a single
  * copy: the first the merge sees, which is React Native's. libmpv needs
  * symbols that copy does not have, and loading it fails outright — while a
  * newer libc++ serves every older caller happily. A source set of the app's

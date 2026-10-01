@@ -161,8 +161,7 @@ the design, and most of it runs today, built with
 - **Search**, on Media and on TV — each box searching what is in front of
   you, never everything at once.
 - **Not yet:** M3U and Xtream, Plex and Emby, the drives, and downloads.
-  KSPlayer is a manifest with no engine behind it, and VLC was dropped in
-  Phase 9 — git has it.
+  KSPlayer is a manifest with no engine behind it.
 
 Development builds also have a pretend account, for trying things offline.
 

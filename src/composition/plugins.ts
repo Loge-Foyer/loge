@@ -6,6 +6,7 @@ import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
 import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
+import { plugin as vlc } from '@sc/player-vlc';
 import { plugin as emby } from '@sc/source-emby';
 import { plugin as invidious } from '@sc/source-invidious';
 import { plugin as jellyfin } from '@sc/source-jellyfin';
@@ -44,6 +45,7 @@ export const plugins: readonly Plugin[] = [
   // only ever showed a player that could never be chosen. Its adapter stays,
   // and an import plus a line brings it back the day it has one.
   mpv,
+  vlc,
   customServer,
   icloudBackup,
   googleDriveBackup,
@@ -53,4 +55,4 @@ export const plugins: readonly Plugin[] = [
 ];
 
 /** The players with an engine, and the view that draws it — what the player screen is handed. */
-export const players: readonly PlayerPlugin[] = [systemPlayer, mpv];
+export const players: readonly PlayerPlugin[] = [systemPlayer, mpv, vlc];

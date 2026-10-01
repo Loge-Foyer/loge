@@ -14,6 +14,7 @@ import { plugin as xtream } from '@sc/iptv-xtream';
 import { plugin as ksplayer } from '@sc/player-ksplayer';
 import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
+import { plugin as vlc } from '@sc/player-vlc';
 import { plugin as emby } from '@sc/source-emby';
 import { plugin as googleDrive } from '@sc/source-google-drive';
 import { plugin as icloudDrive } from '@sc/source-icloud-drive';
@@ -52,6 +53,7 @@ const plugins: readonly Plugin[] = [
   systemPlayer,
   ksplayer,
   mpv,
+  vlc,
   customServer,
   icloudBackup,
   googleDriveBackup,

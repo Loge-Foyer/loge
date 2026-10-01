@@ -5,7 +5,8 @@ Building and running on simulator and device, native modules, config plugins, an
 The app runs in a **development build**, not Expo Go. The built-in player is
 expo-video on AVPlayer (Phase 7), and mpv is an Expo module in its adapter,
 autolinked the way the Android half already is. It builds and links but has not
-played here yet. **VLC was dropped in Phase 9** and KSPlayer never arrived. Face ID needs the app's usage text,
+played here yet. VLC is an Expo module in its adapter too, against VLCKit 3.7
+(MobileVLCKit here, TVVLCKit on Apple TV); KSPlayer never arrived. Face ID needs the app's usage text,
 which Expo Go cannot carry. Picture in picture on
 iPhone belongs to mpv's own module, so `modules/sc-pip` is Android-only.
 Phase 4's key derivation module went with its vault.
@@ -86,11 +87,16 @@ which is exactly the case the policy above exists for.
   inside HLS. So `players/system`'s `ios` profile omits `mpegts`, on purpose,
   and a channel that only offers `.ts` correctly says it needs another player.
   The IPTV plugin asks the portal for HLS where it can.
-- **mpv is the one engine here besides the built-in player.** It draws into an
-  `AVSampleBufferDisplayLayer`, which is also what lets the system take it for
-  picture in picture. `players/ksplayer` is a manifest with no profile and is
-  not registered. VLC was dropped: libVLC draws into a plain OpenGL view, which
-  gives the system no layer to take, and mpv plays everything it did.
+- **mpv** draws into an `AVSampleBufferDisplayLayer`, which is also what lets
+  the system take it for picture in picture.
+- **VLC** is VLCKit 3.7: MobileVLCKit on iPhone and TVVLCKit on Apple TV, the
+  same libVLC generation as Android's, so one profile serves both. It draws
+  into a plain OpenGL view, which gives the system no layer to take, so VLC
+  has no picture in picture here — its profile does not claim it, and the
+  player offers none while it plays. It sets its own audio session, and
+  `--quiet` with no loggers keeps libVLC from writing a stream's address to
+  the device log.
+- `players/ksplayer` is a manifest with no profile and is not registered.
 - **Licences are settled** (Phase 8): the app is GPL-3.0-or-later, so a player
   may link a GPL engine, and libmpv's build is one. A closed or App Store build
   would need LGPL engines instead — a plan of its own.

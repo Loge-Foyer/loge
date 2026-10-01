@@ -70,12 +70,13 @@ A player plugin is in the `players` category, and has three parts:
 | --- | --- | --- | --- |
 | `players/system` | expo-video: AVPlayer on iOS, Media3 / ExoPlayer on Android; `<video>` with hls.js and mpegts.js on the web | all | Phase 7; MPEG-TS on the web in Phase 8 |
 | `players/mpv` | libmpv on Android, through an Expo module in its adapter with its own JNI; MPVKit on iOS | Android, iOS | Phase 8 — Android is in; iOS built, not yet played |
+| `players/vlc` | libVLC 3.7 on Android; VLCKit 3.7 on iOS — MobileVLCKit on iPhone, TVVLCKit on Apple TV | Android, iOS | Phase 8, dropped in Phase 9, back since |
 
-**VLC was dropped in Phase 9**, both halves. On iPhone libVLC draws into a
-plain OpenGL view, so the system has no layer to take over for picture in
-picture; on Android mpv already played everything it did, and a second engine
-of its size is 37 MB of framework and a longer install for nothing. Git has
-it. **KSPlayer never arrived**: it is on no package manager, its own podspec
+**VLC left in Phase 9 and came back**, both halves, and Apple TV with them. On
+iPhone libVLC 3 draws into a plain OpenGL view, so the system has no layer to
+take over for picture in picture: VLC's profile does not claim it, and mpv and
+the built-in player keep theirs. VLCKit 4 would give it one, and is still an
+alpha. **KSPlayer never arrived**: it is on no package manager, its own podspec
 pins a tag that does not exist, and its FFmpeg ships only as a very large git
 clone — its adapter is a manifest, and is not registered.
 

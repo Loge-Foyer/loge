@@ -54,7 +54,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brought more players; Phase 9 took VLC out again.**
+**Phase 7 — it plays. Phase 8 brought more players; VLC left in Phase 9, and is back.**
 
 The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
 categories, and Settings → Adapters shows one list per category for this
@@ -87,8 +87,9 @@ What runs today:
   in a browser — with Resume, Mark watched, the tracks and Next episode. On
   mpv plays too, an Expo module in its adapter: Matroska, DTS and TrueHD as
   the file, raw MPEG-TS, a file's own subtitles drawn with libass — on Android
-  and, built but not yet played, on iPhone. **VLC was dropped in Phase 9**;
-  git has it. A browser plays raw MPEG-TS through mpegts.js.
+  and, built but not yet played, on iPhone. VLC is back — libVLC 3.7 on
+  Android, VLCKit 3.7 on iPhone and Apple TV — and plays first on TV. A
+  browser plays raw MPEG-TS through mpegts.js.
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos is real: one source at a time, a paging grid, and

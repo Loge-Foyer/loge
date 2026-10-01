@@ -28,6 +28,77 @@ export class SharedObject {
   }
 }
 
+export interface FakeLoad {
+  readonly uri: string;
+  readonly userAgent: string | null;
+  readonly referrer: string | null;
+  readonly startMs: number | null;
+}
+
+export class FakeVlcPlayer extends SharedObject {
+  readonly loads: FakeLoad[] = [];
+  readonly calls: string[] = [];
+  audioTrack: number | undefined;
+  subtitleTrack: number | undefined;
+
+  constructor() {
+    super();
+    created.push(this);
+  }
+
+  async load(uri: string, userAgent: string | null, referrer: string | null, startMs: number | null) {
+    this.loads.push({ uri, userAgent, referrer, startMs });
+  }
+
+  play() {
+    this.calls.push('play');
+  }
+
+  pause() {
+    this.calls.push('pause');
+  }
+
+  replay(startMs: number) {
+    this.calls.push(`replay ${startMs}`);
+  }
+
+  seek(positionMs: number) {
+    this.calls.push(`seek ${positionMs}`);
+  }
+
+  rate = 1;
+  volume = 100;
+
+  setRate(rate: number) {
+    this.rate = rate;
+  }
+
+  setVolume(volume: number) {
+    this.volume = volume;
+  }
+
+  softwareFallback = true;
+  pictureInPicture = false;
+
+  setSoftwareFallback(on: boolean) {
+    this.softwareFallback = on;
+  }
+
+  setPictureInPicture(on: boolean) {
+    this.pictureInPicture = on;
+  }
+
+  setAudioTrack(id: number) {
+    this.audioTrack = id;
+  }
+
+  setSubtitleTrack(id: number) {
+    this.subtitleTrack = id;
+  }
+}
+
+export const created: FakeVlcPlayer[] = [];
+
 export interface FakeMpvLoad {
   readonly uri: string;
   readonly headers: Readonly<Record<string, string>> | null;
@@ -100,6 +171,7 @@ export class FakeMpvPlayer extends SharedObject {
 export const createdMpv: FakeMpvPlayer[] = [];
 
 export function requireNativeModule(name: string): unknown {
+  if (name === 'ScVlc') return { Player: FakeVlcPlayer };
   if (name === 'ScMpv') return { Player: FakeMpvPlayer };
   throw new Error(`Cannot find native module '${name}'`);
 }
