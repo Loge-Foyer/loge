@@ -44,6 +44,13 @@ export type { MergeState } from './merge';
 export interface RowSpec {
   readonly kind: ContentKind;
   readonly sort: ItemSort;
+  /**
+   * Only what matches, within this kind. Asked of the sources whose `search`
+   * is in effect, and of no other — a source that cannot search is left out
+   * rather than answered for. A searched page is never saved: what is kept for
+   * a kind is its catalogue, not somebody's query.
+   */
+  readonly term?: string;
 }
 
 /** What arrived, and which sources could not answer. Never an error for one source. */
@@ -296,8 +303,14 @@ export function createMediaService(deps: {
       return showsOn('media', source.manifest.category, kinds) || showsOn('videos', source.manifest.category, kinds);
     });
 
-  const listing = async (userId: UserId, kind: ContentKind) =>
-    (await libraryOf(userId)).filter((source) => can(source, 'browse') && (source.effective.media?.contentKinds.includes(kind) ?? false));
+  const listing = async (userId: UserId, kind: ContentKind, searching = false) =>
+    (await libraryOf(userId)).filter(
+      (source) =>
+        can(source, 'browse') &&
+        (source.effective.media?.contentKinds.includes(kind) ?? false) &&
+        // A term goes only to a source that promised to honour one.
+        (!searching || can(source, 'search')),
+    );
 
   const listItems = (provider: ConnectedMediaProvider, query: ItemQuery, signal?: CancelSignal): Promise<ItemPage> => {
     if (!provider.listItems) throw missing('listItems');
@@ -458,7 +471,9 @@ export function createMediaService(deps: {
     },
 
     gridPage: async (userId, spec, state, pageSize, signal) => {
-      const list = await listing(userId, spec.kind);
+      const term = spec.term?.trim();
+      const searching = term !== undefined && term.length > 0;
+      const list = await listing(userId, spec.kind, searching);
       const byId = new Map(list.map((source) => [source.connection.id, source]));
       const key = listKey.grid(spec);
       // The sources of the first page stay fixed while scrolling; one gone since is dropped.
@@ -473,10 +488,15 @@ export function createMediaService(deps: {
           for (let attempt = 0; source && next.state === 'open' && next.buffer.length < pageSize && attempt < REFILLS_PER_PAGE; attempt += 1) {
             try {
               const page = await call(source, (provider) =>
-                listItems(provider, { kind: spec.kind, sort: spec.sort, limit: pageSize, ...(next.cursor ? { cursor: next.cursor } : {}) }, signal),
+                listItems(
+                  provider,
+                  { kind: spec.kind, sort: spec.sort, limit: pageSize, ...(next.cursor ? { cursor: next.cursor } : {}), ...(searching ? { term } : {}) },
+                  signal,
+                ),
               );
-              // A source's own first page is what is saved for it — never a later one.
-              if (state === null && attempt === 0) await saveList(userId, source, key, page.items);
+              // A source's own first page is what is saved for it — never a
+              // later one, and never a search: a query is not a catalogue.
+              if (state === null && attempt === 0 && !searching) await saveList(userId, source, key, page.items);
               const more = page.nextCursor !== undefined && !(page.items.length === 0 && attempt === REFILLS_PER_PAGE - 1);
               const total = page.total ?? next.total;
               next = {
@@ -492,7 +512,9 @@ export function createMediaService(deps: {
               // On the first page only, what was saved stands in — as a failed
               // source with no cursor, so the merge neither waits for it nor
               // pages it: a saved page is shown, never paged from.
-              const stand = state === null && attempt === 0 ? await savedFor(userId, source, key, failure) : undefined;
+              // Nothing saved stands in for a search: it would answer a
+              // question it was never asked.
+              const stand = state === null && attempt === 0 && !searching ? await savedFor(userId, source, key, failure) : undefined;
               sourceErrors.push(sourceError(source, failure, stand?.savedAt));
               next = stand
                 ? { connectionId: cursor.connectionId, buffer: stand.items, state: 'failed' }

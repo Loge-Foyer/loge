@@ -4,7 +4,7 @@ import { CalendarDays } from '@tamagui/lucide-icons-2/icons/CalendarDays';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { TvMinimalPlay } from '@tamagui/lucide-icons-2/icons/TvMinimalPlay';
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
@@ -15,6 +15,7 @@ import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
+import { SearchField } from '@/components/search-field';
 import { usePosterWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
@@ -36,12 +37,17 @@ const GUIDE_CHANNELS = 40;
 export function TvScreen() {
   const { data: sources } = useTabSources('tv');
   const params = useLocalSearchParams<{ source?: string; kind?: string; group?: string }>();
+  const [term, setTerm] = useState('');
+  const onTerm = useCallback((next: string) => setTerm(next), []);
 
   if (!sources) return <Screen>{null}</Screen>;
   if (sources.length === 0) return <TvEmptyState />;
   const selected = sources.find((source) => source.connection.id === params.source) ?? sources[0];
   if (!selected) return null;
   const kind = selected.kinds.find((each) => each === params.kind) ?? selected.kinds[0];
+  // Each section searches its own: channels, films or series — never across them.
+  const searchable = selected.effective.media?.capabilities.has('search') ?? false;
+  const searchLabel = kind === 'live' ? 'Search channels' : kind ? `Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}` : 'Search';
 
   const header = (
     <YStack gap="$3" pb="$3">
@@ -56,14 +62,21 @@ export function TvScreen() {
         <SourceTabs
           tabs={selected.kinds.map((each) => ({ id: each, label: each === 'live' ? 'Live' : CONTENT_KIND_LABELS[each] }))}
           selected={kind ?? ''}
-          onSelect={(id) => router.setParams({ kind: id })}
+          onSelect={(id) => {
+            setTerm('');
+            router.setParams({ kind: id });
+          }}
         />
       ) : null}
+      {searchable ? <SearchField key={`${selected.connection.id}:${kind}`} placeholder={searchLabel} term={term} onTerm={onTerm} /> : null}
     </YStack>
   );
 
-  if (kind === 'live') return <Live key={selected.connection.id} source={selected} group={params.group || undefined} header={header} />;
-  return <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} header={header} />;
+  // A new term is a new list: the key resets the section's paging with it.
+  if (kind === 'live') {
+    return <Live key={`${selected.connection.id}:${term}`} source={selected} group={params.group || undefined} term={term} header={header} />;
+  }
+  return <SourceGrid key={`${selected.connection.id}:${kind}:${term}`} source={selected} kind={kind} term={term} header={header} />;
 }
 
 function TvEmptyState() {
@@ -113,10 +126,10 @@ function useRefresh() {
   return { onRefresh, control: <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={String(theme.color10.val)} /> };
 }
 
-function Live({ source, group, header }: { source: TabSource; group: string | undefined; header: React.ReactElement }) {
+function Live({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
   const connectionId = source.connection.id;
   const groups = useChannelGroups(connectionId);
-  const channels = useChannels(connectionId, group);
+  const channels = useChannels(connectionId, group, term);
   const list = channels.data?.pages.flatMap((page) => page.value.channels) ?? [];
   const guide = useGuide(connectionId, list.slice(0, GUIDE_CHANNELS).map((channel) => channel.key));
   const now = useNow();
@@ -261,8 +274,8 @@ export function clockOf(iso: string): string {
   return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
 }
 
-function SourceGrid({ source, kind, header }: { source: TabSource; kind: ContentKind | undefined; header: React.ReactElement }) {
-  const page = useSourcePage(source.connection.id, kind, NEWEST);
+function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: ContentKind | undefined; term: string; header: React.ReactElement }) {
+  const page = useSourcePage(source.connection.id, kind, NEWEST, term);
   const { width } = useWindowDimensions();
   const posterWidth = usePosterWidth();
   const { onRefresh, control } = useRefresh();

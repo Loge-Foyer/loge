@@ -5,6 +5,7 @@ import {
   AppError,
   categoryOfPluginId,
   compareItems,
+  matchesTerm,
   pluginId,
   type ConnectedMediaProvider,
   type HttpClient,
@@ -99,6 +100,8 @@ export interface FakeSourceOptions {
   /** Thrown by every call while set. */
   readonly failWith?: () => AppError | undefined;
   readonly withImages?: boolean;
+  /** Honours `ItemQuery.term`, and declares that it does. */
+  readonly searches?: boolean;
   /** Reads its credentials before every call, the way a real source signs in. */
   readonly signsIn?: boolean;
   /** A field that says nothing of where or as whom it signs in — as Jellyfin's "local only". */
@@ -124,6 +127,8 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     /** What reached the source, in order: `started 0`, `stopped 90000`, `played true`. */
     reports: [] as string[],
     playbackRequests: [] as PlaybackRequest[],
+    /** The term each `listItems` was given — `undefined` where it was asked to browse. */
+    terms: [] as (string | undefined)[],
   };
   const manifest: PluginManifest = {
     id: pluginId(`sources/${id}`),
@@ -139,6 +144,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
         ...(options.writesWatchState ? (['watchStateWrite'] as const) : []),
         ...(options.playback ? (['playback'] as const) : []),
         ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
+        ...(options.searches ? (['search'] as const) : []),
       ],
     },
     connectionFields: [
@@ -174,7 +180,11 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
           },
           listItems: async (query) => {
             await fail();
-            const all = (options.movies?.(target.connectionId) ?? []).toSorted(compareItems(query.sort));
+            stats.terms.push(query.term);
+            const matching = (options.movies?.(target.connectionId) ?? []).filter((item) =>
+              query.term === undefined ? true : matchesTerm(query.term, 'title' in item ? item.title : ''),
+            );
+            const all = matching.toSorted(compareItems(query.sort));
             const offset = query.cursor ? Number(query.cursor) : 0;
             const items = all.slice(offset, offset + query.limit);
             const next = offset + items.length;

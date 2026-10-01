@@ -117,6 +117,26 @@ describe('media grid', () => {
     expect(pages).toBeLessThan(10);
   });
 
+  it('searches only the sources that promised to, and keeps the search inside its kind', async () => {
+    const titled = (id: string) => (connectionId: ConnectionId) =>
+      [movie(connectionId, `${id}-erste`, 2025), movie(connectionId, `${id}-zweite`, 2024)].map((item) => ({ ...item, title: item.key.externalId }));
+    const searching = fakeMediaPlugin('alpha', { movies: titled('a'), searches: true });
+    const browsing = fakeMediaPlugin('beta', { movies: titled('b') });
+    const { services, kids } = await withSources([searching, browsing]);
+
+    const page = await services.media.gridPage(kids, { kind: 'movies', sort: NEWEST, term: 'erste' }, null, 10);
+    // Only the source that declared `search` is asked — the other is left out
+    // rather than answered for, so nothing unmatched slips into the results.
+    expect(page.items.map((item) => item.key.externalId)).toEqual(['a-erste']);
+    expect(searching.stats.terms).toEqual(['erste']);
+    expect(browsing.stats.terms).toEqual([]);
+
+    // Browsing is unchanged, and asks for no term at all.
+    const all = await services.media.gridPage(kids, { kind: 'movies', sort: NEWEST }, null, 10);
+    expect(all.items.length).toBe(4);
+    expect(browsing.stats.terms).toEqual([undefined]);
+  });
+
   it('keeps showing one source when the other fails midway', async () => {
     let fail = false;
     const a = fakeMediaPlugin('alpha', { movies: (id) => [2020, 2018, 2016, 2014].map((year) => movie(id, `a${year}`, year)) });

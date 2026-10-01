@@ -73,10 +73,12 @@ export function useContinueWatching(enabled = true) {
 export function useGrid(spec: RowSpec | undefined) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  // Nothing was ever saved for a search, so nothing stands in for one.
+  const searching = (spec?.term ?? '').trim().length > 0;
   const saved = useQuery({
     queryKey: remoteKey(userId, 'saved', 'grid', spec?.kind, spec?.sort.by, spec?.sort.order),
-    queryFn: () => (spec ? media.saved.gridFirstPage(userId, spec, GRID_PAGE) : null),
-    enabled: spec !== undefined,
+    queryFn: () => (spec && !searching ? media.saved.gridFirstPage(userId, spec, GRID_PAGE) : null),
+    enabled: spec !== undefined && !searching,
   });
   // A saved first page has no `next`, and a placeholder never counts for
   // `hasNextPage` — so the grid cannot page on from last week's positions.
@@ -86,7 +88,8 @@ export function useGrid(spec: RowSpec | undefined) {
     [saved.data],
   );
   return useInfiniteQuery({
-    queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order),
+    // The term is part of the key: one query's answers never show under another's.
+    queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.term?.trim() || undefined),
     queryFn: ({ pageParam, signal }) => {
       if (!spec) throw new Error('No row to show.');
       return media.gridPage(userId, spec, pageParam, GRID_PAGE, signal);

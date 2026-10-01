@@ -1,7 +1,7 @@
 import type { MediaItem } from '@sc/api';
 import { FlashList } from '@shopify/flash-list';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
 
@@ -11,6 +11,7 @@ import { LandscapeCard } from '@/components/media/landscape-card';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { Screen } from '@/components/screen';
+import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
@@ -27,7 +28,11 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
   const { rows, sources } = useHomeRows();
   const row = rows?.find((candidate) => candidate.id === rowId);
   const kindRow = row?.type === 'kind' ? row : undefined;
-  const grid = useGrid(kindRow ? { kind: kindRow.kind, sort: kindRow.sort } : undefined);
+  const [term, setTerm] = useState('');
+  const searching = term.trim().length > 0;
+  // A search stays inside this row's kind: films answer a search of films.
+  const grid = useGrid(kindRow ? { kind: kindRow.kind, sort: kindRow.sort, ...(searching ? { term } : {}) } : undefined);
+  const onTerm = useCallback((next: string) => setTerm(next), []);
   const refresh = useRefreshMedia();
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -93,7 +98,8 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
           </YStack>
         )}
         ListHeaderComponent={
-          <YStack px={GAP / 2} pb="$4" gap="$2">
+          <YStack px={GAP / 2} pb="$4" gap="$3">
+            <SearchField placeholder={`Search ${rowTitle(kindRow).toLowerCase()}`} term={term} onTerm={onTerm} />
             {total === undefined ? null : (
               <SizableText size="$2" color="$color10">
                 {total === 1 ? '1 title' : `${total} titles`}
@@ -109,7 +115,7 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
             </YStack>
           ) : (
             <SizableText px={GAP / 2} color="$color10">
-              Nothing here yet.
+              {searching ? 'Nothing here matches that.' : 'Nothing here yet.'}
             </SizableText>
           )
         }

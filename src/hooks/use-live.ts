@@ -27,14 +27,21 @@ export function useChannelGroups(connectionId: ConnectionId | undefined) {
 }
 
 /** A group's channels — every channel without one — page by page, in the source's own order. */
-export function useChannels(connectionId: ConnectionId | undefined, groupId: string | undefined) {
+export function useChannels(connectionId: ConnectionId | undefined, groupId: string | undefined, term?: string) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const searching = (term ?? '').trim();
   return useInfiniteQuery({
-    queryKey: remoteKey(userId, 'live', connectionId, 'channels', groupId ?? '*'),
+    // The term is part of the key: one search's channels never show under another's.
+    queryKey: remoteKey(userId, 'live', connectionId, 'channels', groupId ?? '*', searching || undefined),
     queryFn: ({ pageParam, signal }) => {
       if (!connectionId) throw new Error('No source.');
-      return media.channels(userId, connectionId, { limit: CHANNEL_PAGE, ...(groupId ? { groupId } : {}), ...(pageParam ? { cursor: pageParam } : {}) }, signal);
+      return media.channels(
+        userId,
+        connectionId,
+        { limit: CHANNEL_PAGE, ...(groupId ? { groupId } : {}), ...(pageParam ? { cursor: pageParam } : {}), ...(searching ? { term: searching } : {}) },
+        signal,
+      );
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.value.nextCursor ?? null,
@@ -84,14 +91,20 @@ export function nowAndNext(programmes: readonly Programme[] | undefined, channel
 }
 
 /** One source's films or series, page by page, in the source's own order. */
-export function useSourcePage(connectionId: ConnectionId | undefined, kind: ContentKind | undefined, sort: ItemSort) {
+export function useSourcePage(connectionId: ConnectionId | undefined, kind: ContentKind | undefined, sort: ItemSort, term?: string) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const searching = (term ?? '').trim();
   return useInfiniteQuery({
-    queryKey: remoteKey(userId, 'source', connectionId, kind, sort.by, sort.order),
+    queryKey: remoteKey(userId, 'source', connectionId, kind, sort.by, sort.order, searching || undefined),
     queryFn: ({ pageParam, signal }) => {
       if (!connectionId || !kind) throw new Error('Nothing to list.');
-      return media.sourcePage(userId, connectionId, { kind, sort, limit: CHANNEL_PAGE, ...(pageParam ? { cursor: pageParam } : {}) }, signal);
+      return media.sourcePage(
+        userId,
+        connectionId,
+        { kind, sort, limit: CHANNEL_PAGE, ...(pageParam ? { cursor: pageParam } : {}), ...(searching ? { term: searching } : {}) },
+        signal,
+      );
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor ?? null,
