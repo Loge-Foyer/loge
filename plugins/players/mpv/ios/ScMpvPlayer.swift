@@ -82,7 +82,6 @@ public final class ScMpvPlayer: SharedObject {
     // falls back to FFmpeg's own decoders rather than handing back no frame.
     option("hwdec", "videotoolbox")
     option("hwdec-codecs", "all")
-    option("hwdec-software-fallback", "yes")
     // At the end, stay on the last frame instead of shutting the core down, so
     // playing again is a seek rather than another open.
     option("keep-open", "always")
@@ -364,6 +363,10 @@ public final class ScMpvPlayer: SharedObject {
 
   func setRate(_ rate: Double) {
     onMpv { [weak self] in self?.setDouble("speed", rate) }
+  }
+
+  func setSoftwareFallback(_ on: Bool) {
+    onMpv { [weak self] in self?.setString("hwdec-software-fallback", on ? "yes" : "no") }
   }
 
   func setVolume(_ volume: Int) {

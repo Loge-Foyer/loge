@@ -77,6 +77,12 @@ export class FakeVlcPlayer extends SharedObject {
     this.volume = volume;
   }
 
+  softwareFallback = true;
+
+  setSoftwareFallback(on: boolean) {
+    this.softwareFallback = on;
+  }
+
   setAudioTrack(id: number) {
     this.audioTrack = id;
   }
@@ -135,6 +141,12 @@ export class FakeMpvPlayer extends SharedObject {
 
   setVolume(volume: number) {
     this.volume = volume;
+  }
+
+  softwareFallback = true;
+
+  setSoftwareFallback(on: boolean) {
+    this.softwareFallback = on;
   }
 
   setAudioTrack(id: number) {

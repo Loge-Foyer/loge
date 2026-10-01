@@ -63,9 +63,25 @@ export interface MediaPlayer {
 }
 
 /** What an engine gets from its host. */
+/**
+ * What the device asks of any engine that can honour it. Settings are the
+ * app's and are the same for every player — a player is the engine, not the
+ * experience — so an engine takes what it understands and ignores the rest.
+ */
+export interface PlayerPreferences {
+  /**
+   * Decode in software when the hardware decoder will not take a stream,
+   * rather than refusing it. On by default, because a picture is better than
+   * none; off says so loudly instead of quietly flattening the battery.
+   */
+  readonly softwareFallback: boolean;
+}
+
 export interface PlayerContext {
   /** A stream's headers, resolved at load time and held in memory only. */
   resolveHeaders(ref: HeadersRef): Promise<Readonly<Record<string, string>> | undefined>;
+  /** Absent only where nothing has been set yet; an engine should default as this document does. */
+  readonly preferences?: PlayerPreferences;
 }
 
 export interface PlayerRole {

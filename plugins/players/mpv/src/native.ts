@@ -40,6 +40,8 @@ export declare class NativePlayer extends SharedObject<NativeEvents> {
   setRate(rate: number): void;
   /** How loud, 0 to 100 — mpv's own scale. */
   setVolume(volume: number): void;
+  /** Whether to decode in software when the hardware decoder refuses a stream. */
+  setSoftwareFallback(on: boolean): void;
   /** `-1` turns it off. */
   setAudioTrack(id: number): void;
   setSubtitleTrack(id: number): void;

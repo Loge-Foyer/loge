@@ -48,6 +48,10 @@ public final class ScMpvModule: Module {
         player.setRate(rate)
       }
 
+      Function("setSoftwareFallback") { (player: ScMpvPlayer, on: Bool) in
+        player.setSoftwareFallback(on)
+      }
+
       Function("setVolume") { (player: ScMpvPlayer, volume: Int) in
         player.setVolume(volume)
       }

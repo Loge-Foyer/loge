@@ -150,6 +150,8 @@ class ScMpvPlayer(context: Context, appContext: AppContext) : SharedObject(appCo
 
   fun setRate(rate: Double) = onMpv { ScMpvNative.setPropertyDouble(mpv, "speed", rate) }
 
+  fun setSoftwareFallback(on: Boolean) = onMpv { ScMpvNative.setPropertyString(mpv, "hwdec-software-fallback", if (on) "yes" else "no") }
+
   fun setVolume(volume: Int) = onMpv { ScMpvNative.setPropertyDouble(mpv, "volume", volume.toDouble()) }
 
   fun setAudioTrack(id: Int) = onMpv {

@@ -43,6 +43,10 @@ const SUBTITLE_FORMATS: Readonly<Record<string, string>> = {
 export function createEngine(context: PlayerContext): MediaPlayer {
   const { Player } = nativeModule();
   const mpv = new Player();
+  // Said once, before anything is loaded: mpv keeps it for every file after.
+  // Off means a stream the hardware decoder will not take is refused rather
+  // than decoded in software — which is slower, hotter and silent about it.
+  mpv.setSoftwareFallback(context.preferences?.softwareFallback ?? true);
   const events = createPlayerEvents();
   let audio: readonly NativeTrack[] = [];
   let subtitles: readonly NativeTrack[] = [];

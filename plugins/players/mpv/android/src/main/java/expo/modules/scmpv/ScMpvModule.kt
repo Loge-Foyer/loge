@@ -37,6 +37,9 @@ class ScMpvModule : Module() {
       Function("setRate") { player: ScMpvPlayer, rate: Double ->
         appContext.mainQueue.launch { player.setRate(rate) }
       }
+      Function("setSoftwareFallback") { player: ScMpvPlayer, on: Boolean ->
+        appContext.mainQueue.launch { player.setSoftwareFallback(on) }
+      }
       Function("setVolume") { player: ScMpvPlayer, volume: Int ->
         appContext.mainQueue.launch { player.setVolume(volume) }
       }

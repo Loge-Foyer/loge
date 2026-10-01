@@ -16,8 +16,8 @@ function source(overrides: Partial<PlaybackSource> = {}): PlaybackSource {
   return { uri: 'https://server/film.mkv', protocol: 'progressive', container: 'mkv', transcoded: false, live: false, ...overrides };
 }
 
-function mpv() {
-  const player = createEngine(context);
+function mpv(overrides: { preferences?: { softwareFallback: boolean } } = {}) {
+  const player = createEngine({ ...context, ...(overrides.preferences ? { preferences: overrides.preferences } : {}) });
   const engine = createdMpv.at(-1);
   if (!engine) throw new Error('no engine');
   const events: PlayerEvent[] = [];
@@ -213,5 +213,16 @@ describe('mpv on Android (libmpv)', () => {
     expect(engine.rate).toBe(4);
     player.setRate?.(0);
     expect(engine.rate).toBe(0.25);
+  });
+
+  it('is told whether it may fall back to software, before anything is loaded', async () => {
+    // On by default: a picture is better than none.
+    const { engine } = mpv();
+    expect(engine.softwareFallback).toBe(true);
+
+    // Off refuses a stream the hardware decoder will not take, rather than
+    // decoding it in software and saying nothing about the battery.
+    const strict = mpv({ preferences: { softwareFallback: false } });
+    expect(strict.engine.softwareFallback).toBe(false);
   });
 });
