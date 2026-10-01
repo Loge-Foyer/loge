@@ -35,6 +35,7 @@ describe('SQLite migrations', () => {
       'connection_profile_values',
       'connections',
       'device_settings',
+      'downloads',
       'media_details',
       'media_lists',
       'outbox',
@@ -238,7 +239,7 @@ describe('SQLite migrations', () => {
     expect(await db.outbox.list()).toHaveLength(1);
     await db.users.delete(userId('u-alex'));
     expect(await db.outbox.list()).toEqual([]);
-    expect(await versionOf(path)).toBe(5);
+    expect(await versionOf(path)).toBe(MIGRATIONS.length);
   });
 
   it('insist on steps numbered one after another', async () => {

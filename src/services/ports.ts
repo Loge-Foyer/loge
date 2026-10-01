@@ -1,4 +1,5 @@
 import type {
+  AppErrorCode,
   CancelSignal,
   Connection,
   ConnectionId,
@@ -231,6 +232,49 @@ export interface WatchStatusRepository {
   prune(before: number): Promise<void>;
 }
 
+/**
+ * A copy of one item kept on this device (v6). Device state, like the watch
+ * cache: never journaled, never on your server, never in a backup — a file on
+ * this phone is this phone's.
+ *
+ * **No address is kept.** A download's URL can carry an `api_key`, an HMAC
+ * signature or a session token, so it is asked for again when a download
+ * starts and when it resumes, exactly as playback asks again.
+ */
+export type DownloadState = 'queued' | 'running' | 'paused' | 'done' | 'failed';
+
+export interface DownloadEntry {
+  readonly id: string;
+  readonly userId: UserId;
+  readonly key: GlobalMediaKey;
+  readonly state: DownloadState;
+  /** What was chosen from `listDownloadOptions`, so a resume asks for the same. */
+  readonly optionId?: string;
+  /** The item as it was, so a Downloads list reads while every source is away. */
+  readonly item: MediaItem;
+  /** Under the downloads directory — never an absolute path, which changes between installs on iOS. */
+  readonly fileName: string;
+  readonly container: string;
+  readonly bytesTotal?: number;
+  readonly bytesDone: number;
+  readonly errorCode?: AppErrorCode;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface DownloadRepository {
+  get(id: string): Promise<DownloadEntry | undefined>;
+  /** One item is kept once per profile; this is how that is enforced. */
+  forItem(userId: UserId, key: GlobalMediaKey): Promise<DownloadEntry | undefined>;
+  /** A profile's downloads, newest first. */
+  list(userId: UserId): Promise<readonly DownloadEntry[]>;
+  /** Every profile's, for the budget and for the queue to find its work. */
+  listAll(): Promise<readonly DownloadEntry[]>;
+  /** Skipped when the profile or the connection is gone. */
+  put(entry: DownloadEntry): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
 /** One report waiting for the source that masters the item's watch state. */
 export interface OutboxEntry {
   readonly seq: number;
@@ -383,6 +427,7 @@ export interface Repositories {
   readonly backupState: BackupStateRepository;
   readonly watchStatus: WatchStatusRepository;
   readonly outbox: OutboxRepository;
+  readonly downloads: DownloadRepository;
   readonly journal: JournalRepository;
 }
 

@@ -1,4 +1,4 @@
-import type { Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
+import type { AppErrorCode, Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
 
 import type {
   AccountRepository,
@@ -8,6 +8,9 @@ import type {
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
+  DownloadEntry,
+  DownloadRepository,
+  DownloadState,
   JournalAnnouncement,
   JournalEntry,
   JournalRepository,
@@ -82,6 +85,41 @@ interface WatchRecord {
   readonly status: WatchStatus;
   readonly item?: MediaItem;
   readonly updatedAt: number;
+}
+
+interface DownloadRecord {
+  readonly id: string;
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  readonly externalId: string;
+  readonly state: DownloadState;
+  readonly optionId?: string;
+  readonly item: MediaItem;
+  readonly fileName: string;
+  readonly container: string;
+  readonly bytesTotal?: number;
+  readonly bytesDone: number;
+  readonly errorCode?: AppErrorCode;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+function toDownloadEntry(row: DownloadRecord): DownloadEntry {
+  return {
+    id: row.id,
+    userId: row.userId,
+    key: { connectionId: row.connectionId, externalId: row.externalId },
+    state: row.state,
+    ...(row.optionId === undefined ? {} : { optionId: row.optionId }),
+    item: row.item,
+    fileName: row.fileName,
+    container: row.container,
+    ...(row.bytesTotal === undefined ? {} : { bytesTotal: row.bytesTotal }),
+    bytesDone: row.bytesDone,
+    ...(row.errorCode === undefined ? {} : { errorCode: row.errorCode }),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 interface OutboxRecord {
@@ -163,7 +201,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<UserRecord>('users', id);
       if (!row) return;
       await request(store('users').delete(id));
-      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox'] as const) {
+      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads'] as const) {
         await deleteWhere(name, 'byUser', id);
       }
       await record({ userId: id, entity: 'user', entityId: id, operation: 'delete', localVersion: row.version + 1 });
@@ -198,7 +236,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<ConnectionRecord>('connections', id);
       if (!row) return;
       await request(store('connections').delete(id));
-      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox'] as const) {
+      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
       await request(store('backupState').delete(id));
@@ -410,6 +448,51 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  const downloads: DownloadRepository = {
+    get: async (id) => {
+      const row = await get<DownloadRecord>('downloads', id);
+      return row && toDownloadEntry(row);
+    },
+    forItem: async (user, key) => {
+      const row = await request(
+        store('downloads').index('byItem').get([user, key.connectionId, key.externalId]) as IDBRequest<DownloadRecord | undefined>,
+      );
+      return row && toDownloadEntry(row);
+    },
+    list: async (user) =>
+      (await request(store('downloads').index('byUser').getAll(user) as IDBRequest<DownloadRecord[]>))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(toDownloadEntry),
+    listAll: async () =>
+      (await request(store('downloads').getAll() as IDBRequest<DownloadRecord[]>))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(toDownloadEntry),
+    put: async (entry) => {
+      if (!(await parentsExist(entry.userId, entry.key.connectionId))) return;
+      await request(
+        store('downloads').put({
+          id: entry.id,
+          userId: entry.userId,
+          connectionId: entry.key.connectionId,
+          externalId: entry.key.externalId,
+          state: entry.state,
+          ...(entry.optionId === undefined ? {} : { optionId: entry.optionId }),
+          item: entry.item,
+          fileName: entry.fileName,
+          container: entry.container,
+          ...(entry.bytesTotal === undefined ? {} : { bytesTotal: entry.bytesTotal }),
+          bytesDone: entry.bytesDone,
+          ...(entry.errorCode === undefined ? {} : { errorCode: entry.errorCode }),
+          createdAt: entry.createdAt,
+          updatedAt: entry.updatedAt,
+        } satisfies DownloadRecord),
+      );
+    },
+    remove: async (id) => {
+      await request(store('downloads').delete(id));
+    },
+  };
+
   const outbox: OutboxRepository = {
     add: async (user, report) => {
       const { connectionId: connection, externalId } = report.key;
@@ -502,7 +585,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, journal };
 }
 
 function toWatchEntry(row: WatchRecord) {

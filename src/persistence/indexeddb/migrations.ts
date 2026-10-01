@@ -19,6 +19,7 @@ export const STORES = [
   'backupState',
   'watchStatus',
   'outbox',
+  'downloads',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -118,6 +119,17 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     outbox.createIndex('byUser', 'userId');
     outbox.createIndex('byConnection', 'connectionId');
     outbox.createIndex('byItem', ['userId', 'connectionId', 'externalId']);
+  },
+
+  // Files kept on this device: as SQLite's v6. One row per item per profile,
+  // which `byItem` enforces by being the thing the repository looks up before
+  // it writes — IndexedDB has no unique index on a non-key path.
+  (db) => {
+    const downloads = db.createObjectStore('downloads', { keyPath: 'id' });
+    downloads.createIndex('byUser', 'userId');
+    downloads.createIndex('byConnection', 'connectionId');
+    downloads.createIndex('byItem', ['userId', 'connectionId', 'externalId'], { unique: true });
+    downloads.createIndex('byState', 'state');
   },
 ];
 

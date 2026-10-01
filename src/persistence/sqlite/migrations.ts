@@ -150,11 +150,39 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   },
   { version: 4, up: accountModel },
   { version: 5, up: (tx) => tx.exec(V5) },
+  { version: 6, up: (tx) => tx.exec(V6) },
 ];
 
 // Watch status, for sources that master it (Phase 7): a cache per profile,
 // and the outbox that carries this device's changes to the source. Both are
 // the device's: never journaled, never in a backup.
+// Files kept on this device (Phase 10). Device state, like the watch cache and
+// unlike anything the account holds: never journaled, never pushed, never in a
+// backup — a copy on this phone is this phone's. It cascades from both parents
+// so removing a profile or a connection takes its downloads' rows; the files
+// themselves are swept separately, since a cascade cannot delete from disk.
+const V6 = `
+CREATE TABLE downloads (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  option_id TEXT,
+  item TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  container TEXT NOT NULL,
+  bytes_total INTEGER,
+  bytes_done INTEGER NOT NULL,
+  error_code TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+CREATE UNIQUE INDEX downloads_item ON downloads (user_id, connection_id, external_id);
+CREATE INDEX downloads_connection ON downloads (connection_id);
+CREATE INDEX downloads_state ON downloads (state);
+`;
+
 const V5 = `
 CREATE TABLE watch_status (
   user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,

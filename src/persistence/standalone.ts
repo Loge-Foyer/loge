@@ -68,6 +68,14 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       put: (userId, entry) => write((r) => r.watchStatus.put(userId, entry)),
       prune: (before) => write((r) => r.watchStatus.prune(before)),
     },
+    downloads: {
+      get: (id) => read((r) => r.downloads.get(id)),
+      forItem: (userId, key) => read((r) => r.downloads.forItem(userId, key)),
+      list: (userId) => read((r) => r.downloads.list(userId)),
+      listAll: () => read((r) => r.downloads.listAll()),
+      put: (entry) => write((r) => r.downloads.put(entry)),
+      remove: (id) => write((r) => r.downloads.remove(id)),
+    },
     outbox: {
       add: (userId, report) => write((r) => r.outbox.add(userId, report)),
       list: () => read((r) => r.outbox.list()),

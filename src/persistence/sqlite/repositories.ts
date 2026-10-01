@@ -3,6 +3,7 @@ import {
   credentialsRef,
   pluginId,
   userId,
+  type AppErrorCode,
   type Connection,
   type ConnectionId,
   type ConnectionValues,
@@ -23,6 +24,9 @@ import type {
   ConnectionRepository,
   DeviceSettings,
   DeviceSettingsRepository,
+  DownloadEntry,
+  DownloadRepository,
+  DownloadState,
   JournalAnnouncement,
   JournalEntry,
   JournalRepository,
@@ -498,6 +502,54 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  const downloads: DownloadRepository = {
+    get: async (id) => {
+      const row = await sql.get<DownloadRow>('SELECT * FROM downloads WHERE id = ?', [id]);
+      return row && toDownloadEntry(row);
+    },
+    forItem: async (user, key) => {
+      const row = await sql.get<DownloadRow>('SELECT * FROM downloads WHERE user_id = ? AND connection_id = ? AND external_id = ?', [
+        user,
+        key.connectionId,
+        key.externalId,
+      ]);
+      return row && toDownloadEntry(row);
+    },
+    list: async (user) =>
+      (await sql.all<DownloadRow>('SELECT * FROM downloads WHERE user_id = ? ORDER BY created_at DESC', [user])).map(toDownloadEntry),
+    listAll: async () => (await sql.all<DownloadRow>('SELECT * FROM downloads ORDER BY created_at DESC')).map(toDownloadEntry),
+    put: async (entry) => {
+      if (!(await parentsExist(entry.userId, entry.key.connectionId))) return;
+      await sql.run(
+        `INSERT INTO downloads (id, user_id, connection_id, external_id, state, option_id, item, file_name, container, bytes_total, bytes_done, error_code, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           state = excluded.state, option_id = excluded.option_id, item = excluded.item, file_name = excluded.file_name,
+           container = excluded.container, bytes_total = excluded.bytes_total, bytes_done = excluded.bytes_done,
+           error_code = excluded.error_code, updated_at = excluded.updated_at`,
+        [
+          entry.id,
+          entry.userId,
+          entry.key.connectionId,
+          entry.key.externalId,
+          entry.state,
+          entry.optionId ?? null,
+          JSON.stringify(entry.item),
+          entry.fileName,
+          entry.container,
+          entry.bytesTotal ?? null,
+          entry.bytesDone,
+          entry.errorCode ?? null,
+          entry.createdAt,
+          entry.updatedAt,
+        ],
+      );
+    },
+    remove: async (id) => {
+      await sql.run('DELETE FROM downloads WHERE id = ?', [id]);
+    },
+  };
+
   const outbox: OutboxRepository = {
     add: async (user, report) => {
       const { connectionId: connection, externalId } = report.key;
@@ -619,7 +671,7 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, journal };
+  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, journal };
 }
 
 interface WatchRow {
@@ -636,6 +688,41 @@ function toWatchEntry(row: WatchRow): WatchEntry {
     key: { connectionId: connectionId(row.connection_id), externalId: row.external_id },
     status: parse<WatchStatus>(row.status),
     ...(row.item === null ? {} : { item: parse<MediaItem>(row.item) }),
+    updatedAt: row.updated_at,
+  };
+}
+
+interface DownloadRow {
+  readonly id: string;
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly state: string;
+  readonly option_id: string | null;
+  readonly item: string;
+  readonly file_name: string;
+  readonly container: string;
+  readonly bytes_total: number | null;
+  readonly bytes_done: number;
+  readonly error_code: string | null;
+  readonly created_at: number;
+  readonly updated_at: number;
+}
+
+function toDownloadEntry(row: DownloadRow): DownloadEntry {
+  return {
+    id: row.id,
+    userId: userId(row.user_id),
+    key: { connectionId: connectionId(row.connection_id), externalId: row.external_id },
+    state: row.state as DownloadState,
+    ...(row.option_id === null ? {} : { optionId: row.option_id }),
+    item: parse<MediaItem>(row.item),
+    fileName: row.file_name,
+    container: row.container,
+    ...(row.bytes_total === null ? {} : { bytesTotal: row.bytes_total }),
+    bytesDone: row.bytes_done,
+    ...(row.error_code === null ? {} : { errorCode: row.error_code as AppErrorCode }),
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

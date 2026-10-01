@@ -1,7 +1,7 @@
 import { connectionId, credentialsRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { LocalDatabase, ProfileValues, StoredAccount } from '@/services/ports';
+import type { DownloadEntry, LocalDatabase, ProfileValues, StoredAccount } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -608,6 +608,75 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       const head = await db.journal.head();
       await db.watchStatus.put(alex.id, { key: key('m1'), status: { played: true }, updatedAt: 1 });
       await db.outbox.add(alex.id, played('m1'));
+      expect(await db.journal.head()).toBe(head);
+    });
+  });
+
+  describe('downloads', () => {
+    const key = (id: string, connection = 'c-home') => ({ connectionId: connectionId(connection), externalId: id });
+    const download = (id: string, item: string, overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
+      id,
+      userId: alex.id,
+      key: key(item),
+      state: 'queued',
+      item: movie(connectionId('c-home'), item, 2020),
+      fileName: `${id}.mp4`,
+      container: 'mp4',
+      bytesDone: 0,
+      createdAt: 1,
+      updatedAt: 1,
+      ...overrides,
+    });
+
+    it('keeps one copy of an item per profile, found either way', async () => {
+      const { db } = open();
+      await household(db);
+      await db.downloads.put(download('d1', 'm1'));
+      await db.downloads.put(download('d2', 'm2', { createdAt: 2, updatedAt: 2 }));
+      expect((await db.downloads.list(alex.id)).map((entry) => entry.id)).toEqual(['d2', 'd1']);
+      expect((await db.downloads.forItem(alex.id, key('m1')))?.id).toBe('d1');
+      expect((await db.downloads.get('d2'))?.item.title).toBe('m2');
+      expect(await db.downloads.list(kids.id)).toEqual([]);
+    });
+
+    it('updates in place as bytes arrive', async () => {
+      const { db } = open();
+      await household(db);
+      await db.downloads.put(download('d1', 'm1'));
+      await db.downloads.put(download('d1', 'm1', { state: 'running', bytesDone: 4096, bytesTotal: 8192, updatedAt: 9 }));
+      const entry = await db.downloads.get('d1');
+      expect(entry).toMatchObject({ state: 'running', bytesDone: 4096, bytesTotal: 8192, updatedAt: 9 });
+      expect(await db.downloads.listAll()).toHaveLength(1);
+    });
+
+    it('goes with its profile, and with its connection', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.downloads.put(download('d1', 'm1'));
+      await db.users.delete(alex.id);
+      expect(await db.downloads.listAll()).toEqual([]);
+
+      await db.users.insert(alex);
+      await db.connections.putProfileValues(home.id, alex.id, ownValues);
+      await db.downloads.put(download('d2', 'm1'));
+      await db.connections.delete(home.id);
+      expect(await db.downloads.listAll()).toEqual([]);
+    });
+
+    it('is not written for a profile or a connection that is gone', async () => {
+      const { db } = open();
+      await household(db);
+      await db.downloads.put(download('d1', 'm1', { userId: userId('u-nobody') }));
+      await db.downloads.put(download('d2', 'm1', { key: key('m1', 'c-nowhere') }));
+      expect(await db.downloads.listAll()).toEqual([]);
+    });
+
+    it('is never journaled: a file on this device is this device’s', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.downloads.put(download('d1', 'm1'));
+      await db.downloads.remove('d1');
       expect(await db.journal.head()).toBe(head);
     });
   });
