@@ -1,0 +1,140 @@
+{
+  "about": "Account records both sides judge alike: isAccountRecord in api, and the server's collection rules. Every record under valid passes; every record under invalid fails, for the reason given. Under recordIds, the id each side derives for a record on the server.",
+  "valid": [
+    { "kind": "profile", "key": "u1", "deleted": false, "data": { "userId": "u1", "name": "Alex" } },
+    { "kind": "pin", "key": "u1", "deleted": false, "data": { "userId": "u1", "pin": "1234" } },
+    { "kind": "pin", "key": "u1", "deleted": false, "data": { "userId": "u1", "pin": null } },
+    {
+      "kind": "preference",
+      "key": "u1/homeLayout",
+      "deleted": false,
+      "data": { "userId": "u1", "name": "homeLayout", "value": { "version": 1, "rows": [{ "id": "continue", "type": "continue", "hidden": false }] } }
+    },
+    {
+      "kind": "connection",
+      "key": "c1",
+      "deleted": false,
+      "data": {
+        "connectionId": "c1",
+        "pluginId": "sources/jellyfin",
+        "label": "Home",
+        "enabled": true,
+        "perProfile": "credentials",
+        "fields": { "serverUrl": "http://192.168.1.20:8096", "localOnly": true },
+        "settings": { "cacheMetadata": true, "libraries": { "mode": "except", "ids": ["kids"] } },
+        "secretKeys": ["password"],
+        "secrets": { "password": "correct horse" }
+      }
+    },
+    {
+      "kind": "connection",
+      "key": "c2",
+      "deleted": false,
+      "data": {
+        "connectionId": "c2",
+        "pluginId": "iptv/stalker",
+        "label": "Portal",
+        "enabled": false,
+        "perProfile": "none",
+        "fields": { "portalUrl": "http://portal.example.com/c/" },
+        "settings": {},
+        "secretKeys": ["mac"],
+        "secrets": { "mac": "00:1A:79:12:34:56" }
+      }
+    },
+    {
+      "kind": "profileValues",
+      "key": "c1/u1",
+      "deleted": false,
+      "data": {
+        "connectionId": "c1",
+        "userId": "u1",
+        "off": false,
+        "fields": { "username": "alex" },
+        "settings": {},
+        "secretKeys": ["password"],
+        "secrets": {}
+      }
+    },
+    { "kind": "profile", "key": "u2", "deleted": true },
+    { "kind": "pin", "key": "u2", "deleted": true },
+    { "kind": "preference", "key": "u1/homeLayout", "deleted": true },
+    { "kind": "connection", "key": "c3", "deleted": true },
+    { "kind": "profileValues", "key": "c1/u2", "deleted": true }
+  ],
+  "invalid": [
+    { "why": "an unknown kind", "record": { "kind": "watchProgress", "key": "u1", "deleted": false, "data": { "userId": "u1" } } },
+    { "why": "a key that is not the data's", "record": { "kind": "profile", "key": "u2", "deleted": false, "data": { "userId": "u1", "name": "Alex" } } },
+    { "why": "a blank profile name", "record": { "kind": "profile", "key": "u1", "deleted": false, "data": { "userId": "u1", "name": "   " } } },
+    { "why": "a PIN that is not four digits", "record": { "kind": "pin", "key": "u1", "deleted": false, "data": { "userId": "u1", "pin": "12345" } } },
+    { "why": "an id containing a slash", "record": { "kind": "profile", "key": "a/b", "deleted": false, "data": { "userId": "a/b", "name": "Alex" } } },
+    { "why": "deleted that is not a boolean", "record": { "kind": "profile", "key": "u1", "deleted": "no", "data": { "userId": "u1", "name": "Alex" } } },
+    { "why": "a record without its data", "record": { "kind": "profile", "key": "u1", "deleted": false } },
+    { "why": "a tombstone whose key has the wrong shape", "record": { "kind": "profileValues", "key": "c1", "deleted": true } },
+    { "why": "a preference name that is not camelCase", "record": { "kind": "preference", "key": "u1/Home-Layout", "deleted": false, "data": { "userId": "u1", "name": "Home-Layout", "value": 1 } } },
+    {
+      "why": "a device-wide plugin travelling with the account",
+      "record": {
+        "kind": "connection",
+        "key": "c1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "pluginId": "players/system", "label": "Player", "enabled": true, "perProfile": "none", "fields": {}, "settings": {}, "secretKeys": [], "secrets": {} }
+      }
+    },
+    {
+      "why": "an id without its category",
+      "record": {
+        "kind": "connection",
+        "key": "c1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "pluginId": "jellyfin", "label": "Home", "enabled": true, "perProfile": "none", "fields": {}, "settings": {}, "secretKeys": [], "secrets": {} }
+      }
+    },
+    {
+      "why": "a secret the record does not list",
+      "record": {
+        "kind": "connection",
+        "key": "c1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "pluginId": "sources/jellyfin", "label": "Home", "enabled": true, "perProfile": "none", "fields": {}, "settings": {}, "secretKeys": [], "secrets": { "password": "x" } }
+      }
+    },
+    {
+      "why": "a per-profile mode that does not exist",
+      "record": {
+        "kind": "connection",
+        "key": "c1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "pluginId": "sources/jellyfin", "label": "Home", "enabled": true, "perProfile": "some", "fields": {}, "settings": {}, "secretKeys": [], "secrets": {} }
+      }
+    },
+    {
+      "why": "a field value that is not a string, a boolean or a library selection",
+      "record": {
+        "kind": "connection",
+        "key": "c1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "pluginId": "sources/jellyfin", "label": "Home", "enabled": true, "perProfile": "none", "fields": { "port": 8096 }, "settings": {}, "secretKeys": [], "secrets": {} }
+      }
+    },
+    {
+      "why": "profile values without their secrets map",
+      "record": {
+        "kind": "profileValues",
+        "key": "c1/u1",
+        "deleted": false,
+        "data": { "connectionId": "c1", "userId": "u1", "off": false, "fields": {}, "settings": {}, "secretKeys": [] }
+      }
+    }
+  ],
+  "recordIds": [
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "profile", "key": "u1", "id": "d9c7c1f461623c8" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "pin", "key": "u1", "id": "658b12881019fbc" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "preference", "key": "u1/homeLayout", "id": "48a4abba3e9e133" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "connection", "key": "c1", "id": "a9a0a6959f44427" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "profileValues", "key": "c1/u1", "id": "f29581fa547ab3e" },
+    { "accountId": "a0000000000000b", "kind": "profile", "key": "u1", "id": "dc0587e23d0d8f0" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "profile", "key": "6f1c2b1e-8d4a-4f7e-9c3b-2a1d0e9f8c7b", "id": "aeb08e7b99cc933" },
+    { "accountId": "k4r9x2m1q8w3e5t", "kind": "profile", "key": "Zoë", "id": "46ac03d0e84523d" }
+  ]
+}

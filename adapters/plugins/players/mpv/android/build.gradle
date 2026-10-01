@@ -1,0 +1,68 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.scmpv'
+version = '0.0.0'
+
+/*
+ * libmpv 0.41, built by libmpv-android and published to Maven Central. The
+ * wrapper is MIT; the binaries are configured `--enable-gpl
+ * --enable-version3`, so what ships here is GPLv3 — which is why this app is
+ * GPL-3.0-or-later. An LGPL build would have to be made from source; see the
+ * workspace's LGPL engines plan.
+ *
+ * Only the binaries are used. This package has its own JNI (`src/main/cpp`),
+ * because the published wrapper prints every mpv log message to the device
+ * log, stream addresses and all, with no way to turn it off.
+ */
+def libmpv = 'dev.jdtech.mpv:libmpv:1.0.0'
+
+configurations {
+  libmpvAar
+}
+
+dependencies {
+  // For the .so files it brings: its Java side is never called.
+  implementation libmpv
+  libmpvAar "$libmpv@aar"
+}
+
+// Unpacked so this module's C++ can link against libmpv and FFmpeg, and so the
+// app can take the newest libc++ from here (see the app's with-newest-libcxx).
+def engine = layout.buildDirectory.dir('libmpv-jni')
+def unpackEngine = tasks.register('unpackLibmpv', Copy) {
+  from({ zipTree(configurations.libmpvAar.singleFile) }) {
+    include 'jni/*/*.so'
+    eachFile { it.path = it.path.replaceFirst('^jni/', '') }
+  }
+  into engine
+  includeEmptyDirs = false
+}
+
+android {
+  namespace "expo.modules.scmpv"
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+    externalNativeBuild {
+      cmake {
+        arguments "-DLIBMPV_JNI_DIR=${engine.get().asFile}"
+        // The ABIs the engine was built for.
+        abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+      }
+    }
+  }
+  externalNativeBuild {
+    cmake {
+      path 'src/main/cpp/CMakeLists.txt'
+      version '3.22.1'
+    }
+  }
+}
+
+tasks.named('preBuild') { dependsOn(unpackEngine) }
+tasks.configureEach { task ->
+  if (task.name.startsWith('configureCMake') || task.name.startsWith('buildCMake')) task.dependsOn(unpackEngine)
+}

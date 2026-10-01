@@ -1,0 +1,12 @@
+{
+  "name": "@sc/player-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "peerDependencies": {
+    "@sc/api": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

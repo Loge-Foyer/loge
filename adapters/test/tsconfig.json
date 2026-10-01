@@ -1,0 +1,15 @@
+{
+  // The tests run in Node and use its modules (node:crypto for the fake
+  // context). The program for api and the plugins never sees Node's types:
+  // their code runs on Hermes, where Node's globals do not exist.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // The built-in player's tests reach its engines and, through the
+    // conformance check, its views: the DOM's types and JSX, as the players'
+    // own program has them.
+    "lib": ["esnext", "dom"],
+    "jsx": "react-jsx",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

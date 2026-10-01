@@ -1,0 +1,14 @@
+node_modules/
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# What the app's native build leaves inside a player's Expo module.
+plugins/players/*/android/build/
+plugins/players/*/android/.gradle/
+plugins/players/*/android/.cxx/
+
+# A scratch corner for one-off scripts run against a real server.
+.probe/
