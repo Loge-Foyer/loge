@@ -1,4 +1,4 @@
-import type { ConnectionId, DownloadOption, Episode, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
+import type { ConnectionId, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { Download as DownloadIcon } from '@tamagui/lucide-icons-2/icons/Download';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
@@ -15,7 +15,7 @@ import { PrimaryButton } from '@/components/primary-button';
 import { Chip, ChipRow } from '@/components/chip';
 import { episodeCode, fileSize, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
-import { itemHref } from '@/components/media/item-link';
+import { itemHref, keyHref, playHref, routeId } from '@/components/media/item-link';
 import { SourceNotices } from '@/components/media/source-notices';
 import { Scrim } from '@/components/scrim';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
@@ -138,6 +138,12 @@ function Detail({
 function Hero({ item }: { item: MediaItem }) {
   const { width } = useWindowDimensions();
   const aspect = width >= 900 ? 21 / 9 : 16 / 10;
+  // A cover and nothing wider — what an IPTV provider has for its films and
+  // series — is shown as a cover, rather than a slice of it stretched across
+  // the page.
+  if (item.type !== 'episode' && !item.images.backdrop && !item.images.thumb && item.images.poster) {
+    return <CoverHero item={item} poster={item.images.poster} width={width} height={Math.round(width / aspect)} />;
+  }
   const image =
     item.type === 'episode'
       ? (item.images.thumb ?? item.images.backdrop)
@@ -167,6 +173,28 @@ function Hero({ item }: { item: MediaItem }) {
           }
         />
       </YStack>
+    </YStack>
+  );
+}
+
+/** The cover beside the title, over a softened, darkened copy of itself. */
+function CoverHero({ item, poster, width, height }: { item: MediaItem; poster: ImageRef; width: number; height: number }) {
+  const coverWidth = Math.round(Math.min(220, Math.max(110, width * 0.28)));
+  // Tall enough for the whole cover under the header that floats over it.
+  const tall = Math.max(height, Math.round(coverWidth * 1.5) + 120);
+  return (
+    <YStack position="relative" width={width} height={tall} bg="$color2">
+      <Artwork connectionId={item.key.connectionId} image={poster} width={width} aspect={width / tall} label={item.title} rounded="$0" blur={30} />
+      <Scrim from="top" strength={0.6} />
+      <Scrim from="bottom" />
+      <XStack position="absolute" l="$4" r="$4" b="$4" gap="$4" items="flex-end">
+        <Artwork connectionId={item.key.connectionId} image={poster} width={coverWidth} aspect={2 / 3} label={item.title} rounded="$5" />
+        <YStack flex={1} pb="$1">
+          <H1 size="$9" color="$color12" numberOfLines={3}>
+            {item.title}
+          </H1>
+        </YStack>
+      </XStack>
     </YStack>
   );
 }
@@ -232,15 +260,7 @@ function Actions({
   const followable = canFollow && item.type === 'show';
   if (!playable && !canMarkWatched && !keepable && !followable) return null;
   const play = (startMs?: number, player?: PluginId) =>
-    router.push({
-      pathname: '/play/[connectionId]/[itemId]',
-      params: {
-        connectionId: item.key.connectionId,
-        itemId: item.key.externalId,
-        ...(startMs ? { start: String(startMs) } : {}),
-        ...(player ? { player } : {}),
-      },
-    });
+    router.push(playHref(item.key, { ...(startMs ? { startMs } : {}), ...(player ? { player } : {}) }));
   const played = item.watch?.played ?? false;
   return (
     <YStack gap="$3">
@@ -490,7 +510,7 @@ function MediaSummary({ item, versions }: { item: MediaItem; versions: readonly 
         subtitle={summary}
         href={{
           pathname: '/media-info/[connectionId]/[itemId]',
-          params: { connectionId: item.key.connectionId, itemId: item.key.externalId },
+          params: { connectionId: item.key.connectionId, itemId: routeId(item.key.externalId) },
         }}
       />
     </SettingsSection>
@@ -515,7 +535,7 @@ function summarise(version: MediaVersion, count: number): string {
 
 function ShowLink({ episode }: { episode: Episode }) {
   return (
-    <Link href={{ pathname: '/item/[connectionId]/[itemId]', params: { connectionId: episode.show.connectionId, itemId: episode.show.externalId } }} asChild>
+    <Link href={keyHref(episode.show)} asChild>
       <Pressable accessibilityRole="link">
         <XStack gap="$1" items="center">
           <SizableText size="$4" color="$accent11" fontWeight="600">

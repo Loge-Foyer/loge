@@ -23,6 +23,7 @@ import { PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent, 
 import { Button, SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
+import { liveHref, playHref } from '@/components/media/item-link';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
@@ -190,10 +191,7 @@ function Controls({
   };
   const playNext = () => {
     if (!next) return;
-    router.replace({
-      pathname: '/play/[connectionId]/[itemId]',
-      params: { connectionId: next.key.connectionId, itemId: next.key.externalId, ...(player ? { player } : {}) },
-    });
+    router.replace(playHref(next.key, player ? { player } : {}));
   };
 
   // What a drag down an edge is showing, while it is showing it.
@@ -530,10 +528,7 @@ function LiveBar({ channel, title, group }: { channel: GlobalMediaKey; title: st
   const zap = (offset: number) => {
     const target = at >= 0 ? list[(at + offset + list.length) % list.length] : undefined;
     if (!target || target.key.externalId === channel.externalId) return;
-    router.replace({
-      pathname: '/play/[connectionId]/[itemId]',
-      params: { connectionId: target.key.connectionId, itemId: target.key.externalId, live: '1', title: target.name, ...(group ? { group } : {}) },
-    });
+    router.replace(liveHref(target.key, target.name, group));
   };
   return (
     <XStack items="center" gap="$3">

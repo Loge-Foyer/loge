@@ -375,4 +375,18 @@ describe('Stalker — films and series', () => {
     const { provider } = await connect();
     await expect(need(provider, 'getPlaybackDescriptor')({ key: key('show:v:601'), profile })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
+
+  it('opens a series asked for while its list is still on its way', async () => {
+    const { provider } = await connect({ seriesSection: true });
+    // A saved page shows at launch; the series is opened before the portal has answered.
+    const listing = need(provider, 'listItems')({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 });
+    const opened = need(provider, 'getItem')('show:s:18390%3A18390');
+    await listing;
+    expect((await opened).item.title).toBe('Harbour Nights');
+  });
+
+  it('still says it does not know a series nothing has listed', async () => {
+    const { provider } = await connect({ seriesSection: true });
+    await expect(need(provider, 'getItem')('show:s:18390%3A18390')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
 });

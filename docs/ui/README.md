@@ -95,7 +95,11 @@ row's own sort, with as many columns as the width allows (`FlashList`, keyed by
 the column count). **Detail pages** switch on the item's type — a movie's hero
 and cast, a show's seasons and episodes, an episode's still with a way to its
 show. Play, Resume, Mark watched and Next episode arrive with playback
-(Phase 7, `docs/playback`).
+(Phase 7, `docs/playback`). An item with a cover and nothing wider — an IPTV
+provider's films and series — gets the cover beside its title over a softened
+copy of it, rather than a slice of a portrait stretched across the page; what
+a source does not bring (cast, studios, what the file is, watch state) is
+simply not there.
 
 **Customize** is a sheet with everything inline, because a Tamagui portal would
 render behind a native sheet: per row, up and down, shown or hidden, sort and

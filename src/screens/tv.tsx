@@ -11,6 +11,7 @@ import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 import { Artwork } from '@/components/artwork';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listNames } from '@/components/labels';
+import { fromRouteId, liveHref, routeId } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
@@ -75,7 +76,7 @@ export function TvScreen() {
 
   // A new term is a new list: the key resets the section's paging with it.
   if (kind === 'live') {
-    return <Live key={`${selected.connection.id}:${term}`} source={selected} group={params.group || undefined} term={term} header={header} />;
+    return <Live key={`${selected.connection.id}:${term}`} source={selected} group={params.group ? fromRouteId(params.group) : undefined} term={term} header={header} />;
   }
   return <SourceGrid key={`${selected.connection.id}:${kind}:${term}`} source={selected} kind={kind} term={term} header={header} />;
 }
@@ -183,16 +184,13 @@ function GroupChips({ groups, selected }: { groups: readonly ChannelGroup[]; sel
     <SourceTabs
       tabs={[{ id: '', label: 'All' }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
       selected={selected ?? ''}
-      onSelect={(id) => router.setParams({ group: id })}
+      onSelect={(id) => router.setParams({ group: routeId(id) })}
     />
   );
 }
 
 export function playChannel(channel: Channel, group: string | undefined) {
-  router.push({
-    pathname: '/play/[connectionId]/[itemId]',
-    params: { connectionId: channel.key.connectionId, itemId: channel.key.externalId, live: '1', title: channel.name, ...(group ? { group } : {}) },
-  });
+  router.push(liveHref(channel.key, channel.name, group));
 }
 
 function ChannelRow({
@@ -256,7 +254,7 @@ function ChannelRow({
         onPress={() =>
           router.push({
             pathname: '/tv/channel/[connectionId]/[channelId]',
-            params: { connectionId, channelId: channel.key.externalId, name: channel.name, ...(group ? { group } : {}) },
+            params: { connectionId, channelId: routeId(channel.key.externalId), name: channel.name, ...(group ? { group: routeId(group) } : {}) },
           })
         }
         accessibilityRole="button"

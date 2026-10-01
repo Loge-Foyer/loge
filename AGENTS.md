@@ -563,6 +563,13 @@ typecheck.
   global list.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
   `field.type` only. Never write a form for a specific plugin.
+- **An adapter's id goes into a route through `routeId` and comes out through
+  `fromRouteId`** (`components/media/item-link.ts`). expo-router decodes a
+  param twice — parsing the path or query, then in `useLocalSearchParams` —
+  so an id holding `%` arrives changed: a Stalker series id
+  `show:s:18390%3A18390` came out `show:s:18390:18390`, and every series
+  failed to open. Use `itemHref`, `keyHref`, `playHref` and `liveHref`
+  rather than spelling a pathname with an id in it.
 
 ---
 

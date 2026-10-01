@@ -1,6 +1,7 @@
 import { connectionId as toConnectionId, pluginId } from '@sc/api';
 import { useLocalSearchParams } from 'expo-router';
 
+import { fromRouteId } from '@/components/media/item-link';
 import { PlayerScreen } from '@/screens/player';
 
 export default function Play() {
@@ -18,9 +19,9 @@ export default function Play() {
   return (
     <PlayerScreen
       connectionId={toConnectionId(connectionId)}
-      itemId={itemId}
+      itemId={fromRouteId(itemId)}
       {...(startMs !== undefined && Number.isFinite(startMs) && startMs > 0 ? { startMs } : {})}
-      {...(live === '1' ? { live: { title: title ?? '', ...(group ? { group } : {}) } } : {})}
+      {...(live === '1' ? { live: { title: title ?? '', ...(group ? { group: fromRouteId(group) } : {}) } } : {})}
       {...(player ? { player: pluginId(player) } : {})}
     />
   );

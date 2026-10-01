@@ -24,6 +24,7 @@ export function Artwork({
   label,
   rounded = '$5',
   fit = 'cover',
+  blur,
 }: {
   connectionId: ConnectionId;
   image: ImageRef | undefined;
@@ -33,6 +34,8 @@ export function Artwork({
   label: string;
   rounded?: Radius;
   fit?: ImageContentFit;
+  /** Softened, for a cover laid behind the page rather than looked at. */
+  blur?: number;
 }) {
   const height = Math.round(width / aspect);
   const resolved = useArtwork(connectionId, image, width, height);
@@ -71,6 +74,7 @@ export function Artwork({
             cachePolicy={resolved.cachePolicy}
             recyclingKey={resolved.uri}
             transition={150}
+            {...(blur ? { blurRadius: blur } : {})}
             accessibilityIgnoresInvertColors
             {...(resolved.blurhash ? { placeholder: { blurhash: resolved.blurhash } } : {})}
           />

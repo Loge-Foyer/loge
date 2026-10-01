@@ -9,6 +9,7 @@ import { Button, Paragraph, SizableText, XStack, YStack } from 'tamagui';
 import { ConfirmButton } from '@/components/confirm-button';
 import { EmptyState } from '@/components/empty-state';
 import { episodeCode } from '@/components/labels';
+import { keyHref } from '@/components/media/item-link';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
@@ -140,7 +141,7 @@ function ItemRow({ item, onRemove }: { item: GlobalMediaKey; onRemove: () => voi
     <SettingsRow
       title={title}
       {...(detail.data ? { subtitle: describeKind(detail.data.detail.item) } : {})}
-      href={{ pathname: '/item/[connectionId]/[itemId]', params: { connectionId: item.connectionId, itemId: item.externalId } }}
+      href={keyHref(item)}
       trailing={
         <Button size="$2" aria-label={`Remove ${title} from this list`} onPress={onRemove}>
           Remove
