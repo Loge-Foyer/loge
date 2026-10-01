@@ -403,6 +403,22 @@ describe('Jellyfin — mapping', () => {
     });
   });
 
+  it('calls a file by the name a person would, not ffprobe’s first guess', async () => {
+    const { provider } = await connect({
+      routes: {
+        'GET /Items/m-arrival': {
+          status: 200,
+          json: {
+            ...fixtures.movieDetail,
+            MediaSources: [{ Id: 's', Container: 'mov,mp4,m4a,3gp,3g2,mj2', MediaStreams: [] }],
+          },
+        },
+      },
+    });
+    // `mov` is first in the family list and is the least likely truth.
+    expect((await provider.getItem?.('m-arrival'))?.versions?.[0]?.container).toBe('mp4');
+  });
+
   it('calls Atmos Atmos, and only where the server does', async () => {
     const { provider } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail } } });
     const audio = (await provider.getItem?.('m-arrival'))?.versions?.[0]?.audio ?? [];
@@ -447,6 +463,77 @@ describe('Jellyfin — mapping', () => {
     });
     // Absent, not an empty list: "the server did not say" is not "there are none".
     expect((await provider.getItem?.('m-arrival'))?.versions).toBeUndefined();
+  });
+
+  it('offers the file it has, and the smaller ones it would make', async () => {
+    const { provider } = await connect({ routes: { 'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail } } });
+    const list = provider.listDownloadOptions;
+    if (!list) throw new Error('listDownloadOptions is missing');
+    const options = await list({ connectionId: connectionId('connection-1'), externalId: 'm-arrival' });
+
+    const original = options[0];
+    expect(original).toMatchObject({ height: 2160, estimatedBytes: 68_719_476_736, transcoded: false, container: 'mkv' });
+
+    // The whole point: 68 GB becomes something that fits on a phone. 1080p at
+    // 8 Mbps over a 1h58 film is about 7 GB; 480p about 1.3 GB.
+    const smaller = options.filter((option) => option.transcoded);
+    expect(smaller.map((option) => option.height)).toEqual([1080, 720, 480, 360]);
+    expect(smaller[0]?.estimatedBytes).toBe(Math.round((8_000_000 / 8) * 7098));
+    expect(smaller.every((option) => option.container === 'mp4' && option.videoCodec === 'h264')).toBe(true);
+
+    // Nothing taller than the file itself: upscaling costs space and gains
+    // nothing, so 4K is not offered as a transcode of a 4K file.
+    expect(smaller.some((option) => (option.height ?? 0) >= 2160)).toBe(false);
+  });
+
+  it('asks for one file, never a playlist, and hands back a static address', async () => {
+    const { provider, http } = await connect({
+      routes: {
+        'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail },
+        'POST /Items/m-arrival/PlaybackInfo': { status: 200, json: fixtures.directPlayInfo },
+      },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    const plan = await get({ key: { connectionId: connectionId('connection-1'), externalId: 'm-arrival' } });
+
+    const body = JSON.parse(http.to('POST /Items/m-arrival/PlaybackInfo')[0]?.body ?? '{}') as {
+      DeviceProfile: { TranscodingProfiles: { Protocol: string; Context: string }[] };
+    };
+    // http and Static, never hls: a download is one file, not a playlist and
+    // a folder of segments.
+    expect(body.DeviceProfile.TranscodingProfiles[0]).toMatchObject({ Protocol: 'http', Context: 'Static' });
+    expect(plan.transcoded).toBe(false);
+    expect(plan.uri).toContain('/Download');
+    expect(plan.container).toBe('mp4');
+  });
+
+  it('asks the server to make a smaller one when a rung was chosen', async () => {
+    const { provider, http } = await connect({
+      routes: {
+        'GET /Items/m-arrival': { status: 200, json: fixtures.movieDetail },
+        'POST /Items/m-arrival/PlaybackInfo': { status: 200, json: fixtures.transcodeInfo },
+      },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    const plan = await get({ key: { connectionId: connectionId('connection-1'), externalId: 'm-arrival' }, optionId: 'source-4k|1080' });
+
+    const body = JSON.parse(http.to('POST /Items/m-arrival/PlaybackInfo')[0]?.body ?? '{}') as {
+      MaxStreamingBitrate: number;
+      MediaSourceId: string;
+      DeviceProfile: { CodecProfiles: { Conditions: { Property: string; Value: string }[] }[] };
+    };
+    expect(body.MediaSourceId).toBe('source-4k');
+    expect(body.MaxStreamingBitrate).toBe(8_000_000);
+    const conditions = body.DeviceProfile.CodecProfiles[0]?.Conditions ?? [];
+    expect(conditions).toContainEqual(expect.objectContaining({ Property: 'Height', Value: '1080' }));
+    // HDR off for a rung: tone-mapping is a transcode either way, and an SDR
+    // copy is what a phone shows.
+    expect(conditions).toContainEqual(expect.objectContaining({ Property: 'VideoRangeType', Value: 'SDR' }));
+    expect(plan.transcoded).toBe(true);
+    // A transcode's size is nobody's to know in advance.
+    expect(plan.expectedBytes).toBeUndefined();
   });
 
   it('turns a missing item into NOT_FOUND', async () => {

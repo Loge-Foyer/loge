@@ -22,9 +22,10 @@ import { resolveItemImage } from './images';
 import { isLimited, scopeFor } from './libraries';
 import { toDetail, toLibrary, toMediaItem } from './map';
 import { pageAcross, readCursor, writeCursor } from './merge';
+import { describe, downloadContainer, downloadOptions, downloadProfile, externalSubtitles, parseOption } from './download';
 import { deviceProfile, TICKS_PER_MS, toDescriptor, type PlaySession } from './playback';
 import { DETAIL_FIELDS, IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
-import { normalizeBaseUrl } from './url';
+import { normalizeBaseUrl, queryString } from './url';
 
 // Libraries change rarely; a limited selection needs them on every page.
 const LIBRARIES_TTL_MS = 5 * 60_000;
@@ -209,6 +210,69 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         }),
       );
       return mergeSorted(lists, byLastPlayed, limit).map((entry) => entry.value);
+    },
+
+    listDownloadOptions: async (key, signal) => {
+      const userId = await client.userId(signal);
+      const dto = readItem(
+        await client.get(`/Items/${encodeURIComponent(key.externalId)}`, { userId, fields: DETAIL_FIELDS }, signal),
+      );
+      const detail = dto && toDetail(dto, connectionId);
+      if (!dto || !detail) throw new AppError('NOT_FOUND', 'The server no longer has this item.');
+      return downloadOptions(dto.mediaSources, detail.versions ?? []);
+    },
+
+    getDownloadDescriptor: async (request, signal) => {
+      const itemId = request.key.externalId;
+      const userId = await client.userId(signal);
+      const { mediaSourceId, quality } = parseOption(request.optionId, request.quality);
+      // The file as the server knows it, so a direct-play profile can name its
+      // own codecs and the server has no reason to re-encode.
+      const dto = readItem(
+        await client.get(`/Items/${encodeURIComponent(itemId)}`, { userId, fields: DETAIL_FIELDS }, signal),
+      );
+      const versions = (dto && toDetail(dto, connectionId))?.versions ?? [];
+      const chosen = mediaSourceId === undefined ? 0 : Math.max(0, dto?.mediaSources.findIndex((entry) => entry.id === mediaSourceId) ?? 0);
+
+      const json = await client.post(
+        `/Items/${encodeURIComponent(itemId)}/PlaybackInfo`,
+        { userId },
+        {
+          UserId: userId,
+          DeviceProfile: downloadProfile(quality, versions[chosen]),
+          ...(mediaSourceId === undefined ? {} : { MediaSourceId: mediaSourceId }),
+          ...(quality.maxBitrate === undefined ? {} : { MaxStreamingBitrate: quality.maxBitrate }),
+          EnableDirectPlay: true,
+          EnableDirectStream: true,
+          EnableTranscoding: true,
+          AllowVideoStreamCopy: true,
+          AllowAudioStreamCopy: true,
+        },
+        signal,
+      );
+      const info = readPlaybackInfo(json);
+      const token = client.token();
+      if (!info || !token) throw unreadable();
+      const source = info.mediaSources.find((entry) => entry.id === mediaSourceId) ?? info.mediaSources[0];
+      if (!source) throw new AppError('INVALID_STATE', 'The server offered no file to keep.', { retry: 'never' });
+
+      const transcoding = source.transcodingUrl;
+      const container = transcoding ? (source.transcodingContainer ?? 'mp4') : downloadContainer(source.container);
+      const version = versions[chosen];
+      return {
+        key: request.key,
+        uri: transcoding
+          ? baseUrl + transcoding
+          : `${baseUrl}/Items/${encodeURIComponent(itemId)}/Download${queryString({ api_key: token, mediaSourceId: source.id })}`,
+        container: container.toLowerCase(),
+        ...describe(source),
+        transcoded: transcoding !== undefined,
+        // A transcode's size is nobody's to know in advance; a file's is the
+        // server's own figure.
+        ...(transcoding !== undefined || version?.sizeBytes === undefined ? {} : { expectedBytes: version.sizeBytes }),
+        ...(source.runTimeTicks === undefined ? {} : { durationMs: Math.round(source.runTimeTicks / TICKS_PER_MS) }),
+        subtitles: externalSubtitles(source, baseUrl),
+      };
     },
 
     getPlaybackDescriptor: async (request, signal) => {

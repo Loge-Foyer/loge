@@ -22,6 +22,7 @@ import type {
 import type { ItemDto, MediaSourceDto, MediaStreamDto } from './dto';
 import { itemImage, type ImageKind } from './images';
 import { bcp47 } from './languages';
+import { downloadContainer } from './download';
 import { deliveryOf, hdrOf, ours } from './playback';
 
 const TICKS_PER_MS = 10_000;
@@ -146,8 +147,10 @@ function toVersion(source: MediaSourceDto): MediaVersion {
   return {
     id: source.id,
     ...optional('label', source.name),
-    // ffprobe answers with a list for a family of containers; the first is the one.
-    ...optional('container', source.container?.split(',')[0]?.toLowerCase()),
+    // ffprobe answers with a family list — `mov,mp4,m4a,…` — whose first name
+    // is `mov`, the least likely truth. `downloadContainer` picks the one a
+    // person would call it.
+    ...optional('container', source.container === undefined ? undefined : downloadContainer(source.container)),
     ...optional('sizeBytes', source.size),
     ...optional('bitrate', source.bitrate),
     ...optional('durationMs', source.runTimeTicks === undefined ? undefined : Math.round(source.runTimeTicks / TICKS_PER_MS)),

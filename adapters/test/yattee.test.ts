@@ -364,6 +364,77 @@ describe('Yattee — playing', () => {
   });
 });
 
+describe('Yattee — keeping a copy', () => {
+  it('offers every rendition, with what each weighs', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const list = provider.listDownloadOptions;
+    if (!list) throw new Error('listDownloadOptions is missing');
+    const options = await list({ connectionId: 'connection-1' as never, externalId: 'dQw4w9WgXcQ' });
+    expect(options.map((option) => option.height)).toEqual([1080, 720, 360]);
+    expect(options[0]).toMatchObject({ label: '1080p', estimatedBytes: 112_328_704, container: 'mp4', transcoded: false });
+    // Nothing is re-encoded: the server fetches and muxes what already exists.
+    expect(options.every((option) => !option.transcoded)).toBe(true);
+  });
+
+  it('fetches through the muxing proxy, at the height chosen', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    const plan = await get({ key: { connectionId: 'connection-1' as never, externalId: 'dQw4w9WgXcQ' }, optionId: '18' });
+    // 360p is itag 18: the selector caps the merge at that height.
+    expect(plan.uri).toContain('/proxy/fast/dQw4w9WgXcQ');
+    expect(decodeURIComponent(plan.uri)).toContain('height<=360');
+    expect(plan.height).toBe(360);
+    expect(plan.container).toBe('mp4');
+    expect(plan.transcoded).toBe(false);
+    expect(plan.expectedBytes).toBe(18_874_368);
+    // The address carries the sign-in through a ref, never inline.
+    expect(plan.headersRef).toBeDefined();
+  });
+
+  it('takes the best rendition when nothing was chosen', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    const plan = await get({ key: { connectionId: 'connection-1' as never, externalId: 'dQw4w9WgXcQ' } });
+    expect(plan.height).toBe(1080);
+  });
+
+  it('keeps the captions beside the file', async () => {
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    const plan = await get({ key: { connectionId: 'connection-1' as never, externalId: 'dQw4w9WgXcQ' } });
+    expect(plan.subtitles.map((track) => track.language)).toEqual(['en', 'de']);
+    expect(plan.subtitles[0]?.uri).toContain('/api/v1/captions/');
+  });
+
+  it('refuses rather than guessing when the site published nothing', async () => {
+    const { provider } = await connect({
+      routes: {
+        'GET /api/v1/videos/dQw4w9WgXcQ': {
+          status: 200,
+          json: { ...fixtures.video, formatStreams: [], adaptiveFormats: [] },
+        },
+      },
+    });
+    const get = provider.getDownloadDescriptor;
+    if (!get) throw new Error('getDownloadDescriptor is missing');
+    await expect(get({ key: { connectionId: 'connection-1' as never, externalId: 'dQw4w9WgXcQ' } })).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+      retry: 'never',
+    });
+  });
+});
+
 describe('Yattee — what it refuses to guess', () => {
   it('calls an unreadable answer unreadable rather than empty', async () => {
     const { provider } = await connect({

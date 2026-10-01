@@ -16,6 +16,13 @@ export const MEDIA_CAPABILITIES = [
   'favoritesRead',
   'favoritesWrite',
   'remoteImages',
+  // A file the app may keep on the device: `getDownloadDescriptor`.
+  'downloads',
+  // There is more than one version to choose between — because the server will
+  // make one (Jellyfin transcoding) or because several already exist (a site's
+  // own renditions): `listDownloadOptions`. Without it a download takes
+  // whatever the source hands over, and no sheet of choices is shown.
+  'downloadOptions',
   // Not a call but a permission: the source's items keep stable ids and
   // tag-versioned artwork, so the app may keep them on the device.
   'offlineMetadata',

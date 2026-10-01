@@ -21,7 +21,7 @@ import { createClient } from './client';
 import { readChannel, readInfo, readPlaylist, readVideo, readVideos, type FormatDto, type VideoDto } from './dto';
 import { unreadable } from './errors';
 import { channelToItem, parseId, playlistToItem, toDetail, toItem, toItems } from './map';
-import { normalizeBaseUrl } from './url';
+import { normalizeBaseUrl, queryString } from './url';
 
 /** Every image this adapter resolves needs the same header, so one ref serves them all. */
 const AUTH_HEADERS = headersRef('auth');
@@ -154,6 +154,16 @@ function toVersions(video: VideoDto): readonly MediaVersion[] {
   return [...byHeight.values()].sort((a, b) => (b.video?.height ?? 0) - (a.video?.height ?? 0));
 }
 
+/**
+ * A yt-dlp format selector for the height asked for. The `[ext=…]` preferences
+ * push the merge towards an MP4 rather than a Matroska; the bare `best…`
+ * fallbacks are what runs when the site published no such pair.
+ */
+function selector(maxHeight: number | undefined): string {
+  const cap = maxHeight === undefined ? '' : `[height<=${maxHeight}]`;
+  return `bestvideo${cap}[ext=mp4]+bestaudio[ext=m4a]/bestvideo${cap}+bestaudio/best${cap}`;
+}
+
 export function createProvider(target: MediaTarget, context: MediaContext): ConnectedMediaProvider {
   const { connectionId, fields, settings } = target;
   const baseUrl = normalizeBaseUrl(typeof fields.serverUrl === 'string' ? fields.serverUrl : '');
@@ -271,6 +281,72 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         subtitleTracks: toSubtitles(video, baseUrl),
         ...(request.startMs === undefined ? {} : { startMs: request.startMs }),
         ...(video.lengthSeconds === undefined || live ? {} : { durationMs: video.lengthSeconds * 1000 }),
+      };
+    },
+
+    listDownloadOptions: async (key, signal) => {
+      const video = await videoOf(key.externalId, signal);
+      // The renditions the site published. Nothing is re-encoded for any of
+      // them: the server fetches and muxes what already exists.
+      return toVersions(video).map((version) => ({
+        id: version.id,
+        ...(version.label === undefined ? {} : { label: version.label }),
+        ...(version.video?.height === undefined ? {} : { height: version.video.height }),
+        ...(version.bitrate === undefined ? {} : { bitrate: version.bitrate }),
+        ...(version.sizeBytes === undefined ? {} : { estimatedBytes: version.sizeBytes }),
+        // What `/proxy/fast/` produces when it merges, not what the rendition
+        // alone is: the audio is a second stream, and the two become one file.
+        container: 'mp4',
+        ...(version.video?.codec === undefined ? {} : { videoCodec: version.video.codec }),
+        ...(version.audio.length === 0
+          ? {}
+          : { audioCodecs: version.audio.flatMap((track) => (track.codec === undefined ? [] : [track.codec])) }),
+        transcoded: false,
+      }));
+    },
+
+    getDownloadDescriptor: async (request, signal) => {
+      const video = await videoOf(request.key.externalId, signal);
+      const versions = toVersions(video);
+      const chosen = versions.find((version) => version.id === request.optionId) ?? versions[0];
+      const ceiling = chosen?.video?.height ?? request.quality?.maxHeight;
+      if (versions.length === 0) {
+        throw new AppError('INVALID_STATE', 'The server offered nothing to keep.', { retry: 'never' });
+      }
+      return {
+        key: request.key,
+        // `/proxy/fast/` runs yt-dlp and streams the file out as it goes, so
+        // the separate video and audio renditions arrive as one file — the
+        // full-quality route playback cannot take, because it has no manifest
+        // and no Range.
+        uri:
+          `${baseUrl}/proxy/fast/${encodeURIComponent(request.key.externalId)}` +
+          queryString({ format: selector(ceiling) }),
+        headersRef: AUTH_HEADERS,
+        container: 'mp4',
+        ...(chosen?.video?.codec === undefined ? {} : { videoCodec: chosen.video.codec }),
+        ...(chosen && chosen.audio.length > 0
+          ? { audioCodecs: chosen.audio.flatMap((track) => (track.codec === undefined ? [] : [track.codec])) }
+          : {}),
+        ...(ceiling === undefined ? {} : { height: ceiling }),
+        transcoded: false,
+        ...(chosen?.sizeBytes === undefined ? {} : { expectedBytes: chosen.sizeBytes }),
+        ...(video.lengthSeconds === undefined ? {} : { durationMs: video.lengthSeconds * 1000 }),
+        subtitles: video.captions.flatMap((caption, index) =>
+          caption.url === undefined
+            ? []
+            : [
+                {
+                  id: `caption-${index}`,
+                  uri: caption.url.startsWith('http') ? caption.url : baseUrl + caption.url,
+                  headersRef: AUTH_HEADERS,
+                  format: 'vtt',
+                  ...(caption.languageCode === undefined ? {} : { language: caption.languageCode }),
+                  label: caption.label,
+                  delivery: 'external' as const,
+                },
+              ],
+        ),
       };
     },
 

@@ -16,6 +16,7 @@ export * from './per-profile';
 export * from './user';
 export * from './effective';
 export * from './validate';
+export * from './download';
 export * from './media';
 export * from './query';
 export * from './errors';

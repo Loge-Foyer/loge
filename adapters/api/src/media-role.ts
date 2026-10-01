@@ -1,5 +1,6 @@
 import type { MediaCapability } from './capabilities';
 import type { PluginContext, PluginTarget } from './context';
+import type { DownloadDescriptor, DownloadOption, DownloadRequest } from './download';
 import type { CancelSignal } from './http';
 import type { ConnectionId } from './ids';
 import type { ChannelGroup, ChannelPage, ChannelQuery, GuideQuery, Programme } from './live';
@@ -53,6 +54,17 @@ export interface ConnectedMediaProvider {
    * delivers these, and may deliver one twice after a lost answer, so a report
    * must be safe to repeat.
    */
+  /**
+   * The versions this item can be kept as. Cheap enough to ask while drawing a
+   * sheet of choices; `getDownloadDescriptor` is the expensive half.
+   */
+  listDownloadOptions?(key: GlobalMediaKey, signal?: CancelSignal): Promise<readonly DownloadOption[]>;
+  /**
+   * How to fetch one copy. The address may expire or carry a token, so it is
+   * asked for when the download starts and again when it resumes — never
+   * stored.
+   */
+  getDownloadDescriptor?(request: DownloadRequest, signal?: CancelSignal): Promise<DownloadDescriptor>;
   reportPlayback?(report: ProgressReport, signal?: CancelSignal): Promise<void>;
   /** Watched, or not, as the user said. Safe to repeat, like a report. */
   setPlayed?(key: GlobalMediaKey, played: boolean, signal?: CancelSignal): Promise<void>;
@@ -83,4 +95,6 @@ export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   epg: ['getGuide'],
   playback: ['getPlaybackDescriptor'],
   watchStateWrite: ['reportPlayback', 'setPlayed'],
+  downloads: ['getDownloadDescriptor'],
+  downloadOptions: ['listDownloadOptions'],
 };
