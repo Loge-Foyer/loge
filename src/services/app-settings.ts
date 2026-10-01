@@ -13,16 +13,34 @@ export const APP_DEFAULTS: AppSettings = {
   // What a player needs to hand and nothing else. "Next episode" is not here:
   // it appears by itself at the end, where it belongs.
   buttons: ['audio', 'subtitles', 'speed'],
+  // Nothing floats over the picture unless it is asked for.
+  topButtons: [],
+  centreJump: 'seek',
+  doubleTap: 'seek',
+  // Where a thumb already is on a phone held on its side.
+  leftSlider: 'brightness',
+  rightSlider: 'volume',
+  showRemaining: true,
+  // Off: a hold that changes the speed surprises anyone who did not ask for it.
+  holdRate: 1,
+  pictureInPicture: true,
+  backgroundPlayback: true,
 };
+
+/** What a press and hold may be set to. 1 is off. */
+export const HOLD_RATES = [1, 1.5, 2, 2.5, 3, 4] as const;
 
 /** What the seek buttons may be set to, in seconds. */
 export const SEEK_CHOICES = [5, 10, 15, 30, 60] as const;
 
+/** The two rows a button may sit in. */
+export type ButtonRow = 'buttons' | 'topButtons';
+
 export interface AppSettingsService {
   get(): Promise<AppSettings>;
   set(change: Partial<AppSettings>): Promise<void>;
-  /** Puts a button in the row, or takes it out, keeping the row's own order. */
-  setButton(button: PlayerButton, shown: boolean): Promise<void>;
+  /** Puts a button in one of the two rows, or takes it out, keeping the row's own order. */
+  setButton(row: ButtonRow, button: PlayerButton, shown: boolean): Promise<void>;
 }
 
 export function createAppSettingsService(deps: { readonly deviceSettings: DeviceSettingsRepository }): AppSettingsService {
@@ -32,13 +50,13 @@ export function createAppSettingsService(deps: { readonly deviceSettings: Device
     set: async (change) => {
       await deviceSettings.update((current) => ({ ...current, app: { ...current.app, ...change } }));
     },
-    setButton: async (button, shown) => {
+    setButton: async (row, button, shown) => {
       await deviceSettings.update((current) => {
-        const now = current.app?.buttons ?? APP_DEFAULTS.buttons;
+        const now = current.app?.[row] ?? APP_DEFAULTS[row];
         // Kept in the order the list itself is in, so switching one off and on
         // again puts it back where it was rather than at the end.
-        const buttons = shown ? PLAYER_BUTTONS.filter((each) => each === button || now.includes(each)) : now.filter((each) => each !== button);
-        return { ...current, app: { ...current.app, buttons } };
+        const next = shown ? PLAYER_BUTTONS.filter((each) => each === button || now.includes(each)) : now.filter((each) => each !== button);
+        return { ...current, app: { ...current.app, [row]: next } };
       });
     },
   };

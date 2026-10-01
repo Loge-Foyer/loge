@@ -13,7 +13,10 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "NSLocalNetworkUsageDescription": "Streaming Center reaches your media servers and sync server on this network."
+        "NSLocalNetworkUsageDescription": "Streaming Center reaches your media servers and sync server on this network.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
       },
       "bundleIdentifier": "com.fkg.streamingcenter",
       "appleTeamId": "UWDGY69RA7"

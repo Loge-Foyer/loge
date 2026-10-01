@@ -44,15 +44,15 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     // What a player needs to hand, and no always-on Next episode.
     expect(await app.get()).toMatchObject({ seekMs: 10_000, buttons: ['audio', 'subtitles', 'speed'], forceLandscape: true });
 
-    await app.setButton('chapters', true);
+    await app.setButton('buttons', 'chapters', true);
     // Put where the list itself has it, not on the end.
     expect((await app.get()).buttons).toEqual(['audio', 'subtitles', 'speed', 'chapters']);
 
-    await app.setButton('audio', false);
+    await app.setButton('buttons', 'audio', false);
     expect((await app.get()).buttons).toEqual(['subtitles', 'speed', 'chapters']);
 
     // Switched on again, it goes back where it was rather than to the end.
-    await app.setButton('audio', true);
+    await app.setButton('buttons', 'audio', true);
     expect((await app.get()).buttons).toEqual(['audio', 'subtitles', 'speed', 'chapters']);
 
     await app.set({ seekMs: 30_000 });

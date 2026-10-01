@@ -13,6 +13,7 @@ import { createNetworkMonitor } from '@/platform/network';
 import { createOwnerAuthentication } from '@/platform/owner-authentication';
 import { currentPlatform } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
+import { screenBrightness } from '@/platform/brightness';
 import { screenOrientation } from '@/platform/screen-orientation';
 import { createAccountService } from '@/services/account';
 import { createBackupService } from '@/services/backup';
@@ -200,6 +201,7 @@ export function createServices(): AppServices {
       watch,
       playback,
       orientation: screenOrientation,
+      brightness: screenBrightness,
     },
     start: async () => {
       // Upright, as every screen but the player's is laid out; iOS starts that way already.

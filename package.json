@@ -40,6 +40,7 @@
     "expo": "~57.0.26",
     "expo-application": "~57.0.3",
     "expo-asset": "~57.0.18",
+    "expo-brightness": "~57.0.2",
     "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.19",
     "expo-crypto": "~57.0.3",

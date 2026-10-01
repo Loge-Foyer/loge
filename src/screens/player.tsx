@@ -2,6 +2,10 @@ import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episo
 import type { PlayerView } from '@sc/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
+import { ChevronsLeft } from '@tamagui/lucide-icons-2/icons/ChevronsLeft';
+import { ChevronsRight } from '@tamagui/lucide-icons-2/icons/ChevronsRight';
+import { Sun } from '@tamagui/lucide-icons-2/icons/Sun';
+import { Volume2 } from '@tamagui/lucide-icons-2/icons/Volume2';
 import { Gauge } from '@tamagui/lucide-icons-2/icons/Gauge';
 import { List } from '@tamagui/lucide-icons-2/icons/List';
 import { SkipForward } from '@tamagui/lucide-icons-2/icons/SkipForward';
@@ -14,8 +18,8 @@ import { RotateCw } from '@tamagui/lucide-icons-2/icons/RotateCw';
 import { X } from '@tamagui/lucide-icons-2/icons/X';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 import { Button, SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
@@ -25,7 +29,7 @@ import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
 import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import type { PlayerButton } from '@/services/ports';
+import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
 
 const HIDE_AFTER_MS = 3_500;
@@ -62,6 +66,7 @@ export function PlayerScreen({
   });
   const report = usePlaybackReports(item, live !== undefined, startMs);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
+  usePlayerLeaving(controller, live !== undefined);
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;
   const next = useNextEpisode(item?.type === 'episode' ? item : undefined);
@@ -144,7 +149,8 @@ function Controls({
   const [panel, setPanel] = useState<'audio' | 'subtitles' | 'speed' | 'chapters'>();
   const [rate, setRate] = useState(1);
   const { data: settings } = useAppSettings();
-  const { seekMs, buttons } = settings ?? APP_DEFAULTS;
+  const app = settings ?? APP_DEFAULTS;
+  const { seekMs, buttons, topButtons, centreJump, showRemaining, holdRate } = app;
   const seekSeconds = Math.round(seekMs / 1000);
   const [scrub, setScrub] = useState<number>();
   const { state, positionMs, durationMs } = snapshot;
@@ -172,6 +178,15 @@ function Controls({
     touch();
     controller?.seek(Math.max(0, Math.min(durationMs ?? Number.MAX_SAFE_INTEGER, positionMs + by)));
   };
+  /** Back or forward, by whatever the setting says that means. */
+  const jump = (how: PlayerJump, direction: -1 | 1) => {
+    if (how === 'off') return;
+    if (how === 'seek') return skip(direction * seekMs);
+    const to = chapterBeside(chapters, positionMs, direction);
+    if (to === undefined) return;
+    touch();
+    controller?.seek(to);
+  };
   const playNext = () => {
     if (!next) return;
     router.replace({
@@ -179,6 +194,125 @@ function Controls({
       params: { connectionId: next.key.connectionId, itemId: next.key.externalId, ...(player ? { player } : {}) },
     });
   };
+
+  // What a drag down an edge is showing, while it is showing it.
+  const [adjust, setAdjust] = useState<{ readonly kind: PlayerSlider; readonly value: number }>();
+  const [boosted, setBoosted] = useState(false);
+  const { brightness } = useServices();
+  const [levels, setLevels] = useState({ brightness: 0.5, volume: 1 });
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const lastTap = useRef({ at: 0, x: 0 });
+
+  // The screen's own brightness is read once, and put back when the player goes.
+  useEffect(() => {
+    let left = false;
+    void brightness.get().then((value) => {
+      if (!left && value !== undefined) setLevels((now) => ({ ...now, brightness: value }));
+    });
+    return () => {
+      left = true;
+      void brightness.restore();
+    };
+  }, [brightness]);
+
+  /**
+   * `by` is how far the whole drag has come, not the step since the last call:
+   * taken from where the level stood when the finger went down, a drag cannot
+   * drift away from the finger however often it reports.
+   */
+  const drag = (kind: PlayerSlider, by: number) => {
+    if (kind === 'off') return;
+    const next = Math.min(1, Math.max(0, levels[kind] + by));
+    setAdjust({ kind, value: next });
+    if (kind === 'brightness') void brightness.set(next);
+    else controller?.setVolume?.(next);
+  };
+
+  // Only a deliberate vertical drag down an edge takes over; a tap falls
+  // through to the controls underneath, which is what makes both possible on
+  // the same piece of picture. `x0` is where the gesture began, so which edge
+  // it belongs to needs nothing remembered between its calls.
+  const edges = PanResponder.create({
+    onMoveShouldSetPanResponder: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
+      if (Math.abs(state.dy) < 12 || Math.abs(state.dy) < Math.abs(state.dx)) return false;
+      const third = size.width / 3;
+      return state.x0 < third || state.x0 > size.width - third;
+    },
+    onPanResponderMove: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
+      // Up is more, as every phone does it.
+      drag(state.x0 < size.width / 2 ? app.leftSlider : app.rightSlider, -state.dy / (size.height || 1) / 2);
+    },
+    // Where it ended is where it starts from next time.
+    onPanResponderRelease: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
+      const kind = state.x0 < size.width / 2 ? app.leftSlider : app.rightSlider;
+      if (kind !== 'off') {
+        const next = Math.min(1, Math.max(0, levels[kind] + -state.dy / (size.height || 1) / 2));
+        setLevels((now) => ({ ...now, [kind]: next }));
+      }
+      setTimeout(() => setAdjust(undefined), 600);
+    },
+  });
+
+  /** A tap, unless another followed it quickly on the same side — then a jump. */
+  const onTap = (x: number) => {
+    const now = Date.now();
+    const sameSide = x < size.width / 2 === lastTap.current.x < size.width / 2;
+    if (app.doubleTap !== 'off' && !live && now - lastTap.current.at < 300 && sameSide) {
+      lastTap.current = { at: 0, x };
+      jump(app.doubleTap, x < size.width / 2 ? -1 : 1);
+      return;
+    }
+    lastTap.current = { at: now, x };
+    if (shown) setVisible(false);
+    else touch();
+  };
+
+  const hold = (on: boolean) => {
+    if (holdRate <= 1 || live || !controller?.setRate) return;
+    setBoosted(on);
+    controller.setRate(on ? holdRate : 1);
+  };
+
+  /** One row of buttons, from whichever list was arranged for it. */
+  const row = (which: readonly PlayerButton[]) =>
+    which.map((button: PlayerButton) => {
+                // A button with nothing behind it is not shown: no second audio
+                // track, no subtitles, an engine that cannot change its rate.
+                const open = (which: typeof panel) => () => setPanel(panel === which ? undefined : which);
+                if (button === 'audio') {
+                  return snapshot.audio.length > 1 ? (
+                    <IconButton key={button} label="Audio" onPress={open('audio')}>
+                      <AudioLines size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'subtitles') {
+                  return snapshot.subtitles.length > 0 ? (
+                    <IconButton key={button} label="Subtitles" onPress={open('subtitles')}>
+                      <Captions size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'speed') {
+                  return controller?.setRate && !live ? (
+                    <IconButton key={button} label="Speed" onPress={open('speed')}>
+                      <Gauge size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                if (button === 'chapters') {
+                  return (chapters?.length ?? 0) > 1 && !live ? (
+                    <IconButton key={button} label="Chapters" onPress={open('chapters')}>
+                      <List size={24} color="white" />
+                    </IconButton>
+                  ) : null;
+                }
+                return next ? (
+                  <IconButton key={button} label="Next episode" onPress={playNext}>
+                    <SkipForward size={24} color="white" />
+                  </IconButton>
+                ) : null;
+    });
 
   // What the source marked this moment as, and what to offer for it. An outro
   // is where the next episode belongs — so there is no button for it the rest
@@ -197,11 +331,19 @@ function Controls({
           } };
 
   return (
-    <Pressable
+    <View
       style={StyleSheet.absoluteFill}
-      onPress={() => (shown ? setVisible(false) : touch())}
-      accessibilityLabel={shown ? 'Hide the controls' : 'Show the controls'}
+      onLayout={(event) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+      {...edges.panHandlers}
     >
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={(event) => onTap(event.nativeEvent.locationX)}
+        onLongPress={() => hold(true)}
+        onPressOut={() => hold(false)}
+        delayLongPress={400}
+        accessibilityLabel={shown ? 'Hide the controls' : 'Show the controls'}
+      >
       {shown ? (
         <YStack flex={1} justify="space-between" bg="rgba(0, 0, 0, 0.45)" px="$4" pt="$5" pb="$5">
           <XStack items="center" gap="$3">
@@ -219,12 +361,18 @@ function Controls({
                 {item?.title ?? ''}
               </SizableText>
             </YStack>
+            {/* The top left is always what is playing; what floats at the right is arranged. */}
+            <XStack items="center" gap="$2">{row(topButtons)}</XStack>
           </XStack>
 
           <XStack items="center" justify="center" gap="$8">
-            {live ? null : (
-              <IconButton label={`Back ${seekSeconds} seconds`} onPress={() => skip(-seekMs)} disabled={!controller}>
-                <RotateCcw size={30} color="white" />
+            {live || centreJump === 'off' ? null : (
+              <IconButton
+                label={centreJump === 'chapter' ? 'Chapter back' : `Back ${seekSeconds} seconds`}
+                onPress={() => jump(centreJump, -1)}
+                disabled={!controller}
+              >
+                {centreJump === 'chapter' ? <ChevronsLeft size={30} color="white" /> : <RotateCcw size={30} color="white" />}
               </IconButton>
             )}
             {waiting ? (
@@ -234,9 +382,13 @@ function Controls({
                 {playing ? <Pause size={44} color="white" fill="white" /> : <Play size={44} color="white" fill="white" />}
               </IconButton>
             )}
-            {live ? null : (
-              <IconButton label={`Forward ${seekSeconds} seconds`} onPress={() => skip(seekMs)} disabled={!controller}>
-                <RotateCw size={30} color="white" />
+            {live || centreJump === 'off' ? null : (
+              <IconButton
+                label={centreJump === 'chapter' ? 'Chapter forward' : `Forward ${seekSeconds} seconds`}
+                onPress={() => jump(centreJump, 1)}
+                disabled={!controller}
+              >
+                {centreJump === 'chapter' ? <ChevronsRight size={30} color="white" /> : <RotateCw size={30} color="white" />}
               </IconButton>
             )}
           </XStack>
@@ -328,55 +480,41 @@ function Controls({
                   <Slider.Thumb index={0} circular size="$1" bg="white" />
                 </Slider>
                 <SizableText size="$2" color="white" minW={52} text="right">
-                  {clockTime(durationMs)}
+                  {showRemaining ? `-${clockTime(Math.max(0, durationMs - (scrub ?? positionMs)))}` : clockTime(durationMs)}
                 </SizableText>
               </XStack>
             ) : null}
             <XStack items="center" gap="$2">
               <XStack flex={1}>{skipAction ? <SkipButton label={skipAction.label} onPress={skipAction.run} /> : null}</XStack>
-              {buttons.map((button: PlayerButton) => {
-                // A button with nothing behind it is not shown: no second audio
-                // track, no subtitles, an engine that cannot change its rate.
-                const open = (which: typeof panel) => () => setPanel(panel === which ? undefined : which);
-                if (button === 'audio') {
-                  return snapshot.audio.length > 1 ? (
-                    <IconButton key={button} label="Audio" onPress={open('audio')}>
-                      <AudioLines size={24} color="white" />
-                    </IconButton>
-                  ) : null;
-                }
-                if (button === 'subtitles') {
-                  return snapshot.subtitles.length > 0 ? (
-                    <IconButton key={button} label="Subtitles" onPress={open('subtitles')}>
-                      <Captions size={24} color="white" />
-                    </IconButton>
-                  ) : null;
-                }
-                if (button === 'speed') {
-                  return controller?.setRate && !live ? (
-                    <IconButton key={button} label="Speed" onPress={open('speed')}>
-                      <Gauge size={24} color="white" />
-                    </IconButton>
-                  ) : null;
-                }
-                if (button === 'chapters') {
-                  return (chapters?.length ?? 0) > 1 && !live ? (
-                    <IconButton key={button} label="Chapters" onPress={open('chapters')}>
-                      <List size={24} color="white" />
-                    </IconButton>
-                  ) : null;
-                }
-                return next ? (
-                  <IconButton key={button} label="Next episode" onPress={playNext}>
-                    <SkipForward size={24} color="white" />
-                  </IconButton>
-                ) : null;
-              })}
+              {row(buttons)}
             </XStack>
           </YStack>
         </YStack>
       ) : null}
-    </Pressable>
+      </Pressable>
+      {adjust && adjust.kind !== 'off' ? <EdgeReadout kind={adjust.kind} value={adjust.value} /> : null}
+      {boosted ? (
+        <YStack position="absolute" t="$8" l={0} r={0} items="center" pointerEvents="none">
+          <SizableText size="$5" fontWeight="700" color="white" bg="rgba(0,0,0,0.6)" px="$3" py="$2" rounded="$10">
+            {holdRate}× ▸▸
+          </SizableText>
+        </YStack>
+      ) : null}
+    </View>
+  );
+}
+
+/** What a drag down an edge is doing, while it is doing it. */
+function EdgeReadout({ kind, value }: { kind: Exclude<PlayerSlider, 'off'>; value: number }) {
+  return (
+    <YStack position="absolute" t={0} b={0} l={0} r={0} items="center" justify="center" pointerEvents="none">
+      <YStack items="center" gap="$2" bg="rgba(0,0,0,0.6)" px="$4" py="$3" rounded="$6">
+        {kind === 'brightness' ? <Sun size={24} color="white" /> : <Volume2 size={24} color="white" />}
+        <SizableText size="$4" fontWeight="600" color="white">
+          {Math.round(value * 100)}%
+        </SizableText>
+      </YStack>
+    </YStack>
   );
 }
 
@@ -554,4 +692,32 @@ function PanelRow({ label, chosen, onPress }: { label: string; chosen: boolean; 
       </SizableText>
     </Pressable>
   );
+}
+
+/** The chapter before or after a position, or nothing at either end. */
+function chapterBeside(chapters: readonly Chapter[] | undefined, positionMs: number, direction: -1 | 1): number | undefined {
+  const starts = (chapters ?? []).map((chapter) => chapter.startMs);
+  if (starts.length === 0) return undefined;
+  if (direction === 1) return starts.find((start) => start > positionMs + 1_000);
+  // Back goes to the top of this chapter first, as a disc player does, and
+  // only to the one before when it is already there.
+  const here = starts.filter((start) => start <= positionMs - 3_000).at(-1);
+  return here ?? 0;
+}
+
+/**
+ * Picture in picture and background sound, asked of the engine once there is
+ * one. Both are the device's settings, and an engine without either simply
+ * carries on as before. A channel is neither: it is live, and shrinking it
+ * into a corner to keep the sound is not what anyone means by it.
+ */
+function usePlayerLeaving(controller: MediaPlayer | undefined, live: boolean) {
+  const { data } = useAppSettings();
+  const pictureInPicture = (data ?? APP_DEFAULTS).pictureInPicture && !live;
+  const backgroundPlayback = (data ?? APP_DEFAULTS).backgroundPlayback;
+  useEffect(() => {
+    if (!controller) return;
+    controller.setPictureInPicture?.(pictureInPicture);
+    controller.setBackgroundPlayback?.(backgroundPlayback);
+  }, [controller, pictureInPicture, backgroundPlayback]);
 }

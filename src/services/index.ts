@@ -9,7 +9,7 @@ import type { PinService } from './pins';
 import type { PlaybackService } from './playback';
 import type { AppSettingsService } from './app-settings';
 import type { PlayerService } from './players';
-import type { FileExchange, ScreenOrientationControl } from './ports';
+import type { FileExchange, ScreenBrightness, ScreenOrientationControl } from './ports';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
 import type { SessionService } from './session';
@@ -48,6 +48,8 @@ export interface Services {
   readonly players: PlayerService;
   /** What the app does by itself on this device — how the player turns, for now. */
   readonly appSettings: AppSettingsService;
+  /** The screen's brightness, for the player's edge slider. */
+  readonly brightness: ScreenBrightness;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */
   readonly watch: WatchService;
   /** Pressing Play: which player plays what, its controller and its view. */

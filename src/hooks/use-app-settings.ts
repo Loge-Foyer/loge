@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
+import type { ButtonRow } from '@/services/app-settings';
 import { deviceKey } from '@/services/query-keys';
 import type { AppSettings, PlayerButton } from '@/services/ports';
 
@@ -21,7 +22,7 @@ export function useAppSettingActions() {
       onSuccess: () => refresh(),
     }),
     setButton: useMutation({
-      mutationFn: ({ button, shown }: { button: PlayerButton; shown: boolean }) => appSettings.setButton(button, shown),
+      mutationFn: ({ row, button, shown }: { row: ButtonRow; button: PlayerButton; shown: boolean }) => appSettings.setButton(row, button, shown),
       onSuccess: () => refresh(),
     }),
   };

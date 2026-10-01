@@ -86,12 +86,7 @@ export interface DeviceSettings {
     readonly order?: readonly PluginId[];
   };
   /** How this device behaves, whoever is watching. Never journaled, never backed up. */
-  readonly app?: {
-    /** Turn the phone on its side for the player and hold it there. On unless set otherwise. */
-    readonly forceLandscape?: boolean;
-    readonly seekMs?: number;
-    readonly buttons?: readonly PlayerButton[];
-  };
+  readonly app?: Partial<AppSettings>;
 }
 
 /**
@@ -99,25 +94,54 @@ export interface DeviceSettings {
  * applied, so nothing downstream has to know what the default was.
  */
 /**
- * A button the player may show in its bottom row. The row beneath the picture
- * is the user's to arrange; the three in the middle — back, play, forward —
- * are the player itself and are always there.
+ * A button the player may show. Two rows can hold these: the one beneath the
+ * picture and the one floating at the top right. The top left is always the
+ * title, and is not arranged.
  */
 export const PLAYER_BUTTONS = ['audio', 'subtitles', 'speed', 'chapters', 'nextEpisode'] as const;
 
 export type PlayerButton = (typeof PLAYER_BUTTONS)[number];
 
+/**
+ * What the pair either side of play does, and what a double tap on a half of
+ * the picture does. `seek` moves by `seekMs`; `chapter` jumps to the one
+ * before or after.
+ */
+export const PLAYER_JUMPS = ['off', 'seek', 'chapter'] as const;
+
+export type PlayerJump = (typeof PLAYER_JUMPS)[number];
+
+/** What an edge of the picture drags. Either edge may hold either, or neither. */
+export const PLAYER_SLIDERS = ['off', 'brightness', 'volume'] as const;
+
+export type PlayerSlider = (typeof PLAYER_SLIDERS)[number];
+
 export interface AppSettings {
   /** Turn the phone on its side for the player and hold it there. */
   readonly forceLandscape: boolean;
-  /** How far the two seek buttons move, each way. */
+  /** How far a `seek` moves, each way. */
   readonly seekMs: number;
-  /**
-   * The bottom row, in order. The same for every player: a player is the
-   * engine, not the controls, so the controls are the app's and are arranged
-   * once for all of them.
-   */
+  /** The row beneath the picture, in order. */
   readonly buttons: readonly PlayerButton[];
+  /** The row floating at the top right, in order. */
+  readonly topButtons: readonly PlayerButton[];
+  /** The pair either side of play. */
+  readonly centreJump: PlayerJump;
+  /** A double tap on the left or right half of the picture. */
+  readonly doubleTap: PlayerJump;
+  readonly leftSlider: PlayerSlider;
+  readonly rightSlider: PlayerSlider;
+  /** The figure at the right of the scrubber: what is left, or how long it is. */
+  readonly showRemaining: boolean;
+  /** How fast a press and hold plays while it is held. 1 turns it off. */
+  readonly holdRate: number;
+  /**
+   * Picture in picture, and sound carrying on when the app is not in front.
+   * Both are asked of the engine, and an engine without them simply does
+   * neither — `playsHere` on a player says which it has.
+   */
+  readonly pictureInPicture: boolean;
+  readonly backgroundPlayback: boolean;
 }
 
 export interface DeviceSettingsRepository {
@@ -422,6 +446,18 @@ export interface OwnerAuthentication {
   /** Whether the device can ask at all: a passcode or a biometric is set up. */
   available(): Promise<boolean>;
   authenticate(reason: string): Promise<OwnerAnswer>;
+}
+
+/**
+ * The screen's own brightness, 0 to 1, for the slider down an edge of the
+ * player. `undefined` from `get` means the device will not say, and the
+ * slider starts from the middle.
+ */
+export interface ScreenBrightness {
+  get(): Promise<number | undefined>;
+  set(value: number): Promise<void>;
+  /** Back to the system's, when the player closes. */
+  restore(): Promise<void>;
 }
 
 /** Which ways the screen may turn: upright, as the app is laid out, or any way — a film fills a phone on its side. */

@@ -14,8 +14,8 @@ import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
 import { usePlayerActions, usePlayers } from '@/hooks/use-players';
-import { APP_DEFAULTS, SEEK_CHOICES } from '@/services/app-settings';
-import { PLAYER_BUTTONS, type PlayerButton } from '@/services/ports';
+import { APP_DEFAULTS, HOLD_RATES, SEEK_CHOICES, type ButtonRow } from '@/services/app-settings';
+import { PLAYER_BUTTONS, PLAYER_JUMPS, PLAYER_SLIDERS, type PlayerButton, type PlayerJump, type PlayerSlider } from '@/services/ports';
 import type { PlayerSummary } from '@/services/players';
 
 import { BackupSection } from './backup';
@@ -170,54 +170,180 @@ const BUTTON_NOTES: Readonly<Partial<Record<PlayerButton, string>>> = {
   nextEpisode: 'It appears at the end of an episode whether this is on or not.',
 };
 
+const JUMP_LABELS: Readonly<Record<PlayerJump, string>> = { off: 'Off', seek: 'Seconds', chapter: 'Chapter' };
+const SLIDER_LABELS: Readonly<Record<PlayerSlider, string>> = { off: 'Off', brightness: 'Brightness', volume: 'Volume' };
+
+/** A row whose trailing edge is a short list of choices, one of them taken. */
+function ChoiceRow<T extends string | number>({
+  title,
+  subtitle,
+  options,
+  label,
+  value,
+  disabled,
+  onChoose,
+}: {
+  title: string;
+  subtitle?: string;
+  options: readonly T[];
+  label: (option: T) => string;
+  value: T;
+  disabled: boolean;
+  onChoose: (option: T) => void;
+}) {
+  return (
+    <SettingsRow
+      title={title}
+      {...(subtitle ? { subtitle } : {})}
+      trailing={
+        <XStack gap="$1" flexWrap="wrap" justify="flex-end" maxW={240}>
+          {options.map((option) => (
+            <Button
+              key={String(option)}
+              size="$2"
+              aria-label={`${title}: ${label(option)}`}
+              disabled={disabled}
+              {...(option === value ? ({ theme: 'accent' } as const) : {})}
+              onPress={() => onChoose(option)}
+            >
+              <Button.Text>{label(option)}</Button.Text>
+            </Button>
+          ))}
+        </XStack>
+      }
+    />
+  );
+}
+
+function ButtonRows({ row, title, footer }: { row: ButtonRow; title: string; footer: string }) {
+  const { data } = useAppSettings();
+  const { setButton } = useAppSettingActions();
+  const settings = data ?? APP_DEFAULTS;
+  return (
+    <SettingsSection title={title} footer={footer}>
+      {PLAYER_BUTTONS.map((button) => (
+        <SettingsRow
+          key={button}
+          title={BUTTON_LABELS[button]}
+          {...(BUTTON_NOTES[button] ? { subtitle: BUTTON_NOTES[button] } : {})}
+          trailing={
+            <AppSwitch
+              label={`${BUTTON_LABELS[button]} — ${title}`}
+              checked={settings[row].includes(button)}
+              disabled={setButton.isPending}
+              onCheckedChange={(shown) => setButton.mutate({ row, button, shown })}
+            />
+          }
+        />
+      ))}
+    </SettingsSection>
+  );
+}
+
 /**
  * The controls, which belong to the app rather than to any player: a player is
  * the engine, not the buttons. Arranged once here, and the same on every one.
  */
 function PlayerControlsSection() {
   const { data } = useAppSettings();
-  const { set, setButton } = useAppSettingActions();
+  const { set } = useAppSettingActions();
   const settings = data ?? APP_DEFAULTS;
+  const busy = set.isPending;
   return (
     <>
-      <SettingsSection title="Controls" footer="The same on every player: a player is the engine, and the controls are the app’s. Back, play and forward are always in the middle.">
-        <SettingsRow
+      <SettingsSection title="Controls" footer="The same on every player: a player is the engine, and the controls are the app’s. Play itself is always in the middle.">
+        <ChoiceRow
           title="Skip by"
-          subtitle="How far the two buttons either side of play move."
-          trailing={
-            <XStack gap="$1">
-              {SEEK_CHOICES.map((seconds) => (
-                <Button
-                  key={seconds}
-                  size="$2"
-                  aria-label={`Skip by ${seconds} seconds`}
-                  disabled={set.isPending}
-                  {...(settings.seekMs === seconds * 1000 ? ({ theme: 'accent' } as const) : {})}
-                  onPress={() => set.mutate({ seekMs: seconds * 1000 })}
-                >
-                  <Button.Text>{seconds}s</Button.Text>
-                </Button>
-              ))}
-            </XStack>
-          }
+          subtitle="How far a seek moves, by button or by tap."
+          options={SEEK_CHOICES}
+          label={(seconds) => `${seconds}s`}
+          value={(SEEK_CHOICES.find((seconds) => seconds * 1000 === settings.seekMs) ?? 10) as (typeof SEEK_CHOICES)[number]}
+          disabled={busy}
+          onChoose={(seconds) => set.mutate({ seekMs: seconds * 1000 })}
+        />
+        <ChoiceRow
+          title="Either side of play"
+          options={PLAYER_JUMPS}
+          label={(jump) => JUMP_LABELS[jump]}
+          value={settings.centreJump}
+          disabled={busy}
+          onChoose={(centreJump) => set.mutate({ centreJump })}
+        />
+        <ChoiceRow
+          title="Double tap a side"
+          subtitle="Left goes back, right goes forward."
+          options={PLAYER_JUMPS}
+          label={(jump) => JUMP_LABELS[jump]}
+          value={settings.doubleTap}
+          disabled={busy}
+          onChoose={(doubleTap) => set.mutate({ doubleTap })}
+        />
+        <ChoiceRow
+          title="Press and hold"
+          subtitle="How fast it plays while a finger is down."
+          options={HOLD_RATES}
+          label={(rate) => (rate === 1 ? 'Off' : `${rate}×`)}
+          value={(HOLD_RATES.find((rate) => rate === settings.holdRate) ?? 1) as (typeof HOLD_RATES)[number]}
+          disabled={busy}
+          onChoose={(holdRate) => set.mutate({ holdRate })}
+        />
+        <ChoiceRow
+          title="Time at the right"
+          options={['left', 'total'] as const}
+          label={(which) => (which === 'left' ? 'Left' : 'Total')}
+          value={settings.showRemaining ? 'left' : 'total'}
+          disabled={busy}
+          onChoose={(which) => set.mutate({ showRemaining: which === 'left' })}
         />
       </SettingsSection>
-      <SettingsSection title="Buttons" footer="What sits in the row beneath the picture, in this order.">
-        {PLAYER_BUTTONS.map((button) => (
-          <SettingsRow
-            key={button}
-            title={BUTTON_LABELS[button]}
-            {...(BUTTON_NOTES[button] ? { subtitle: BUTTON_NOTES[button] } : {})}
-            trailing={
-              <AppSwitch
-                label={BUTTON_LABELS[button]}
-                checked={settings.buttons.includes(button)}
-                disabled={setButton.isPending}
-                onCheckedChange={(shown) => setButton.mutate({ button, shown })}
-              />
-            }
-          />
-        ))}
+
+      <SettingsSection title="Edges" footer="Drag down an edge of the picture. Brightness is this app’s window only, and goes back to the system’s when the player closes.">
+        <ChoiceRow
+          title="Left edge"
+          options={PLAYER_SLIDERS}
+          label={(slider) => SLIDER_LABELS[slider]}
+          value={settings.leftSlider}
+          disabled={busy}
+          onChoose={(leftSlider) => set.mutate({ leftSlider })}
+        />
+        <ChoiceRow
+          title="Right edge"
+          options={PLAYER_SLIDERS}
+          label={(slider) => SLIDER_LABELS[slider]}
+          value={settings.rightSlider}
+          disabled={busy}
+          onChoose={(rightSlider) => set.mutate({ rightSlider })}
+        />
+      </SettingsSection>
+
+      <ButtonRows row="buttons" title="Buttons, beneath" footer="What sits in the row under the picture, in this order." />
+      <ButtonRows row="topButtons" title="Buttons, floating" footer="What floats at the top right. The top left is always the title." />
+
+      <SettingsSection title="Leaving the player" footer="Both are asked of the engine. A player whose engine has neither simply carries on as before — the built-in player has both.">
+        <SettingsRow
+          title="Picture in picture"
+          subtitle="Shrink to a floating window when the app goes behind something else."
+          trailing={
+            <AppSwitch
+              label="Picture in picture"
+              checked={settings.pictureInPicture}
+              disabled={busy}
+              onCheckedChange={(pictureInPicture) => set.mutate({ pictureInPicture })}
+            />
+          }
+        />
+        <SettingsRow
+          title="Keep playing in the background"
+          subtitle="Carry on with the sound when the app is not in front."
+          trailing={
+            <AppSwitch
+              label="Keep playing in the background"
+              checked={settings.backgroundPlayback}
+              disabled={busy}
+              onCheckedChange={(backgroundPlayback) => set.mutate({ backgroundPlayback })}
+            />
+          }
+        />
       </SettingsSection>
     </>
   );
