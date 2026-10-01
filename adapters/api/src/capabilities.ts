@@ -16,6 +16,10 @@ export const MEDIA_CAPABILITIES = [
   'favoritesRead',
   'favoritesWrite',
   'remoteImages',
+  // The latest from a set of channels, in one call: `listFeed`. A source
+  // without it has no feed row — asking each channel separately would be one
+  // request per channel, which is not a row anyone would wait for.
+  'feed',
   // A file the app may keep on the device: `getDownloadDescriptor`.
   'downloads',
   // There is more than one version to choose between — because the server will

@@ -284,6 +284,20 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       };
     },
 
+    listFeed: async (externalIds, query, signal) => {
+      if (externalIds.length === 0) return { items: [] };
+      const page = query.cursor === undefined ? 0 : Number(query.cursor);
+      // The server keeps no subscription list of its own: the channels come
+      // from the profile, on every call.
+      const answer = await client.post(
+        '/api/v1/feed',
+        { channels: [...externalIds], limit: query.limit, offset: page * query.limit },
+        signal,
+      );
+      const items = toItems(readVideos(answer), connectionId);
+      return { items, ...(items.length >= query.limit ? { nextCursor: String(page + 1) } : {}) };
+    },
+
     listDownloadOptions: async (key, signal) => {
       const video = await videoOf(key.externalId, signal);
       // The renditions the site published. Nothing is re-encoded for any of

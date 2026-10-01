@@ -17,6 +17,7 @@ import type { SourceService } from './sources';
 import type { Applied } from './sync/parts';
 import type { SyncStatus } from './sync/engine';
 import type { DownloadService } from './downloads';
+import type { ListsService } from './lists';
 import type { DownloadSettingsService } from './downloads/settings';
 import type { WatchService } from './watch';
 
@@ -59,6 +60,8 @@ export interface Services {
   /** Copies kept on this device, and the budget they live within. */
   readonly downloads: DownloadService;
   readonly downloadSettings: DownloadSettingsService;
+  /** The channels a profile follows and the lists it made — account-wide. */
+  readonly lists: ListsService;
   /** Pressing Play: which player plays what, its controller and its view. */
   readonly playback: PlaybackService;
   readonly orientation: ScreenOrientationControl;

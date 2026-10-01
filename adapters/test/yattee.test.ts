@@ -364,6 +364,29 @@ describe('Yattee — playing', () => {
   });
 });
 
+describe('Yattee — the latest from channels someone follows', () => {
+  it('asks for them all at once, because the server keeps no list of its own', async () => {
+    const { provider, http } = await connect({
+      routes: { 'POST /api/v1/feed': { status: 200, json: fixtures.channelVideos } },
+    });
+    const feed = provider.listFeed;
+    if (!feed) throw new Error('listFeed is missing');
+    const page = await feed(['UC1', 'UC2'], { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 2 });
+    expect(page.items.map((item) => item.title)).toEqual(['The channel’s newest', 'The one before it']);
+    const body = JSON.parse(http.to('POST /api/v1/feed')[0]?.body ?? '{}') as { channels: string[]; limit: number; offset: number };
+    expect(body).toEqual({ channels: ['UC1', 'UC2'], limit: 2, offset: 0 });
+    expect(page.nextCursor).toBe('1');
+  });
+
+  it('asks nothing when nobody is followed', async () => {
+    const { provider, http } = await connect({});
+    const feed = provider.listFeed;
+    if (!feed) throw new Error('listFeed is missing');
+    expect(await feed([], { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 10 })).toEqual({ items: [] });
+    expect(http.to('POST /api/v1/feed')).toHaveLength(0);
+  });
+});
+
 describe('Yattee — keeping a copy', () => {
   it('offers every rendition, with what each weighs', async () => {
     const { provider } = await connect({

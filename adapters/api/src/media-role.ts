@@ -55,6 +55,12 @@ export interface ConnectedMediaProvider {
    * must be safe to repeat.
    */
   /**
+   * The newest from these channels, merged by the source and ordered as
+   * `ItemQuery.sort` asks. The app holds the channel list — it is the
+   * profile's, not the server's — and hands it over on each call.
+   */
+  listFeed?(externalIds: readonly string[], query: ItemQuery, signal?: CancelSignal): Promise<ItemPage>;
+  /**
    * The versions this item can be kept as. Cheap enough to ask while drawing a
    * sheet of choices; `getDownloadDescriptor` is the expensive half.
    */
@@ -95,6 +101,7 @@ export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   epg: ['getGuide'],
   playback: ['getPlaybackDescriptor'],
   watchStateWrite: ['reportPlayback', 'setPlayed'],
+  feed: ['listFeed'],
   downloads: ['getDownloadDescriptor'],
   downloadOptions: ['listDownloadOptions'],
 };

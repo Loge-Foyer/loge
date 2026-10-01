@@ -19,7 +19,7 @@ export const plugin: Plugin = {
     description: 'Backend for YouTube and other web video.',
     media: {
       contentKinds: ['videos'],
-      capabilities: ['browse', 'search', 'playback', 'remoteImages', 'offlineMetadata', 'downloads', 'downloadOptions'],
+      capabilities: ['browse', 'search', 'feed', 'playback', 'remoteImages', 'offlineMetadata', 'downloads', 'downloadOptions'],
     },
     connectionFields: [
       {

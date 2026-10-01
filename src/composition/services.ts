@@ -43,6 +43,7 @@ import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
 import { createWatchService } from '@/services/watch';
 import { createDownloadService } from '@/services/downloads';
+import { createListsService } from '@/services/lists';
 import { createDownloadQueue } from '@/services/downloads/queue';
 import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createOutboxDrainer } from '@/services/watch/drainer';
@@ -98,6 +99,7 @@ export function createServices(): AppServices {
   const activity = createAppActivity();
   const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log });
   const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
+  const lists = createListsService({ db, ids, clock });
   const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });
   const files = createFileStore();
   const downloadQueue = createDownloadQueue({
@@ -236,6 +238,7 @@ export function createServices(): AppServices {
       watch,
       downloads,
       downloadSettings,
+      lists,
       playback,
       orientation: screenOrientation,
       brightness: screenBrightness,
