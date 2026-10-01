@@ -34,6 +34,8 @@ export interface ChannelQuery {
   readonly limit: number;
   /** Opaque, from the previous page. */
   readonly cursor?: string;
+  /** Only channels matching these words, as `ItemQuery.term` does for items. */
+  readonly term?: string;
 }
 
 /** A page of channels, in the provider's own order. */

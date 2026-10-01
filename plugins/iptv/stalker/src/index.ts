@@ -17,7 +17,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android'],
     displayName: 'Stalker portal',
     description: 'Live TV, films and series from a Stalker portal, signed in with its MAC address.',
-    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'channels', 'epg', 'playback', 'remoteImages', 'offlineMetadata'] },
+    media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'search', 'channels', 'epg', 'playback', 'remoteImages', 'offlineMetadata'] },
     connectionFields: [
       { key: 'portalUrl', label: 'Portal address', type: 'url', required: true, placeholder: 'http://portal.example.com/c/' },
       // The MAC address is what signs in: anyone with it and the portal's address can use the subscription.

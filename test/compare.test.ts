@@ -1,4 +1,4 @@
-import { compareItems, connectionId, mergeSorted, type MediaItem, type Movie } from '@sc/api';
+import { compareItems, connectionId, matchesTerm, mergeSorted, type MediaItem, type Movie } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 function movie(id: string, extra: Partial<Movie> = {}): MediaItem {
@@ -67,5 +67,27 @@ describe('mergeSorted', () => {
 
   it('stops at the limit', () => {
     expect(mergeSorted([[1, 4], [2, 3]], byNumber, 3).map((entry) => entry.value)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('matching a search term', () => {
+  it('finds every word, in any order, ignoring case and accents', () => {
+    expect(matchesTerm('erste das', 'Das Erste')).toBe(true);
+    expect(matchesTerm('pokemon', 'Pokémon')).toBe(true);
+    expect(matchesTerm('POKEMON', 'pokémon')).toBe(true);
+    // Across the texts it is given, so a subtitle counts as well as a title.
+    expect(matchesTerm('erste hd', 'Das Erste', 'HD')).toBe(true);
+    expect(matchesTerm('zweite', 'Das Erste')).toBe(false);
+  });
+
+  it('matches everything when there is nothing to match', () => {
+    // An emptied search box is not a filter.
+    expect(matchesTerm('', 'anything')).toBe(true);
+    expect(matchesTerm('   ', 'anything')).toBe(true);
+  });
+
+  it('skips the texts an item does not have', () => {
+    expect(matchesTerm('erste', undefined, 'Das Erste')).toBe(true);
+    expect(matchesTerm('erste', undefined)).toBe(false);
   });
 });

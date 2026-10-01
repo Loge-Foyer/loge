@@ -1,5 +1,6 @@
 import {
   AppError,
+  matchesTerm,
   type CancelSignal,
   type ConnectedMediaProvider,
   type GlobalMediaKey,
@@ -129,12 +130,20 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     listChannels: async (query, signal) => {
       const page = query.cursor ? Number(query.cursor) : 1;
-      const js = await portal.call('itv', 'get_ordered_list', { genre: query.groupId ?? '*', fav: 0, sortby: 'number', hd: 0, force_ch_link_check: '', p: page }, signal);
+      const term = query.term?.trim();
+      const js = await portal.call(
+        'itv',
+        'get_ordered_list',
+        { genre: query.groupId ?? '*', fav: 0, sortby: 'number', hd: 0, force_ch_link_check: '', p: page, ...(term ? { search: term } : {}) },
+        signal,
+      );
       const result = toChannels(js, page, connectionId, portal.root());
       remember(result.rows);
       const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
       return {
-        channels: result.rows.map((row) => row.channel),
+        // Asked of the portal and checked again here: not every portal honours
+        // `search`, and one that ignores it would answer with every channel.
+        channels: result.rows.map((row) => row.channel).filter((channel) => (term ? matchesTerm(term, channel.name) : true)),
         ...(result.total === undefined ? {} : { total: result.total }),
         ...(more ? { nextCursor: String(result.page + 1) } : {}),
       };
@@ -166,13 +175,25 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const page = query.cursor ? Number(query.cursor) : 1;
       const wanted = query.kind === 'movies' ? 'movie' : 'show';
 
+      const term = query.term?.trim();
       const ask = async (from: VodType) => {
-        const js = await portal.call(from, 'get_ordered_list', { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: page }, signal);
+        const js = await portal.call(
+          from,
+          'get_ordered_list',
+          { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: page, ...(term ? { search: term } : {}) },
+          signal,
+        );
         const result = toVod(js, page, connectionId, portal.root(), from);
         for (const row of result.rows) vod.set(row.item.key.externalId, row);
         const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
-        // Where films and series share pages, each kind takes its own from them.
-        return { items: result.rows.map((row) => row.item).filter((item) => item.type === wanted), ...(more ? { nextCursor: String(result.page + 1) } : {}) };
+        // Where films and series share pages, each kind takes its own from
+        // them — and a term is checked again here, as the channels are.
+        return {
+          items: result.rows
+            .map((row) => row.item)
+            .filter((item) => item.type === wanted && (term ? matchesTerm(term, item.title) : true)),
+          ...(more ? { nextCursor: String(result.page + 1) } : {}),
+        };
       };
 
       if (wanted === 'movie') return ask('vod');

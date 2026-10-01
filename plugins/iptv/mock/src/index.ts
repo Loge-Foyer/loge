@@ -21,7 +21,7 @@ export const plugin: Plugin = {
     description: 'A pretend IPTV portal with fixed channels, a guide and a few films and series, for working offline.',
     media: {
       contentKinds: ['live', 'movies', 'shows'],
-      capabilities: ['browse', 'channels', 'epg', 'playback'],
+      capabilities: ['browse', 'search', 'channels', 'epg', 'playback'],
     },
     connectionFields: [
       { key: 'portalUrl', label: 'Portal address', type: 'url', placeholder: 'mock://portal', description: 'Optional, and ignored.' },

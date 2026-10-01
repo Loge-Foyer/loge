@@ -17,7 +17,7 @@ export const plugin: Plugin = {
     description: 'Self-hosted film and TV server.',
     media: {
       contentKinds: ['movies', 'shows'],
-      capabilities: ['browse', 'libraries', 'watchStateRead', 'watchStateWrite', 'remoteImages', 'offlineMetadata', 'playback'],
+      capabilities: ['browse', 'search', 'libraries', 'watchStateRead', 'watchStateWrite', 'remoteImages', 'offlineMetadata', 'playback'],
     },
     connectionFields: [
       {

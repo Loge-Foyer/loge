@@ -125,7 +125,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
           toPage(
             await client.get(
               '/Items',
-              itemsParams({ userId, itemType: itemType.jellyfin, sort: query.sort, parentId, startIndex, limit }),
+              itemsParams({ userId, itemType: itemType.jellyfin, sort: query.sort, parentId, startIndex, limit, term: query.term }),
               signal,
             ),
             itemType.type,

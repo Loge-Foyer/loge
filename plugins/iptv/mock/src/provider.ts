@@ -1,6 +1,7 @@
 import {
   AppError,
   compareItems,
+  matchesTerm,
   type ConnectedMediaProvider,
   type GlobalMediaKey,
   type MediaContext,
@@ -62,7 +63,9 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     // Films and series; channels are not items, so `live` has none.
     listItems: (query) =>
       respond(() => {
-        const all = [...(query.kind === 'movies' ? lineup.movies : query.kind === 'shows' ? lineup.shows : [])].sort(compareItems(query.sort));
+        const kind = query.kind === 'movies' ? lineup.movies : query.kind === 'shows' ? lineup.shows : [];
+        const term = query.term?.trim();
+        const all = [...(term ? kind.filter((item) => matchesTerm(term, item.title)) : kind)].sort(compareItems(query.sort));
         const { slice, ...rest } = page(all, query.limit, query.cursor);
         return { items: slice, ...rest };
       }),
@@ -92,7 +95,9 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     listChannels: (query) =>
       respond(() => {
         const { groupId } = query;
-        const all = groupId === undefined ? lineup.channels : lineup.channels.filter((channel) => channel.groupIds.includes(groupId));
+        const term = query.term?.trim();
+        const inGroup = groupId === undefined ? lineup.channels : lineup.channels.filter((channel) => channel.groupIds.includes(groupId));
+        const all = term ? inGroup.filter((channel) => matchesTerm(term, channel.name)) : inGroup;
         const { slice, ...rest } = page(all, query.limit, query.cursor);
         return { channels: slice, ...rest };
       }),

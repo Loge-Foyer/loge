@@ -42,9 +42,14 @@ export function itemsParams(options: {
   readonly parentId: string | undefined;
   readonly startIndex: number;
   readonly limit: number;
+  readonly term?: string | undefined;
 }): Readonly<Record<string, QueryValue>> {
   const { sortBy, sortOrder } = sortParams(options.sort);
+  const term = options.term?.trim();
   return {
+    // The server searches as it searches — its own matching, its own ranking —
+    // and still answers in the sort asked for, so pages merge as they always do.
+    ...(term ? { searchTerm: term } : {}),
     userId: options.userId,
     parentId: options.parentId,
     includeItemTypes: options.itemType,

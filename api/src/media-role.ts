@@ -64,7 +64,14 @@ export interface MediaRole {
   connect(target: MediaTarget, context: MediaContext): Promise<ConnectedMediaProvider>;
 }
 
-/** The members each media capability promises. Capabilities absent here promise none yet. */
+/**
+ * The members each media capability promises. Capabilities absent here promise
+ * none yet — and `search` promises none on purpose: it is not a call of its
+ * own but a promise about the ones already here. A source that declares it
+ * honours `ItemQuery.term`, and `ChannelQuery.term` as well where it declares
+ * `channels`. Searching therefore pages, sorts and merges exactly as browsing
+ * does, and the app needs no second path through any of it.
+ */
 export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   Partial<Record<MediaCapability, readonly (keyof ConnectedMediaProvider)[]>>
 > = {

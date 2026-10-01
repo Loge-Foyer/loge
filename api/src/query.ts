@@ -19,6 +19,39 @@ export interface ItemQuery {
   readonly limit: number;
   /** The previous page's `nextCursor`. Only the plugin that made it can read it. */
   readonly cursor?: string;
+  /**
+   * Only what matches these words, within this kind — never across kinds, so a
+   * search of films answers with films. Set only on a source whose `search` is
+   * in effect; one without it never sees a term. Matching is the source's own:
+   * a server searches as it searches, and a provider that holds its catalogue
+   * on the device matches titles, case and accents aside.
+   */
+  readonly term?: string;
+}
+
+/**
+ * Case and accents folded away, for matching on the device. A server searches
+ * however it searches; this is only for a source that holds its catalogue
+ * here — a portal's channel list, say — so that "Das Erste" is found by
+ * "erste" and "Pokémon" by "pokemon".
+ */
+function fold(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+/**
+ * Whether every word of `term` appears somewhere in `texts`. Words rather than
+ * the whole phrase, so "erste das" finds "Das Erste", and a blank term matches
+ * everything — a search box that has been emptied is not a filter.
+ */
+export function matchesTerm(term: string, ...texts: readonly (string | undefined)[]): boolean {
+  const words = fold(term).split(/\s+/).filter((word) => word.length > 0);
+  if (words.length === 0) return true;
+  const haystack = fold(texts.filter((text): text is string => text !== undefined).join(' '));
+  return words.every((word) => haystack.includes(word));
 }
 
 export interface ItemPage {
