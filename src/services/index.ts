@@ -16,6 +16,8 @@ import type { SessionService } from './session';
 import type { SourceService } from './sources';
 import type { Applied } from './sync/parts';
 import type { SyncStatus } from './sync/engine';
+import type { DownloadService } from './downloads';
+import type { DownloadSettingsService } from './downloads/settings';
 import type { WatchService } from './watch';
 
 /** The sync engine as screens see it: how it stands, what it brought, and "Sync now". */
@@ -54,6 +56,9 @@ export interface Services {
   readonly pictureInPicture: PictureInPicture;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */
   readonly watch: WatchService;
+  /** Copies kept on this device, and the budget they live within. */
+  readonly downloads: DownloadService;
+  readonly downloadSettings: DownloadSettingsService;
   /** Pressing Play: which player plays what, its controller and its view. */
   readonly playback: PlaybackService;
   readonly orientation: ScreenOrientationControl;

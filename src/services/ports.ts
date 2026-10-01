@@ -88,6 +88,27 @@ export interface DeviceSettings {
   };
   /** How this device behaves, whoever is watching. Never journaled, never backed up. */
   readonly app?: Partial<AppSettings>;
+  /**
+   * What this device keeps, and how much of it. Device-wide like players: a
+   * copy on this phone is this phone's, so none of it is journaled, pushed or
+   * backed up.
+   */
+  readonly downloads?: Partial<DownloadSettings>;
+}
+
+export interface DownloadSettings {
+  /** The ceiling for everything kept, in bytes. */
+  readonly maxBytes: number;
+  /** Nothing is fetched on mobile data while this is on. */
+  readonly onlyOnWifi: boolean;
+  /** What to ask a source for where it can make something smaller. */
+  readonly maxHeight: number;
+  /** Bits per second, which is what turns an 80 GB film into a 3 GB one. */
+  readonly maxBitrate: number;
+  /** Keep HDR, where the source has it and will hand it over. */
+  readonly hdr: boolean;
+  /** Ask the source to make a smaller copy, rather than taking the file as it is. */
+  readonly askForSmaller: boolean;
 }
 
 /**
@@ -273,6 +294,44 @@ export interface DownloadRepository {
   /** Skipped when the profile or the connection is gone. */
   put(entry: DownloadEntry): Promise<void>;
   remove(id: string): Promise<void>;
+}
+
+/** How a download is going, as the device reports it. */
+export interface TransferProgress {
+  readonly bytesDone: number;
+  /** Absent where the server sent no length — a transcode, usually. */
+  readonly bytesTotal?: number;
+}
+
+export interface TransferRequest {
+  readonly uri: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  /** Under the downloads directory, extension included. */
+  readonly fileName: string;
+  readonly onProgress: (progress: TransferProgress) => void;
+  readonly signal: AbortSignal;
+}
+
+/**
+ * Fetching a file and keeping it, and knowing how much room there is. The one
+ * port that touches the filesystem — `src/platform/downloads.ts` on a phone,
+ * and a refusal on the web, where there is nothing to keep a file in.
+ */
+export interface FileStore {
+  readonly available: boolean;
+  /**
+   * Fetches to a temporary name and moves it into place on success, so a
+   * half-written file is never mistaken for a finished one.
+   */
+  fetch(request: TransferRequest): Promise<TransferProgress>;
+  /** Bytes of everything kept, whatever the database thinks. The disk is the truth. */
+  used(): Promise<number>;
+  /** What the device itself has left, which is a second ceiling over the user's. */
+  free(): Promise<number>;
+  remove(fileName: string): Promise<void>;
+  /** Files no row points at — what a crash between the two leaves behind. */
+  sweep(keep: ReadonlySet<string>): Promise<void>;
+  uriOf(fileName: string): string;
 }
 
 /** One report waiting for the source that masters the item's watch state. */

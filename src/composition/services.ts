@@ -3,6 +3,7 @@ import { categoryOfPluginId } from '@sc/api';
 import { backupSql } from '@/persistence/backup/sql';
 import { createAppActivity } from '@/platform/app-activity';
 import { createClientIdentitySource } from '@/platform/client-identity';
+import { createFileStore } from '@/platform/downloads';
 import { createFileExchange } from '@/platform/file-exchange';
 import { systemClock } from '@/platform/clock';
 import { hostCrypto } from '@/platform/crypto';
@@ -41,6 +42,9 @@ import type { SyncParts } from '@/services/sync/parts';
 import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
 import { createWatchService } from '@/services/watch';
+import { createDownloadService } from '@/services/downloads';
+import { createDownloadQueue } from '@/services/downloads/queue';
+import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createOutboxDrainer } from '@/services/watch/drainer';
 
 import { players as playerPlugins, plugins } from './plugins';
@@ -94,6 +98,30 @@ export function createServices(): AppServices {
   const activity = createAppActivity();
   const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log });
   const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
+  const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });
+  const files = createFileStore();
+  const downloadQueue = createDownloadQueue({
+    downloads: db.downloads,
+    files,
+    sources,
+    pool,
+    network,
+    activity,
+    clock,
+    log,
+    onlyOnWifi: async () => (await downloadSettings.get()).onlyOnWifi,
+  });
+  const downloads = createDownloadService({
+    downloads: db.downloads,
+    files,
+    sources,
+    pool,
+    limitBytes: async () => (await downloadSettings.get()).maxBytes,
+    ids,
+    clock,
+    log,
+    onQueued: () => downloadQueue.kick(),
+  });
   const media = createMediaService({
     sources,
     pool,
@@ -205,6 +233,8 @@ export function createServices(): AppServices {
       players,
       appSettings,
       watch,
+      downloads,
+      downloadSettings,
       playback,
       orientation: screenOrientation,
       brightness: screenBrightness,
@@ -227,6 +257,7 @@ export function createServices(): AppServices {
       scheduler.start();
       backupTargets.start();
       drainer.start();
+      downloadQueue.start();
     },
   };
 }
