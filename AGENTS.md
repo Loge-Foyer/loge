@@ -138,6 +138,7 @@ the connection's values already resolved for one profile.
 | Capability | Members |
 | --- | --- |
 | `browse` | `listItems`, `getItem`, `getChildren` |
+| `search` | none of its own: `listItems` honours `ItemQuery.term`, and `listChannels` honours `ChannelQuery.term` where `channels` is declared too |
 | `libraries` | `getLibraries` |
 | `watchStateRead` | `getResume` (items carry `watch` too) |
 | `remoteImages` | `resolveImage` (synchronous), `resolveHeaders` |

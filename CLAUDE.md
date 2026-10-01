@@ -88,6 +88,8 @@ Phase 8 adds players — VLC and mpv on Android are in.
 - **`api`:** holds these, with its tests:
   - the manifest vocabulary, with categories, platforms, qualified ids, and
     the player, account and backup blocks
+  - search as a `term` on the queries that already page, and `matchesTerm`
+    for a source that matches on the device
   - per-profile values, the media contract with live TV and playback members,
     and watch state written back (`reportPlayback`, `setPlayed`)
   - the player contract, the account role (records), the backup role
