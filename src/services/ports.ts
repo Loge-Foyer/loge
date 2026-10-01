@@ -142,6 +142,13 @@ export interface AppSettings {
    */
   readonly pictureInPicture: boolean;
   readonly backgroundPlayback: boolean;
+  /**
+   * Whether an engine may decode in software when the hardware decoder will
+   * not take a stream. Off refuses it instead — slower, hotter and silent is
+   * how a phone flattens its battery on a film it looked like it could play.
+   * Only an engine that can tell the difference honours it.
+   */
+  readonly softwareFallback: boolean;
 }
 
 export interface DeviceSettingsRepository {

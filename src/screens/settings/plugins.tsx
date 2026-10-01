@@ -319,6 +319,25 @@ function PlayerControlsSection() {
       <ButtonRows row="buttons" title="Buttons, beneath" footer="What sits in the row under the picture, in this order." />
       <ButtonRows row="topButtons" title="Buttons, floating" footer="What floats at the top right. The top left is always the title." />
 
+      <SettingsSection title="Decoding" footer="Only an engine that can tell the difference honours this — mpv can; the built-in player leaves it to the system.">
+        <SettingsRow
+          title="Fall back to software"
+          subtitle={
+            settings.softwareFallback
+              ? 'A stream the hardware decoder refuses is decoded in software: slower, hotter, and quiet about it.'
+              : 'A stream the hardware decoder refuses is refused, rather than flattening the battery for it.'
+          }
+          trailing={
+            <AppSwitch
+              label="Fall back to software"
+              checked={settings.softwareFallback}
+              disabled={busy}
+              onCheckedChange={(softwareFallback) => set.mutate({ softwareFallback })}
+            />
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection title="Leaving the player" footer="Both are asked of the engine. A player whose engine has neither simply carries on as before — the built-in player has both.">
         <SettingsRow
           title="Picture in picture"

@@ -25,6 +25,8 @@ export const APP_DEFAULTS: AppSettings = {
   holdRate: 1,
   pictureInPicture: true,
   backgroundPlayback: true,
+  // A picture is better than none, so this stays as it was.
+  softwareFallback: true,
 };
 
 /** What a press and hold may be set to. 1 is off. */

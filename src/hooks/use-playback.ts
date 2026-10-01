@@ -8,6 +8,7 @@ import type { PlaybackReports } from '@/services/playback-reports';
 import { remoteKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
+import { useAppSettings } from './use-app-settings';
 import { useActiveUserId } from './use-session';
 
 /**
@@ -95,10 +96,14 @@ export function usePlayer(plan: PlaybackPlan | undefined, connectionId: Connecti
   const { playback } = useServices();
   const [session, setSession] = useState<Session>();
   const heard = useEffectEvent(onEvent);
+  const { data: settings } = useAppSettings();
+  // Read as the engine is made, so a change takes effect the next time
+  // something plays rather than halfway through a film.
+  const preferences = useEffectEvent(() => ({ softwareFallback: (settings ?? APP_DEFAULTS).softwareFallback }));
 
   useEffect(() => {
     if (plan?.kind !== 'play') return;
-    const player = playback.create(userId, plan.player, connectionId);
+    const player = playback.create(userId, plan.player, connectionId, preferences());
     const unsubscribe = player.subscribe((event) => {
       heard(event);
       setSession((current) => ({ plan, controller: player, snapshot: next(current?.controller === player ? current.snapshot : IDLE, event) }));

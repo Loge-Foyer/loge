@@ -15,7 +15,7 @@ import {
   type PluginId,
   type Show,
   type UserId,
-} from '@sc/api';
+  type PlayerPreferences,} from '@sc/api';
 import type { PlayerPlugin, PlayerView } from '@sc/player-kit';
 
 import type { MediaService } from './media';
@@ -59,7 +59,7 @@ export interface PlaybackService {
    */
   plan(userId: UserId, key: GlobalMediaKey, options?: PlaybackOptions, signal?: CancelSignal): Promise<PlaybackPlan>;
   /** A controller for a chosen player. Whoever creates it disposes it. */
-  create(userId: UserId, player: PluginId, connectionId: ConnectionId): MediaPlayer;
+  create(userId: UserId, player: PluginId, connectionId: ConnectionId, preferences?: PlayerPreferences): MediaPlayer;
   /** The view that draws a player's controllers. */
   view(player: PluginId): PlayerView | undefined;
   /** The episode after this one — the next season's first, after a season's last. */
@@ -98,11 +98,14 @@ export function createPlaybackService(deps: {
       return { kind: 'none', needs: best ? missingFor(first.profile, best) : [], ...(best ? { source: best } : {}) };
     },
 
-    create: (userId, player, connectionId) => {
+    create: (userId, player, connectionId, preferences) => {
       const plugin = pluginOf(player);
       if (!plugin) throw new Error(`No engine for ${player} in this build.`);
       // A stream's headers come from its source, in memory, when the engine loads it.
-      return plugin.player.create({ resolveHeaders: (ref) => media.artworkHeaders(userId, connectionId, ref) });
+      return plugin.player.create({
+        resolveHeaders: (ref) => media.artworkHeaders(userId, connectionId, ref),
+        ...(preferences === undefined ? {} : { preferences }),
+      });
     },
 
     view: (player) => pluginOf(player)?.View,
