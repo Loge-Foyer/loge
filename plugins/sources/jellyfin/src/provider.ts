@@ -16,7 +16,7 @@ import {
 } from '@sc/api';
 
 import { createClient } from './client';
-import { readItem, readItemsPage, readPlaybackInfo, readPublicInfo } from './dto';
+import { readChapters, readItem, readItemsPage, readMediaSegments, readPlaybackInfo, readPublicInfo } from './dto';
 import { unreadable } from './errors';
 import { resolveItemImage } from './images';
 import { isLimited, scopeFor } from './libraries';
@@ -234,7 +234,19 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const info = readPlaybackInfo(json);
       const token = client.token();
       if (!info || !token) throw unreadable();
-      const { descriptor, session } = toDescriptor({ info, request, baseUrl, token });
+      // Marks are worth having and never worth failing for: a server without
+      // the segments endpoint, or an item nobody has analysed, simply plays.
+      const [chapters, segments] = await Promise.all([
+        client
+          .get(`/Items/${encodeURIComponent(itemId)}`, { userId, fields: 'Chapters' }, signal)
+          .then(readChapters)
+          .catch(() => []),
+        client
+          .get(`/MediaSegments/${encodeURIComponent(itemId)}`, {}, signal)
+          .then(readMediaSegments)
+          .catch(() => []),
+      ]);
+      const { descriptor, session } = toDescriptor({ info, request, baseUrl, token, chapters, segments });
       plays.set(itemId, session);
       return descriptor;
     },

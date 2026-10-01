@@ -478,6 +478,52 @@ describe('Jellyfin — playing', () => {
     'DELETE /UserPlayedItems/m-arrival': { status: 200, json: { Played: false } },
   };
 
+  it('carries the file’s chapters and the segments worth skipping, and plays without either', async () => {
+    // The shapes a real Jellyfin 12 answers with: ticks, and the server's own
+    // names for the segment types.
+    const marks: Readonly<Record<string, Route>> = {
+      'GET /Items/m-arrival': {
+        status: 200,
+        json: {
+          Id: 'm-arrival',
+          Chapters: [
+            { Name: 'Chapter 02', StartPositionTicks: 1_229_980_000 },
+            { Name: 'Chapter 01', StartPositionTicks: 0 },
+            // No start is not a mark.
+            { Name: 'Broken' },
+          ],
+        },
+      },
+      'GET /MediaSegments/m-arrival': {
+        status: 200,
+        json: {
+          Items: [
+            { Id: 's2', ItemId: 'm-arrival', Type: 'Outro', StartTicks: 14_349_750_000, EndTicks: 15_409_559_999 },
+            { Id: 's1', ItemId: 'm-arrival', Type: 'Intro', StartTicks: 1_229_980_000, EndTicks: 2_150_060_000 },
+            // A type this app does not know, and one that ends before it starts.
+            { Id: 's3', ItemId: 'm-arrival', Type: 'Sponsor', StartTicks: 1, EndTicks: 2 },
+            { Id: 's4', ItemId: 'm-arrival', Type: 'Recap', StartTicks: 500, EndTicks: 400 },
+          ],
+          TotalRecordCount: 4,
+        },
+      },
+    };
+    const connected = await connect({ routes: { ...playbackRoute(fixtures.directPlayInfo), ...REPORTS, ...marks } });
+    const descriptor = await connected.provider.getPlaybackDescriptor?.({ key, profile: phone });
+    // Both in order of where they begin, whatever order the server sent them in.
+    expect(descriptor?.chapters).toEqual([{ startMs: 0, title: 'Chapter 01' }, { startMs: 122_998, title: 'Chapter 02' }]);
+    expect(descriptor?.segments).toEqual([
+      { kind: 'intro', startMs: 122_998, endMs: 215_006 },
+      { kind: 'outro', startMs: 1_434_975, endMs: 1_540_956 },
+    ]);
+
+    // A server with neither endpoint still plays: the marks are never fatal.
+    const bare = await describePlayback(fixtures.directPlayInfo);
+    expect(bare.descriptor.sources.length).toBe(1);
+    expect(bare.descriptor.chapters).toBeUndefined();
+    expect(bare.descriptor.segments).toBeUndefined();
+  });
+
   it('asks for a stream with the player’s profile as a DeviceProfile', async () => {
     const { asked, body } = await describePlayback(fixtures.directPlayInfo, { startMs: 90_000, audioTrackId: '2', subtitleTrackId: '3' });
     expect(asked?.query).toEqual({ userId: 'user-1' });

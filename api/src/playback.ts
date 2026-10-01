@@ -64,6 +64,30 @@ export interface SubtitleTrack {
   readonly default?: boolean;
 }
 
+/** Where a file is divided, for the scrubber to show. A title where the file names one. */
+export interface Chapter {
+  readonly startMs: number;
+  readonly title?: string;
+}
+
+/**
+ * What a stretch of a file is. `intro` and `recap` are offered as a skip
+ * forward; `outro` is where the next episode is offered instead.
+ */
+export const MEDIA_SEGMENT_KINDS = ['intro', 'outro', 'recap', 'preview', 'commercial'] as const;
+
+export type MediaSegmentKind = (typeof MEDIA_SEGMENT_KINDS)[number];
+
+/**
+ * A stretch of a file worth offering to skip. Sources that have none — most —
+ * send none, and the player simply offers nothing.
+ */
+export interface MediaSegment {
+  readonly kind: MediaSegmentKind;
+  readonly startMs: number;
+  readonly endMs: number;
+}
+
 export interface PlaybackDescriptor {
   readonly key: GlobalMediaKey;
   readonly sources: readonly PlaybackSource[];
@@ -72,6 +96,20 @@ export interface PlaybackDescriptor {
   /** Where to start: the resume position, when there is one. */
   readonly startMs?: number;
   readonly durationMs?: number;
+  /** In order, from the start of the file. Empty or absent where the source has none. */
+  readonly chapters?: readonly Chapter[];
+  /** In order, and may overlap: a recap can sit inside an intro. */
+  readonly segments?: readonly MediaSegment[];
+}
+
+/** The segment covering a position, preferring the one that ends soonest where they overlap. */
+export function segmentAt(segments: readonly MediaSegment[] | undefined, positionMs: number): MediaSegment | undefined {
+  let found: MediaSegment | undefined;
+  for (const segment of segments ?? []) {
+    if (positionMs < segment.startMs || positionMs >= segment.endMs) continue;
+    if (!found || segment.endMs < found.endMs) found = segment;
+  }
+  return found;
 }
 
 /**

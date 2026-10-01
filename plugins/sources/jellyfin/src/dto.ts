@@ -366,3 +366,37 @@ function readMediaStream(value: unknown): MediaStreamDto | undefined {
     ...present('deliveryUrl', text(stream.DeliveryUrl)),
   };
 }
+
+/**
+ * A file's chapter marks, as `fields=Chapters` sends them. A chapter with no
+ * start is not a mark, and the server's generated "Chapter 01" names are kept
+ * as they come: the app decides whether a name is worth showing.
+ */
+export function readChapters(value: unknown): readonly { readonly startTicks: number; readonly name?: string }[] {
+  const item = record(value);
+  const rows = Array.isArray(item?.Chapters) ? item.Chapters : [];
+  return rows.flatMap((row) => {
+    const chapter = record(row);
+    const startTicks = number(chapter?.StartPositionTicks);
+    if (chapter === undefined || startTicks === undefined) return [];
+    const name = text(chapter.Name);
+    return [{ startTicks, ...(name === undefined ? {} : { name }) }];
+  });
+}
+
+/**
+ * What `/MediaSegments/{id}` answers. A segment needs both ends and a type
+ * this app knows; anything else is left out rather than guessed at.
+ */
+export function readMediaSegments(value: unknown): readonly { readonly type: string; readonly startTicks: number; readonly endTicks: number }[] {
+  const page = record(value);
+  const rows = Array.isArray(page?.Items) ? page.Items : [];
+  return rows.flatMap((row) => {
+    const segment = record(row);
+    const type = text(segment?.Type);
+    const startTicks = number(segment?.StartTicks);
+    const endTicks = number(segment?.EndTicks);
+    if (type === undefined || startTicks === undefined || endTicks === undefined || endTicks <= startTicks) return [];
+    return [{ type, startTicks, endTicks }];
+  });
+}

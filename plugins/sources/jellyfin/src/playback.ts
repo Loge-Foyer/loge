@@ -1,7 +1,10 @@
 import {
   AppError,
   type AudioTrack,
+  type Chapter,
   type HdrFormat,
+  type MediaSegment,
+  type MediaSegmentKind,
   type PlaybackDescriptor,
   type PlaybackRequest,
   type PlaybackSource,
@@ -90,13 +93,35 @@ export function deviceProfile(profile: PlayerProfile, maxBitrate: number): Reado
 }
 
 /** Jellyfin's answer as a descriptor, and the session reports will name. */
+/** Jellyfin's segment types, as this app names them. Anything else is left out. */
+const SEGMENT_KINDS: Readonly<Record<string, MediaSegmentKind>> = {
+  Intro: 'intro',
+  Outro: 'outro',
+  Recap: 'recap',
+  Preview: 'preview',
+  Commercial: 'commercial',
+};
+
 export function toDescriptor(options: {
   readonly info: PlaybackInfoDto;
   readonly request: PlaybackRequest;
   readonly baseUrl: string;
   readonly token: string;
+  readonly chapters?: readonly { readonly startTicks: number; readonly name?: string }[];
+  readonly segments?: readonly { readonly type: string; readonly startTicks: number; readonly endTicks: number }[];
 }): { readonly descriptor: PlaybackDescriptor; readonly session: PlaySession } {
   const { info, request, baseUrl, token } = options;
+  const chapters: readonly Chapter[] = (options.chapters ?? [])
+    .map((chapter): Chapter => ({ startMs: Math.round(chapter.startTicks / TICKS_PER_MS), ...(chapter.name === undefined ? {} : { title: chapter.name }) }))
+    .sort((a, b) => a.startMs - b.startMs);
+  const segments: readonly MediaSegment[] = (options.segments ?? [])
+    .flatMap((segment): readonly MediaSegment[] => {
+      const kind = SEGMENT_KINDS[segment.type];
+      return kind
+        ? [{ kind, startMs: Math.round(segment.startTicks / TICKS_PER_MS), endMs: Math.round(segment.endTicks / TICKS_PER_MS) }]
+        : [];
+    })
+    .sort((a, b) => a.startMs - b.startMs);
   if (info.errorCode) throw refusal(info.errorCode);
   const source = info.mediaSources[0];
   if (!source) throw new AppError('NOT_FOUND', 'The server has nothing to play for this item.');
@@ -112,6 +137,10 @@ export function toDescriptor(options: {
       subtitleTracks: source.mediaStreams.flatMap((stream) => (stream.type === 'Subtitle' ? (subtitleTrack(stream, baseUrl, token) ?? []) : [])),
       ...(request.startMs === undefined ? {} : { startMs: request.startMs }),
       ...(source.runTimeTicks ? { durationMs: Math.round(source.runTimeTicks / TICKS_PER_MS) } : {}),
+      // Only where there are any: an empty list says "none here", which is the
+      // same to the player as saying nothing, and costs a key to say.
+      ...(chapters.length > 0 ? { chapters } : {}),
+      ...(segments.length > 0 ? { segments } : {}),
     },
     session: {
       mediaSourceId: source.id,
