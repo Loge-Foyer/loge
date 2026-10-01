@@ -41,3 +41,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# What the app's native build leaves inside a player adapter's Expo module.
+# The adapters carried these rules in their own .gitignore until they moved in.
+adapters/players/*/android/build/
+adapters/players/*/android/.gradle/
+adapters/players/*/android/.cxx/
+*.tsbuildinfo
