@@ -235,24 +235,49 @@ describe('Yattee — what the file is', () => {
 });
 
 describe('Yattee — artwork', () => {
-  it('builds a thumbnail address from the size asked for, with a header ref', async () => {
-    const { provider } = await connect({
-      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } },
-    });
+  // A server that proxies pictures signs each address it hands out, for that
+  // video and a day, and checks no Basic sign-in on them.
+  const proxied = {
+    ...fixtures.video,
+    videoThumbnails: [
+      { quality: 'maxres', url: '/api/v1/thumbnails/dQw4w9WgXcQ/maxres.jpg?token=signed', width: 1280, height: 720 },
+      { quality: 'medium', url: '/api/v1/thumbnails/dQw4w9WgXcQ/medium.jpg?token=signed', width: 320, height: 180 },
+    ],
+  };
+
+  it('draws a thumbnail from the address the server signed for it, the size asked for', async () => {
+    const { provider } = await connect({ routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: proxied } } });
     const getItem = provider.getItem;
     const resolveImage = provider.resolveImage;
     if (!getItem || !resolveImage) throw new Error('image members are missing');
-    const detail = await getItem('dQw4w9WgXcQ');
-    const ref = detail.item.images.thumb;
+    const ref = (await getItem('dQw4w9WgXcQ')).item.images.thumb;
     if (!ref) throw new Error('no thumbnail');
-
-    expect(resolveImage(ref, { width: 320 })?.uri).toBe('https://yt.test/api/v1/thumbnails/dQw4w9WgXcQ/medium.jpg');
-    expect(resolveImage(ref, { width: 1000 })?.uri).toBe('https://yt.test/api/v1/thumbnails/dQw4w9WgXcQ/maxres.jpg');
-    // Never an inline header: the host resolves the ref at load time.
+    // The ref names the video and nothing that expires.
+    expect(String(ref)).toBe('v/dQw4w9WgXcQ');
+    expect(resolveImage(ref, { width: 320 })?.uri).toBe('https://yt.test/api/v1/thumbnails/dQw4w9WgXcQ/medium.jpg?token=signed');
+    expect(resolveImage(ref, { width: 1000 })?.uri).toBe('https://yt.test/api/v1/thumbnails/dQw4w9WgXcQ/maxres.jpg?token=signed');
+    // Larger than any there is: the largest.
+    expect(resolveImage(ref, { width: 4000 })?.uri).toContain('/maxres.jpg');
+    // The server's own address may take its sign-in, by ref — never inline.
     expect(resolveImage(ref, { width: 320 })?.headersRef).toBeDefined();
   });
 
-  it('snaps a channel avatar to a size the server publishes', async () => {
+  it('takes the site’s own CDN as it is, and sends it no sign-in', async () => {
+    const { provider } = await connect({ routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: fixtures.video } } });
+    const resolveImage = provider.resolveImage;
+    const getItem = provider.getItem;
+    if (!getItem || !resolveImage) throw new Error('image members are missing');
+    const ref = (await getItem('dQw4w9WgXcQ')).item.images.thumb;
+    if (!ref) throw new Error('no thumbnail');
+    expect(resolveImage(ref, { width: 320 })).toEqual({ uri: 'https://i.example/medium.jpg' });
+  });
+
+  it('draws nothing for a picture no answer has named yet', async () => {
+    const { provider } = await connect({});
+    expect(provider.resolveImage?.('v/dQw4w9WgXcQ' as never, { width: 320 })).toBeNull();
+  });
+
+  it('takes a channel’s avatar from what the server said, the size asked for', async () => {
     const { provider } = await connect({
       routes: { 'GET /api/v1/channels/UCuAXFkgsw1L7xaCfnd5JJOw': { status: 200, json: fixtures.channel } },
     });
@@ -262,15 +287,20 @@ describe('Yattee — artwork', () => {
     const detail = await getItem('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
     const ref = detail.item.images.poster;
     if (!ref) throw new Error('no avatar');
-    expect(resolveImage(ref, { width: 90 })?.uri).toContain('/avatar/100.jpg');
-    expect(resolveImage(ref, { width: 400 })?.uri).toContain('/avatar/512.jpg');
+    expect(resolveImage(ref, { width: 90 })?.uri).toBe('https://i.example/avatar100.jpg');
+    expect(resolveImage(ref, { width: 400 })?.uri).toBe('https://i.example/avatar512.jpg');
   });
 
   it('resolves the header to the same Basic sign-in', async () => {
-    const { provider } = await connect({ credentials: { password: 'hunter2' } });
+    const { provider } = await connect({
+      credentials: { password: 'hunter2' },
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: proxied } },
+    });
+    const getItem = provider.getItem;
     const resolveImage = provider.resolveImage;
     const resolveHeaders = provider.resolveHeaders;
-    if (!resolveImage || !resolveHeaders) throw new Error('image members are missing');
+    if (!getItem || !resolveImage || !resolveHeaders) throw new Error('image members are missing');
+    await getItem('dQw4w9WgXcQ');
     const source = resolveImage('v/dQw4w9WgXcQ' as never, { width: 320 });
     const ref = source?.headersRef;
     if (!ref) throw new Error('no header ref');

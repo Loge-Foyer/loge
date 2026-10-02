@@ -54,10 +54,19 @@ credential store once per connected provider and builds one header.
   server's own.
 - **`getItem` and `getChildren`** also open a channel (`channel:<id>`) or a
   playlist (`playlist:<id>`), each as a `show` with videos inside it.
-- **`resolveImage`** builds `/api/v1/thumbnails/<id>/<name>.jpg` and
-  `/api/v1/channels/<id>/avatar/<size>.jpg` from the size asked for, and both
-  carry a `headersRef` the host resolves to the Basic header at load time —
-  never an inline header.
+- **`resolveImage`** draws a picture from the address the server gave for it
+  — the smallest at least as wide as asked. A server that proxies pictures
+  hands out its own `/api/v1/thumbnails/<id>/<file>?token=…`: its Basic
+  sign-in middleware leaves that path alone, and the endpoint checks only the
+  token, which it signs for that video and a day. One that does not proxy
+  hands out the site's CDN. Only the server's own address carries the
+  `headersRef` the host resolves to the Basic header; another host never sees
+  it.
+  - **The addresses live in memory**, from each answer. A ref names the video
+    or the channel (`v/<id>`, `c/<id>`) and nothing that expires, because saved
+    lists and kept copies hold refs for longer than a day. A picture no answer
+    has named yet draws its plate until one does, and the host draws again
+    when the source answers.
 
 ## Decisions worth knowing
 
@@ -81,10 +90,15 @@ invents.
 ## Status
 
 Implemented and tested against a fake of the server's routes
-(`adapters/test/yattee.test.ts`, 24 cases). **Not yet run against a real
-instance** — when it is, the two things to confirm are that Basic auth alone
-reaches `/api/v1/thumbnails/` and `/api/v1/captions/` (this adapter does not
-use their signing tokens), and what `/api/v1/channels/{id}/videos` returns for
+(`adapters/test/yattee.test.ts`). **Run against a real instance**, where it
+listed videos and their pictures came out blank: Basic auth alone does not
+reach `/api/v1/thumbnails/` or `/api/v1/captions/` — the server's
+`basic_auth.py` leaves both paths to the endpoints, which want the token
+signed into the addresses the server hands out. Pictures use those addresses
+now (above); that is tested against the fake, and not yet seen on the real
+server. Captions already took the server's addresses as given.
+
+Still to confirm: what `/api/v1/channels/{id}/videos` returns for
 `continuation`, which has nowhere to live until `getChildren` carries a cursor.
 
 See `adapters/docs/writing-a-plugin/`.

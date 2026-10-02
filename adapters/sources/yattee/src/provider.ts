@@ -18,12 +18,12 @@ import {
 } from '@sc/api';
 
 import { createClient } from './client';
-import { readChannel, readInfo, readPlaylist, readVideo, readVideos, type FormatDto, type VideoDto } from './dto';
+import { readChannel, readInfo, readPlaylist, readVideo, readVideos, type FormatDto, type ThumbnailDto, type VideoDto } from './dto';
 import { unreadable } from './errors';
-import { channelToItem, parseId, playlistToItem, toDetail, toItem, toItems } from './map';
+import { channelToItem, parseId, pickThumbnail, playlistToItem, toDetail, toItem, toItems } from './map';
 import { normalizeBaseUrl, queryString } from './url';
 
-/** Every image this adapter resolves needs the same header, so one ref serves them all. */
+/** Every request to the server takes the same header, so one ref serves them all. */
 const AUTH_HEADERS = headersRef('auth');
 
 /** The server's orders closest to each sort. Its pages come in its own order. */
@@ -34,23 +34,9 @@ const SORTS: Readonly<Record<ItemSortKey, string>> = {
   rating: 'rating',
 };
 
-/** Invidious' thumbnail names, smallest first, and the width each is worth asking for. */
-const THUMBNAILS: readonly (readonly [number, string])[] = [
-  [120, 'default'],
-  [320, 'medium'],
-  [480, 'hqdefault'],
-  [1280, 'maxres'],
-];
-
-/** The avatar sizes the server publishes. */
-const AVATARS: readonly number[] = [32, 48, 76, 100, 176, 512];
-
-function nearest(sizes: readonly number[], width: number): number {
-  let chosen = sizes[sizes.length - 1] ?? width;
-  for (const size of [...sizes].reverse()) {
-    if (size >= width) chosen = size;
-  }
-  return chosen;
+/** `scheme://host:port`, lower-cased: what decides whether an address is the server's own. */
+function originOf(url: string): string | undefined {
+  return url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i)?.[0]?.toLowerCase();
 }
 
 /**
@@ -172,9 +158,23 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   const region = typeof settings.region === 'string' ? settings.region : 'US';
   const client = createClient({ baseUrl, username, context });
 
+  // What the server said each picture is, from its own answers. Its proxy
+  // checks no Basic sign-in on a thumbnail: it wants the token it signed into
+  // each address, for that video and a day. So the addresses live here, in
+  // memory, and a ref — which saved lists and kept copies hold — names only
+  // the video or the channel.
+  const thumbnails = new Map<string, readonly ThumbnailDto[]>();
+  const avatars = new Map<string, readonly ThumbnailDto[]>();
+  const seen = (videos: readonly VideoDto[]) => {
+    for (const video of videos) if (video.thumbnails.length > 0) thumbnails.set(video.videoId, video.thumbnails);
+    return videos;
+  };
+  const absolute = (url: string) => (url.startsWith('//') ? `https:${url}` : /^[a-z]+:\/\//i.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);
+
   const videoOf = async (id: string, signal?: CancelSignal): Promise<VideoDto> => {
     const video = readVideo(await client.get(`/api/v1/videos/${encodeURIComponent(id)}`, { proxy_mode: proxy }, signal));
     if (!video) throw unreadable();
+    seen([video]);
     return video;
   };
 
@@ -197,7 +197,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         const videos = readVideos(
           await client.get('/api/v1/search', { q: term, type: 'video', sort: SORTS[query.sort.by], page }, signal),
         );
-        const items = toItems(videos, connectionId);
+        const items = toItems(seen(videos), connectionId);
         // The server says nothing about how many pages there are: a full page
         // means there may be another, an empty one ends it.
         return { items, ...(items.length >= query.limit ? { nextCursor: String(page + 1) } : {}) };
@@ -205,7 +205,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       // Trending and popular are each a single page the server curates.
       if (query.cursor !== undefined) return { items: [] };
       const videos = readVideos(await client.get('/api/v1/trending', { region }, signal));
-      return { items: toItems(videos, connectionId) };
+      return { items: toItems(seen(videos), connectionId) };
     },
 
     getItem: async (externalId, signal): Promise<MediaDetail> => {
@@ -213,11 +213,13 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       if (parsed.kind === 'channel') {
         const channel = readChannel(await client.get(`/api/v1/channels/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!channel) throw new AppError('NOT_FOUND', 'The server no longer has this channel.');
+        if (channel.thumbnails.length > 0) avatars.set(channel.authorId, channel.thumbnails);
         return { item: channelToItem(channel, connectionId), people: [], studios: [], externalIds: {} };
       }
       if (parsed.kind === 'playlist') {
         const playlist = readPlaylist(await client.get(`/api/v1/playlists/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!playlist) throw new AppError('NOT_FOUND', 'The server no longer has this playlist.');
+        seen(playlist.videos);
         return { item: playlistToItem(playlist, connectionId), people: [], studios: [], externalIds: {} };
       }
       const video = await videoOf(parsed.id, signal);
@@ -232,32 +234,33 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         // server gives and nothing more — its `continuation` token has nowhere
         // to live until the contract carries one.
         const answer = await client.get(`/api/v1/channels/${encodeURIComponent(parsed.id)}/videos`, {}, signal);
-        return { items: toItems(readVideos(answer), connectionId) };
+        return { items: toItems(seen(readVideos(answer)), connectionId) };
       }
       if (parsed.kind === 'playlist') {
         const playlist = readPlaylist(await client.get(`/api/v1/playlists/${encodeURIComponent(parsed.id)}`, {}, signal));
-        return { items: playlist ? toItems(playlist.videos, connectionId) : [] };
+        return { items: playlist ? toItems(seen(playlist.videos), connectionId) : [] };
       }
       // A video has nothing inside it.
       return { items: [] };
     },
 
+    /**
+     * The address the server gave for the picture, the size asked for: its own
+     * proxy's, signed — or the site's CDN, where the server is set not to
+     * proxy pictures. Only the server's own address is sent the sign-in;
+     * another host never sees it. A picture no answer has named yet draws its
+     * plate, until one does.
+     */
     resolveImage: (ref: ImageRef, size: ImageSize): ImageSource | null => {
       const value = String(ref);
       const at = value.indexOf('/');
       const kind = value.slice(0, at);
       const id = value.slice(at + 1);
-      if (kind === 'v') {
-        const [, name] = THUMBNAILS.find(([width]) => width >= size.width) ?? THUMBNAILS[THUMBNAILS.length - 1] ?? [0, 'medium'];
-        return { uri: `${baseUrl}/api/v1/thumbnails/${encodeURIComponent(id)}/${name}.jpg`, headersRef: AUTH_HEADERS };
-      }
-      if (kind === 'c') {
-        return {
-          uri: `${baseUrl}/api/v1/channels/${encodeURIComponent(id)}/avatar/${nearest(AVATARS, size.width)}.jpg`,
-          headersRef: AUTH_HEADERS,
-        };
-      }
-      return null;
+      const known = kind === 'v' ? thumbnails.get(id) : kind === 'c' ? avatars.get(id) : undefined;
+      const chosen = known && pickThumbnail(known, size.width);
+      if (!chosen) return null;
+      const uri = absolute(chosen.url);
+      return originOf(uri) === originOf(baseUrl) ? { uri, headersRef: AUTH_HEADERS } : { uri };
     },
 
     resolveHeaders: async (ref) => (ref === AUTH_HEADERS ? { Authorization: await client.authorization() } : undefined),
@@ -294,7 +297,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         { channels: [...externalIds], limit: query.limit, offset: page * query.limit },
         signal,
       );
-      const items = toItems(readVideos(answer), connectionId);
+      const items = toItems(seen(readVideos(answer)), connectionId);
       return { items, ...(items.length >= query.limit ? { nextCursor: String(page + 1) } : {}) };
     },
 

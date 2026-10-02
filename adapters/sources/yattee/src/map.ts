@@ -21,14 +21,10 @@ export function channelImage(channel: ChannelDto): string | undefined {
   return channel.thumbnails.length > 0 ? `c/${channel.authorId}` : undefined;
 }
 
-/** The widest thumbnail no larger than `width`, else the smallest there is. */
+/** The smallest thumbnail at least as wide as asked — sharp, and no larger — else the widest there is. */
 export function pickThumbnail(thumbnails: readonly ThumbnailDto[], width: number): ThumbnailDto | undefined {
   const sorted = [...thumbnails].sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
-  let chosen: ThumbnailDto | undefined;
-  for (const thumbnail of sorted) {
-    if ((thumbnail.width ?? 0) <= width) chosen = thumbnail;
-  }
-  return chosen ?? sorted[0];
+  return sorted.find((thumbnail) => (thumbnail.width ?? 0) >= width) ?? sorted.at(-1);
 }
 
 /** Seconds since the epoch, as the ISO date the domain uses. */
