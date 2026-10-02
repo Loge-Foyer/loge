@@ -141,17 +141,17 @@ export function useArtwork(connectionId: ConnectionId, ref: ImageRef | undefined
   const userId = useActiveUserId();
   const { media } = useServices();
   const scale = PixelRatio.get();
-  // Draws again when the source connects or answers: a card drawn before its
-  // source could resolve it — from what was saved, at launch — asks again,
-  // rather than keeping its plate.
-  useSyncExternalStore(media.subscribeArtwork, () => media.artworkGeneration(connectionId));
-  // The same object for the same address, from the service: nothing below sees a change that is not one.
-  const resolved = ref
-    ? media.artwork(userId, connectionId, ref, {
-        width: Math.round(width * scale),
-        ...(height === undefined ? {} : { height: Math.round(height * scale) }),
-      })
-    : null;
+  const pixelWidth = Math.round(width * scale);
+  const pixelHeight = height === undefined ? undefined : Math.round(height * scale);
+  // The resolved image is the store's snapshot: asked again whenever a source
+  // connects or answers, so a card drawn before its source could resolve it —
+  // from what was saved, at launch — draws it once it can. A plain call would
+  // not do: the React Compiler memoizes it by its arguments, and the first
+  // null would stand for good. The service answers the same object for the
+  // same address, so asking again changes nothing that has not changed.
+  const resolved = useSyncExternalStore(media.subscribeArtwork, () =>
+    ref ? media.artwork(userId, connectionId, ref, { width: pixelWidth, ...(pixelHeight === undefined ? {} : { height: pixelHeight }) }) : null,
+  );
   useEffect(() => {
     if (ref && !resolved) media.prepareArtwork(userId, connectionId);
   }, [media, userId, connectionId, ref, resolved]);
