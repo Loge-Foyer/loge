@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.version          = '1.0.0'
   s.summary          = 'libVLC for Loge, on iPhone and Apple TV.'
   s.description      = 'Loge’s player plugin for VLC’s engine: the iOS half of @loge/player-vlc.'
-  s.license          = 'GPL-3.0-or-later'
+  s.license          = 'AGPL-3.0-or-later'
   s.author           = 'Loge'
   # This package has no remote; it ships inside the Loge repository
   # and is consumed by path. CocoaPods only checks these when linting for

@@ -146,9 +146,9 @@ which is exactly the case the policy above exists for.
   `--quiet` with no loggers keeps libVLC from writing a stream's address to
   the device log.
 - `players/ksplayer` is a manifest with no profile and is not registered.
-- **Licences are settled** (Phase 8): the app is GPL-3.0-or-later, so a player
-  may link a GPL engine, and libmpv's build is one. A closed or App Store build
-  would need LGPL engines instead — a plan of its own.
+- **Licences are settled**: the app is AGPL-3.0-or-later, so a player may link
+  a GPL engine, and libmpv's build is one. A closed or App Store build would
+  need LGPL engines instead — a plan of its own.
 - Which players are on, and the default, are this device's settings.
 
 ## iCloud

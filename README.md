@@ -205,6 +205,16 @@ full of rules. This file is the one written for you.
 
 ## Licence
 
-**GPL-3.0-or-later.** The app is free software, and it links players built
-from FFmpeg and mpv that are GPL themselves. That means anyone you give a
-build to may have its source, and the same freedoms.
+**AGPL-3.0-or-later.** The app is free software. Anyone may use it, change
+it, and host it — for money too — as long as they give their users the
+complete source, under the same licence.
+
+- **Hosting counts.** Someone who runs a copy as a service for others, the
+  web build included, owes those users its source. A renamed copy owes it
+  just the same, and none may be closed.
+- **The attribution stays.** One additional term (`NOTICE`, under the
+  licence's section 7(b)): a work based on Loge keeps "Based on Loge" and a
+  link to this repository wherever it shows its legal notices.
+- **The engines fit.** It links players built from FFmpeg and mpv that are
+  GPL-3.0 themselves, and the AGPL and the GPL allow exactly that
+  combination.

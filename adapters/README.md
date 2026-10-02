@@ -146,6 +146,7 @@ The full architecture is in
 
 ## Licence
 
-**GPL-3.0-or-later.** `api` and the plugins are free software; the player
-plugins link engines — FFmpeg, mpv, libVLC — and mpv's build is GPL, which
-sets the licence for anything shipped with it.
+**AGPL-3.0-or-later**, with the app (`../LICENSE`, `../NOTICE`). `api` and
+the adapters are free software. The player adapters link engines — FFmpeg,
+mpv, libVLC — and mpv's build is GPL-3.0, which the AGPL is allowed to combine
+with.

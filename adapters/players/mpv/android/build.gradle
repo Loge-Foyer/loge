@@ -9,9 +9,10 @@ version = '0.0.0'
 /*
  * libmpv 0.41, built by libmpv-android and published to Maven Central. The
  * wrapper is MIT; the binaries are configured `--enable-gpl
- * --enable-version3`, so what ships here is GPLv3 — which is why this app is
- * GPL-3.0-or-later. An LGPL build would have to be made from source; see the
- * workspace's LGPL engines plan.
+ * --enable-version3`, so what ships here is GPLv3 — which is why this app's
+ * licence, AGPL-3.0-or-later, has to be one the GPL may combine with. An LGPL
+ * build would have to be made from source; see the workspace's LGPL engines
+ * plan.
  *
  * Only the binaries are used. This package has its own JNI (`src/main/cpp`),
  * because the published wrapper prints every mpv log message to the device

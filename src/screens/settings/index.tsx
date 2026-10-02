@@ -242,6 +242,8 @@ export function SettingsScreen() {
           icon={<Info size={20} color="$color11" />}
           trailing={<SizableText color="$color10">{Constants.expoConfig?.version ?? '—'}</SizableText>}
         />
+        {/* The AGPL owes whoever uses a copy its source, and NOTICE asks every copy to keep this attribution. */}
+        <SettingsRow title="Loge" subtitle="Free software, under the GNU AGPL 3.0 or later. Source: github.com/Loge-Foyer/loge" />
         {/* What the services the app uses ask it to say: their manifests carry it, so nothing here names one. */}
         {catalog.list().flatMap((manifest) =>
           manifest.attribution ? [<SettingsRow key={manifest.id} title={manifest.displayName} subtitle={manifest.attribution} />] : [],

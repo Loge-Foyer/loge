@@ -107,7 +107,8 @@ VideoToolbox is the default there and falls back rather than stalling.
 ## Licence
 
 The binaries are FFmpeg and mpv configured `--enable-gpl --enable-version3`,
-which makes them **GPLv3** — and so is this app. Shipping a closed build would
+which makes them **GPLv3**. The app is AGPL-3.0-or-later, which may link
+them: the two licences allow that combination. Shipping a closed build would
 need LGPL engines, built from source; that is a plan of its own at the
 workspace root.
 
