@@ -9,6 +9,7 @@ import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
+import { px } from '@/components/density';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listNames } from '@/components/labels';
 import { fromRouteId, liveHref, routeId } from '@/components/media/item-link';
@@ -244,9 +245,9 @@ function ChannelRow({
       >
         {({ pressed }) => (
           <XStack gap="$3" items="center" opacity={pressed ? 0.75 : 1} bg={row.focused ? '$accent4' : '$color2'} rounded="$4" p="$2.5">
-            <YStack width={72} height={42} rounded="$2" overflow="hidden" bg="$color3" items="center" justify="center">
+            <YStack width={px(72)} height={px(42)} rounded="$2" overflow="hidden" bg="$color3" items="center" justify="center">
               {channel.logo ? (
-                <Artwork connectionId={connectionId} image={channel.logo} width={72} aspect={72 / 42} label={channel.name} rounded="$3" fit="contain" />
+                <Artwork connectionId={connectionId} image={channel.logo} width={px(72)} aspect={72 / 42} label={channel.name} rounded="$3" fit="contain" />
               ) : (
                 <SizableText size="$4" fontWeight="700" color="$color10">
                   {channel.number ?? channel.name.slice(0, 2)}

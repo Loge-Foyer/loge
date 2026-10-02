@@ -276,6 +276,15 @@ object. Without a reference, or from a source that has no images, a card shows
 its title on a colour derived from its key. Channel logos go through the same
 resolver.
 
+An image resolves only through a connected source, and a card is often drawn
+before its source is: from what was saved, at launch, or just after a sync
+changed the connection. So the media service keeps a generation per connection
+that moves when its provider connects, answers or is let go
+(`artworkGeneration`), and a card that drew its plate asks again when it moves
+— and asks for the source to be connected meanwhile, which needs no network.
+The service answers the same object for the same address, so a card asking
+again never makes an image load again.
+
 `components/scrim.tsx` fades artwork into the page with `expo-linear-gradient`,
 which takes resolved colours. `pointerEvents` goes in its style: React Native
 deprecated the prop.

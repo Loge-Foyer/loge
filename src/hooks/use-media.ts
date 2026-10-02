@@ -1,6 +1,6 @@
 import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@sc/api';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { PixelRatio } from 'react-native';
 
 import type { GridPage, MergeState, RowResult, RowSpec } from '@/services/media';
@@ -141,16 +141,21 @@ export function useArtwork(connectionId: ConnectionId, ref: ImageRef | undefined
   const userId = useActiveUserId();
   const { media } = useServices();
   const scale = PixelRatio.get();
-  return useMemo(
-    () =>
-      ref
-        ? media.artwork(userId, connectionId, ref, {
-            width: Math.round(width * scale),
-            ...(height === undefined ? {} : { height: Math.round(height * scale) }),
-          })
-        : null,
-    [media, userId, connectionId, ref, width, height, scale],
-  );
+  // Draws again when the source connects or answers: a card drawn before its
+  // source could resolve it — from what was saved, at launch — asks again,
+  // rather than keeping its plate.
+  useSyncExternalStore(media.subscribeArtwork, () => media.artworkGeneration(connectionId));
+  // The same object for the same address, from the service: nothing below sees a change that is not one.
+  const resolved = ref
+    ? media.artwork(userId, connectionId, ref, {
+        width: Math.round(width * scale),
+        ...(height === undefined ? {} : { height: Math.round(height * scale) }),
+      })
+    : null;
+  useEffect(() => {
+    if (ref && !resolved) media.prepareArtwork(userId, connectionId);
+  }, [media, userId, connectionId, ref, resolved]);
+  return resolved;
 }
 
 /** Headers an image needs, resolved in memory. Kept out of the remote keys: a refresh must not refetch every image. */

@@ -1,5 +1,5 @@
 import { AppError, imageRef, type ConnectionId, type MediaItem, type Plugin, type UserId } from '@sc/api';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';
 import type { MergeState } from '@/services/media';
@@ -198,6 +198,45 @@ describe('media pool', () => {
       cachePolicy: 'memory-disk',
     });
     expect(services.media.artwork(kids, plainId, imageRef('poster'), { width: 300 })).toBeNull();
+  });
+
+  it('resolves again once its source is ready, and moves on only when something changed', async () => {
+    const withArt = fakeMediaPlugin('art', { movies: (id) => [movie(id, 'x', 2020)], withImages: true });
+    const { services, kids, ids } = await withSources([withArt]);
+    const [artId] = ids as [ConnectionId];
+    const poster = imageRef('poster');
+    let told = 0;
+    const stop = services.media.subscribeArtwork(() => {
+      told += 1;
+    });
+
+    // A card drawn from what was saved, before anything asked the source.
+    expect(services.media.artwork(kids, artId, poster, { width: 300 })).toBeNull();
+    const before = services.media.artworkGeneration(artId);
+    services.media.prepareArtwork(kids, artId);
+    await vi.waitFor(() => expect(services.media.artworkGeneration(artId)).toBeGreaterThan(before));
+    expect(told).toBeGreaterThan(0);
+    // No sign-in for an address: connecting does no network work.
+    expect(withArt.stats.calls).toBe(0);
+    const resolved = services.media.artwork(kids, artId, poster, { width: 300 });
+    expect(resolved).toEqual({ uri: 'https://img.test/poster?w=300', cachePolicy: 'memory-disk' });
+    // The same object for the same address: the web image component fetches again for a new one.
+    expect(services.media.artwork(kids, artId, poster, { width: 300 })).toBe(resolved);
+
+    // Ready already, so preparing again moves nothing — or a card that cannot resolve would ask for ever.
+    const settled = services.media.artworkGeneration(artId);
+    services.media.prepareArtwork(kids, artId);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(services.media.artworkGeneration(artId)).toBe(settled);
+
+    // An answer moves it on, and so does letting the connection go.
+    await services.media.row(kids, { kind: 'movies', sort: NEWEST }, 10);
+    expect(services.media.artworkGeneration(artId)).toBeGreaterThan(settled);
+    const answered = services.media.artworkGeneration(artId);
+    services.media.forgetConnection(artId);
+    expect(services.media.artworkGeneration(artId)).toBeGreaterThan(answered);
+    expect(services.media.artwork(kids, artId, poster, { width: 300 })).toBeNull();
+    stop();
   });
 
   it('tests a draft with the secret being typed, outside the pool', async () => {

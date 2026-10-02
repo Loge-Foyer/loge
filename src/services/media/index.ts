@@ -145,8 +145,21 @@ export interface MediaService {
   /** One source's page of one kind, in the source's own order: nothing is merged with another source. */
   sourcePage(userId: UserId, connectionId: ConnectionId, query: ItemQuery, signal?: CancelSignal): Promise<SourcePage>;
   readonly saved: SavedMedia;
-  /** Synchronous: an image address needs no network, only a connected source. */
+  /**
+   * Synchronous: an image address needs no network, only a connected source.
+   * The same object for the same address, however often it is asked: the web
+   * image component fetches again for a new one.
+   */
   artwork(userId: UserId, connectionId: ConnectionId, ref: ImageRef, size: ImageSize): ResolvedArtwork | null;
+  /**
+   * Moves when a connection's images may resolve differently: its provider
+   * connected, or answered, or was let go. A card that drew its plate before
+   * any of that asks `artwork` again when this moves.
+   */
+  artworkGeneration(connectionId: ConnectionId): number;
+  subscribeArtwork(listener: () => void): () => void;
+  /** Connects the source behind an image that cannot resolve yet — no network — and moves its generation once it has. */
+  prepareArtwork(userId: UserId, connectionId: ConnectionId): void;
   artworkHeaders(userId: UserId, connectionId: ConnectionId, ref: HeadersRef): Promise<Readonly<Record<string, string>> | undefined>;
   /** Signs a draft in, for "Test connection". */
   test(target: ProbeTarget, signal?: CancelSignal): Promise<SourceInfo>;
@@ -216,6 +229,14 @@ export function createMediaService(deps: {
   const live = new Map<UserId, ReadonlyMap<ConnectionId, Source>>();
   // Sources whose saved answers were purged this session, because they may not be kept.
   const purged = new Set<string>();
+  const generations = new Map<ConnectionId, number>();
+  const artworkListeners = new Set<() => void>();
+  const resolved = new Map<string, ResolvedArtwork>();
+  const preparing = new Set<string>();
+  const moved = (connectionId: ConnectionId) => {
+    generations.set(connectionId, (generations.get(connectionId) ?? 0) + 1);
+    for (const listener of artworkListeners) listener();
+  };
 
   network.subscribe((_kind, previous) => {
     // The first reading after launch is not a change of network.
@@ -249,12 +270,22 @@ export function createMediaService(deps: {
     return found;
   };
 
-  /** Calls a source, parking it when trying again cannot help until something changes. */
+  /**
+   * Calls a source, parking it when trying again cannot help until something
+   * changes. Connecting, and every answer, may change what its images resolve
+   * to — a provider can learn an image's address from what it lists — so both
+   * move the connection's artwork on.
+   */
   const call = async <T>(source: Source, run: (provider: ConnectedMediaProvider) => Promise<T>): Promise<T> => {
     const parked = pool.parked(source);
     if (parked) throw parked;
     try {
-      return await run(await pool.provider(source));
+      const connected = pool.connected(source) !== undefined;
+      const provider = await pool.provider(source);
+      if (!connected) moved(source.connection.id);
+      const value = await run(provider);
+      moved(source.connection.id);
+      return value;
     } catch (error) {
       if (isAborted(error)) throw error;
       const failure = toAppError(error, log);
@@ -668,7 +699,41 @@ export function createMediaService(deps: {
       if (!source || !can(source, 'remoteImages')) return null;
       const image = pool.connected(source)?.resolveImage?.(ref, size);
       if (!image) return null;
-      return { ...image, cachePolicy: keeps(source) ? 'memory-disk' : 'memory' };
+      const next: ResolvedArtwork = { ...image, cachePolicy: keeps(source) ? 'memory-disk' : 'memory' };
+      const key = `${userId}|${connectionId}|${ref}|${size.width}x${size.height ?? ''}`;
+      const before = resolved.get(key);
+      if (before && JSON.stringify(before) === JSON.stringify(next)) return before;
+      resolved.set(key, next);
+      return next;
+    },
+
+    artworkGeneration: (connectionId) => generations.get(connectionId) ?? 0,
+
+    subscribeArtwork: (listener) => {
+      artworkListeners.add(listener);
+      return () => artworkListeners.delete(listener);
+    },
+
+    prepareArtwork: (userId, connectionId) => {
+      const known = live.get(userId)?.get(connectionId);
+      // Connected already: preparing changes nothing, so the generation must
+      // not move — a card whose image cannot resolve would ask for ever.
+      if (known && pool.connected(known)) return;
+      const mark = `${userId}|${connectionId}`;
+      if (preparing.has(mark)) return;
+      preparing.add(mark);
+      void (async () => {
+        try {
+          const source = (await sourcesOf(userId)).find((candidate) => candidate.connection.id === connectionId);
+          if (!source || !can(source, 'remoteImages') || pool.parked(source)) return;
+          await pool.provider(source);
+          moved(connectionId);
+        } catch {
+          // A source that cannot connect keeps its plates; its next answer moves them on.
+        } finally {
+          preparing.delete(mark);
+        }
+      })();
     },
 
     artworkHeaders: async (userId, connectionId, ref) => {
@@ -698,11 +763,16 @@ export function createMediaService(deps: {
       await quietly(cache.prune(clock.now() - GUIDE_KEPT_MS, GUIDE));
     },
 
-    forgetConnection: (id) => pool.forgetConnection(id),
+    forgetConnection: (id) => {
+      pool.forgetConnection(id);
+      moved(id);
+    },
 
     forgetUser: (id) => {
+      const connections = [...(live.get(id)?.keys() ?? [])];
       live.delete(id);
       pool.forgetUser(id);
+      for (const connectionId of connections) moved(connectionId);
     },
   };
 }
