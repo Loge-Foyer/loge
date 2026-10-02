@@ -469,7 +469,8 @@ describe('Yattee — the latest from channels someone follows', () => {
     });
     const feed = provider.listFeed;
     if (!feed) throw new Error('listFeed is missing');
-    const page = await feed(['UC1', 'UC2'], { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 2 });
+    // As the app holds them: the channels' keys, as this adapter made them.
+    const page = await feed(['channel:UC1', 'channel:UC2'], { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 2 });
     expect(page.items.map((item) => item.title)).toEqual(['The channel’s newest', 'The one before it']);
     const body = JSON.parse(http.to('POST /api/v1/feed')[0]?.body ?? '{}') as { channels: string[]; limit: number; offset: number };
     expect(body).toEqual({ channels: ['UC1', 'UC2'], limit: 2, offset: 0 });
@@ -482,6 +483,21 @@ describe('Yattee — the latest from channels someone follows', () => {
     if (!feed) throw new Error('listFeed is missing');
     expect(await feed([], { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 10 })).toEqual({ items: [] });
     expect(http.to('POST /api/v1/feed')).toHaveLength(0);
+  });
+
+  it('takes back the channel ids it gave out, each once, and leaves out what is no channel', async () => {
+    const { provider, http } = await connect({
+      routes: { 'POST /api/v1/feed': { status: 200, json: fixtures.channelVideos } },
+    });
+    const feed = provider.listFeed;
+    if (!feed) throw new Error('listFeed is missing');
+    const query = { kind: 'videos', sort: { by: 'addedAt', order: 'desc' }, limit: 2 } as const;
+    // A followed channel's key, the same one twice, a video's and a playlist's.
+    await feed(['channel:UC1', 'channel:UC1', 'dQw4w9WgXcQ', 'playlist:PL1', 'channel:'], query);
+    expect((JSON.parse(http.to('POST /api/v1/feed')[0]?.body ?? '{}') as { channels: string[] }).channels).toEqual(['UC1']);
+    // Nothing that is a channel: nothing to ask.
+    expect(await feed(['dQw4w9WgXcQ'], query)).toEqual({ items: [] });
+    expect(http.to('POST /api/v1/feed')).toHaveLength(1);
   });
 });
 

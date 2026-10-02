@@ -22,7 +22,7 @@ import { accountWide } from '../scope';
 import { sessionRef } from '../sessions';
 import { snapshotOf } from '../watch/snapshot';
 import type { Applied, SyncParts } from './parts';
-import { announcementOf, identityOf, identityOfEntry } from './records';
+import { announcementOf, identityOf, identityOfEntry, ownerByKey } from './records';
 
 type Live<K extends AccountRecord['kind']> = Extract<AccountRecord, { kind: K; deleted: false }>;
 
@@ -633,8 +633,5 @@ interface LocalIdentity extends Pick<AccountRecord, 'kind' | 'key'> {
 
 /** The profile a record belongs to, if it is one's. */
 function ownerOf(record: LocalIdentity): UserId | undefined {
-  if (record.owner !== undefined) return record.owner;
-  const [first, second] = record.key.split('/');
-  if (record.kind === 'profile' || record.kind === 'pin' || record.kind === 'preference') return toUserId(first ?? '');
-  return record.kind === 'profileValues' ? toUserId(second ?? '') : undefined;
+  return record.owner ?? ownerByKey(record.kind, record.key);
 }

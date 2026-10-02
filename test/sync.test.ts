@@ -452,6 +452,74 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
       expect(recordOf(server, 'pin', lee)).toMatchObject({ data: { pin: '4321' } });
       expect(await b.services.account.heldBack()).toEqual(new Set());
     });
+
+    it('keeps a held-back profile’s lists and what it watched on this device too, and sends none of it until there is room', async () => {
+      const { a, b, server, media, sam } = await onOneAccount({ maxProfiles: 3 });
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, sam));
+      await sync(a);
+      await sync(b);
+      const warn = vi.spyOn(silentLog, 'warn');
+      // The last place, taken on both devices at once: A's Kim gets it, and B's Lee waits.
+      const kim = (await a.services.profiles.create('Kim')).id;
+      const lee = (await b.services.profiles.create('Lee')).id;
+      const watched = `${lee}/${identityHash('tmdb:movie:603')}`;
+      const at = '2026-10-02T12:00:00.000Z';
+      // Each of these names its profile in its body, or — a watch record — in its key; a generated id names nobody.
+      await b.db.favoriteChannels.put({ id: 'fav-lee', userId: lee, connectionId: home.id, externalId: 'ch:1', name: 'One', addedAt: at, version: 1 });
+      await b.db.subscriptions.put({ id: 'sub-lee', userId: lee, connectionId: home.id, externalId: 'UC1', title: 'Some Channel', addedAt: at, version: 1 });
+      await b.db.playlists.put({ id: 'list-lee', userId: lee, title: 'Mine', items: [], createdAt: at, updatedAt: at, version: 1 });
+      await b.db.watchProgress.put({ id: watched, userId: lee, identity: 'tmdb:movie:603', round: 0, watched: true, createdAt: at, updatedAt: at, version: 1 });
+      await sync(a);
+      await sync(b);
+
+      expect(await b.services.account.heldBack()).toEqual(new Set([lee]));
+      for (const [kind, key] of [['favoriteChannel', 'fav-lee'], ['subscription', 'sub-lee'], ['playlist', 'list-lee'], ['watchProgress', watched]] as const) {
+        expect(recordOf(server, kind, key), kind).toBeUndefined();
+      }
+      // The server refused nothing: nothing it would have refused was sent.
+      expect(warn).not.toHaveBeenCalled();
+
+      // A delete while held back has no body to say whose it is: its journal entry does, and it waits too.
+      await b.db.favoriteChannels.remove('fav-lee');
+      const pushes = server.calls.pushes;
+      await sync(b);
+      expect(server.calls.pushes).toBe(pushes);
+
+      // Room: Kim goes, and Lee arrives with everything that is still Lee's.
+      await a.services.profiles.remove(kim);
+      await sync(a);
+      await sync(b);
+      await sync(b);
+      expect(server.profileNames()).toEqual(['Lee', 'Robin', 'Sam']);
+      for (const [kind, key] of [['subscription', 'sub-lee'], ['playlist', 'list-lee'], ['watchProgress', watched]] as const) {
+        expect(recordOf(server, kind, key), kind).toMatchObject({ deleted: false });
+      }
+      expect(recordOf(server, 'favoriteChannel', 'fav-lee')).toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('lets a deleted connection take its favourites and subscriptions with it, never sending them under its tombstone', async () => {
+      const { a, b, server, media, sam } = await onOneAccount();
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, sam));
+      await sync(a);
+      await sync(b);
+      await a.services.connections.remove(home.id);
+      await sync(a);
+      // B has not heard: it renames the connection, and favours a channel on it.
+      const onB = await b.services.connections.edit(home.id);
+      if (!onB) throw new Error('setup');
+      await b.services.connections.update(home.id, { ...draftOf(media.manifest, onB), label: 'Renamed on B' });
+      await b.db.favoriteChannels.put({ id: 'fav-late', userId: sam, connectionId: home.id, externalId: 'ch:9', name: 'Late', addedAt: '2026-10-02T12:00:00.000Z', version: 1 });
+      await b.db.subscriptions.put({ id: 'sub-late', userId: sam, connectionId: home.id, externalId: 'UC9', title: 'Late', addedAt: '2026-10-02T12:00:00.000Z', version: 1 });
+      await sync(b);
+
+      expect(recordOf(server, 'connection', home.id)?.deleted).toBe(true);
+      expect(recordOf(server, 'favoriteChannel', 'fav-late')).toBeUndefined();
+      expect(recordOf(server, 'subscription', 'sub-late')).toBeUndefined();
+      expect(await b.db.connections.get(home.id)).toBeUndefined();
+      expect(await b.db.favoriteChannels.listAll()).toEqual([]);
+    });
   });
 
   describe('passwords', () => {

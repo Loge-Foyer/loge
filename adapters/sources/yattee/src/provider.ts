@@ -343,15 +343,14 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     },
 
     listFeed: async (externalIds, query, signal) => {
-      if (externalIds.length === 0) return { items: [] };
+      // The app hands back the ids this adapter put in the channels' keys —
+      // `channel:UC…` — and the server wants its own. What is no channel has no feed.
+      const channels = [...new Set(externalIds.map(parseId).flatMap((parsed) => (parsed.kind === 'channel' && parsed.id !== '' ? [parsed.id] : [])))];
+      if (channels.length === 0) return { items: [] };
       const page = query.cursor === undefined ? 0 : Number(query.cursor);
       // The server keeps no subscription list of its own: the channels come
       // from the profile, on every call.
-      const answer = await client.post(
-        '/api/v1/feed',
-        { channels: [...externalIds], limit: query.limit, offset: page * query.limit },
-        signal,
-      );
+      const answer = await client.post('/api/v1/feed', { channels, limit: query.limit, offset: page * query.limit }, signal);
       const items = toItems(seen(readVideos(answer)), connectionId);
       return { items, ...(items.length >= query.limit ? { nextCursor: String(page + 1) } : {}) };
     },

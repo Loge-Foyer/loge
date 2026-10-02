@@ -136,6 +136,10 @@ export function fakeAccountServer(options: FakeServerOptions = {}): FakeServer {
         continue;
       }
       if ((record.kind === 'profile' || record.kind === 'connection') && before?.deleted) return refuse(index, 'deleted');
+      // A child points at its parents, and PocketBase refuses a relation to a record it does not hold — deleted ones it does.
+      const parents = record.data as Partial<Record<'userId' | 'connectionId', string>>;
+      if (record.kind !== 'profile' && parents.userId !== undefined && !working.has(`profile/${parents.userId}`)) return refuse(index, 'invalid');
+      if (record.kind !== 'connection' && parents.connectionId !== undefined && !working.has(`connection/${parents.connectionId}`)) return refuse(index, 'invalid');
       if (record.kind === 'profile' && !before) {
         const live = [...working.values()].filter((stored) => stored.kind === 'profile' && !stored.deleted).length;
         if (live >= server.maxProfiles) return refuse(index, 'limit');

@@ -6,6 +6,7 @@ import {
   type Credentials,
   type CredentialsRef,
   type RecordKind,
+  type UserId,
 } from '@sc/api';
 
 import type { JournalAnnouncement, JournalEntry, JournalEntity, LocalDatabase, SecureCredentialStore } from '../ports';
@@ -60,19 +61,31 @@ export const identityOf = (record: Pick<AccountRecord, 'kind' | 'key'>): string 
 
 export const identityOfEntry = (entry: Pick<JournalEntry, 'entity' | 'entityId'>): string => `${KIND_OF[entry.entity]}/${entry.entityId}`;
 
+/**
+ * The profile a record's key names: a profile's, a PIN's, a preference's, a
+ * watch record's, a profile's values'. Nothing for the account's own — a
+ * connection, a setting — and nothing for a subscription, a favourite or a
+ * playlist, whose key is a generated id: whose those are comes from their
+ * row, their body or their journal entry.
+ */
+export function ownerByKey(kind: RecordKind, key: string): UserId | undefined {
+  const [first, second] = key.split('/');
+  switch (kind) {
+    case 'profile':
+    case 'pin':
+    case 'preference':
+    case 'watchProgress':
+      return first ? toUserId(first) : undefined;
+    case 'profileValues':
+      return second ? toUserId(second) : undefined;
+    default:
+      return undefined;
+  }
+}
+
 /** A local row, announced as if just changed: how a sign-up uploads, and how a row a server lost goes back. */
 export function announcementOf(kind: RecordKind, key: string, owner?: string): JournalAnnouncement {
-  const [first] = key.split('/');
-  const userId =
-    kind === 'profile' || kind === 'pin' || kind === 'preference' || kind === 'watchProgress'
-      ? first
-      : kind === 'setting'
-        ? undefined
-      : kind === 'profileValues'
-        ? key.split('/')[1]
-        : // A subscription's, a favourite's and a playlist's key is a
-          // generated id and names nobody, so whose it is comes from the row.
-          owner;
+  const userId = ownerByKey(kind, key) ?? (kind === 'setting' || kind === 'connection' ? undefined : owner);
   return { ...(userId ? { userId: toUserId(userId) } : {}), entity: ENTITY_OF[kind], entityId: key, operation: 'upsert', localVersion: 0 };
 }
 

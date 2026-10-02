@@ -61,7 +61,9 @@ export interface ConnectedMediaProvider {
   /**
    * The newest from these channels, merged by the source and ordered as
    * `ItemQuery.sort` asks. The app holds the channel list — it is the
-   * profile's, not the server's — and hands it over on each call.
+   * profile's, not the server's — and hands it over on each call, as the
+   * channels' own `key.externalId`s: what this source put in their keys, which
+   * it turns back into what its server calls them.
    */
   listFeed?(externalIds: readonly string[], query: ItemQuery, signal?: CancelSignal): Promise<ItemPage>;
   /**

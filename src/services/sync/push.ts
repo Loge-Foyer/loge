@@ -1,12 +1,11 @@
-import type { AccountRecord, CancelSignal, ConnectedAccount, UserId } from '@sc/api';
+import { userId as toUserId, type AccountRecord, type CancelSignal, type ConnectedAccount } from '@sc/api';
 
 import type { JournalEntry } from '../ports';
 import type { SyncParts } from './parts';
-import { identityOf, PARENTS_FIRST, recordFor } from './records';
+import { identityOf, ownerByKey, PARENTS_FIRST, recordFor } from './records';
 
 // Well under what a server takes in one batch; a whole account fits many times over.
 const BATCH = 200;
-
 
 /**
  * Sends the journal after the checkpoint as batches the server stores whole
@@ -32,60 +31,80 @@ export async function pushPending(parts: SyncParts, account: ConnectedAccount, r
     const last = entries[entries.length - 1];
     if (!last) return;
 
-    const heldBack = new Set(state.heldBack);
-    let records = await recordsOf(parts, entries, heldBack);
-    while (records.length > 0) {
-      const outcome = await account.push(records, signal);
+    const heldBack = new Set<string>(state.heldBack);
+    let outgoing = await recordsOf(parts, entries, heldBack);
+    while (outgoing.length > 0) {
+      const outcome = await account.push(outgoing.map((each) => each.record), signal);
       if (outcome.kind === 'stored') break;
-      const stopped = records[outcome.index];
+      const stopped = outgoing[outcome.index];
       if (!stopped) break;
-      if (outcome.reason === 'limit' && stopped.kind === 'profile') {
-        heldBack.add(stopped.key as UserId);
-        records = records.filter((record) => !ownedBy(record, stopped.key));
+      if (outcome.reason === 'limit' && stopped.record.kind === 'profile') {
+        heldBack.add(stopped.record.key);
+        outgoing = outgoing.filter((each) => each.owner !== stopped.record.key);
       } else if (outcome.reason === 'deleted') {
-        records = records.filter((record) => record !== stopped && !childOf(record, stopped));
+        outgoing = outgoing.filter((each) => each !== stopped && !childOf(each, stopped.record));
       } else {
-        parts.log.warn('sync', 'The account refused a change, and it was left out', { kind: stopped.kind });
-        refused.add(identityOf(stopped));
-        records = records.filter((record) => record !== stopped);
+        parts.log.warn('sync', 'The account refused a change, and it was left out', { kind: stopped.record.kind });
+        refused.add(identityOf(stopped.record));
+        outgoing = outgoing.filter((each) => each !== stopped);
       }
     }
     await db.unjournaled(async (tx) => {
       const current = await tx.account.sync();
-      await tx.account.putSync({ ...current, checkpoint: Math.max(current.checkpoint, last.seq), heldBack: [...heldBack] });
+      await tx.account.putSync({ ...current, checkpoint: Math.max(current.checkpoint, last.seq), heldBack: [...heldBack].map(toUserId) });
     });
   }
 }
 
-/** Every entity the entries name, once, as it is now — parents first; nothing of a profile held back. */
-async function recordsOf(parts: SyncParts, entries: readonly JournalEntry[], heldBack: ReadonlySet<string>): Promise<AccountRecord[]> {
-  const latest = new Map<string, JournalEntry>();
-  for (const entry of entries) latest.set(`${entry.entity}/${entry.entityId}`, entry);
-  const records: AccountRecord[] = [];
-  for (const entry of latest.values()) {
-    const record = await recordFor(entry, parts);
-    if (record && ![...heldBack].some((userId) => ownedBy(record, userId))) records.push(record);
-  }
-  const seen = new Set<string>();
-  return records
-    .filter((record) => {
-      const identity = identityOf(record);
-      if (seen.has(identity)) return false;
-      seen.add(identity);
-      return true;
-    })
-    .sort((a, b) => PARENTS_FIRST.indexOf(a.kind) - PARENTS_FIRST.indexOf(b.kind));
+/**
+ * A record to send, with the profile it belongs to and the connection it hangs
+ * off. A subscription's, a favourite's and a playlist's key is a generated id
+ * that names neither, and their tombstone has no body: their journal entry
+ * says whose they are.
+ */
+interface Outgoing {
+  readonly record: AccountRecord;
+  readonly owner?: string;
+  readonly connection?: string;
 }
 
-/** Whether a record is a profile's or one of its own: its PIN, preferences, and values on connections. */
-function ownedBy(record: Pick<AccountRecord, 'kind' | 'key'>, userId: string): boolean {
-  const [first, second] = record.key.split('/');
-  if (record.kind === 'profile' || record.kind === 'pin' || record.kind === 'preference') return first === userId;
-  return record.kind === 'profileValues' && second === userId;
+/** Every entity the entries name, once, as it is now — parents first; nothing of a profile held back. */
+async function recordsOf(parts: SyncParts, entries: readonly JournalEntry[], heldBack: ReadonlySet<string>): Promise<Outgoing[]> {
+  const latest = new Map<string, JournalEntry>();
+  for (const entry of entries) latest.set(`${entry.entity}/${entry.entityId}`, entry);
+  const outgoing: Outgoing[] = [];
+  const seen = new Set<string>();
+  for (const entry of latest.values()) {
+    const record = await recordFor(entry, parts);
+    if (!record) continue;
+    const identity = identityOf(record);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    const owner = ownerOf(record) ?? entry.userId;
+    // Held back with its profile: the server has no room for it, and would refuse a child of a profile it lacks.
+    if (owner !== undefined && heldBack.has(owner)) continue;
+    const connection = connectionOf(record);
+    outgoing.push({ record, ...(owner === undefined ? {} : { owner }), ...(connection === undefined ? {} : { connection }) });
+  }
+  return outgoing.sort((a, b) => PARENTS_FIRST.indexOf(a.record.kind) - PARENTS_FIRST.indexOf(b.record.kind));
+}
+
+/** Whose a record is, where its key or its body says. */
+function ownerOf(record: AccountRecord): string | undefined {
+  const byKey = ownerByKey(record.kind, record.key);
+  if (byKey !== undefined || record.deleted) return byKey;
+  return 'userId' in record.data ? record.data.userId : undefined;
+}
+
+/** The connection a record hangs off, where its key or its body says: a profile's values, a subscription, a favourite. */
+function connectionOf(record: AccountRecord): string | undefined {
+  if (record.kind === 'profileValues') return record.key.split('/')[0];
+  if (record.deleted) return undefined;
+  return record.kind === 'subscription' || record.kind === 'favoriteChannel' ? record.data.connectionId : undefined;
 }
 
 /** Whether a record hangs off a profile or a connection: goes when it goes. */
-function childOf(record: Pick<AccountRecord, 'kind' | 'key'>, parent: Pick<AccountRecord, 'kind' | 'key'>): boolean {
-  if (parent.kind === 'profile') return record !== parent && ownedBy(record, parent.key);
-  return parent.kind === 'connection' && record.kind === 'profileValues' && record.key.split('/')[0] === parent.key;
+function childOf(record: Outgoing, parent: Pick<AccountRecord, 'kind' | 'key'>): boolean {
+  if (parent.kind === 'profile') return record.owner === parent.key;
+  return parent.kind === 'connection' && record.connection === parent.key;
 }

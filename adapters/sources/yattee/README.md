@@ -56,6 +56,11 @@ playlist.
   it has not answered yet: the server says nothing about how many pages there
   are, and its page is its own size whatever `limit` asks. The sort is mapped
   to the server's nearest order; pages come in the server's own.
+- **`listFeed`** takes the channels the app holds as their keys —
+  `channel:<id>`, as this adapter made them — and posts their ids to
+  `/api/v1/feed`, each once, with the page as an offset; what is no channel is
+  left out, and nothing at all asks nothing. The server keeps no list of its
+  own.
 - **`getItem` and `getChildren`** also open a channel (`channel:<id>`) — its
   face, banner and followers, and its sections: videos, shorts, live streams
   and playlists, each paged by the server's `continuation` — or a playlist

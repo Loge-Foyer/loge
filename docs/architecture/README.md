@@ -278,7 +278,10 @@ connections — so a run (`sync/engine.ts`) reads all of it:
    profile or connection gives way to the delete, with its children; one the
    server finds invalid is left out and logged, and not taken for lost until
    the app starts again. The rest is sent again, and the checkpoint moves past
-   what was stored.
+   what was stored. "Everything of it" includes what a key does not name: a
+   subscription's, a favourite's and a playlist's key is a generated id and
+   their tombstone has no body, so whose they are, and which connection they
+   hang off, come from their body or their journal entry.
 2. **Read** every record of the account, deleted ones included, each checked
    with `isAccountRecord`.
 3. **Reconcile** (`sync/reconcile.ts`). First the plan, outside any

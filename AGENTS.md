@@ -276,6 +276,11 @@ silently:
   the delete, with its children; one the server finds invalid is left out and
   logged — and not taken for lost, and sent again, on every run. The
   checkpoint moves past what was stored, and no further.
+- **Whose a record is never comes from its key alone.** A subscription's, a
+  favourite's and a playlist's key is a generated id, and a tombstone has no
+  body: the push takes the owner from the body, else the journal entry
+  (`userId`). Judged by key alone, a held-back profile's lists went to a
+  server that has no such profile, and were refused one round trip each.
 - **A reconcile or replace transaction awaits nothing but `tx`** — not the
   credential store, not a plugin, not `profiles.remove` (use the helpers in
   `services/removal.ts`). PINs and passwords are written to the keychain under
