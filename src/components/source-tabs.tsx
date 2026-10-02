@@ -1,5 +1,6 @@
 import { EyeOff } from '@tamagui/lucide-icons-2/icons/EyeOff';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
+import type { ReactElement } from 'react';
 import { ScrollView } from 'react-native';
 import { Circle, XStack } from 'tamagui';
 
@@ -7,7 +8,11 @@ import { Button } from '@/components/button';
 
 export interface SourceTab {
   readonly id: string;
+  /** Empty for a tab that is its icon alone, which then says what it is in `name`. */
   readonly label: string;
+  readonly icon?: ReactElement;
+  /** What it is called aloud, for a tab with no label. */
+  readonly name?: string;
   /** A small sign after the label: something to finish, a PIN to enter first, or not in use. */
   readonly marker?: 'attention' | 'locked' | 'off';
 }
@@ -39,6 +44,8 @@ export function SourceTabs({
               borderWidth={0}
               fontWeight={active ? '600' : '400'}
               onPress={() => onSelect(tab.id)}
+              {...(tab.icon ? { icon: tab.icon } : {})}
+              {...(tab.name ? { 'aria-label': tab.name } : {})}
               {...(tab.marker === 'locked' ? { iconAfter: <Lock size={12} />, 'aria-label': `${tab.label}, locked` } : {})}
               {...(tab.marker === 'off' ? { iconAfter: <EyeOff size={12} />, 'aria-label': `${tab.label}, not used` } : {})}
               {...(tab.marker === 'attention'

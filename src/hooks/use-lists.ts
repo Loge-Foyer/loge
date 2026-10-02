@@ -1,4 +1,4 @@
-import type { ConnectionId, GlobalMediaKey, MediaItem } from '@sc/api';
+import type { Channel, ConnectionId, GlobalMediaKey, MediaItem } from '@sc/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { userKey } from '@/services/query-keys';
@@ -26,6 +26,17 @@ export function useFollows(connectionId: ConnectionId | undefined, externalId: s
   });
 }
 
+/** A connection's favourite channels, for the ★ before its groups. */
+export function useFavoriteChannels(connectionId: ConnectionId | undefined) {
+  const userId = useActiveUserId();
+  const { lists } = useServices();
+  return useQuery({
+    queryKey: userKey(userId, LISTS, 'favorite-channels', connectionId),
+    queryFn: () => (connectionId ? lists.favoriteChannels(userId, connectionId) : []),
+    enabled: connectionId !== undefined,
+  });
+}
+
 export function usePlaylists() {
   const userId = useActiveUserId();
   const { lists } = useServices();
@@ -50,6 +61,8 @@ export function useListActions() {
   return {
     follow: useMutation({ mutationFn: (channel: MediaItem) => lists.follow(userId, channel), onSuccess: refresh }),
     unfollow: useMutation({ mutationFn: (id: string) => lists.unfollow(userId, id), onSuccess: refresh }),
+    favorite: useMutation({ mutationFn: (channel: Channel) => lists.favorite(userId, channel), onSuccess: refresh }),
+    unfavorite: useMutation({ mutationFn: (id: string) => lists.unfavorite(userId, id), onSuccess: refresh }),
     create: useMutation({ mutationFn: (title: string) => lists.create(userId, title), onSuccess: refresh }),
     rename: useMutation({ mutationFn: ({ id, title }: { id: string; title: string }) => lists.rename(id, title), onSuccess: refresh }),
     add: useMutation({ mutationFn: ({ id, key }: { id: string; key: GlobalMediaKey }) => lists.add(id, key), onSuccess: refresh }),

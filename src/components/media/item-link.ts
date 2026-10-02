@@ -49,6 +49,15 @@ export function playHref(key: GlobalMediaKey, options: { readonly startMs?: numb
   };
 }
 
+/**
+ * The group a channel opened from the ★ list zaps through: the profile's
+ * favourites on its connection. Never a provider's group, so it never reaches
+ * `listChannels` — a portal's genres are numbers, and no provider calls one ★.
+ */
+export const FAVORITES_GROUP = '★';
+
+export const isFavorites = (group: string | undefined): boolean => group === FAVORITES_GROUP;
+
 /** The player, for a channel: live, under its name, zapping through the group it was opened from. */
 export function liveHref(channel: GlobalMediaKey, name: string, group: string | undefined): Href {
   return {

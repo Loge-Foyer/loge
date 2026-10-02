@@ -1,11 +1,16 @@
-import { AppError, type ConnectionId, type GlobalMediaKey, type MediaItem, type UserId } from '@sc/api';
+import { AppError, type Channel, type ConnectionId, type GlobalMediaKey, type MediaItem, type UserId } from '@sc/api';
 
-import type { Clock, IdGenerator, LocalDatabase, Playlist, Subscription } from './ports';
+import type { Clock, FavoriteChannel, IdGenerator, LocalDatabase, Playlist, Subscription } from './ports';
+
+// The account's limits on what a favourite keeps of its channel (`isAccountRecord`).
+const MAX_NAME = 200;
+const MAX_LOGO = 2_048;
 
 /**
- * What a profile keeps for itself: the channels it follows, and the lists it
- * made. Account-wide — journaled, carried to your own server, written into
- * backups — because they are the profile's and belong wherever it signs in.
+ * What a profile keeps for itself: the channels it follows, the live channels
+ * it keeps at hand, and the lists it made. Account-wide — journaled, carried
+ * to your own server, written into backups — because they are the profile's
+ * and belong wherever it signs in.
  *
  * A list may mix sources: a Jellyfin film beside a web video. Its items are
  * `GlobalMediaKey`s, so each knows which connection it came from.
@@ -17,6 +22,14 @@ export interface ListsService {
   unfollow(userId: UserId, id: string): Promise<void>;
   /** Whether this profile already follows it — what the button reads. */
   follows(userId: UserId, connectionId: ConnectionId, externalId: string): Promise<Subscription | undefined>;
+
+  /** A connection's favourite channels: numbered ones in their order, the rest by name after. */
+  favoriteChannels(userId: UserId, connectionId: ConnectionId): Promise<readonly FavoriteChannel[]>;
+  /** Choosing a channel twice chooses it once. */
+  favorite(userId: UserId, channel: Channel): Promise<FavoriteChannel>;
+  unfavorite(userId: UserId, id: string): Promise<void>;
+  /** Whether a channel is one of this profile's favourites — what its menu offers. */
+  favoriteOf(userId: UserId, connectionId: ConnectionId, externalId: string): Promise<FavoriteChannel | undefined>;
 
   playlists(userId: UserId): Promise<readonly Playlist[]>;
   playlist(id: string): Promise<Playlist | undefined>;
@@ -31,6 +44,20 @@ export interface ListsService {
 }
 
 const sameKey = (a: GlobalMediaKey, b: GlobalMediaKey) => a.connectionId === b.connectionId && a.externalId === b.externalId;
+
+const byNumberThenName = (a: FavoriteChannel, b: FavoriteChannel) =>
+  (a.number ?? Number.MAX_SAFE_INTEGER) - (b.number ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name);
+
+/** A favourite as the channel it was when chosen: enough to draw its row and play it. */
+export function asChannel(favorite: FavoriteChannel): Channel {
+  return {
+    key: { connectionId: favorite.connectionId, externalId: favorite.externalId },
+    name: favorite.name,
+    ...(favorite.number === undefined ? {} : { number: favorite.number }),
+    ...(favorite.logo === undefined ? {} : { logo: favorite.logo }),
+    groupIds: [],
+  };
+}
 
 export function createListsService(deps: {
   readonly db: LocalDatabase;
@@ -72,6 +99,33 @@ export function createListsService(deps: {
 
     unfollow: (userId, id) => db.subscriptions.remove(id),
     follows: (userId, connectionId, externalId) => db.subscriptions.forChannel(userId, connectionId, externalId),
+
+    favoriteChannels: async (userId, connectionId) =>
+      [...(await db.favoriteChannels.list(userId))].filter((favorite) => favorite.connectionId === connectionId).sort(byNumberThenName),
+
+    favorite: async (userId, channel) => {
+      const { connectionId, externalId } = channel.key;
+      const existing = await db.favoriteChannels.forChannel(userId, connectionId, externalId);
+      if (existing) return existing;
+      const name = channel.name.trim().slice(0, MAX_NAME);
+      const favorite: FavoriteChannel = {
+        id: ids.next(),
+        userId,
+        connectionId,
+        externalId,
+        // As it is now, so the list reads while the provider is away.
+        name: name === '' ? externalId.slice(0, MAX_NAME) : name,
+        ...(channel.number !== undefined && Number.isInteger(channel.number) && channel.number > 0 ? { number: channel.number } : {}),
+        ...(channel.logo !== undefined && channel.logo.length <= MAX_LOGO ? { logo: channel.logo } : {}),
+        addedAt: now(),
+        version: 1,
+      };
+      await db.favoriteChannels.put(favorite);
+      return favorite;
+    },
+
+    unfavorite: (_userId, id) => db.favoriteChannels.remove(id),
+    favoriteOf: (userId, connectionId, externalId) => db.favoriteChannels.forChannel(userId, connectionId, externalId),
 
     playlists: (userId) => db.playlists.list(userId),
     playlist: (id) => db.playlists.get(id),

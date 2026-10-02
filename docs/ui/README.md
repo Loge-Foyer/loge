@@ -124,9 +124,17 @@ browser, that providers can't be reached there). Otherwise:
 
 - **One provider at a time** — a pill for each across the top, then Live,
   Movies and Shows as the provider brings them.
-- **Live** — group chips ("All" first), and the channels in the provider's own
-  order: logo or number, name, what is on now with how far along, and what is
-  next. The guide is asked for the channels near the top, refreshed every five
+- **Live** — group chips (★, then "All", then the provider's), and the
+  channels in the provider's own order: logo or number, name, what is on now
+  with how far along, and what is next.
+- **★ Favourites** — the profile's own channels on this provider, kept on the
+  account so every device has them: numbered ones in their order, the rest by
+  name. Pressing and holding a channel — holding select, with a remote — opens
+  a menu to add it or take it out (`components/action-menu.tsx`: the system's
+  alert on iOS, Android and tvOS, which the remote drives; Tamagui's dialog in
+  a browser), and a favourite's name carries a ★. A channel played from the ★
+  list zaps through the favourites. The list is the profile's, so only its
+  guide is asked of the provider; a search filters it on the device. The guide is asked for the channels near the top, refreshed every five
   minutes. A tap plays the channel; the calendar opens its day
   (`tv/channel/[connectionId]/[channelId]`): today from midnight, what is on
   now marked, and Watch live.

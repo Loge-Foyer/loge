@@ -1,7 +1,8 @@
-import { connectionId, type GlobalMediaKey, type MediaItem } from '@sc/api';
+import { connectionId, imageRef, type Channel, type GlobalMediaKey, type MediaItem } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';
+import { asChannel } from '@/services/lists';
 
 import { buildServices, fakeMediaPlugin } from './support/services';
 
@@ -112,5 +113,45 @@ describe('lists a profile makes', () => {
     const { services, sam } = await setUp();
     void sam;
     await expect(services.lists.rename('nobody', 'A name')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('channels a profile keeps at hand', () => {
+  const live = (id: string, name: string, extra: Partial<Channel> = {}): Channel => ({ key: key(id), name, groupIds: ['news'], ...extra });
+
+  it('keeps a channel once, as it was when chosen, however often it is asked', async () => {
+    const { services, sam } = await setUp();
+    const first = await services.lists.favorite(sam, live('ch:1', 'Das Erste', { number: 1, logo: imageRef('http://portal.test/1.png') }));
+    const again = await services.lists.favorite(sam, live('ch:1', 'Das Erste HD', { number: 9 }));
+    expect(again.id).toBe(first.id);
+    expect(await services.lists.favoriteOf(sam, home, 'ch:1')).toMatchObject({ name: 'Das Erste', number: 1, logo: 'http://portal.test/1.png' });
+    // As a channel again: enough to draw its row and play it.
+    expect(asChannel(first)).toEqual({ key: key('ch:1'), name: 'Das Erste', number: 1, logo: 'http://portal.test/1.png', groupIds: [] });
+  });
+
+  it('lists a connection’s in its own numbering, the unnumbered by name after them', async () => {
+    const { services, sam } = await setUp();
+    await services.lists.favorite(sam, live('ch:z', 'Zulu'));
+    await services.lists.favorite(sam, live('ch:7', 'Seven', { number: 7 }));
+    await services.lists.favorite(sam, live('ch:a', 'Alpha'));
+    await services.lists.favorite(sam, live('ch:2', 'Two', { number: 2 }));
+    expect((await services.lists.favoriteChannels(sam, home)).map((favorite) => favorite.name)).toEqual(['Two', 'Seven', 'Alpha', 'Zulu']);
+    expect(await services.lists.favoriteChannels(sam, connectionId('c-elsewhere'))).toEqual([]);
+  });
+
+  it('lets one go', async () => {
+    const { services, sam } = await setUp();
+    const kept = await services.lists.favorite(sam, live('ch:1', 'Das Erste'));
+    await services.lists.unfavorite(sam, kept.id);
+    expect(await services.lists.favoriteOf(sam, home, 'ch:1')).toBeUndefined();
+  });
+
+  it('keeps only what the account can carry: a name it can hold, a number from 1, a logo no longer than an address', async () => {
+    const { services, sam } = await setUp();
+    const kept = await services.lists.favorite(sam, live('ch:0', `  ${'Long '.repeat(60)}`, { number: 0, logo: imageRef(`http://portal.test/${'x'.repeat(2100)}`) }));
+    expect(kept.name.length).toBeLessThanOrEqual(200);
+    expect(kept.name.startsWith('Long')).toBe(true);
+    expect(kept.number).toBeUndefined();
+    expect(kept.logo).toBeUndefined();
   });
 });

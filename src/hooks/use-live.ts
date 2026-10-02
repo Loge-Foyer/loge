@@ -40,7 +40,7 @@ export function useChannelGroups(connectionId: ConnectionId | undefined) {
 }
 
 /** A group's channels — every channel without one — page by page, in the source's own order. */
-export function useChannels(connectionId: ConnectionId | undefined, groupId: string | undefined, term?: string) {
+export function useChannels(connectionId: ConnectionId | undefined, groupId: string | undefined, term?: string, options: { enabled?: boolean } = {}) {
   const userId = useActiveUserId();
   const { media } = useServices();
   const searching = (term ?? '').trim();
@@ -58,7 +58,7 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.value.nextCursor ?? null,
-    enabled: connectionId !== undefined,
+    enabled: connectionId !== undefined && options.enabled !== false,
     staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
     refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
   });

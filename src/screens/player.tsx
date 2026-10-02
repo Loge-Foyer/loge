@@ -25,14 +25,16 @@ import { SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 import { px } from '@/components/density';
 import { Button } from '@/components/button';
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
-import { liveHref, playHref } from '@/components/media/item-link';
+import { isFavorites, liveHref, playHref } from '@/components/media/item-link';
 import { isTV } from '@/components/remote';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
+import { useFavoriteChannels } from '@/hooks/use-lists';
 import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
 import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
 import { APP_DEFAULTS } from '@/services/app-settings';
+import { asChannel } from '@/services/lists';
 import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
 import { useRemoteKeys } from '@/hooks/use-remote-keys';
@@ -541,10 +543,16 @@ function EdgeReadout({ kind, value }: { kind: Exclude<PlayerSlider, 'off'>; valu
   );
 }
 
-/** A channel's name marked live, what is on now and next, and the channels either side in its group. */
+/**
+ * A channel's name marked live, what is on now and next, and the channels
+ * either side in its group — or among the favourites, when it was opened
+ * from the ★ list.
+ */
 function LiveBar({ channel, title, group }: { channel: GlobalMediaKey; title: string; group?: string }) {
-  const channels = useChannels(channel.connectionId, group);
-  const list = channels.data?.pages.flatMap((page) => page.value.channels) ?? [];
+  const favorites = isFavorites(group);
+  const channels = useChannels(channel.connectionId, group, undefined, { enabled: !favorites });
+  const kept = useFavoriteChannels(favorites ? channel.connectionId : undefined);
+  const list = favorites ? (kept.data ?? []).map(asChannel) : (channels.data?.pages.flatMap((page) => page.value.channels) ?? []);
   const at = list.findIndex((each) => each.key.externalId === channel.externalId);
   const guide = useGuide(channel.connectionId, [channel]);
   const now = useNow();

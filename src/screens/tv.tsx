@@ -1,31 +1,35 @@
-import type { Channel, ChannelGroup, ConnectionId, ContentKind, MediaItem, Programme } from '@sc/api';
+import { matchesTerm, type Channel, type ChannelGroup, type ConnectionId, type ContentKind, type MediaItem, type Programme } from '@sc/api';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { CalendarDays } from '@tamagui/lucide-icons-2/icons/CalendarDays';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
+import { Star } from '@tamagui/lucide-icons-2/icons/Star';
 import { TvMinimalPlay } from '@tamagui/lucide-icons-2/icons/TvMinimalPlay';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
+import { ActionMenu } from '@/components/action-menu';
 import { Artwork } from '@/components/artwork';
 import { px } from '@/components/density';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listNames } from '@/components/labels';
-import { fromRouteId, liveHref, routeId } from '@/components/media/item-link';
+import { FAVORITES_GROUP, fromRouteId, isFavorites, liveHref, routeId } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
-import { useRemoteFocus } from '@/components/remote';
+import { isTV, useRemoteFocus } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { usePosterWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
+import { useFavoriteChannels, useListActions } from '@/hooks/use-lists';
 import { nowAndNext, useChannelGroups, useChannels, useGuide, useNow, useSourcePage } from '@/hooks/use-live';
 import { useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
+import { asChannel } from '@/services/lists';
 import type { SourceError } from '@/services/media';
 import type { TabSource } from '@/services/sources';
 
@@ -139,52 +143,93 @@ function useRefresh() {
 
 function Live({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
   const connectionId = source.connection.id;
+  const favorites = isFavorites(group);
   const groups = useChannelGroups(connectionId);
-  const channels = useChannels(connectionId, group, term);
-  const list = channels.data?.pages.flatMap((page) => page.value.channels) ?? [];
+  // The ★ list is the profile's own: the provider is asked for its guide, and nothing else.
+  const channels = useChannels(connectionId, group, term, { enabled: !favorites });
+  const kept = useFavoriteChannels(connectionId);
+  const keptIds = new Map((kept.data ?? []).map((entry) => [entry.externalId, entry.id] as const));
+  const searching = term.trim();
+  const list = favorites
+    ? (kept.data ?? []).map(asChannel).filter((channel) => (searching ? matchesTerm(searching, channel.name) : true))
+    : (channels.data?.pages.flatMap((page) => page.value.channels) ?? []);
   const guide = useGuide(connectionId, list.slice(0, GUIDE_CHANNELS).map((channel) => channel.key));
   const now = useNow();
   const { onRefresh, control } = useRefresh();
-  const errors = [groups.data?.sourceError, channels.data?.pages[0]?.sourceError, guide.data?.sourceError].filter((error): error is SourceError => error !== undefined);
+  const errors = [groups.data?.sourceError, favorites ? undefined : channels.data?.pages[0]?.sourceError, guide.data?.sourceError].filter(
+    (error): error is SourceError => error !== undefined,
+  );
   const scroller = useRef<FlatList<Channel>>(null);
   useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
 
+  // What a long press — a held select, with a remote — was on, while its menu is up.
+  const [held, setHeld] = useState<Channel>();
+  const { favorite, unfavorite } = useListActions();
+  const heldId = held ? keptIds.get(held.key.externalId) : undefined;
+  const closeMenu = () => setHeld(undefined);
+  const actions = held
+    ? [heldId ? { label: 'Remove from Favorites', onPress: () => unfavorite.mutate(heldId) } : { label: 'Add to Favorites', onPress: () => favorite.mutate(held) }]
+    : [];
+
   return (
-    <FlatList
-      ref={scroller}
-      data={list}
-      // The first tap after typing reaches a chip or ✕, rather than only putting the keyboard away.
-      keyboardShouldPersistTaps="handled"
-      keyExtractor={(channel) => channel.key.externalId}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}
-      ListHeaderComponent={
-        <YStack gap="$3" pb="$3">
-          {header}
-          <GroupChips groups={groups.data?.value ?? []} selected={group} />
-          <SourceNotices errors={dedupe(errors)} onRetry={() => void onRefresh()} />
-        </YStack>
-      }
-      renderItem={({ item }) => <ChannelRow channel={item} connectionId={connectionId} group={group} programmes={guide.data?.value} now={now} />}
-      ItemSeparatorComponent={() => <YStack height={10} />}
-      ListEmptyComponent={
-        channels.isPending ? (
-          <YStack py="$8" items="center">
-            <Spinner size="large" color="$accent9" />
+    <>
+      <FlatList
+        ref={scroller}
+        data={list}
+        // The first tap after typing reaches a chip or ✕, rather than only putting the keyboard away.
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(channel) => channel.key.externalId}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}
+        ListHeaderComponent={
+          <YStack gap="$3" pb="$3">
+            {header}
+            <GroupChips groups={groups.data?.value ?? []} selected={group} />
+            <SourceNotices errors={dedupe(errors)} onRetry={() => void onRefresh()} />
           </YStack>
-        ) : channels.error ? (
-          <SizableText color="$color10">{channels.error.message}</SizableText>
-        ) : (
-          <SizableText color="$color10">No channels here.</SizableText>
-        )
-      }
-      ListFooterComponent={channels.isFetchingNextPage ? <Spinner color="$accent9" my="$5" /> : null}
-      onEndReachedThreshold={0.6}
-      onEndReached={() => {
-        if (channels.hasNextPage && !channels.isFetchingNextPage) void channels.fetchNextPage();
-      }}
-      refreshControl={control}
-    />
+        }
+        renderItem={({ item }) => (
+          <ChannelRow
+            channel={item}
+            connectionId={connectionId}
+            group={group}
+            programmes={guide.data?.value}
+            now={now}
+            favorite={keptIds.has(item.key.externalId)}
+            onHold={setHeld}
+          />
+        )}
+        ItemSeparatorComponent={() => <YStack height={10} />}
+        ListEmptyComponent={
+          favorites ? (
+            kept.isPending ? null : (
+              <SizableText color="$color10">
+                {searching
+                  ? 'No favourite matches that.'
+                  : isTV
+                    ? 'No favourites yet. Hold select on a channel to add it.'
+                    : 'No favourites yet. Press and hold a channel to add it.'}
+              </SizableText>
+            )
+          ) : channels.isPending ? (
+            <YStack py="$8" items="center">
+              <Spinner size="large" color="$accent9" />
+            </YStack>
+          ) : channels.error ? (
+            <SizableText color="$color10">{channels.error.message}</SizableText>
+          ) : (
+            <SizableText color="$color10">No channels here.</SizableText>
+          )
+        }
+        ListFooterComponent={!favorites && channels.isFetchingNextPage ? <Spinner color="$accent9" my="$5" /> : null}
+        onEndReachedThreshold={0.6}
+        onEndReached={() => {
+          if (!favorites && channels.hasNextPage && !channels.isFetchingNextPage) void channels.fetchNextPage();
+        }}
+        refreshControl={control}
+      />
+      <ActionMenu title={held?.name ?? ''} actions={actions} open={held !== undefined} onClose={closeMenu} />
+    </>
   );
 }
 
@@ -203,10 +248,14 @@ function dedupe(errors: readonly SourceError[]): readonly SourceError[] {
 }
 
 function GroupChips({ groups, selected }: { groups: readonly ChannelGroup[]; selected: string | undefined }) {
-  if (groups.length === 0) return null;
   return (
     <SourceTabs
-      tabs={[{ id: '', label: 'All' }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
+      tabs={[
+        // The profile's own favourites, before any group of the provider's.
+        { id: FAVORITES_GROUP, label: '', name: 'Favorites', icon: <Star size={px(14)} /> },
+        { id: '', label: 'All' },
+        ...groups.map((group) => ({ id: group.id, label: group.name })),
+      ]}
       selected={selected ?? ''}
       onSelect={(id) => router.setParams({ group: routeId(id) })}
     />
@@ -223,12 +272,18 @@ function ChannelRow({
   group,
   programmes,
   now: at,
+  favorite,
+  onHold,
 }: {
   channel: Channel;
   connectionId: ConnectionId;
   group: string | undefined;
   programmes: readonly Programme[] | undefined;
   now: number;
+  /** One of this profile's favourites, marked with a ★. */
+  favorite: boolean;
+  /** A long press — or a held select — offers to add it to the favourites, or take it out. */
+  onHold: (channel: Channel) => void;
 }) {
   const { now, next } = nowAndNext(programmes, channel.key, at);
   const progress = now ? (at - Date.parse(now.startsAt)) / (Date.parse(now.endsAt) - Date.parse(now.startsAt)) : undefined;
@@ -239,8 +294,10 @@ function ChannelRow({
       <Pressable
         style={{ flex: 1 }}
         onPress={() => playChannel(channel, group)}
+        onLongPress={() => onHold(channel)}
         accessibilityRole="button"
-        accessibilityLabel={`Watch ${channel.name}${now ? `, now ${now.title}` : ''}`}
+        accessibilityLabel={`Watch ${channel.name}${favorite ? ', a favourite' : ''}${now ? `, now ${now.title}` : ''}`}
+        accessibilityHint={favorite ? 'Hold to remove it from your favourites' : 'Hold to add it to your favourites'}
         {...row.handlers}
       >
         {({ pressed }) => (
@@ -255,9 +312,12 @@ function ChannelRow({
               )}
             </YStack>
             <YStack flex={1} gap="$1">
-              <SizableText size="$4" fontWeight="600" color="$color12" numberOfLines={1}>
-                {channel.number === undefined ? channel.name : `${channel.number}  ${channel.name}`}
-              </SizableText>
+              <XStack items="center" gap="$1.5">
+                <SizableText size="$4" fontWeight="600" color="$color12" numberOfLines={1} shrink={1}>
+                  {channel.number === undefined ? channel.name : `${channel.number}  ${channel.name}`}
+                </SizableText>
+                {favorite ? <Star size={px(13)} color="$accent10" /> : null}
+              </XStack>
               {now ? (
                 <YStack gap="$1">
                   <SizableText size="$2" color="$color11" numberOfLines={1}>
