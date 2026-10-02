@@ -84,13 +84,34 @@ function codecsOf(format: FormatDto): { container?: string; videoCodec?: string;
   };
 }
 
-function toSource(format: FormatDto, live: boolean): PlaybackSource {
+/**
+ * A rendition the site publishes as an HLS manifest. yt-dlp lists it among the
+ * muxed streams — on some servers it is the only one — with `hls` where a
+ * container would be, which no player takes for a file.
+ */
+function isHls(format: FormatDto): boolean {
+  return (
+    format.container === 'hls' ||
+    format.container === 'm3u8' ||
+    /mpegurl/i.test(format.type ?? '') ||
+    /\.m3u8(?:[?#]|$)/i.test(format.url)
+  );
+}
+
+function toSource(format: FormatDto, live: boolean, baseUrl: string): PlaybackSource {
   const height = heightOf(format);
+  const hls = live || isHls(format);
+  const { container, ...codecs } = codecsOf(format);
   return {
     uri: format.url,
-    headersRef: AUTH_HEADERS,
-    protocol: live ? 'hls' : 'progressive',
-    ...codecsOf(format),
+    // The server's sign-in goes to the server's own addresses alone: a
+    // stream straight from the site's CDN must never be handed the
+    // household's password.
+    ...(originOf(format.url) === originOf(baseUrl) ? { headersRef: AUTH_HEADERS } : {}),
+    protocol: hls ? 'hls' : 'progressive',
+    // An HLS source states no container: the manifest says what it holds.
+    ...(hls || container === undefined ? {} : { container }),
+    ...codecs,
     ...(height === undefined ? {} : { height }),
     // Nothing is re-encoded: these are the renditions the site published.
     transcoded: false,
@@ -331,7 +352,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const ceiling = request.profile.maxHeight;
       const sorted = [...formats].sort((a, b) => (heightOf(b) ?? 0) - (heightOf(a) ?? 0));
       const allowed = sorted.filter((format) => ceiling === undefined || (heightOf(format) ?? 0) <= ceiling);
-      const sources = (allowed.length > 0 ? allowed : sorted).map((format) => toSource(format, live));
+      const sources = (allowed.length > 0 ? allowed : sorted).map((format) => toSource(format, live, baseUrl));
       return {
         key: request.key,
         sources,

@@ -1,11 +1,13 @@
 import {
   AppError,
+  canPlay,
   encodeBase64,
   encodeUtf8,
   type ConnectedMediaProvider,
   type Credentials,
   type FieldValues,
   type ItemPage,
+  type PlaybackSource,
   type PlayerProfile,
   type SearchScope,
 } from '@loge/api';
@@ -400,6 +402,41 @@ describe('Yattee — playing', () => {
     // Nothing is re-encoded: these are the renditions the site published.
     expect(plan.sources.every((source) => !source.transcoded)).toBe(true);
     expect(plan.durationMs).toBe(213_000);
+  });
+
+  it('plays an HLS rendition as HLS, which every engine here takes', async () => {
+    // What a real server answered: one muxed "stream", the site's own manifest.
+    const hls = {
+      itag: '269',
+      url: 'https://rr1.cdn.test/api/manifest/hls_variant/expire/99/index.m3u8',
+      type: 'application/vnd.apple.mpegurl',
+      container: 'hls',
+    };
+    const { provider } = await connect({
+      routes: { 'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: { ...fixtures.video, formatStreams: [hls] } } },
+    });
+    const plan = await descriptor(provider, { ...EVERYTHING, containers: ['mp4', 'm4v', 'mov'] });
+    expect(plan.sources).toHaveLength(1);
+    expect(plan.sources[0]?.protocol).toBe('hls');
+    // A container of `hls` reads as a file no player opens: an HLS source states none.
+    expect(plan.sources[0]?.container).toBeUndefined();
+    expect(canPlay({ ...EVERYTHING, containers: ['mp4', 'm4v', 'mov'] }, plan.sources[0] as PlaybackSource)).toBe(true);
+  });
+
+  it("sends the server's sign-in to its own addresses alone", async () => {
+    const cdn = { ...fixtures.video.formatStreams[0], url: 'https://rr1.cdn.test/videoplayback?id=abc', qualityLabel: '480p' };
+    const { provider } = await connect({
+      routes: {
+        'GET /api/v1/videos/dQw4w9WgXcQ': { status: 200, json: { ...fixtures.video, formatStreams: [...fixtures.video.formatStreams, cdn] } },
+      },
+    });
+    const plan = await descriptor(provider);
+    const byHost = (host: string) => plan.sources.filter((source) => source.uri.startsWith(host));
+    expect(byHost(SERVER).length).toBeGreaterThan(0);
+    expect(byHost(SERVER).every((source) => source.headersRef !== undefined)).toBe(true);
+    // Straight from the site's CDN: the household's password must never travel there.
+    expect(byHost('https://rr1.cdn.test')).toHaveLength(1);
+    expect(byHost('https://rr1.cdn.test')[0]?.headersRef).toBeUndefined();
   });
 
   it('keeps within the height the chosen player allows', async () => {
