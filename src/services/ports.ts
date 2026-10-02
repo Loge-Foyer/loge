@@ -139,6 +139,11 @@ export const PLAYER_SLIDERS = ['off', 'brightness', 'volume'] as const;
 
 export type PlayerSlider = (typeof PLAYER_SLIDERS)[number];
 
+/** How a title page's buttons show what they do: the symbol alone, or the symbol and its words. */
+export const BUTTON_LABELS = ['symbols', 'symbolsAndText'] as const;
+
+export type ButtonLabels = (typeof BUTTON_LABELS)[number];
+
 export interface AppSettings {
   /** The tab the app opens on when it starts. */
   readonly openOn: ContentTab;
@@ -180,6 +185,8 @@ export interface AppSettings {
    * Only an engine that can tell the difference honours it.
    */
   readonly softwareFallback: boolean;
+  /** A title page's buttons: their symbols alone, or with their words. Every one keeps its words for a screen reader. */
+  readonly buttonLabels: ButtonLabels;
 }
 
 export interface DeviceSettingsRepository {

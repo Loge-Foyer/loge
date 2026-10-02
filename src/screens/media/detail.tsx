@@ -1,20 +1,29 @@
 import type { ConnectionId, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
-import { Download as DownloadIcon } from '@tamagui/lucide-icons-2/icons/Download';
-import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
+import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';
+import { Download as DownloadIcon } from '@tamagui/lucide-icons-2/icons/Download';
+import { Ellipsis } from '@tamagui/lucide-icons-2/icons/Ellipsis';
+import { Eye } from '@tamagui/lucide-icons-2/icons/Eye';
+import { ListPlus } from '@tamagui/lucide-icons-2/icons/ListPlus';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
+import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
+import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
+import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
+import { UserCheck } from '@tamagui/lucide-icons-2/icons/UserCheck';
+import { UserPlus } from '@tamagui/lucide-icons-2/icons/UserPlus';
 import { useMutation } from '@tanstack/react-query';
-import { Link, router } from 'expo-router';
+import { Link, router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { ActionButton } from '@/components/action-button';
 import { px } from '@/components/density';
-import { Button } from '@/components/button';
 import { Artwork, ArtworkLogo } from '@/components/artwork';
-import { PrimaryButton } from '@/components/primary-button';
-import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
+import { EyeFilled } from '@/components/icons';
+import { Menu, MenuHeader, MenuNote, MenuRow, MoreButton } from '@/components/more-menu';
+import { CARD_FOCUSED, isTV, useRemoteFocus } from '@/components/remote';
 import { Chip, ChipRow } from '@/components/chip';
 import { episodeCode, fileSize, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
@@ -32,6 +41,8 @@ import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import type { SourceError } from '@/services/media';
+import type { PlayerSummary } from '@/services/players';
+import type { Playlist } from '@/services/ports';
 
 /** A film, a series with its seasons and episodes, or one episode — whatever the key points at. */
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
@@ -229,8 +240,11 @@ function Meta({ item }: { item: MediaItem }) {
 
 /**
  * Play, or Resume where the source says it stopped — for a film or an
- * episode, where the source can play. Watched and unwatched, where it keeps
- * what was watched: written here first, the source hears later.
+ * episode, where the source can play — and the eye: watched or not, where it
+ * keeps what was watched, written here first and heard by the source later.
+ * The rest — another player, a copy, a list — waits behind "⋯": in the
+ * header that floats over the artwork, or at the end of the row on a TV,
+ * which has no header.
  */
 function Actions({
   item,
@@ -250,58 +264,64 @@ function Actions({
   const userId = useActiveUserId();
   const { watch } = useServices();
   const { data: players = [] } = usePlayers();
-  const [choosing, setChoosing] = useState(false);
+  const { data: budget } = useDownloadBudget();
+  const [menuOpen, setMenuOpen] = useState(false);
   const mark = useMutation({ mutationFn: (played: boolean) => watch.setPlayed(userId, item, played), networkMode: 'always' });
   const playable = canPlay && (item.type === 'movie' || item.type === 'episode');
-  // Only a single playable thing is worth keeping: a series is its episodes.
-  const keepable = canDownload && (item.type === 'movie' || item.type === 'episode');
+  // Only a single playable thing is worth keeping — a series is its episodes —
+  // and a browser or a TV has nowhere to keep it.
+  const keepable = canDownload && (item.type === 'movie' || item.type === 'episode') && budget?.limitBytes !== 0;
   const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
   // "Play with…" offers the players that are on and can play here — and only when there is a choice.
   const here = players.filter((player) => player.enabled && player.playsHere);
   // A channel or a playlist is a `show`: something you open to find things
   // inside it, and the only shape worth following.
   const followable = canFollow && item.type === 'show';
-  if (!playable && !canMarkWatched && !keepable && !followable) return null;
+  // A list may hold anything playable from any source, so it is offered wherever Play is.
+  const hasMenu = playable || keepable;
+  if (!playable && !canMarkWatched && !followable && !hasMenu) return null;
   const play = (startMs?: number, player?: PluginId) =>
     router.push(playHref(item.key, { ...(startMs ? { startMs } : {}), ...(player ? { player } : {}) }));
   const played = item.watch?.played ?? false;
+  const openMenu = () => setMenuOpen(true);
   return (
-    <YStack gap="$3">
+    <>
+      {isTV ? null : <Stack.Screen options={{ headerRight: () => (hasMenu ? <MoreButton label="More" onPress={openMenu} /> : null) }} />}
       <XStack gap="$3" flexWrap="wrap" items="center">
         {playable ? (
-          <PrimaryButton size="$4" icon={<Play size={18} fill="currentColor" />} onPress={() => play(resumeAt)} hasTVPreferredFocus>
-            {resumeAt ? 'Resume' : 'Play'}
-          </PrimaryButton>
+          <ActionButton
+            primary
+            preferred
+            icon={<Play size={18} fill="currentColor" />}
+            label={resumeAt ? 'Resume' : 'Play'}
+            onPress={() => play(resumeAt)}
+          />
         ) : null}
-        {playable && resumeAt ? (
-          <Button size="$4" onPress={() => play()}>
-            From the beginning
-          </Button>
-        ) : null}
-        {playable && here.length > 1 ? (
-          <Button size="$4" aria-expanded={choosing} onPress={() => setChoosing(!choosing)}>
-            Play with…
-          </Button>
-        ) : null}
+        {playable && resumeAt ? <ActionButton icon={<RotateCcw size={18} />} label="From the beginning" onPress={() => play()} /> : null}
         {canMarkWatched ? (
-          <Button size="$4" {...(played ? {} : { icon: <Check size={18} /> })} disabled={mark.isPending} onPress={() => mark.mutate(!played)}>
-            {played ? 'Mark unwatched' : 'Mark watched'}
-          </Button>
+          <ActionButton
+            icon={played ? <EyeFilled size={20} /> : <Eye size={20} />}
+            label={played ? 'Mark as unwatched' : 'Mark as watched'}
+            disabled={mark.isPending}
+            onPress={() => mark.mutate(!played)}
+          />
         ) : null}
-        {keepable ? <DownloadButton item={item} offersChoices={offersChoices} /> : null}
         {followable ? <FollowButton channel={item} /> : null}
-        {playable ? <AddToListButton item={item} /> : null}
+        {hasMenu && isTV ? <ActionButton icon={<Ellipsis size={20} />} label="More" onPress={openMenu} /> : null}
       </XStack>
-      {playable && choosing ? (
-        <XStack gap="$2" flexWrap="wrap" items="center">
-          {here.map((player) => (
-            <Button key={player.manifest.id} size="$3" onPress={() => play(resumeAt, player.manifest.id)} aria-label={`Play with ${player.manifest.displayName}`}>
-              {player.manifest.displayName}
-            </Button>
-          ))}
-        </XStack>
+      {hasMenu ? (
+        <TitleMenu
+          item={item}
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          players={playable ? here : []}
+          canList={playable}
+          keepable={keepable}
+          offersChoices={offersChoices}
+          onPlayWith={(player) => play(resumeAt, player)}
+        />
       ) : null}
-    </YStack>
+    </>
   );
 }
 
@@ -311,143 +331,218 @@ function FollowButton({ channel }: { channel: MediaItem }) {
   const { follow, unfollow } = useListActions();
   const busy = follow.isPending || unfollow.isPending;
   return following ? (
-    <Button size="$4" icon={<Check size={18} />} disabled={busy} onPress={() => unfollow.mutate(following.id)}>
-      Following
-    </Button>
+    <ActionButton icon={<UserCheck size={18} />} label="Following" disabled={busy} onPress={() => unfollow.mutate(following.id)} />
   ) : (
-    <Button size="$4" icon={<Plus size={18} />} disabled={busy} onPress={() => follow.mutate(channel)}>
-      Follow
-    </Button>
+    <ActionButton icon={<UserPlus size={18} />} label="Follow" disabled={busy} onPress={() => follow.mutate(channel)} />
   );
 }
 
-/**
- * Put this in one of the profile's own lists. A list may hold anything
- * playable from any source, so this is offered wherever Play is.
- */
-function AddToListButton({ item }: { item: MediaItem }) {
-  const { data: lists = [] } = usePlaylists();
-  const { add, create } = useListActions();
-  const [choosing, setChoosing] = useState(false);
-  const inAList = lists.some((list) =>
-    list.items.some((entry) => entry.connectionId === item.key.connectionId && entry.externalId === item.key.externalId),
+type MenuPage = 'root' | 'players' | 'lists' | 'download';
+
+const MENU_ICON = { size: px(18), color: '$color11' } as const;
+
+/** What waits behind "⋯": another player, a copy kept on this device, and the profile's own lists. */
+function TitleMenu({
+  item,
+  open,
+  onClose,
+  players,
+  canList,
+  keepable,
+  offersChoices,
+  onPlayWith,
+}: {
+  item: MediaItem;
+  open: boolean;
+  onClose: () => void;
+  /** The players that can play it here — "Play with…" only when there is more than one. */
+  players: readonly PlayerSummary[];
+  canList: boolean;
+  keepable: boolean;
+  offersChoices: boolean;
+  onPlayWith: (player: PluginId) => void;
+}) {
+  const [page, setPage] = useState<MenuPage>('root');
+  const choosesPlayer = players.length > 1;
+  const close = () => {
+    onClose();
+    setPage('root');
+  };
+  const back = () => setPage('root');
+  return (
+    <Menu open={open} label={`More for ${item.title}`} onClose={close}>
+      {page === 'players' ? (
+        <>
+          <MenuHeader title="Play with" onBack={back} />
+          {players.map((player, index) => (
+            <MenuRow
+              key={player.manifest.id}
+              label={player.manifest.displayName}
+              preferred={index === 0}
+              onPress={() => {
+                close();
+                onPlayWith(player.manifest.id);
+              }}
+            />
+          ))}
+        </>
+      ) : page === 'lists' ? (
+        <ListsPage item={item} onBack={back} />
+      ) : page === 'download' ? (
+        <DownloadPage item={item} onBack={back} onDone={close} />
+      ) : (
+        <>
+          {choosesPlayer ? (
+            <MenuRow icon={<CirclePlay {...MENU_ICON} />} label="Play with…" more preferred onPress={() => setPage('players')} />
+          ) : null}
+          {keepable ? (
+            <DownloadRow item={item} offersChoices={offersChoices} preferred={!choosesPlayer} onChoose={() => setPage('download')} onDone={close} />
+          ) : null}
+          {canList ? <ListsRow item={item} preferred={!choosesPlayer && !keepable} onPress={() => setPage('lists')} /> : null}
+        </>
+      )}
+    </Menu>
   );
+}
+
+const holds = (list: Playlist, item: MediaItem) =>
+  list.items.some((entry) => entry.connectionId === item.key.connectionId && entry.externalId === item.key.externalId);
+
+function ListsRow({ item, preferred, onPress }: { item: MediaItem; preferred: boolean; onPress: () => void }) {
+  const { data: lists = [] } = usePlaylists();
+  const count = lists.filter((list) => holds(list, item)).length;
+  return (
+    <MenuRow
+      icon={<ListPlus {...MENU_ICON} />}
+      label="Add to list"
+      {...(count === 0 ? {} : { detail: count === 1 ? 'In 1 list' : `In ${count} lists` })}
+      more
+      preferred={preferred}
+      onPress={onPress}
+    />
+  );
+}
+
+/** The profile's own lists, each ticked where it holds this — a press puts it in, or takes it out. */
+function ListsPage({ item, onBack }: { item: MediaItem; onBack: () => void }) {
+  const { data: lists = [] } = usePlaylists();
+  const { add, removeItem, create } = useListActions();
   return (
     <>
-      <Button size="$4" aria-expanded={choosing} onPress={() => setChoosing(!choosing)}>
-        {inAList ? 'In a list' : 'Add to list'}
-      </Button>
-      {choosing ? (
-        <XStack gap="$2" flexWrap="wrap" items="center" width="100%">
-          {lists.map((list) => (
-            <Button
-              key={list.id}
-              size="$3"
-              aria-label={`Add to ${list.title}`}
-              onPress={() => {
-                setChoosing(false);
-                add.mutate({ id: list.id, key: item.key });
-              }}
-            >
-              {list.title}
-            </Button>
-          ))}
-          <Button
-            size="$3"
-            icon={<Plus size={14} />}
-            disabled={create.isPending}
-            onPress={() => {
-              setChoosing(false);
-              // Named after what starts it, which is nearly always right and
-              // always renameable.
-              create.mutate(item.title, { onSuccess: (list) => add.mutate({ id: list.id, key: item.key }) });
-            }}
-          >
-            New list
-          </Button>
-        </XStack>
-      ) : null}
+      <MenuHeader title="Add to list" onBack={onBack} />
+      {lists.map((list, index) => {
+        const inIt = holds(list, item);
+        return (
+          <MenuRow
+            key={list.id}
+            label={list.title}
+            selected={inIt}
+            preferred={index === 0}
+            onPress={() => (inIt ? removeItem : add).mutate({ id: list.id, key: item.key })}
+          />
+        );
+      })}
+      <MenuRow
+        icon={<Plus {...MENU_ICON} />}
+        label="New list"
+        // Named after what starts it, which is nearly always right and always renameable.
+        detail={item.title}
+        preferred={lists.length === 0}
+        disabled={create.isPending}
+        onPress={() => create.mutate(item.title, { onSuccess: (list) => add.mutate({ id: list.id, key: item.key }) })}
+      />
     </>
   );
 }
 
 /**
  * Keep a copy, and say where it has got to. Where the source offers versions
- * it opens a sheet of them with their sizes; where it does not, one press
- * takes whatever the source hands over.
+ * it opens a page of them with their sizes; where it does not, one press takes
+ * whatever the source hands over.
  */
-function DownloadButton({ item, offersChoices }: { item: MediaItem; offersChoices: boolean }) {
+function DownloadRow({
+  item,
+  offersChoices,
+  preferred,
+  onChoose,
+  onDone,
+}: {
+  item: MediaItem;
+  offersChoices: boolean;
+  preferred: boolean;
+  onChoose: () => void;
+  onDone: () => void;
+}) {
   const { data: entry } = useDownloadOf(item.key);
   const { data: budget } = useDownloadBudget();
   const { start, remove } = useDownloadActions();
-  const [choosing, setChoosing] = useState(false);
-  const { data: options = [], isPending: loadingOptions } = useDownloadOptions(item.key, choosing);
-
-  // A browser has nowhere to keep it.
-  if (budget?.limitBytes === 0) return null;
-
+  const icon = <DownloadIcon {...MENU_ICON} />;
   if (entry?.state === 'done') {
     return (
-      <Button size="$4" icon={<Check size={18} />} onPress={() => remove.mutate(entry.id)} aria-label="Downloaded — press to delete">
-        Downloaded
-      </Button>
+      <MenuRow
+        icon={<Trash2 {...MENU_ICON} />}
+        label="Delete download"
+        detail="Kept on this device"
+        preferred={preferred}
+        onPress={() => {
+          remove.mutate(entry.id);
+          onDone();
+        }}
+      />
     );
   }
   if (entry) {
     const percent =
       entry.bytesTotal === undefined || entry.bytesTotal === 0 ? undefined : Math.round((entry.bytesDone / entry.bytesTotal) * 100);
     return (
-      <Button size="$4" disabled aria-label="Downloading">
-        {entry.state === 'failed' ? 'Download failed' : percent === undefined ? 'Downloading…' : `Downloading ${percent}%`}
-      </Button>
+      <MenuRow
+        icon={icon}
+        label={entry.state === 'failed' ? 'Download failed' : 'Downloading'}
+        {...(entry.state === 'failed' || percent === undefined ? {} : { detail: `${percent} %` })}
+        disabled
+      />
     );
   }
-  if (budget?.full) {
-    return (
-      <Button size="$4" disabled aria-label="No room for downloads">
-        No room left
-      </Button>
-    );
-  }
+  if (budget?.full) return <MenuRow icon={icon} label="Download" detail="No room left" disabled />;
+  return (
+    <MenuRow
+      icon={icon}
+      label="Download"
+      more={offersChoices}
+      preferred={preferred}
+      disabled={start.isPending}
+      onPress={() => {
+        if (offersChoices) {
+          onChoose();
+          return;
+        }
+        start.mutate({ item });
+        onDone();
+      }}
+    />
+  );
+}
 
+/** The versions the source will hand over, each with its size — asked for when this page opens. */
+function DownloadPage({ item, onBack, onDone }: { item: MediaItem; onBack: () => void; onDone: () => void }) {
+  const { start } = useDownloadActions();
+  const { data: options = [], isPending } = useDownloadOptions(item.key, true);
+  const take = (optionId?: string) => {
+    start.mutate({ item, ...(optionId ? { optionId } : {}) });
+    onDone();
+  };
   return (
     <>
-      <Button
-        size="$4"
-        icon={<DownloadIcon size={18} />}
-        disabled={start.isPending}
-        onPress={() => (offersChoices ? setChoosing(!choosing) : start.mutate({ item }))}
-        aria-expanded={offersChoices ? choosing : undefined}
-      >
-        Download
-      </Button>
-      {choosing ? (
-        <XStack gap="$2" flexWrap="wrap" items="center" width="100%">
-          {loadingOptions ? (
-            <SizableText size="$2" color="$color10">
-              Asking the server…
-            </SizableText>
-          ) : options.length === 0 ? (
-            <Button size="$3" onPress={() => start.mutate({ item })}>
-              Download as it is
-            </Button>
-          ) : (
-            options.map((option) => (
-              <Button
-                key={option.id}
-                size="$3"
-                aria-label={optionLabel(option)}
-                onPress={() => {
-                  setChoosing(false);
-                  start.mutate({ item, optionId: option.id });
-                }}
-              >
-                {optionLabel(option)}
-              </Button>
-            ))
-          )}
-        </XStack>
-      ) : null}
+      <MenuHeader title="Download" onBack={onBack} />
+      {isPending ? (
+        <MenuNote>Asking the server…</MenuNote>
+      ) : options.length === 0 ? (
+        <MenuRow label="Download as it is" preferred onPress={() => take()} />
+      ) : (
+        options.map((option, index) => (
+          <MenuRow key={option.id} label={optionLabel(option)} preferred={index === 0} onPress={() => take(option.id)} />
+        ))
+      )}
     </>
   );
 }

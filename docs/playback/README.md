@@ -323,8 +323,10 @@ over the tabs, with `start` in milliseconds for a resume:
   on an iPhone, which player would play it.
 
 Detail pages get Play — or Resume where the source says it stopped, with
-From the beginning — for a film or an episode whose source has `playback` in
-effect, and Mark watched or unwatched where it has `watchStateWrite`.
+From the beginning beside it — for a film or an episode whose source has
+`playback` in effect, and the eye, to mark it watched or unwatched, where it
+has `watchStateWrite`. "Play with…" is in the page's "⋯" menu, beside
+Download and Add to list.
 
 ## Until an engine exists
 

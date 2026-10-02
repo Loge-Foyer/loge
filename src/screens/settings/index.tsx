@@ -28,10 +28,16 @@ import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import { APP_DEFAULTS } from '@/services/app-settings';
+import { BUTTON_LABELS, type ButtonLabels } from '@/services/ports';
 import { CONTENT_TABS } from '@/services/tab-content';
 
 import { downloadOptionsSummary } from './download-options';
 import { categoryHref } from './plugin-route';
+
+const BUTTON_LABEL_NAMES: Readonly<Record<ButtonLabels, string>> = {
+  symbols: 'Symbols',
+  symbolsAndText: 'Symbols and text',
+};
 
 const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
   sources: Film,
@@ -59,6 +65,7 @@ export function SettingsScreen() {
   const forceLandscape = appSettings.data?.forceLandscape ?? APP_DEFAULTS.forceLandscape;
   const openOn = appSettings.data?.openOn ?? APP_DEFAULTS.openOn;
   const asks = appSettings.data?.alwaysChooseProfile;
+  const buttonLabels = appSettings.data?.buttonLabels ?? APP_DEFAULTS.buttonLabels;
   const defaultProfile = profiles.find((profile) => profile.id === defaultUserId);
 
   /** A list's line: what is set up in it, or what it is for. */
@@ -142,6 +149,15 @@ export function SettingsScreen() {
             }
           />
         )}
+        <ChoiceRow
+          title="Buttons"
+          subtitle="On a title's page: Play, watched and the rest"
+          options={BUTTON_LABELS}
+          label={(option) => BUTTON_LABEL_NAMES[option]}
+          value={buttonLabels}
+          disabled={appSettings.data === undefined || set.isPending}
+          onChoose={(option) => set.mutate({ buttonLabels: option })}
+        />
       </SettingsSection>
 
       <SettingsSection title="Downloads" footer="What this device keeps to watch with no network at all.">

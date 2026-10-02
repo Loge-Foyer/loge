@@ -30,6 +30,8 @@ export const APP_DEFAULTS: AppSettings = {
   backgroundPlayback: true,
   // A picture is better than none, so this stays as it was.
   softwareFallback: true,
+  // Play and the eye say what they do; the words only crowd a phone's row.
+  buttonLabels: 'symbols',
 };
 
 /**

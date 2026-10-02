@@ -710,7 +710,8 @@ Everything above describes the target; what runs today:
   `src/app/index.tsx` redirects there at a cold start and after a profile is
   picked), whether it asks who is watching at every launch
   (`alwaysChooseProfile`: off on a phone, on on a TV, from `appDefaults`), and
-  force landscape on playback, on by default. Players also carry this
+  force landscape on playback, on by default, and a title's buttons as
+  symbols or with their words (`buttonLabels`, symbols by default). Players also carry this
   device's own order (`players.order`), which is the order they are listed
   *and* tried in.
 - **Watch status (database v5):** marking something watched and where

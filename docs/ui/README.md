@@ -103,8 +103,15 @@ All of this only where the source may be kept on the device (`docs/data`).
 row's own sort, with as many columns as the width allows (`FlashList`, keyed by
 the column count). **Detail pages** switch on the item's type — a movie's hero
 and cast, a show's seasons and episodes, an episode's still with a way to its
-show. Play, Resume, Mark watched and Next episode arrive with playback
-(Phase 7, `docs/playback`). An item with a cover and nothing wider — an IPTV
+show. A title's own row is short: Play — or Resume, with a restart symbol
+beside it — in the accent, and the eye, outlined until it is watched and
+filled once it is. Everything else waits behind "⋯" (`components/more-menu.tsx`):
+Play with…, Download and Add to list, each a page of choices in a card that
+floats below the top right — React Native's own modal, which sits above every
+native screen and takes a remote's focus. On a phone and in a browser "⋯" is
+in the header over the artwork; on a TV, which has none, it ends the row.
+Settings → App → Buttons shows the row's buttons as symbols, the default, or
+with their words; either way each keeps its words for a screen reader. An item with a cover and nothing wider — an IPTV
 provider's films and series — gets the cover beside its title over a softened
 copy of it, rather than a slice of a portrait stretched across the page; what
 a source does not bring (cast, studios, what the file is, watch state) is
@@ -180,8 +187,9 @@ TV's sections.
 - **App** — how this device behaves, whoever is watching: the tab it opens on
   (Media, Videos or TV), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;
-  the default profile is kept for when it is off), and force landscape on
-  playback.
+  the default profile is kept for when it is off), force landscape on
+  playback, and whether a title's buttons show their words beside their
+  symbols.
 - **Downloads** — Options, what to ask a source for when keeping a copy
   (`settings/downloads/options`); then Downloads, what this device keeps and
   what is still coming down. Options is hidden where nothing can be kept — a
