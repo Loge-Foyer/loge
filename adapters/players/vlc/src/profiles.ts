@@ -1,4 +1,4 @@
-import type { PlatformId, PlayerProfile } from '@sc/api';
+import type { PlatformId, PlayerProfile } from '@loge/api';
 
 /**
  * What libVLC plays on each platform. It decodes in hardware where the device

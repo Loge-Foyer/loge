@@ -1,6 +1,6 @@
 // A pretend backup target — iCloud Drive, Google Drive — that several devices
 // in one test share: files by name, with the conditional writes a real one has.
-import { AppError, pluginId, type BackupStat, type Plugin } from '@sc/api';
+import { AppError, pluginId, type BackupStat, type Plugin } from '@loge/api';
 
 export interface FakeBackupTarget {
   readonly plugin: Plugin;
@@ -19,7 +19,7 @@ export function fakeBackupTarget(id = 'fake-backups'): FakeBackupTarget {
       platforms: ['ios', 'android', 'web'],
       displayName: 'Fake backups',
       description: 'A place for backups that exists only in tests.',
-      backup: { location: 'Memory → Streaming Center' },
+      backup: { location: 'Memory → Loge' },
       connectionFields: [{ key: 'folder', label: 'Folder', type: 'text' }],
       settings: [],
     },

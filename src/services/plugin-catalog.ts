@@ -10,7 +10,7 @@ import {
   type PluginCategory,
   type PluginId,
   type PluginManifest,
-} from '@sc/api';
+} from '@loge/api';
 
 import { showsOn, type ContentTab } from './tab-content';
 

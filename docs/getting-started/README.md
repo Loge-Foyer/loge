@@ -29,7 +29,7 @@ ways in:
   server or export a backup.
 - **Sign in to your server.** The account arrives — profiles, PINs, settings
   and sources, with their passwords — and the app asks "Who's watching?".
-- **Restore a backup.** Pick a `.scbackup` file and type its key. It becomes a
+- **Restore a backup.** Pick a `.logebackup` file and type its key. It becomes a
   local account.
 
 ## Set up once
@@ -45,22 +45,22 @@ Jellyfin, a test account is the thing to use: a wrong password counts against
 the account's lockout on the server.
 
 The workspace root's `jellyfin.env` (gitignored) is a good place to keep the
-test server's details at hand. The app never reads it; the `sc-run` skill types
+test server's details at hand. The app never reads it; the `loge-run` skill types
 them in from there when it drives the app.
 
 ## Your own server
 
 Your own server is PocketBase with the app's collections, in
-`../streaming_center_sync`. To run it on your computer:
+`../foyer`. To run it on your computer:
 
 ```bash
-cd ../streaming_center_sync
+cd ../foyer
 go run . serve                                          # http://localhost:8090; the dashboard is /_/
-go run . superuser upsert you@example.com <password>    # or SC_ADMIN_EMAIL and SC_ADMIN_PASSWORD in .env
+go run . superuser upsert you@example.com <password>    # or FOYER_ADMIN_EMAIL and FOYER_ADMIN_PASSWORD in .env
 go run . invite                                         # prints a one-time invite code
 ```
 
-It needs a recent Go; `../streaming_center_sync/docs/getting-started` has the
+It needs a recent Go; `../foyer/docs/getting-started` has the
 details, and what the `.env` holds.
 
 In the app: **Sign in to your server → New here? Create an account**, with
@@ -110,7 +110,7 @@ The data is only on the device, so starting fresh means clearing it there:
 | --- | --- |
 | Web | a new browser profile, or DevTools → Application → Clear site data |
 | iOS simulator | `xcrun simctl uninstall booted <bundle id>`, and `xcrun simctl keychain booted reset` for the secrets, which iOS keeps across an uninstall |
-| Android emulator | `adb shell pm clear com.fkg.streamingcenter` |
+| Android emulator | `adb shell pm clear com.fkg.loge` |
 | Your own server | stop it and delete its data folder (`pb_data`) |
 
 ## In a browser

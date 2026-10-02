@@ -45,7 +45,7 @@ yarn-error.*
 # What the app's native build leaves inside an Expo module it compiles from
 # source — a player adapter's, and the app's own in modules/. The adapters
 # carried their half of these rules in their own .gitignore until they moved in;
-# modules/ never had them, so 98 files of sc-pip's build output were tracked.
+# modules/ never had them, so 98 files of the PiP module's build output were tracked.
 adapters/players/*/android/build/
 adapters/players/*/android/.gradle/
 adapters/players/*/android/.cxx/

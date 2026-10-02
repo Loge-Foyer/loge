@@ -7,7 +7,7 @@
  * so the app's placeholders get used, and it cannot be kept offline. Its fields
  * cover every field type the app renders.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

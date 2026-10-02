@@ -12,7 +12,7 @@ import {
   userId,
   type AccountRecord,
   type RecordKind,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 // The same file the server's tests read, so both sides judge a record alike.

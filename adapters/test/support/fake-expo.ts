@@ -171,8 +171,8 @@ export class FakeMpvPlayer extends SharedObject {
 export const createdMpv: FakeMpvPlayer[] = [];
 
 export function requireNativeModule(name: string): unknown {
-  if (name === 'ScVlc') return { Player: FakeVlcPlayer };
-  if (name === 'ScMpv') return { Player: FakeMpvPlayer };
+  if (name === 'LogeVlc') return { Player: FakeVlcPlayer };
+  if (name === 'LogeMpv') return { Player: FakeMpvPlayer };
   throw new Error(`Cannot find native module '${name}'`);
 }
 

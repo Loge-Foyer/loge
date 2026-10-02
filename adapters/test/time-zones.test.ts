@@ -1,4 +1,4 @@
-import { fromZoneWallClock, TIME_ZONES, zoneOffsetMs } from '@sc/api';
+import { fromZoneWallClock, TIME_ZONES, zoneOffsetMs } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const HOUR = 3_600_000;

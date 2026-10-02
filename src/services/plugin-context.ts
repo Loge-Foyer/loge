@@ -1,4 +1,4 @@
-import { AppError, type ConnectionValues, type Credentials, type HttpClient, type PluginContext, type PluginCrypto } from '@sc/api';
+import { AppError, type ConnectionValues, type Credentials, type HttpClient, type PluginContext, type PluginCrypto } from '@loge/api';
 
 import { stableHash } from './hash';
 import type { ClientIdentitySource, Clock, NetworkMonitor, SecureCredentialStore } from './ports';

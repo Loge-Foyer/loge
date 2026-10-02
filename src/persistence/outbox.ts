@@ -1,4 +1,4 @@
-import type { PlaybackReport } from '@sc/api';
+import type { PlaybackReport } from '@loge/api';
 
 /**
  * What a new report of each kind makes redundant among the same item's waiting

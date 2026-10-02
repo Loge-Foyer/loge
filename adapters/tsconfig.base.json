@@ -11,7 +11,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "@sc/api": ["./api/src/index.ts"]
+      "@loge/api": ["./api/src/index.ts"]
     }
   }
 }

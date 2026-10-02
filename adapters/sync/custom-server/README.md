@@ -1,7 +1,7 @@
 # Your own server
 
 The account for someone who wants neither Apple nor Google: a server they run
-themselves (`streaming_center_sync`). It keeps the household's account — its
+themselves (`foyer`). It keeps the household's account — its
 profiles, their PINs and preferences, and its sources and IPTV connections
 with their passwords — so every device signed in to it has the same.
 
@@ -52,7 +52,7 @@ The server is PocketBase, and this plugin speaks its own API.
 
 The account role is implemented and tested against a fake of PocketBase's
 routes and rules (`test/custom-server.test.ts`, `test/support/fake-pocketbase.ts`).
-`streaming_center_sync`'s harness runs it against the real server.
+`foyer`'s harness runs it against the real server.
 
 Phase 4's zero-knowledge sign-in — a derived proof, sealed passwords, a change
 log — is retired; it stays in git.

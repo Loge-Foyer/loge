@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { deviceKey, userKey } from '@/services/query-keys';

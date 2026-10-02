@@ -1,5 +1,5 @@
 // Devices on one account: a service graph and a database each, one fake server between them.
-import { userId, type Plugin, type UserId } from '@sc/api';
+import { userId, type Plugin, type UserId } from '@loge/api';
 
 import type { PreparedAccount, ServerTarget } from '@/services/account';
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

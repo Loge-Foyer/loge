@@ -11,7 +11,7 @@ import type {
   PlayerRequirement,
   PluginCategory,
   SpatialAudio,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { BackupProblem } from '@/services/backup';
 import type { TargetStatus } from '@/services/backup/targets';
@@ -445,11 +445,11 @@ export function describeBackupProblem(problem: BackupProblem): string {
     case 'wrong-key':
       return 'That key doesn’t open this backup. Without the key it was saved with, it can’t be opened — by anyone, this app included.';
     case 'too-large':
-      return 'This file is far too large to be a Streaming Center backup.';
+      return 'This file is far too large to be a Loge backup.';
     case 'not-a-backup':
-      return 'This isn’t a Streaming Center backup.';
+      return 'This isn’t a Loge backup.';
     case 'newer':
-      return 'This backup was saved by a newer version of Streaming Center. Update the app, then open it again.';
+      return 'This backup was saved by a newer version of Loge. Update the app, then open it again.';
     case 'damaged':
       return 'This backup is damaged, and can’t be opened.';
   }

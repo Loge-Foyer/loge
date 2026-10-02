@@ -1,4 +1,4 @@
-import type { GlobalMediaKey, MediaItem } from '@sc/api';
+import type { GlobalMediaKey, MediaItem } from '@loge/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { deviceKey, userKey } from '@/services/query-keys';

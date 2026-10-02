@@ -5,12 +5,12 @@ an IPTV provider, a player, or a place for the account. A service that does two
 jobs becomes two plugins, one in each folder.
 
 1. **Create the package** — `adapters/<category>/<name>/`.
-   - Its `package.json` is named for the category: `@sc/source-<name>`,
-     `@sc/iptv-<name>`, `@sc/player-<name>` or `@sc/sync-<name>`.
-   - It has `"exports": "./src/index.ts"`, and `@sc/api` as a **peer**
+   - Its `package.json` is named for the category: `@loge/source-<name>`,
+     `@loge/iptv-<name>`, `@loge/player-<name>` or `@loge/sync-<name>`.
+   - It has `"exports": "./src/index.ts"`, and `@loge/api` as a **peer**
      dependency: the app supplies the one copy, so the plugin and the app
      agree on every type.
-   - A player adds `@sc/player-kit`, React and its engine as peers.
+   - A player adds `@loge/player-kit`, React and its engine as peers.
 2. **Write the manifest** in `src/index.ts`, and export it as `plugin` (see
    `api/`). Its parts:
    - **`id`:** `'<category>/<name>'`.
@@ -106,7 +106,7 @@ Everything above, plus:
 - **Two parts, one package.**
   - `src/index.ts` exports the manifest and `player.create(context)`, which
     returns the framework-free `MediaPlayer`.
-  - The view — the part that draws — is a `PlayerView` from `@sc/player-kit`,
+  - The view — the part that draws — is a `PlayerView` from `@loge/player-kit`,
     exported beside it.
   - Native code, when the engine needs it, is an Expo module in the package's
     own folder: `expo-module.config.json` beside `package.json`, naming the
@@ -136,7 +136,7 @@ Everything above, plus:
   it. State only what really plays.
 - **Report through events.** State, position, tracks and errors go out as
   `PlayerEvent`s. An error is an `AppError`, never a silent stop.
-  `createPlayerEvents` in `@sc/api` keeps `subscribe`'s promise — a state told
+  `createPlayerEvents` in `@loge/api` keeps `subscribe`'s promise — a state told
   once, the current one to a new listener, a failure as a state and an error —
   and `playbackFailed` and `playerReleased` are the errors every engine
   throws.
@@ -191,4 +191,4 @@ Everything above, plus:
   when the file changed since that etag, so two devices never overwrite each
   other in silence.
 - **Say where the file goes**, in `backup.location`, in words the user
-  recognises: "iCloud Drive → Streaming Center".
+  recognises: "iCloud Drive → Loge".

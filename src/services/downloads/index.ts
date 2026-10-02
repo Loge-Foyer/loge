@@ -1,4 +1,4 @@
-import { AppError, type DownloadOption, type GlobalMediaKey, type MediaItem, type PlaybackDescriptor, type UserId } from '@sc/api';
+import { AppError, type DownloadOption, type GlobalMediaKey, type MediaItem, type PlaybackDescriptor, type UserId } from '@loge/api';
 
 import type { Clock, DownloadEntry, DownloadRepository, FileStore, IdGenerator, Logger } from '../ports';
 import type { SourceService } from '../sources';

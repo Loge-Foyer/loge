@@ -1,4 +1,4 @@
-import { connectionId, credentialsRef, pluginId, userId, type PluginManifest } from '@sc/api';
+import { connectionId, credentialsRef, pluginId, userId, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { createSessions, sessionIdentity, sessionRef } from '@/services/sessions';

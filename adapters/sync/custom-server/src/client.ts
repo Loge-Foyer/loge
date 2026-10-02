@@ -1,4 +1,4 @@
-import { isTransportError, TransportError, type CancelSignal, type HttpMethod, type HttpResponse, type PluginContext } from '@sc/api';
+import { isTransportError, TransportError, type CancelSignal, type HttpMethod, type HttpResponse, type PluginContext } from '@loge/api';
 
 import { noPassword, notCreated, refused, statusError, tooManyTries, transportError, unreadable, wrongPassword } from './errors';
 import { decodeSession, encodeSession, type LiveSession, type Session } from './session';
@@ -188,7 +188,7 @@ export function createClient(options: { readonly baseUrl: string; readonly usern
       if (!USERNAME.test(username)) throw notCreated('username');
       const password = await passwordOf();
       if ([...password].length < MIN_PASSWORD) throw notCreated('password');
-      const response = await send('POST', '/api/sc/sign-up', {
+      const response = await send('POST', '/api/foyer/sign-up', {
         body: JSON.stringify({ username, password, invite, firstProfile }),
         ...(signal ? { signal } : {}),
       });

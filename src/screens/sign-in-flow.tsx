@@ -1,4 +1,4 @@
-import { isAppError, type ConnectionId, type Credentials, type FieldValue, type FieldValues, type PluginId, type PluginManifest } from '@sc/api';
+import { isAppError, type ConnectionId, type Credentials, type FieldValue, type FieldValues, type PluginId, type PluginManifest } from '@loge/api';
 import { useState } from 'react';
 import { H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 

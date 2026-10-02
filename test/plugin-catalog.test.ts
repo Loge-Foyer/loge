@@ -1,4 +1,4 @@
-import { PLATFORMS, PLUGIN_CATEGORIES, pluginId, type Plugin, type PluginManifest } from '@sc/api';
+import { PLATFORMS, PLUGIN_CATEGORIES, pluginId, type Plugin, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { plugins } from '@/composition/plugins';

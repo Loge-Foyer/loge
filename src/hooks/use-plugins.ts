@@ -1,4 +1,4 @@
-import type { PluginId } from '@sc/api';
+import type { PluginId } from '@loge/api';
 
 import { useServices } from './services-context';
 

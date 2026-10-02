@@ -250,7 +250,7 @@ for the devices that can.
 - **Sign in to your server** — its connection fields and nothing else, tried
   once. When the account brings profiles, a spinner holds while the gate moves
   to "Who's watching?".
-- **Restore a backup** — a `.scbackup` file and its key, through the import
+- **Restore a backup** — a `.logebackup` file and its key, through the import
   flow (`screens/import-flow.tsx`), which Settings shares: pick, type the key,
   see what it holds and what it replaces, the owner check, done. It never
   navigates afterwards; the gate moves.

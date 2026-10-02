@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-import { connectionId, isAppError, TransportError, userId, type AccountRecord, type ConnectedAccount } from '@sc/api';
-import { plugin } from '@sc/sync-custom-server';
+import { connectionId, isAppError, TransportError, userId, type AccountRecord, type ConnectedAccount } from '@loge/api';
+import { plugin } from '@loge/sync-custom-server';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, target } from './support/fake-http';
@@ -38,10 +38,10 @@ describe('custom-server: signing in', () => {
 
   it('says there is no server where something else answers', async () => {
     const server = fakePocketBase();
-    server.override('GET /api/sc/info', { status: 404 });
+    server.override('GET /api/foyer/info', { status: 404 });
     const { account } = await connect(server);
     expect(await thrown(account.info())).toMatchObject({ code: 'NOT_FOUND', retry: 'never' });
-    server.override('GET /api/sc/info', { status: 200, json: { maxProfiles: 'ten' } });
+    server.override('GET /api/foyer/info', { status: 200, json: { maxProfiles: 'ten' } });
     expect(await thrown(account.info())).toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
   });
 
@@ -125,7 +125,7 @@ describe('custom-server: signing in', () => {
 
   it('gives an abort back to the caller as it came', async () => {
     const server = fakePocketBase();
-    server.override('GET /api/sc/info', new TransportError('aborted'));
+    server.override('GET /api/foyer/info', new TransportError('aborted'));
     const { account } = await connect(server);
     expect(await thrown(account.info())).toBeInstanceOf(TransportError);
   });
@@ -246,7 +246,7 @@ describe('custom-server: moving records', () => {
     expect(await account.push([profile('u1', 'Alex'), profile('u2', 'Sam')])).toEqual({ kind: 'refused', index: 1, reason: 'limit' });
     expect(await account.push([profile('u1', 'Alex'), { kind: 'profile', key: 'u1', deleted: true }])).toEqual({ kind: 'stored' });
     expect(await account.push([profile('u1', 'Alex again')])).toEqual({ kind: 'refused', index: 0, reason: 'deleted' });
-    server.override('POST /api/batch', { status: 400, json: { data: { requests: { 0: { response: { data: { key: { code: 'sc_invalid' } } } } } } } });
+    server.override('POST /api/batch', { status: 400, json: { data: { requests: { 0: { response: { data: { key: { code: 'foyer_invalid' } } } } } } } });
     expect(await account.push([profile('u3', 'Robin')])).toEqual({ kind: 'refused', index: 0, reason: 'invalid' });
   });
 

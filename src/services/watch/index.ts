@@ -9,7 +9,7 @@ import {
   type ProgressReport,
   type UserId,
   type WatchStatus,
-} from '@sc/api';
+} from '@loge/api';
 
 import { stableJson } from '../hash';
 import type { IdentityService } from '../identity';

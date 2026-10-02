@@ -5,7 +5,7 @@ import {
   type HttpMethod,
   type HttpResponse,
   type MediaContext,
-} from '@sc/api';
+} from '@loge/api';
 
 import { readAuthentication } from './dto';
 import { statusError, transportError, unreadable } from './errors';

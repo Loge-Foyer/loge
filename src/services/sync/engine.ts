@@ -1,4 +1,4 @@
-import { AppError, isAppError, type AppErrorCode, type RetryHint } from '@sc/api';
+import { AppError, isAppError, type AppErrorCode, type RetryHint } from '@loge/api';
 
 import { MissingSecretError } from '../plugin-context';
 import type { Clock, RunLock } from '../ports';
@@ -51,7 +51,7 @@ export interface SyncEngine {
   accountChanged(): void;
 }
 
-export const SYNC_LOCK = 'streaming-center-sync';
+export const SYNC_LOCK = 'loge-sync';
 
 export function createSyncEngine(deps: {
   readonly parts: SyncParts;

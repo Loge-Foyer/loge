@@ -1,4 +1,4 @@
-import type { MediaItem } from '@sc/api';
+import type { MediaItem } from '@loge/api';
 import { useWindowDimensions } from 'react-native';
 import { H1, Paragraph, SizableText, YStack } from 'tamagui';
 

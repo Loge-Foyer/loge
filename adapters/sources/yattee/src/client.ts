@@ -6,7 +6,7 @@ import {
   type CancelSignal,
   type HttpResponse,
   type MediaContext,
-} from '@sc/api';
+} from '@loge/api';
 
 import { statusError, transportError, unreadable } from './errors';
 import { queryString, type QueryValue } from './url';

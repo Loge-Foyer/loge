@@ -1,5 +1,5 @@
 /**
- * @sc/api — the vocabulary the app and every plugin are written in, and the
+ * @loge/api — the vocabulary the app and every plugin are written in, and the
  * contracts plugins implement. It depends on nothing: not React, not Expo, not
  * the app, not a plugin.
  */

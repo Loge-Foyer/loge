@@ -1,4 +1,4 @@
-import type { PluginId } from '@sc/api';
+import type { PluginId } from '@loge/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { deviceKey } from '@/services/query-keys';

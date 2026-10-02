@@ -6,7 +6,7 @@
  * IPTV runs on phones: portals send no CORS headers, and a browser will not
  * send the cookie a portal needs.
  */
-import { pluginId, TIME_ZONES, type Plugin } from '@sc/api';
+import { pluginId, TIME_ZONES, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

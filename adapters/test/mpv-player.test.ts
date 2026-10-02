@@ -1,4 +1,4 @@
-import { canPlay, headersRef, type MediaPlayer, type PlaybackSource, type PlayerContext, type PlayerEvent } from '@sc/api';
+import { canPlay, headersRef, type MediaPlayer, type PlaybackSource, type PlayerContext, type PlayerEvent } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { createEngine, engineOf } from '../players/mpv/src/engine';

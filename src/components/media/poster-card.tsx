@@ -1,4 +1,4 @@
-import type { MediaItem } from '@sc/api';
+import type { MediaItem } from '@loge/api';
 import { Link } from 'expo-router';
 import { Pressable } from 'react-native';
 import { SizableText, YStack } from 'tamagui';

@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';

@@ -9,7 +9,7 @@ import {
   type PlaybackSource,
   type PlayerEvent,
   type PlayerProfile,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 // Rough shapes of the engines, enough to exercise the rules.

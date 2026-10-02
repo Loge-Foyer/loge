@@ -1,4 +1,4 @@
-import { PLUGIN_CATEGORIES, type PluginCategory } from '@sc/api';
+import { PLUGIN_CATEGORIES, type PluginCategory } from '@loge/api';
 import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Download } from '@tamagui/lucide-icons-2/icons/Download';

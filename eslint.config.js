@@ -6,8 +6,8 @@ const expoConfig = require('eslint-config-expo/flat');
 // (spec §15). These make that a lint error rather than a convention.
 const implementations = [
   {
-    // A source, IPTV, player, sync or metadata package. @sc/player-kit is the player contract: its types go anywhere (below).
-    group: ['@sc/source-*', '@sc/iptv-*', '@sc/player-*', '!@sc/player-kit', '@sc/sync-*', '@sc/metadata-*'],
+    // A source, IPTV, player, sync or metadata package. @loge/player-kit is the player contract: its types go anywhere (below).
+    group: ['@loge/source-*', '@loge/iptv-*', '@loge/player-*', '!@loge/player-kit', '@loge/sync-*', '@loge/metadata-*'],
     message: 'Only src/composition/ imports a concrete plugin. Use the catalogue from useServices().',
   },
   {
@@ -46,7 +46,7 @@ const missingOnHermes = {
     },
     {
       selector: "CallExpression[callee.property.name=/^(toBase64|fromBase64)$/]",
-      message: 'Hermes has no Uint8Array base64 methods. Use encodeBase64Url / decodeBase64Url from @sc/api.',
+      message: 'Hermes has no Uint8Array base64 methods. Use encodeBase64Url / decodeBase64Url from @loge/api.',
     },
     ...sqliteTransactionHelpers,
   ],
@@ -113,7 +113,7 @@ const tamaguiButton = {
   message: 'Use Button from @/components/button: on a TV only that one can be pressed with the remote.',
 };
 
-// @sc/player-kit holds only types, the React half of the player contract. A
+// @loge/player-kit holds only types, the React half of the player contract. A
 // screen may name them; the views themselves come from the composition root,
 // through useServices() — so nothing else imports it for real.
 const playerKitTypesOnly = {
@@ -122,9 +122,9 @@ const playerKitTypesOnly = {
     {
       paths: [
         {
-          name: '@sc/player-kit',
+          name: '@loge/player-kit',
           allowTypeImports: true,
-          message: 'Only types from @sc/player-kit outside src/composition/. The views come from useServices().',
+          message: 'Only types from @loge/player-kit outside src/composition/. The views come from useServices().',
         },
       ],
     },

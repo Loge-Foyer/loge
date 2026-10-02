@@ -1,4 +1,4 @@
-import type { PluginCategory, PluginId, PluginManifest } from '@sc/api';
+import type { PluginCategory, PluginId, PluginManifest } from '@loge/api';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Stack } from 'expo-router';

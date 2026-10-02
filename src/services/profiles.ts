@@ -1,4 +1,4 @@
-import { AppError, DEFAULT_MAX_PROFILES, userId as toUserId, type AppUser, type UserId } from '@sc/api';
+import { AppError, DEFAULT_MAX_PROFILES, userId as toUserId, type AppUser, type UserId } from '@loge/api';
 
 import type { IdGenerator, LocalDatabase, StoredAccount } from './ports';
 import { removeProfileIn } from './removal';

@@ -1,4 +1,4 @@
-import { compareItems, connectionId, matchesTerm, mergeSorted, type MediaItem, type Movie } from '@sc/api';
+import { compareItems, connectionId, matchesTerm, mergeSorted, type MediaItem, type Movie } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 function movie(id: string, extra: Partial<Movie> = {}): MediaItem {

@@ -16,8 +16,8 @@ import {
   type PlayerProfile,
   type Season,
   type Show,
-} from '@sc/api';
-import { plugin } from '@sc/source-jellyfin';
+} from '@loge/api';
+import { plugin } from '@loge/source-jellyfin';
 import { describe, expect, it } from 'vitest';
 
 import { fnv1a64 } from '../sources/jellyfin/src/hash';
@@ -83,7 +83,7 @@ describe('Jellyfin — signing in', () => {
     const [login] = http.to('POST /Users/AuthenticateByName');
     const deviceId = fnv1a64('install-1|alex');
     expect(login?.headers.Authorization).toBe(
-      `MediaBrowser Client="Streaming%20Center", Device="Test%20Phone", DeviceId="${deviceId}", Version="1.0.0"`,
+      `MediaBrowser Client="Loge", Device="Test%20Phone", DeviceId="${deviceId}", Version="1.0.0"`,
     );
     expect(JSON.parse(login?.body ?? '{}')).toEqual({ Username: 'alex', Pw: 'secret' });
     expect(http.to('GET /Users/Me')[0]?.headers.Authorization).toContain('Token="token-1"');

@@ -1,4 +1,4 @@
-import { CATEGORY_SCOPE, categoryOfPluginId, isQualifiedPluginId, PLUGIN_CATEGORIES, qualifiedPluginId, runsOn } from '@sc/api';
+import { CATEGORY_SCOPE, categoryOfPluginId, isQualifiedPluginId, PLUGIN_CATEGORIES, qualifiedPluginId, runsOn } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 describe('qualified plugin ids', () => {

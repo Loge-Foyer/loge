@@ -1,6 +1,6 @@
 # API
 
-`@sc/api` is the vocabulary the app and every plugin are written in. It depends
+`@loge/api` is the vocabulary the app and every plugin are written in. It depends
 on nothing — not React, not Expo, not the app — so any of them can use it
 without learning about the others.
 

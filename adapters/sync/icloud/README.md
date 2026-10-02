@@ -1,7 +1,7 @@
 # iCloud
 
-Keeps the account's encrypted backup file in iCloud Drive, in a "Streaming
-Center" folder, saved after changes and opened on another device.
+Keeps the account's encrypted backup file in iCloud Drive, in a "Loge" folder,
+saved after changes and opened on another device.
 
 ## Category
 

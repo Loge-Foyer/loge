@@ -1,4 +1,4 @@
-import { AppError, type TransportError } from '@sc/api';
+import { AppError, type TransportError } from '@loge/api';
 
 /** A request that got no response. An abort is the caller's own, and goes back to it as it came. */
 export function transportError(error: TransportError): AppError | TransportError {
@@ -16,7 +16,7 @@ export function transportError(error: TransportError): AppError | TransportError
 
 /** What a status means on any route. Routes that give 400, 401, 403 or 429 a meaning of their own read those first. */
 export function statusError(status: number): AppError {
-  if (status === 404) return new AppError('NOT_FOUND', 'There is no Streaming Center server at this address.', { retry: 'never' });
+  if (status === 404) return new AppError('NOT_FOUND', 'There is no Foyer server at this address.', { retry: 'never' });
   if (status === 429) return tooManyTries('backoff');
   if (status >= 500) return new AppError('PROVIDER_UNAVAILABLE', 'Your server ran into a problem.', { retry: 'backoff' });
   if (status === 400 || status === 413) {

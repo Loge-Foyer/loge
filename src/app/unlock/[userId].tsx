@@ -1,4 +1,4 @@
-import { userId as toUserId } from '@sc/api';
+import { userId as toUserId } from '@loge/api';
 import { useLocalSearchParams } from 'expo-router';
 
 import { UnlockScreen } from '@/screens/unlock';

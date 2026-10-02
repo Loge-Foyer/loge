@@ -1,4 +1,4 @@
-import { encodeBase64, encodeUtf8, type PluginCrypto } from '@sc/api';
+import { encodeBase64, encodeUtf8, type PluginCrypto } from '@loge/api';
 
 /**
  * The file around the backup database: a 76-byte header, then AES-256-GCM
@@ -8,7 +8,7 @@ import { encodeBase64, encodeUtf8, type PluginCrypto } from '@sc/api';
  *
  * | at | bytes | field |
  * | -- | ----- | ----- |
- * | 0  | 4     | magic `SCBK` |
+ * | 0  | 4     | magic `LGBK` |
  * | 4  | 2     | format version |
  * | 6  | 2     | schema version of the database inside |
  * | 8  | 8     | key id: which key opens it |
@@ -26,7 +26,7 @@ export const FORMAT_VERSION = 1;
 
 const FIELD_BYTES = 64;
 const TAG_BYTES = 16;
-const MAGIC = [0x53, 0x43, 0x42, 0x4b];
+const MAGIC = [0x4c, 0x47, 0x42, 0x4b];
 
 export interface BackupHeader {
   readonly formatVersion: number;
@@ -51,17 +51,17 @@ type Crypto = Pick<PluginCrypto, 'sha256' | 'expandKey' | 'seal' | 'open'>;
 /** The file's encryption key and key id, each its own expansion of the backup key. */
 export async function deriveBackupKeys(key: Uint8Array, crypto: Crypto): Promise<BackupKeys> {
   return {
-    fileKey: await crypto.expandKey(key, 'sc/backup/v1|file', 32),
-    keyId: await crypto.expandKey(key, 'sc/backup/v1|key-id', 8),
+    fileKey: await crypto.expandKey(key, 'loge/backup/v1|file', 32),
+    keyId: await crypto.expandKey(key, 'loge/backup/v1|key-id', 8),
   };
 }
 
 /** Sixteen bytes that name something without saying it: an account, an install. */
 export async function tagOf(crypto: Crypto, purpose: 'lineage' | 'writer', value: string): Promise<Uint8Array> {
-  return (await crypto.sha256(encodeUtf8(`sc/backup/v1|${purpose}\n${value}`))).subarray(0, 16);
+  return (await crypto.sha256(encodeUtf8(`loge/backup/v1|${purpose}\n${value}`))).subarray(0, 16);
 }
 
-const additionalData = (fields: Uint8Array) => `sc/backup/v1|${encodeBase64(fields)}`;
+const additionalData = (fields: Uint8Array) => `loge/backup/v1|${encodeBase64(fields)}`;
 
 function fieldsOf(header: BackupHeader): Uint8Array {
   const fields = new Uint8Array(FIELD_BYTES);

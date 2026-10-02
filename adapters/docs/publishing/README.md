@@ -6,16 +6,16 @@ build step, and the app consumes it as a workspace.
 - **Workspaces, not links.** The app's `package.json` declares
   `adapters/api`, `adapters/player-kit` and `adapters/{sources,iptv,players,sync}/*`
   as `workspaces`, and depends on each by name at `"*"`. `npm install` at the
-  app's root links them into `node_modules/@sc/`; there is nothing else to do.
+  app's root links them into `node_modules/@loge/`; there is nothing else to do.
 
   They were a repository of their own until Phase 9, consumed through `file:`
   dependencies with a Metro watch folder and a block list. That is gone, along
   with the second `node_modules` and the duplicate-native-package hazard that
   came with it.
-- **Package names** follow the category: `@sc/source-<name>`,
-  `@sc/iptv-<name>`, `@sc/player-<name>`, `@sc/sync-<name>`, plus `@sc/api`
-  and `@sc/player-kit`.
-- **One copy of `api`.** Every adapter takes `@sc/api` as a peer dependency,
+- **Package names** follow the category: `@loge/source-<name>`,
+  `@loge/iptv-<name>`, `@loge/player-<name>`, `@loge/sync-<name>`, plus `@loge/api`
+  and `@loge/player-kit`.
+- **One copy of `api`.** Every adapter takes `@loge/api` as a peer dependency,
   so the app supplies the one instance and branded ids agree. The same holds
   for a player's React, React Native and engine.
 - **`"exports": "./src/index.ts"`.** The app's bundler and TypeScript both read

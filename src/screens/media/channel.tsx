@@ -1,4 +1,4 @@
-import type { ChildSection, MediaDetail, MediaItem, VideoChannel, VideoPlaylist } from '@sc/api';
+import type { ChildSection, MediaDetail, MediaItem, VideoChannel, VideoPlaylist } from '@loge/api';
 import { FlashList } from '@shopify/flash-list';
 import { UserCheck } from '@tamagui/lucide-icons-2/icons/UserCheck';
 import { UserPlus } from '@tamagui/lucide-icons-2/icons/UserPlus';

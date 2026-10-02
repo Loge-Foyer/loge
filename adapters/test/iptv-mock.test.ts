@@ -11,8 +11,8 @@ import {
   type ItemPage,
   type MediaItem,
   type PlayerProfile,
-} from '@sc/api';
-import { plugin } from '@sc/iptv-mock';
+} from '@loge/api';
+import { plugin } from '@loge/iptv-mock';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';

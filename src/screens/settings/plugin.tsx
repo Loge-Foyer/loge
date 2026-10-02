@@ -1,4 +1,4 @@
-import type { ConnectionId, PluginId, PluginManifest } from '@sc/api';
+import type { ConnectionId, PluginId, PluginManifest } from '@loge/api';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';

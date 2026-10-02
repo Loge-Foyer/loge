@@ -1,4 +1,4 @@
-import type { ContentKind, PluginCategory } from '@sc/api';
+import type { ContentKind, PluginCategory } from '@loge/api';
 
 export type ContentTab = 'media' | 'videos' | 'tv';
 

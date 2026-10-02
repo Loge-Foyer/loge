@@ -1,4 +1,4 @@
-import type { MediaItem } from '@sc/api';
+import type { MediaItem } from '@loge/api';
 import { FlashList } from '@shopify/flash-list';
 import { Stack } from 'expo-router';
 import { useCallback, useState } from 'react';

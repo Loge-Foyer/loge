@@ -1,4 +1,4 @@
-import type { ConnectionId, UserId } from '@sc/api';
+import type { ConnectionId, UserId } from '@loge/api';
 
 import type { PluginCatalog } from '../plugin-catalog';
 import type { IdGenerator, Logger, SecureCredentialStore, SyncDatabase } from '../ports';

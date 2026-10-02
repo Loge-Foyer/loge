@@ -1,8 +1,7 @@
-# AGENTS.md — streaming_center_app
+# AGENTS.md — loge
 
-The Streaming Center client: an Expo/React Native app targeting **iOS, Android
-and web**. Read the workspace root `AGENTS.md` and
-`../.claude/streaming-center-architecture.md` first.
+The Loge client: an Expo/React Native app targeting **iOS, Android and web**.
+Read the workspace root `AGENTS.md` and `../.claude/architecture.md` first.
 
 This repository owns **the experience**: screens, services, the local
 database, the backup file's format, platform access and composition. It does
@@ -89,11 +88,11 @@ Docs: https://docs.expo.dev/eas/index.md
 
 ## Project invariants
 
-These are specific to Streaming Center and matter more than anything above.
+These are specific to Loge and matter more than anything above.
 
 1. **Never define a domain type in `src/`.** `MediaItem`, `GlobalMediaKey`,
-   the capability types and every adapter contract live in `@sc/api`, and the
-   React half of the player contract in `@sc/player-kit` — both under
+   the capability types and every adapter contract live in `@loge/api`, and the
+   React half of the player contract in `@loge/player-kit` — both under
    `adapters/`, in this repository but compiled as programs of their own.
    Defining them in `src/` makes the dependency graph circular, and one
    repository makes that *easier* to do by accident, not harder.
@@ -110,7 +109,7 @@ These are specific to Streaming Center and matter more than anything above.
 
 3. **Only the composition root imports a concrete plugin** — a source, IPTV,
    player, sync or metadata package, and so a player's view. Screens resolve
-   what they need from injected services. `@sc/player-kit` holds only types — the React
+   what they need from injected services. `@loge/player-kit` holds only types — the React
    half of the player contract — and may be named anywhere as `import type`;
    lint refuses anything more. This is what keeps the boundary real rather
    than aspirational.
@@ -213,7 +212,7 @@ These are specific to Streaming Center and matter more than anything above.
   in the database — never the key — spots a phone restored from its OS backup
   at boot: the pending journal and the session are dropped, so a stale journal
   is never pushed.
-- **The backup database is not the device database.** A `.scbackup` has its
+- **The backup database is not the device database.** A `.logebackup` has its
   own versioned schema, is built and read in memory — expo-sqlite's
   `serializeAsync` / `deserializeDatabaseAsync` on native, sql.js on the web —
   and is never opened as a database the app runs on. Never copy the device
@@ -236,9 +235,9 @@ These are specific to Streaming Center and matter more than anything above.
 ## The account
 
 A device holds exactly one account once it is set up: **local**, or **on your
-own server** (PocketBase, `../streaming_center_sync`). It holds up to ten
+own server** (PocketBase, `../foyer`). It holds up to ten
 profiles — fixed at ten locally, `info().maxProfiles` on a server
-(`SC_MAX_PROFILES`, default 10). The `account` row says which it is;
+(`FOYER_MAX_PROFILES`, default 10). The `account` row says which it is;
 `services/account.ts` changes it, and `services/sync/` keeps a server account
 in step. `docs/architecture` and `docs/data` explain each rule. These break
 silently:
@@ -332,7 +331,7 @@ silently:
 
 ## Backups
 
-`services/backup/` writes and reads the account as one encrypted `.scbackup`
+`services/backup/` writes and reads the account as one encrypted `.logebackup`
 file, and `services/backup/targets.ts` keeps it on backup targets. `docs/data`
 has the format. These break silently:
 
@@ -378,13 +377,13 @@ design; these are the rules:
 - **Players are device-wide plugins.** Which are on, the default and their
   settings are device settings — never journaled, never on the server, never
   in a backup.
-- **Only the composition root imports a player package or `@sc/player-kit`.**
+- **Only the composition root imports a player package or `@loge/player-kit`.**
   Screens get the chosen player's controller and view from it through
   `useServices()`. The app never imports an engine — expo-video, hls.js, an
   Expo module — itself: that is the player plugin's (lint). It installs them,
   as the player's peers, so that autolinking builds them and Metro bundles one
   copy of each.
-- **Choosing is `choosePlayer` from `@sc/api`, and pure:** the device's
+- **Choosing is `choosePlayer` from `@loge/api`, and pure:** the device's
   default if it can play one of the item's sources, else the first enabled
   player on this platform that can, else none — and the app says what would
   ("This channel needs a player that plays MPEG-TS."). Never by an engine's
@@ -483,7 +482,7 @@ possibly `structuredClone`, `Promise.withResolvers` and
 `Intl.RelativeTimeFormat`. Code using them typechecks, passes vitest (Node) and
 works on the web, then throws on a phone: Continue Watching broke exactly like
 that. Lint rejects them in `src/`; copy and sort (`[...list].sort(compare)`)
-instead, and turn bytes into text with `@sc/api`'s helpers. Plugins run on
+instead, and turn bytes into text with `@loge/api`'s helpers. Plugins run on
 Hermes too — the adapters' own tests scan for the same gaps. The app's
 TypeScript program never sees Node's types; only `test/tsconfig.json` does.
 
@@ -506,13 +505,13 @@ derivation is built again in JavaScript.
   a browser — and noble's SHA-256 and HKDF.
 - **expo-crypto reads a string of additional data as base64**, and turns bytes
   into base64 through `btoa`. Additional data — a backup's header — goes in as
-  base64 that `@sc/api` encoded: never raw text, never bytes.
+  base64 that `@loge/api` encoded: never raw text, never bytes.
 
 ---
 
 ## The adapters
 
-`@sc/api`, `@sc/player-kit` and every adapter live in **`adapters/`**, in this
+`@loge/api`, `@loge/player-kit` and every adapter live in **`adapters/`**, in this
 repository, as npm workspaces:
 
 ```jsonc
@@ -637,9 +636,9 @@ typecheck.
 
 `.agents/skills/` in this repository:
 
-- **`sc-verify`** — the full verification pass. Use before committing.
-- **`sc-run`** — launch on simulator, emulator or browser.
-- **`sc-use-plugin`** — wiring an adapter into the app.
+- **`loge-verify`** — the full verification pass. Use before committing.
+- **`loge-run`** — launch on simulator, emulator or browser.
+- **`loge-use-plugin`** — wiring an adapter into the app.
 
 Plus 13 official skills from [`expo/skills`](https://github.com/expo/skills) —
 `expo-router`, `expo-ui`, `expo-native-ui`, `expo-design-system`,
@@ -679,7 +678,7 @@ Everything above describes the target; what runs today:
   out keeps a local copy. A run pushes the journal as batches, reads the whole
   account and reconciles by the four rules; a profile over the server's limit
   stays on this device only. Your own server is PocketBase
-  (`../streaming_center_sync`), and its password, typed again, is the owner
+  (`../foyer`), and its password, typed again, is the owner
   check. The dev-only mock is a pretend server in memory. Ten profiles at
   most, or the server's limit.
 - **Media is real:** Continue Watching, one row per kind with per-profile
@@ -784,8 +783,8 @@ npm run typecheck       # the app, then the tests (test/tsconfig.json)
 npx expo lint           # includes the import-boundary, Hermes and SQLite rules
 npm test                # vitest: the database, the credential stores, the services
 npx expo-doctor
-npx expo export --platform ios --output-dir /tmp/sc-ios
-npx expo export --platform web --output-dir /tmp/sc-web
+npx expo export --platform ios --output-dir /tmp/loge-ios
+npx expo export --platform web --output-dir /tmp/loge-web
 ```
 
 After a change to the account contract, run the sync repository's tests too:

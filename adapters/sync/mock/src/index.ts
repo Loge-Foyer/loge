@@ -3,7 +3,7 @@
  * keyed by its endpoint, so the account's flows can be exercised with no
  * server at all. Development builds only.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createAccount } from './account';
 

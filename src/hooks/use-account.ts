@@ -1,4 +1,4 @@
-import type { Credentials } from '@sc/api';
+import type { Credentials } from '@loge/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 

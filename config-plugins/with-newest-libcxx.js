@@ -13,15 +13,20 @@ const { withAppBuildGradle } = require('expo/config-plugins');
  * The app resolves it because packaging is the app's: a player plugin cannot
  * decide what a second plugin's engine put in the same APK. When React Native
  * ships a libc++ newer than every engine needs, this can go.
+ *
+ * mpv's module is found by the name autolinking gives its package, and a build
+ * without it fails: skipped quietly, the APK would ship React Native's copy and
+ * mpv would only fail on a device.
  */
-const MARKER = '// Streaming Center: one libc++_shared.so, and the newest';
+const MARKER = '// Loge: one libc++_shared.so, and the newest';
 
 const SNIPPET = `
 ${MARKER}
-if (findProject(':sc-player-mpv') != null) {
-  android.sourceSets.main.jniLibs.srcDir(new File(project(':sc-player-mpv').projectDir, 'build/libmpv-jni'))
-  tasks.named('preBuild') { dependsOn(':sc-player-mpv:unpackLibmpv') }
+if (findProject(':loge-player-mpv') == null) {
+  throw new GradleException("No :loge-player-mpv project, so libmpv would get React Native's libc++. config-plugins/with-newest-libcxx.js must follow the name of mpv's package.")
 }
+android.sourceSets.main.jniLibs.srcDir(new File(project(':loge-player-mpv').projectDir, 'build/libmpv-jni'))
+tasks.named('preBuild') { dependsOn(':loge-player-mpv:unpackLibmpv') }
 `;
 
 module.exports = function withNewestLibcxx(config) {

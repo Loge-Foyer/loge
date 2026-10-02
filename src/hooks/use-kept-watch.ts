@@ -1,4 +1,4 @@
-import type { ConnectionId, MediaItem } from '@sc/api';
+import type { ConnectionId, MediaItem } from '@loge/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 

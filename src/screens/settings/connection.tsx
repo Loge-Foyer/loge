@@ -13,7 +13,7 @@ import {
   type SelectField,
   type SourceInfo,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';

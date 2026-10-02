@@ -6,7 +6,7 @@ import {
   type PerProfile,
   type PluginManifest,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type {
   ConnectionDraft,

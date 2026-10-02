@@ -1,4 +1,4 @@
-import { userId } from '@sc/api';
+import { userId } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { decideInitialGate } from '@/services/boot';

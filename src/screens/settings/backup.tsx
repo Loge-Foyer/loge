@@ -1,4 +1,4 @@
-import type { Credentials } from '@sc/api';
+import type { Credentials } from '@loge/api';
 import { Download } from '@tamagui/lucide-icons-2/icons/Download';
 import { KeyRound } from '@tamagui/lucide-icons-2/icons/KeyRound';
 import { Upload } from '@tamagui/lucide-icons-2/icons/Upload';

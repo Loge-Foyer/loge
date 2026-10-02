@@ -1,4 +1,4 @@
-import type { AppUser, UserId } from '@sc/api';
+import type { AppUser, UserId } from '@loge/api';
 
 /** Which part of the app is reachable. Routes are guarded on this, one guard each. */
 export type Gate =

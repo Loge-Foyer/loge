@@ -1,4 +1,4 @@
-import type { Field, FieldValue, PluginSettingDescriptor } from '@sc/api';
+import type { Field, FieldValue, PluginSettingDescriptor } from '@loge/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';

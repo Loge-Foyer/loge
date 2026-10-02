@@ -6,7 +6,7 @@ import {
   type MediaContext,
   type PluginManifest,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { SecureCredentialStore } from './ports';
 

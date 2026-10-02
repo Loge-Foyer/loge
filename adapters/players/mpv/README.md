@@ -33,7 +33,7 @@ it sends **any header** — a portal's cookie included, which libVLC cannot.
 
 ## How it works
 
-One Expo module, `ScMpv`, with a half per platform, both autolinked into the
+One Expo module, `LogeMpv`, with a half per platform, both autolinked into the
 app's development build from this package. Both talk to **libmpv's own C API**
 and neither ever calls `mpv_request_log_messages`, so mpv generates no log
 message for anyone — and the address of a stream, with whatever token is in
@@ -41,21 +41,21 @@ it, cannot reach the device log. Everything in `src/` is shared between them.
 
 - **`android/`** — Kotlin and this package's own JNI. The engine comes from
   Maven Central (`dev.jdtech.mpv:libmpv`), and only its binaries are used.
-  - **`src/main/cpp/sc-mpv.cpp`** is this package's own JNI, on libmpv's
+  - **`src/main/cpp/loge-mpv.cpp`** is this package's own JNI, on libmpv's
     published C API. The engine's own Android wrapper is not used: it asks
     mpv for every log message and prints each one to the device log —
     including the address of the stream it opens, with a Jellyfin `api_key` or
     a portal's session token in it. No option turns that off, because
     `msg-level` sets the terminal's level while the level a client asked for is
     what mpv keeps generating for. This package asks for no log at all.
-  - **`ScMpvPlayer`** is a shared object: one mpv core per controller. **Every
+  - **`LogeMpvPlayer`** is a shared object: one mpv core per controller. **Every
     call into mpv waits for its core**, which while a file opens is busy for
     seconds at a time, so they all go one after another on a thread of this
     player's own — never the app's main thread — and what mpv answers becomes
     an event on the main thread. The surface is the exception: Android hands
     it over and takes it back on the main thread, and mpv has to be done with
     it before that call returns.
-  - **`ScMpvView`** holds the `SurfaceView` mpv draws into with OpenGL ES.
+  - **`LogeMpvView`** holds the `SurfaceView` mpv draws into with OpenGL ES.
 - **`ios/`** — Swift, calling the same C entry points directly: no JNI and no
   wrapper, because `import MPVKit` exposes them. The engine comes from
   MPVKit's merged xcframework, asked for by the **app** through
@@ -65,7 +65,7 @@ it, cannot reach the device log. Everything in `src/` is shared between them.
   `config-plugins/with-newest-libcxx.js` says for Android.
   - **The video output never comes and goes.** mpv draws into an
     `AVSampleBufferDisplayLayer` the player owns, handed over as `wid` before
-    `mpv_initialize`, and `ScMpvView` only puts that layer on screen. None of
+    `mpv_initialize`, and `LogeMpvView` only puts that layer on screen. None of
     Android's attach, detach and pause-around-it applies.
   - `hwdec` is `videotoolbox`, with `hwdec-software-fallback`, and the
     subtitles are composited into the same layer as the picture.

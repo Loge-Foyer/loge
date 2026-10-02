@@ -1,4 +1,4 @@
-import { connectionId, encodeUtf8, pluginId, recordKey, userId, type AccountRecord } from '@sc/api';
+import { connectionId, encodeUtf8, pluginId, recordKey, userId, type AccountRecord } from '@loge/api';
 import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
 
@@ -201,7 +201,7 @@ describe('the database inside', () => {
     // One past whatever this build writes, so the next schema bump does not
     // quietly turn this case into "the current one".
     await later.exec(
-      `PRAGMA application_id = ${0x5343424b}; PRAGMA user_version = ${BACKUP_SCHEMA_VERSION + 1}; CREATE TABLE meta (key TEXT, value TEXT);`,
+      `PRAGMA application_id = ${0x4c47424b}; PRAGMA user_version = ${BACKUP_SCHEMA_VERSION + 1}; CREATE TABLE meta (key TEXT, value TEXT);`,
     );
     const newer = await later.serialize();
     await later.close();
@@ -241,7 +241,7 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
   it('carry the whole account to another device — every password into its keychain, never its database', async () => {
     const { a, b, where, smiths, kim, home, theirs } = await twoDevices();
     const file = await a.services.backup.exportFile();
-    expect(file.name).toMatch(/^streaming-center-the-smiths-\d{4}-\d{2}-\d{2}\.scbackup$/);
+    expect(file.name).toMatch(/^loge-the-smiths-\d{4}-\d{2}-\d{2}\.logebackup$/);
     expect(Buffer.from(file.bytes).toString('latin1')).not.toContain('family-secret');
     const key = await a.services.backup.showKey();
 
@@ -275,7 +275,7 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     await expect(b.services.backup.prepareImport(file.bytes, another)).rejects.toMatchObject({ problem: 'wrong-key' });
     await expect(b.services.backup.prepareImport(file.bytes, `${key.slice(0, -1)}${key.endsWith('0') ? '1' : '0'}`)).rejects.toMatchObject({ problem: 'mistyped' });
     let read = false;
-    const huge = { name: 'huge.scbackup', size: MAX_BACKUP_BYTES + 1, read: async () => ((read = true), file.bytes) };
+    const huge = { name: 'huge.logebackup', size: MAX_BACKUP_BYTES + 1, read: async () => ((read = true), file.bytes) };
     await expect(b.services.backup.prepareImport(huge, key)).rejects.toMatchObject({ problem: 'too-large' });
     expect(read).toBe(false);
     expect(await b.services.account.current()).toMatchObject({ name: 'Someone else' });

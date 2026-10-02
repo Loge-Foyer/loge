@@ -1,4 +1,4 @@
-import { credentialsRef, type Credentials, type UserId } from '@sc/api';
+import { credentialsRef, type Credentials, type UserId } from '@loge/api';
 
 import type { OwnerCheck, OwnerVerdict } from './owner-check';
 import type { Clock, IdGenerator, LocalDatabase, SecureCredentialStore } from './ports';

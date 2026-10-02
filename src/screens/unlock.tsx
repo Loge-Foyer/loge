@@ -1,4 +1,4 @@
-import type { Credentials, UserId } from '@sc/api';
+import type { Credentials, UserId } from '@loge/api';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { SizableText, YStack } from 'tamagui';

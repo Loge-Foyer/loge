@@ -1,4 +1,4 @@
-import type { AppError, AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PlayerEvent, PlayerState, PluginId, SubtitleTrack } from '@sc/api';
+import type { AppError, AudioTrack, ConnectionId, Episode, GlobalMediaKey, MediaItem, MediaPlayer, PlayerEvent, PlayerState, PluginId, SubtitleTrack } from '@loge/api';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 

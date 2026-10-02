@@ -6,7 +6,7 @@ import {
   type PlaybackSource,
   type PlayerContext,
   type PlayerEvent,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createEngine as createNativeEngine, engineOf } from '../players/system/src/engine';

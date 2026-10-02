@@ -6,7 +6,7 @@ import {
   type AppErrorReason,
   type ConnectionId,
   type RetryHint,
-} from '@sc/api';
+} from '@loge/api';
 
 import { MissingSecretError } from '../plugin-context';
 import type { Logger } from '../ports';

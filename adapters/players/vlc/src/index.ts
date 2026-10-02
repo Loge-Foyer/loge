@@ -3,8 +3,8 @@
  * MPEG-TS, the subtitles inside a file. Through the Expo module in this
  * package: `android/` on Android, `ios/` on iPhone, one engine behind both.
  */
-import { pluginId } from '@sc/api';
-import type { PlayerPlugin } from '@sc/player-kit';
+import { pluginId } from '@loge/api';
+import type { PlayerPlugin } from '@loge/player-kit';
 
 import { createEngine } from './engine';
 import { PROFILES } from './profiles';

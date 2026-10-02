@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.logepip'
+version = '0.0.0'
+
+android {
+  namespace "expo.modules.logepip"
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+  }
+}
+
+dependencies {
+  // Already in the app's graph through React Native; named here so this
+  // module compiles against the listener rather than polling for the mode.
+  implementation 'androidx.activity:activity-ktx:1.9.3'
+  implementation 'androidx.core:core-ktx:1.13.1'
+}

@@ -1,4 +1,4 @@
-import { matchesTerm, type Channel, type ChannelGroup, type ConnectionId, type ContentKind, type MediaItem, type Programme } from '@sc/api';
+import { matchesTerm, type Channel, type ChannelGroup, type ConnectionId, type ContentKind, type MediaItem, type Programme } from '@loge/api';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { CalendarDays } from '@tamagui/lucide-icons-2/icons/CalendarDays';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';

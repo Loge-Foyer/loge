@@ -1,4 +1,4 @@
-import { identityHash, type ExternalIds, type UserId } from '@sc/api';
+import { identityHash, type ExternalIds, type UserId } from '@loge/api';
 
 import type { Repositories, WatchProgress } from '../ports';
 

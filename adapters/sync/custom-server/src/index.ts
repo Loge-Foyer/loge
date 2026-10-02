@@ -1,13 +1,13 @@
 /**
  * Your own server — the account for someone who wants neither Apple nor
- * Google: PocketBase, run by the household itself (streaming_center_sync).
+ * Google: PocketBase, run by the household itself (Foyer).
  *
  * The device signs in with PocketBase's own password sign-in and keeps its
  * session. Records move whole: every one on a pull, one all-or-nothing batch
  * on a push. Source and IPTV passwords travel in plain text, for now: the
  * server is the household's own.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createAccount } from './account';
 
@@ -17,7 +17,7 @@ export const plugin: Plugin = {
     category: 'sync',
     platforms: ['ios', 'android', 'web'],
     displayName: 'Your own server',
-    description: 'Keeps your account on a Streaming Center server you run yourself.',
+    description: 'Keeps your account on Foyer, the server you run yourself.',
     account: {
       ownerProof: { fields: ['password'] },
       signUp: {

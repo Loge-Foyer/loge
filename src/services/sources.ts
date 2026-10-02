@@ -8,7 +8,7 @@ import {
   type EffectiveCapabilities,
   type PluginManifest,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { watchStatusOf, type WatchStatusSetting } from './account-settings';
 import type { PluginCatalog } from './plugin-catalog';

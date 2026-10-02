@@ -1,5 +1,5 @@
-import { connectionId, type CancelSignal, type ConnectedMediaProvider, type FieldValues, type MediaContext } from '@sc/api';
-import { plugin } from '@sc/iptv-stalker';
+import { connectionId, type CancelSignal, type ConnectedMediaProvider, type FieldValues, type MediaContext } from '@loge/api';
+import { plugin } from '@loge/iptv-stalker';
 import { describe, expect, it } from 'vitest';
 
 import { toProgramme } from '../iptv/stalker/src/map';

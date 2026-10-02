@@ -3,8 +3,8 @@
  * Android — and on the web the browser's own `<video>`, with hls.js fetched
  * when the browser has no HLS of its own. Its profiles say what each plays.
  */
-import { pluginId } from '@sc/api';
-import type { PlayerPlugin } from '@sc/player-kit';
+import { pluginId } from '@loge/api';
+import type { PlayerPlugin } from '@loge/player-kit';
 
 import { createEngine } from './engine';
 import { PROFILES } from './profiles';

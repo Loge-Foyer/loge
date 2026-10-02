@@ -1,4 +1,4 @@
-import { connectionId as toConnectionId, pluginId } from '@sc/api';
+import { connectionId as toConnectionId, pluginId } from '@loge/api';
 import { useLocalSearchParams } from 'expo-router';
 
 import { fromRouteId } from '@/components/media/item-link';

@@ -121,7 +121,7 @@ follows them by what the portal matched them to:
   winter. Choosing the zone it keeps (an IANA id: `Europe/Berlin`,
   `Europe/Istanbul`) turns each programme back into the instant it is, with
   summer time taken at each programme's own date (`fromZoneWallClock` in
-  `@sc/api`, on the platform's own time-zone database). `get_epg_info` is
+  `@loge/api`, on the platform's own time-zone database). `get_epg_info` is
   asked for the hours of the shift as well, so the end of the window is still
   covered.
 

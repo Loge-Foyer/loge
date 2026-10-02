@@ -1,4 +1,4 @@
-import type { ConnectionId, CredentialsRef, UserId } from '@sc/api';
+import type { ConnectionId, CredentialsRef, UserId } from '@loge/api';
 
 import type { Repositories } from './ports';
 import { accountWide } from './scope';

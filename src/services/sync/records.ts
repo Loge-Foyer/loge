@@ -7,7 +7,7 @@ import {
   type CredentialsRef,
   type RecordKind,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { JournalAnnouncement, JournalEntry, JournalEntity, LocalDatabase, SecureCredentialStore } from '../ports';
 import { accountWide } from '../scope';

@@ -8,7 +8,7 @@ autolinked the way the Android half already is. It builds and links but has not
 played here yet. VLC is an Expo module in its adapter too, against VLCKit 3.7
 (MobileVLCKit here, TVVLCKit on Apple TV); KSPlayer never arrived. Face ID needs the app's usage text,
 which Expo Go cannot carry. Picture in picture on
-iPhone belongs to mpv's own module, so `modules/sc-pip` is Android-only.
+iPhone belongs to mpv's own module, so `modules/loge-pip` is Android-only.
 Phase 4's key derivation module went with its vault.
 
 `npm run ios` builds the client and installs it on the simulator; after that,
@@ -105,7 +105,7 @@ change would never land:
 npx expo prebuild -p ios      # not --clean: that discards the Pods install
                               # and any signing team set in Xcode
 npx expo config --type introspect   # cheaper: renders the plist without writing
-plutil -p ios/StreamingCenter/Info.plist
+plutil -p ios/Loge/Info.plist
 ```
 
 Never edit the generated `ios/` folder instead.
@@ -117,14 +117,14 @@ which is exactly the case the policy above exists for.
 ## Storage
 
 - **The database** is SQLite in the app's documents folder, which iCloud and
-  encrypted backups include: `Documents/SQLite/streaming-center.db` in the
+  encrypted backups include: `Documents/SQLite/loge.db` in the
   app's data container (`xcrun simctl get_app_container booted <bundle id>
   data`), which `sqlite3` can open once the app is closed.
-- **Secrets** are in the keychain, under two services. `sc.credentials` holds
+- **Secrets** are in the keychain, under two services. `loge.credentials` holds
   passwords and PINs, and an encrypted backup restores them onto a new phone.
-  `sc.device` holds session tokens, the device key and the backup key, and
+  `loge.device` holds session tokens, the device key and the backup key, and
   stays on this phone: a restored phone signs in to each server as a device of
-  its own, and opening a `.scbackup` there takes the key, typed in.
+  its own, and opening a `.logebackup` there takes the key, typed in.
 - Keychain entries can outlive the app. Uninstalling it does not delete them,
   so starting fresh on a simulator is `xcrun simctl uninstall booted
   <bundle id>` plus `xcrun simctl keychain booted reset`.
@@ -183,4 +183,4 @@ passcode. Only `src/platform/owner-authentication.ts` imports it; the web gets
 
 - `npm run ios` builds, installs and opens the development build. Opened again
   by hand, it shows its launcher: pick the running Metro server.
-- Deep links use the app's own scheme, `streamingcenterapp://<path>`.
+- Deep links use the app's own scheme, `loge://<path>`.

@@ -1,4 +1,4 @@
-import type { PlatformId } from '@sc/api';
+import type { PlatformId } from '@loge/api';
 import { Platform } from 'react-native';
 
 /**
@@ -14,5 +14,5 @@ export function isTV(): boolean {
 export function currentPlatform(): PlatformId {
   const os = Platform.OS;
   if (os === 'ios' || os === 'android' || os === 'web') return os;
-  throw new Error(`Streaming Center does not run on ${os}.`);
+  throw new Error(`Loge does not run on ${os}.`);
 }

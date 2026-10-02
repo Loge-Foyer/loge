@@ -6,7 +6,7 @@
  * service over yt-dlp, with HTTP Basic Auth on everything once it is set up.
  * `sources/invidious` is a different sign-in against the same shapes.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

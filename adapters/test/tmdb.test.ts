@@ -1,5 +1,5 @@
-import { AppError, TransportError, type ConnectedMetadataProvider, type Credentials, type IdentifyQuery } from '@sc/api';
-import { plugin } from '@sc/metadata-tmdb';
+import { AppError, TransportError, type ConnectedMetadataProvider, type Credentials, type IdentifyQuery } from '@loge/api';
+import { plugin } from '@loge/metadata-tmdb';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target, type RecordedRequest, type Route } from './support/fake-http';

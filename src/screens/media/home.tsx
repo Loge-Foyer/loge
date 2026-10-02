@@ -1,4 +1,4 @@
-import type { MediaItem, PerProfile } from '@sc/api';
+import type { MediaItem, PerProfile } from '@loge/api';
 import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';

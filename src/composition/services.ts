@@ -1,4 +1,4 @@
-import { categoryOfPluginId } from '@sc/api';
+import { categoryOfPluginId } from '@loge/api';
 
 import { backupSql } from '@/persistence/backup/sql';
 import { createAppActivity } from '@/platform/app-activity';

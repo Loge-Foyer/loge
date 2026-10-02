@@ -8,7 +8,7 @@ import {
   type PluginManifest,
   type PluginSettingDescriptor,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { ConnectionDraft, ProfileDraft, SavedSecrets, SecretChange, ValuesDraft } from './connections';
 

@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_PROFILES, pluginId as toPluginId } from '@sc/api';
+import { DEFAULT_MAX_PROFILES, pluginId as toPluginId } from '@loge/api';
 import { ArrowLeftRight } from '@tamagui/lucide-icons-2/icons/ArrowLeftRight';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';

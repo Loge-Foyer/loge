@@ -1,4 +1,4 @@
-import type { PlatformId, PlayerProfile } from '@sc/api';
+import type { PlatformId, PlayerProfile } from '@loge/api';
 
 /**
  * What mpv plays on each platform. FFmpeg decodes the formats themselves, in

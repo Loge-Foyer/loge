@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
 
-import type { PluginCrypto } from '@sc/api';
+import type { PluginCrypto } from '@loge/api';
 
 const NONCE = 12;
 const TAG = 16;

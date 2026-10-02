@@ -6,7 +6,7 @@
  * Capabilities are declared together with their implementation. None exists
  * yet, so the list is empty and nothing will ask this plugin to act.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 export const plugin: Plugin = {
   manifest: {

@@ -8,8 +8,8 @@ import {
   type ItemPage,
   type PlayerProfile,
   type SearchScope,
-} from '@sc/api';
-import { plugin } from '@sc/source-yattee';
+} from '@loge/api';
+import { plugin } from '@loge/source-yattee';
 import { describe, expect, it } from 'vitest';
 
 import { normalizeBaseUrl } from '../sources/yattee/src/url';

@@ -1,4 +1,4 @@
-import type { NetworkKind } from '@sc/api';
+import type { NetworkKind } from '@loge/api';
 import * as Network from 'expo-network';
 
 import type { NetworkMonitor } from '@/services/ports';

@@ -1,4 +1,4 @@
-import type { VideoChannel } from '@sc/api';
+import type { VideoChannel } from '@loge/api';
 import { Link } from 'expo-router';
 import { Pressable } from 'react-native';
 import { SizableText, YStack } from 'tamagui';

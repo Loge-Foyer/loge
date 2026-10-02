@@ -18,7 +18,7 @@ let graph: AppGraph | undefined;
 // graph would open the database a second time — on iOS, on the same native
 // connection — so in development the first graph stays; reload to pick up a
 // change in a service.
-const devHolder = globalThis as { __streamingCenterGraph?: AppGraph };
+const devHolder = globalThis as { __logeGraph?: AppGraph };
 
 /**
  * Built once per JavaScript runtime, not per mount: the router may remount the
@@ -26,7 +26,7 @@ const devHolder = globalThis as { __streamingCenterGraph?: AppGraph };
  * mean a second service graph.
  */
 function appGraph(): AppGraph {
-  const existing = __DEV__ ? devHolder.__streamingCenterGraph : graph;
+  const existing = __DEV__ ? devHolder.__logeGraph : graph;
   if (existing) return existing;
   const { services, start } = createServices();
   const created: AppGraph = {
@@ -41,7 +41,7 @@ function appGraph(): AppGraph {
       },
     }),
   };
-  if (__DEV__) devHolder.__streamingCenterGraph = created;
+  if (__DEV__) devHolder.__logeGraph = created;
   else graph = created;
   // A browser reports focus by itself; on a device, coming back to the app is the focus.
   if (process.env.EXPO_OS !== 'web') {

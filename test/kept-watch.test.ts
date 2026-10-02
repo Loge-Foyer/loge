@@ -1,4 +1,4 @@
-import { connectionId, identityHash, userId, type ConnectionId, type Episode, type MediaItem, type Movie, type Show } from '@sc/api';
+import { connectionId, identityHash, userId, type ConnectionId, type Episode, type MediaItem, type Movie, type Show } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

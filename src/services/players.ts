@@ -1,4 +1,4 @@
-import type { PlatformId, PlayerCandidate, PluginId, PluginManifest } from '@sc/api';
+import type { PlatformId, PlayerCandidate, PluginId, PluginManifest } from '@loge/api';
 
 import type { PluginCatalog } from './plugin-catalog';
 import type { DeviceSettings, DeviceSettingsRepository } from './ports';
@@ -25,7 +25,7 @@ export interface PlayerSummary {
  * This device's players — the ones on this platform — and which plays first.
  * Players belong to the device: another device chooses its own, and nothing
  * of this is journaled, carried to your server or written into a backup.
- * Which player plays an item is `choosePlayer` in `@sc/api`, over this.
+ * Which player plays an item is `choosePlayer` in `@loge/api`, over this.
  */
 /** What `choosePlayer` takes on this device: the players that can play here, in order, and the one to try first. */
 export interface PlayerChoice {

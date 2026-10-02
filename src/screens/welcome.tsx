@@ -186,7 +186,7 @@ function Page({ children }: { children: ReactNode }) {
 function Eyebrow() {
   return (
     <SizableText size="$3" fontWeight="700" color="$accent10" textTransform="uppercase">
-      Streaming Center
+      Loge
     </SizableText>
   );
 }

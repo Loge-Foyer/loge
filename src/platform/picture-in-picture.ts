@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { nativePictureInPicture } from '../../modules/sc-pip';
+import { nativePictureInPicture } from '../../modules/loge-pip';
 import type { PictureInPicture } from '@/services/ports';
 
 /**

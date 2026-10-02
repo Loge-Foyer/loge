@@ -1,4 +1,4 @@
-import { connectionId, imageRef, type Channel, type GlobalMediaKey, type MediaItem } from '@sc/api';
+import { connectionId, imageRef, type Channel, type GlobalMediaKey, type MediaItem } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

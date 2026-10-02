@@ -67,7 +67,7 @@ What it tells, as `PlayerEvent`s:
 
 ## Dependencies
 
-`@sc/api`, `@sc/player-kit`, React, React Native, expo-video, hls.js and
+`@loge/api`, `@loge/player-kit`, React, React Native, expo-video, hls.js and
 mpegts.js, all peers: the app installs them, so autolinking builds expo-video and there is one
 copy of each. This repository has them as development dependencies, for the
 players' TypeScript program and the tests.

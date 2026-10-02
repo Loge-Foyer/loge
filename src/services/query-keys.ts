@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 
 // Every cache key starts with its owner. Profile separation is enforced twice:
 // by ownership in storage, and by never letting one profile's cache entry

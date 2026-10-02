@@ -9,7 +9,7 @@ import {
   type Movie,
   type Plugin,
   type PluginManifest,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

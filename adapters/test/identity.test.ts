@@ -1,4 +1,4 @@
-import { bareTitle, connectionId, identityHash, plainTitle, titleKey, watchIdentity, type Episode, type MediaItem, type Movie } from '@sc/api';
+import { bareTitle, connectionId, identityHash, plainTitle, titleKey, watchIdentity, type Episode, type MediaItem, type Movie } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const key = (externalId: string) => ({ connectionId: connectionId('c1'), externalId });

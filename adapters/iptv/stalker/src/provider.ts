@@ -15,7 +15,7 @@ import {
   type Programme,
   type Season,
   zoneOffsetMs,
-} from '@sc/api';
+} from '@loge/api';
 
 import {
   epgInfoFor,

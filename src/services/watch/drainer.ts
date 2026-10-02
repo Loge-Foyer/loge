@@ -1,4 +1,4 @@
-import { AppError, type ConnectedMediaProvider, type PlaybackReport, type UserId } from '@sc/api';
+import { AppError, type ConnectedMediaProvider, type PlaybackReport, type UserId } from '@loge/api';
 
 import { isAborted, toAppError } from '../media/errors';
 import type { ProviderPool } from '../media/pool';

@@ -4,7 +4,7 @@
  * has watched; the server stays the master of that, so it never goes through
  * the account.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

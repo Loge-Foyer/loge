@@ -1,4 +1,4 @@
-import { imageRef, type ChildSection, type ConnectionId, type MediaDetail, type MediaItem, type Movie, type VideoChannel, type VideoPlaylist } from '@sc/api';
+import { imageRef, type ChildSection, type ConnectionId, type MediaDetail, type MediaItem, type Movie, type VideoChannel, type VideoPlaylist } from '@loge/api';
 
 import type { ChannelDto, PlaylistDto, SearchResultDto, ThumbnailDto, VideoDto } from './dto';
 

@@ -1,4 +1,4 @@
-import type { MediaItem, PlayerEvent, ProgressReport, UserId } from '@sc/api';
+import type { MediaItem, PlayerEvent, ProgressReport, UserId } from '@loge/api';
 
 import type { Clock } from './ports';
 import type { WatchService } from './watch';

@@ -1,4 +1,4 @@
-import type { Credentials } from '@sc/api';
+import type { Credentials } from '@loge/api';
 import { useState } from 'react';
 import { H2, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 

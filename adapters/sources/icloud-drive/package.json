@@ -1,10 +1,10 @@
 {
-  "name": "@sc/source-icloud-drive",
+  "name": "@loge/source-icloud-drive",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*"
+    "@loge/api": "*"
   }
 }

@@ -1,4 +1,4 @@
-import { CATEGORY_SCOPE, categoryOfPluginId } from '@sc/api';
+import { CATEGORY_SCOPE, categoryOfPluginId } from '@loge/api';
 
 /**
  * Whether a plugin's connections travel with the account — a source's and an

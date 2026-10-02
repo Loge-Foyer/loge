@@ -1,4 +1,4 @@
-import type { ConnectionId, Creator, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
+import type { ConnectionId, Creator, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@loge/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';

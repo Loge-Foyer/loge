@@ -1,4 +1,4 @@
-import type { GlobalMediaKey, MediaItem, PluginId } from '@sc/api';
+import type { GlobalMediaKey, MediaItem, PluginId } from '@loge/api';
 import type { Href } from 'expo-router';
 
 /**

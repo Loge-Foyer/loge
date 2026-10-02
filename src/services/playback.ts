@@ -15,8 +15,8 @@ import {
   type PluginId,
   type Show,
   type UserId,
-  type PlayerPreferences,} from '@sc/api';
-import type { PlayerPlugin, PlayerView } from '@sc/player-kit';
+  type PlayerPreferences,} from '@loge/api';
+import type { PlayerPlugin, PlayerView } from '@loge/player-kit';
 
 import type { MediaService } from './media';
 import { playbackReports, type PlaybackReports } from './playback-reports';

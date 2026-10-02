@@ -13,7 +13,7 @@ differs.
 Two contracts, kept apart so the app never learns which engine it is talking
 to:
 
-- **What to play** is a `PlaybackDescriptor`, from `@sc/api`. A source returns
+- **What to play** is a `PlaybackDescriptor`, from `@loge/api`. A source returns
   one from `getPlaybackDescriptor`, which it has when it declares the
   `playback` capability. It lists:
   - the ways to reach the stream, best first — each a `PlaybackSource` with its
@@ -70,12 +70,12 @@ A player plugin is in the `players` category, and has three parts:
 - **A manifest block** (`player`) — what its engine plays on each platform, as
   a `PlayerProfile`: protocols, containers, video and audio codecs, subtitle
   formats, HDR, the largest picture.
-- **A controller**, `MediaPlayer`, defined in `@sc/api` and free of any
+- **A controller**, `MediaPlayer`, defined in `@loge/api` and free of any
   framework: `load`, `play`, `pause`, `seek`, `setAudioTrack`,
   `setSubtitleTrack`, `subscribe`, `dispose`. Its events say the state, the
   position, the tracks, or an error — always an `AppError`, never a raw one.
-- **A view**, `PlayerView`, defined in `@sc/player-kit`, which draws the
-  engine's pixels. `@sc/api` imports nothing, so React lives there.
+- **A view**, `PlayerView`, defined in `@loge/player-kit`, which draws the
+  engine's pixels. `@loge/api` imports nothing, so React lives there.
 
 | Plugin | Engine | Platforms | Arrives |
 | --- | --- | --- | --- |
@@ -124,7 +124,7 @@ neither mpv nor VLC is here, so the built-in player plays everything.
 `choosePlayer` takes these as they stand.
 
 **Only the composition root imports a player** — its package, its view, and
-`@sc/player-kit` (lint). The player screen gets the chosen player's controller
+`@loge/player-kit` (lint). The player screen gets the chosen player's controller
 and view from the service graph, through `useServices()`. The app never
 imports an engine itself — expo-video, hls.js, each Expo module belong to
 their player plugin, and lint says so — but it installs them: they are the
@@ -149,7 +149,7 @@ plugin's engine put in the same APK. libmpv also needs Android 8, which is
 why `expo-build-properties` sets `minSdkVersion` to 26.
 
 **What a player tells.** A state is told once, and a new listener hears the
-current one at once — `createPlayerEvents` in `@sc/api` keeps that promise for
+current one at once — `createPlayerEvents` in `@loge/api` keeps that promise for
 every engine — and every failure is a `failed` state and an `AppError` both.
 On a phone the built-in player's "playing" follows what was asked for, not the
 engine's flag — Media3 is not playing while it buffers, and a stream turns
@@ -182,7 +182,7 @@ The next episode keeps it.
 
 ## Choosing a player
 
-`choosePlayer(sources, candidates, preferred?)` in `@sc/api` decides, and it is
+`choosePlayer(sources, candidates, preferred?)` in `@loge/api` decides, and it is
 pure:
 
 1. The one first on the item's tab, else the device's default, when it can

@@ -8,7 +8,7 @@ import {
   type MediaPlayer,
   type PlayerContext,
   type SubtitleTrack,
-} from '@sc/api';
+} from '@loge/api';
 
 import { nativeModule, type NativePlayer, type NativeTrack } from './native';
 

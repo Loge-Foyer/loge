@@ -7,32 +7,32 @@ import {
   METADATA_MEMBERS,
   validateManifest,
   type Plugin,
-} from '@sc/api';
-import { plugin as m3u } from '@sc/iptv-m3u';
-import { plugin as mockIptv } from '@sc/iptv-mock';
-import { plugin as stalker } from '@sc/iptv-stalker';
-import { plugin as xtream } from '@sc/iptv-xtream';
-import { plugin as tmdb } from '@sc/metadata-tmdb';
-import { plugin as ksplayer } from '@sc/player-ksplayer';
-import { plugin as mpv } from '@sc/player-mpv';
-import { plugin as systemPlayer } from '@sc/player-system';
-import { plugin as vlc } from '@sc/player-vlc';
-import { plugin as emby } from '@sc/source-emby';
-import { plugin as googleDrive } from '@sc/source-google-drive';
-import { plugin as icloudDrive } from '@sc/source-icloud-drive';
-import { plugin as invidious } from '@sc/source-invidious';
-import { plugin as jellyfin } from '@sc/source-jellyfin';
-import { plugin as mockSource } from '@sc/source-mock';
-import { plugin as onedrive } from '@sc/source-onedrive';
-import { plugin as plex } from '@sc/source-plex';
-import { plugin as webdav } from '@sc/source-webdav';
-import { plugin as yattee } from '@sc/source-yattee';
-import { plugin as customServer } from '@sc/sync-custom-server';
-import { plugin as googleDriveBackup } from '@sc/sync-google-drive';
-import { plugin as icloudBackup } from '@sc/sync-icloud';
-import { plugin as mockAccount } from '@sc/sync-mock';
-import { plugin as mockBackup } from '@sc/sync-mock-backup';
-import { plugin as onedriveBackup } from '@sc/sync-onedrive';
+} from '@loge/api';
+import { plugin as m3u } from '@loge/iptv-m3u';
+import { plugin as mockIptv } from '@loge/iptv-mock';
+import { plugin as stalker } from '@loge/iptv-stalker';
+import { plugin as xtream } from '@loge/iptv-xtream';
+import { plugin as tmdb } from '@loge/metadata-tmdb';
+import { plugin as ksplayer } from '@loge/player-ksplayer';
+import { plugin as mpv } from '@loge/player-mpv';
+import { plugin as systemPlayer } from '@loge/player-system';
+import { plugin as vlc } from '@loge/player-vlc';
+import { plugin as emby } from '@loge/source-emby';
+import { plugin as googleDrive } from '@loge/source-google-drive';
+import { plugin as icloudDrive } from '@loge/source-icloud-drive';
+import { plugin as invidious } from '@loge/source-invidious';
+import { plugin as jellyfin } from '@loge/source-jellyfin';
+import { plugin as mockSource } from '@loge/source-mock';
+import { plugin as onedrive } from '@loge/source-onedrive';
+import { plugin as plex } from '@loge/source-plex';
+import { plugin as webdav } from '@loge/source-webdav';
+import { plugin as yattee } from '@loge/source-yattee';
+import { plugin as customServer } from '@loge/sync-custom-server';
+import { plugin as googleDriveBackup } from '@loge/sync-google-drive';
+import { plugin as icloudBackup } from '@loge/sync-icloud';
+import { plugin as mockAccount } from '@loge/sync-mock';
+import { plugin as mockBackup } from '@loge/sync-mock-backup';
+import { plugin as onedriveBackup } from '@loge/sync-onedrive';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';

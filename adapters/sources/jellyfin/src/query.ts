@@ -1,4 +1,4 @@
-import type { ContentKind, ItemSort, MediaItemType } from '@sc/api';
+import type { ContentKind, ItemSort, MediaItemType } from '@loge/api';
 
 import type { QueryValue } from './url';
 

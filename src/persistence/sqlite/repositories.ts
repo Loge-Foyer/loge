@@ -16,7 +16,7 @@ import {
   type PlaybackReport,
   type UserId,
   type WatchStatus,
-} from '@sc/api';
+} from '@loge/api';
 
 import type {
   AccountRepository,

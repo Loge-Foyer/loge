@@ -1,4 +1,4 @@
-import { AppError } from '@sc/api';
+import { AppError } from '@loge/api';
 
 import { qualifiedIdOf, qualifiedPluginStates, sessionRefOf } from '../plugin-ids';
 
@@ -392,7 +392,7 @@ export async function migrate(db: SqlDatabase, migrations: readonly SqlMigration
   });
   const current = (await db.get<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
   if (current > migrations.length) {
-    throw new AppError('STORAGE_FAILURE', 'The data on this device was saved by a newer version of Streaming Center. Update the app to open it.', {
+    throw new AppError('STORAGE_FAILURE', 'The data on this device was saved by a newer version of Loge. Update the app to open it.', {
       retry: 'never',
     });
   }

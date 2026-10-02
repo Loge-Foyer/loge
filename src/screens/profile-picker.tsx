@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { useMutation } from '@tanstack/react-query';

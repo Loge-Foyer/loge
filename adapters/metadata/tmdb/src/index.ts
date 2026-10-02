@@ -3,7 +3,7 @@
  * that does not say. It reads the public catalogue with the household's own
  * key, and never writes anything to TMDB.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

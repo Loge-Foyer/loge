@@ -1,4 +1,4 @@
-import { connectionId } from '@sc/api';
+import { connectionId } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { fromRouteId, keyHref, routeId } from '@/components/media/item-link';

@@ -1,4 +1,4 @@
-import type { AppErrorCode, Connection, ConnectionId, CredentialsRef, ExternalIds, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
+import type { AppErrorCode, Connection, ConnectionId, CredentialsRef, ExternalIds, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@loge/api';
 
 import type {
   AccountRepository,

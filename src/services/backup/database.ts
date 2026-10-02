@@ -6,7 +6,7 @@ import {
   userId as toUserId,
   type AccountRecord,
   type PerProfile,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { BackupSql, BackupSqlDatabase } from '../ports';
 
@@ -24,8 +24,8 @@ import type { BackupSql, BackupSqlDatabase } from '../ports';
  * only a *newer* schema is refused, never an older one.
  */
 export const BACKUP_SCHEMA_VERSION = 4;
-// 'SCBK', so a stray SQLite file is never taken for a backup's database.
-const APPLICATION_ID = 0x5343424b;
+// 'LGBK', so a stray SQLite file is never taken for a backup's database.
+const APPLICATION_ID = 0x4c47424b;
 
 const SCHEMA = `
 CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) STRICT;

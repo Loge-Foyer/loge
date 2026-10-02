@@ -1,4 +1,4 @@
-import { AppError, type TransportError } from '@sc/api';
+import { AppError, type TransportError } from '@loge/api';
 
 /**
  * A request that got no response. A local-only server that cannot be reached

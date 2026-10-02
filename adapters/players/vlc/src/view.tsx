@@ -1,4 +1,4 @@
-import type { PlayerViewProps } from '@sc/player-kit';
+import type { PlayerViewProps } from '@loge/player-kit';
 
 import { engineOf } from './engine';
 import { idOf, nativeView } from './native';

@@ -1,4 +1,4 @@
-import { SEARCH_SCOPES, type ContentKind, type MediaItem, type SearchScope } from '@sc/api';
+import { SEARCH_SCOPES, type ContentKind, type MediaItem, type SearchScope } from '@loge/api';
 import { FlashList } from '@shopify/flash-list';
 import { ListMusic } from '@tamagui/lucide-icons-2/icons/ListMusic';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';

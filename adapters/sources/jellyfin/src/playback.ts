@@ -11,7 +11,7 @@ import {
   type PlayerProfile,
   type SubtitleDelivery,
   type SubtitleTrack,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { MediaSourceDto, MediaStreamDto, PlaybackInfoDto } from './dto';
 import { bcp47 } from './languages';
@@ -58,7 +58,7 @@ export function deviceProfile(profile: PlayerProfile, maxBitrate: number): Reado
   const ranges = unique(['SDR', 'DOVIWithSDR', ...(profile.hdr ?? []).flatMap((format) => RANGE_TYPES[format])]);
   const subtitles = profile.subtitleFormats.flatMap((format) => SUBTITLE_NAMES[format] ?? [format]);
   return {
-    Name: 'Streaming Center',
+    Name: 'Loge',
     MaxStreamingBitrate: maxBitrate,
     MaxStaticBitrate: maxBitrate,
     DirectPlayProfiles: profile.protocols.includes('progressive')

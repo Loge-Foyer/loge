@@ -1,4 +1,4 @@
-import type { Channel, ConnectionId, GlobalMediaKey, MediaItem } from '@sc/api';
+import type { Channel, ConnectionId, GlobalMediaKey, MediaItem } from '@loge/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { userKey } from '@/services/query-keys';

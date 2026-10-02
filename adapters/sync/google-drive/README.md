@@ -1,7 +1,7 @@
 # Google Drive (backups)
 
 Keeps the account's encrypted backup file in Google Drive, in a visible
-"Streaming Center" folder, saved after changes and opened on another device.
+"Loge" folder, saved after changes and opened on another device.
 
 ## Category
 

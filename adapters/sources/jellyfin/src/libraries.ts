@@ -1,4 +1,4 @@
-import { isLibrarySelection, selectsLibrary, type ContentKind, type FieldValue, type Library } from '@sc/api';
+import { isLibrarySelection, selectsLibrary, type ContentKind, type FieldValue, type Library } from '@loge/api';
 
 /**
  * Where a query looks. `undefined` stands for the whole server: the fast path

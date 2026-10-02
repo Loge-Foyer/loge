@@ -1,4 +1,4 @@
-import type { PluginCrypto } from '@sc/api';
+import type { PluginCrypto } from '@loge/api';
 
 import { createPluginCrypto, type AesGcm } from '@/platform/plugin-crypto';
 

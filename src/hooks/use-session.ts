@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 import { createContext, use, useSyncExternalStore } from 'react';
 
 import type { Gate } from '@/services/boot';

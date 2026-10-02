@@ -65,11 +65,11 @@ let module: NativeModule | undefined;
 let view: ComponentType<NativeViewProps> | undefined;
 
 export function nativeModule(): NativeModule {
-  module ??= requireNativeModule<NativeModule>('ScVlc');
+  module ??= requireNativeModule<NativeModule>('LogeVlc');
   return module;
 }
 
 export function nativeView(): ComponentType<NativeViewProps> {
-  view ??= requireNativeView<NativeViewProps>('ScVlc');
+  view ??= requireNativeView<NativeViewProps>('LogeVlc');
   return view;
 }

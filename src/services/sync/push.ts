@@ -1,4 +1,4 @@
-import { userId as toUserId, type AccountRecord, type CancelSignal, type ConnectedAccount } from '@sc/api';
+import { userId as toUserId, type AccountRecord, type CancelSignal, type ConnectedAccount } from '@loge/api';
 
 import type { JournalEntry } from '../ports';
 import type { SyncParts } from './parts';

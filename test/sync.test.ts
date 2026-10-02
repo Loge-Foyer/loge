@@ -1,4 +1,4 @@
-import { identityHash, imageRef, type AccountRecord, type ConnectionId, type UserId } from '@sc/api';
+import { identityHash, imageRef, type AccountRecord, type ConnectionId, type UserId } from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { draftOf, initialDraft } from '@/services/connection-draft';

@@ -1,6 +1,6 @@
 // The device boundary, faked: ids, clock, network, logging and the keychain.
 // Everything else in the tests is the real implementation.
-import type { Credentials, CredentialsRef, NetworkKind } from '@sc/api';
+import type { Credentials, CredentialsRef, NetworkKind } from '@loge/api';
 
 import type { Clock, Logger, NetworkMonitor, SecureCredentialStore } from '@/services/ports';
 

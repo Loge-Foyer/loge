@@ -1,4 +1,4 @@
-import { encodeHex, encodeUtf8 } from '@sc/api';
+import { encodeHex, encodeUtf8 } from '@loge/api';
 
 import type { Logger, SyncDatabase } from './ports';
 import { sessionRef } from './sessions';
@@ -23,7 +23,7 @@ export async function checkRestoredDevice(deps: {
   readonly sha256: (data: Uint8Array) => Promise<Uint8Array>;
   readonly log: Logger;
 }): Promise<DeviceCheck> {
-  const print = encodeHex(await deps.sha256(encodeUtf8(`sc/device-key\n${await deps.deviceKey()}`))).slice(0, 32);
+  const print = encodeHex(await deps.sha256(encodeUtf8(`loge/device-key\n${await deps.deviceKey()}`))).slice(0, 32);
   const known = (await deps.db.deviceSettings.get()).deviceKeyPrint;
   if (known === print) return 'same';
   await deps.db.unjournaled(async (tx) => {

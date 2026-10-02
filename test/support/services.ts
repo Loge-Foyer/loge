@@ -24,8 +24,8 @@ import {
   type PlayerProfile,
   type MediaPlayer,
   type PlayerContext,
-} from '@sc/api';
-import type { PlayerPlugin } from '@sc/player-kit';
+} from '@loge/api';
+import type { PlayerPlugin } from '@loge/player-kit';
 
 import initSqlJs from 'sql.js';
 

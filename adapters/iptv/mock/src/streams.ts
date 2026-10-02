@@ -1,4 +1,4 @@
-import type { PlaybackSource } from '@sc/api';
+import type { PlaybackSource } from '@loge/api';
 
 /**
  * What the mock plays: public test streams, since it has no server of its

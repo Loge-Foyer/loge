@@ -1,4 +1,4 @@
-# Streaming Center — plugins
+# Loge — plugins
 
 Everything the app plugs into, and the language they speak.
 
@@ -140,7 +140,7 @@ Phase 4's roles, its change log and its sealed passwords are retired.
 model, settings, testing and publishing.
 
 The full architecture is in
-[`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).
+[`../../.claude/architecture.md`](../../.claude/architecture.md).
 
 ---
 

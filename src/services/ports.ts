@@ -16,7 +16,7 @@ import type {
   PluginId,
   UserId,
   WatchStatus,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { HomeLayout } from './home-layout';
 import type { ContentTab } from './tab-content';

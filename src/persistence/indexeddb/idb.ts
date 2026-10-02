@@ -1,4 +1,4 @@
-import { AppError } from '@sc/api';
+import { AppError } from '@loge/api';
 
 import type { Logger } from '@/services/ports';
 
@@ -26,7 +26,7 @@ function committedEarly(cause: unknown): AppError {
 export function engineError(error: DOMException | null): AppError {
   if (error?.name === 'TransactionInactiveError') return committedEarly(error);
   if (error?.name === 'QuotaExceededError') {
-    return new AppError('STORAGE_FAILURE', 'This browser has no room left for Streaming Center’s data.', { cause: error });
+    return new AppError('STORAGE_FAILURE', 'This browser has no room left for Loge’s data.', { cause: error });
   }
   return storageError(error);
 }
@@ -107,7 +107,7 @@ function openOnce(
     opening.onerror = () => {
       reject(
         opening.error?.name === 'VersionError'
-          ? new AppError('STORAGE_FAILURE', 'The data in this browser was saved by a newer version of Streaming Center. Reload the page to update it.', {
+          ? new AppError('STORAGE_FAILURE', 'The data in this browser was saved by a newer version of Loge. Reload the page to update it.', {
               retry: 'never',
               cause: opening.error,
             })

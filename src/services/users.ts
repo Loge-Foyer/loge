@@ -1,4 +1,4 @@
-import type { AppUser } from '@sc/api';
+import type { AppUser } from '@loge/api';
 
 import type { StoredUser } from './ports';
 

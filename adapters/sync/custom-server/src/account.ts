@@ -7,7 +7,7 @@ import {
   type PluginContext,
   type PluginTarget,
   type PushRefusal,
-} from '@sc/api';
+} from '@loge/api';
 
 import { createClient } from './client';
 import { statusError, unreadable } from './errors';
@@ -35,7 +35,7 @@ export function createAccount(target: PluginTarget, context: PluginContext): Con
     connectionId: target.connectionId,
 
     info: async (signal) => {
-      const response = await client.open('GET', '/api/sc/info', signal ? { signal } : {});
+      const response = await client.open('GET', '/api/foyer/info', signal ? { signal } : {});
       if (response.status >= 400) throw statusError(response.status);
       const info = readInfo(client.json(response));
       if (!info) throw unreadable();
@@ -119,6 +119,6 @@ function refusalOf(body: unknown): { readonly index: number; readonly reason: Pu
   if (!Number.isInteger(index) || index < 0) return undefined;
   const fields = (entry[1] as { response?: { data?: Readonly<Record<string, { code?: unknown }>> } } | null)?.response?.data ?? {};
   const codes = Object.values(fields).map((field) => field?.code);
-  const reason: PushRefusal = codes.includes('sc_limit') ? 'limit' : codes.includes('sc_deleted') ? 'deleted' : 'invalid';
+  const reason: PushRefusal = codes.includes('foyer_limit') ? 'limit' : codes.includes('foyer_deleted') ? 'deleted' : 'invalid';
   return { index, reason };
 }

@@ -1,4 +1,4 @@
-import { categoryOfPluginId, PLUGIN_CATEGORIES, qualifiedPluginId, type PluginCategory, type PluginId } from '@sc/api';
+import { categoryOfPluginId, PLUGIN_CATEGORIES, qualifiedPluginId, type PluginCategory, type PluginId } from '@loge/api';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 

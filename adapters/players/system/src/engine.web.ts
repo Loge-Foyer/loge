@@ -8,7 +8,7 @@ import {
   type MediaPlayer,
   type PlayerContext,
   type SubtitleTrack,
-} from '@sc/api';
+} from '@loge/api';
 import type Hls from 'hls.js';
 import type { ErrorData } from 'hls.js';
 import type Mpegts from 'mpegts.js';

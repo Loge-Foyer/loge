@@ -1,4 +1,4 @@
-import { AppError, mergeSorted, type MediaItem } from '@sc/api';
+import { AppError, mergeSorted, type MediaItem } from '@loge/api';
 
 export interface SourcePage {
   readonly items: readonly MediaItem[];

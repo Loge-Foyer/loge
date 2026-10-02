@@ -1,4 +1,4 @@
-import type { MediaItem } from '@sc/api';
+import type { MediaItem } from '@loge/api';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Link, type Href } from 'expo-router';
 import type { ReactNode } from 'react';

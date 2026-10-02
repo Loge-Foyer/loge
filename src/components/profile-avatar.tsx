@@ -1,4 +1,4 @@
-import type { AppUser } from '@sc/api';
+import type { AppUser } from '@loge/api';
 import { Circle, SizableText } from 'tamagui';
 
 // Colour follows the profile id, so a profile keeps its colour across renames.

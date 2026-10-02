@@ -1,5 +1,5 @@
-import type { AudioStreamInfo, MediaVersion, SubtitleStreamInfo } from '@sc/api';
-import { connectionId as asConnectionId } from '@sc/api';
+import type { AudioStreamInfo, MediaVersion, SubtitleStreamInfo } from '@loge/api';
+import { connectionId as asConnectionId } from '@loge/api';
 import { useState } from 'react';
 import { SizableText, Spinner, YStack } from 'tamagui';
 

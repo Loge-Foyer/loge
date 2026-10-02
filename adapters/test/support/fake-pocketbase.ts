@@ -72,14 +72,14 @@ export function fakePocketBase(options: { readonly base?: string; readonly maxPr
   /** One write, judged as the server's hooks judge it; the refusal's code, or nothing. */
   const judge = (account: Account, next: Map<string, Stored>, collection: string, body: Stored): string | undefined => {
     const kind = COLLECTION_KINDS[collection];
-    if (!kind || typeof body.key !== 'string' || typeof body.deleted !== 'boolean') return 'sc_invalid';
-    if (body.id !== derivedId(account.id, kind, body.key) || body.user !== account.id) return 'sc_invalid';
+    if (!kind || typeof body.key !== 'string' || typeof body.deleted !== 'boolean') return 'foyer_invalid';
+    if (body.id !== derivedId(account.id, kind, body.key) || body.user !== account.id) return 'foyer_invalid';
     const at = `${collection}/${String(body.id)}`;
     const before = next.get(at);
-    if ((collection === 'profiles' || collection === 'connections') && before?.deleted === true && body.deleted === false) return 'sc_deleted';
+    if ((collection === 'profiles' || collection === 'connections') && before?.deleted === true && body.deleted === false) return 'foyer_deleted';
     if (collection === 'profiles' && !before && body.deleted === false) {
       const live = [...next.entries()].filter(([key, stored]) => key.startsWith('profiles/') && stored.deleted === false).length;
-      if (live >= maxProfiles) return 'sc_limit';
+      if (live >= maxProfiles) return 'foyer_limit';
     }
     let stored: Stored = { ...before, ...body, collectionName: collection };
     if (body.deleted === true) {
@@ -100,8 +100,8 @@ export function fakePocketBase(options: { readonly base?: string; readonly maxPr
   };
 
   const routes: Record<string, Route> = {
-    'GET /api/sc/info': () => json(200, { serverVersion: '0.2.0', maxProfiles, signUp: options.signUp ?? 'invite' }),
-    'POST /api/sc/sign-up': (request) => {
+    'GET /api/foyer/info': () => json(200, { serverVersion: '0.2.0', maxProfiles, signUp: options.signUp ?? 'invite' }),
+    'POST /api/foyer/sign-up': (request) => {
       const body = bodyOf(request);
       if ((options.signUp ?? 'invite') === 'closed') return json(403, { message: 'closed' });
       if ((options.signUp ?? 'invite') === 'invite' && !invites.delete(String(body.invite))) return json(403, { message: 'invite' });
@@ -140,9 +140,9 @@ export function fakePocketBase(options: { readonly base?: string; readonly maxPr
       const results = [];
       for (const [index, item] of requests.entries()) {
         const collection = /^\/api\/collections\/([^/]+)\/records$/.exec(item.url)?.[1] ?? '';
-        const code = item.method === 'PUT' ? judge(account, next, collection, item.body) : 'sc_invalid';
+        const code = item.method === 'PUT' ? judge(account, next, collection, item.body) : 'foyer_invalid';
         if (code) {
-          const field = code === 'sc_limit' ? 'user' : code === 'sc_deleted' ? 'deleted' : 'key';
+          const field = code === 'foyer_limit' ? 'user' : code === 'foyer_deleted' ? 'deleted' : 'key';
           return json(400, {
             status: 400,
             message: 'Batch transaction failed.',

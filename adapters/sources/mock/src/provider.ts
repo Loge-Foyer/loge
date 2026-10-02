@@ -6,7 +6,7 @@ import {
   type MediaContext,
   type MediaItem,
   type MediaTarget,
-} from '@sc/api';
+} from '@loge/api';
 
 import { CHILD_PAGE, createCatalogue, kindOf, type CatalogueSize } from './catalogue';
 

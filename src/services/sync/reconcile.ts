@@ -13,7 +13,7 @@ import {
   type PluginManifest,
   type RecordData,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { stableJson } from '../hash';
 import type { JournalAnnouncement, ProfileValues, Repositories, UserPreferences, WatchProgress } from '../ports';

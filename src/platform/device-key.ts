@@ -1,4 +1,4 @@
-import { credentialsRef } from '@sc/api';
+import { credentialsRef } from '@loge/api';
 
 import type { Logger, SecureCredentialStore } from '@/services/ports';
 

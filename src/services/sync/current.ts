@@ -1,4 +1,4 @@
-import type { Connection, PluginManifest } from '@sc/api';
+import type { Connection, PluginManifest } from '@loge/api';
 
 import type { PluginCatalog } from '../plugin-catalog';
 import type { LocalDatabase } from '../ports';

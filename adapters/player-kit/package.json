@@ -1,11 +1,11 @@
 {
-  "name": "@sc/player-kit",
+  "name": "@loge/player-kit",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*",
+    "@loge/api": "*",
     "react": "*",
     "react-native": "*"
   }

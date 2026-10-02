@@ -1,4 +1,4 @@
-import { ITEM_SORTS, type ContentKind, type ItemSort } from '@sc/api';
+import { ITEM_SORTS, type ContentKind, type ItemSort } from '@loge/api';
 import { ArrowDown } from '@tamagui/lucide-icons-2/icons/ArrowDown';
 import { ArrowUp } from '@tamagui/lucide-icons-2/icons/ArrowUp';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';

@@ -1,4 +1,4 @@
-import type { AppError } from '@sc/api';
+import type { AppError } from '@loge/api';
 
 import type { SyncDatabase } from '@/services/ports';
 

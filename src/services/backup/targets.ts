@@ -7,7 +7,7 @@ import {
   type ConnectionId,
   type Credentials,
   type PluginCrypto,
-} from '@sc/api';
+} from '@loge/api';
 
 import { pluginContext, secretsOf, type PluginContextDeps } from '../plugin-context';
 import type { PluginCatalog } from '../plugin-catalog';
@@ -55,7 +55,7 @@ const AFTER_CHANGE_MS = 10_000;
 /**
  * Keeps the account's backup file on every backup target this device has —
  * iCloud Drive, Google Drive, OneDrive — as it changes. A target only stores
- * bytes; the file is the same encrypted `.scbackup` an export writes.
+ * bytes; the file is the same encrypted `.logebackup` an export writes.
  *
  * - **One file per account**, named after its lineage: two accounts never
  *   share a file, and only devices holding the same account can clash.
@@ -118,7 +118,7 @@ export function createBackupTargets(
     );
   };
 
-  const fileNameOf = async (lineage: string) => `streaming-center-${encodeHex(await tagOf(crypto, 'lineage', lineage)).slice(0, 8)}.scbackup`;
+  const fileNameOf = async (lineage: string) => `loge-${encodeHex(await tagOf(crypto, 'lineage', lineage)).slice(0, 8)}.logebackup`;
 
   const failed = (connection: Connection, error: unknown, savedAt?: number) => {
     const code = isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE';

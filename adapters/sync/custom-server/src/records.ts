@@ -1,4 +1,4 @@
-import { isAccountRecord, recordId, type AccountRecord, type RecordKind } from '@sc/api';
+import { isAccountRecord, recordId, type AccountRecord, type RecordKind } from '@loge/api';
 
 /** The collection each kind lives in, parents first: the order a pull reads them in. */
 export const COLLECTIONS: readonly (readonly [RecordKind, string])[] = [

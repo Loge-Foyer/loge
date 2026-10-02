@@ -50,13 +50,13 @@ function TopBar({ children }: TabListProps) {
         <SizableText
           size="$6"
           fontWeight="800"
-          color="$color12"
+          color="$accent10"
           mr="$5"
           letterSpacing={-0.5}
           display="none"
           $md={{ display: 'flex' }}
         >
-          Streaming <SizableText size="$6" fontWeight="800" color="$accent10">Center</SizableText>
+          Loge
         </SizableText>
         {children}
         <XStack flex={1} />

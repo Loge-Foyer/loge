@@ -1,4 +1,4 @@
-import type { Channel, ChannelGroup, ConnectionId, Episode, MediaDetail, Movie, Programme, Season, Show } from '@sc/api';
+import type { Channel, ChannelGroup, ConnectionId, Episode, MediaDetail, Movie, Programme, Season, Show } from '@loge/api';
 
 /**
  * A fixed lineup: the same channels, the same guide and the same films and

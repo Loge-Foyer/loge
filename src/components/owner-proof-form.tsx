@@ -1,4 +1,4 @@
-import type { Credentials, PasswordField } from '@sc/api';
+import type { Credentials, PasswordField } from '@loge/api';
 import { useState } from 'react';
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 

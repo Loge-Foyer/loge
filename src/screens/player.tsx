@@ -1,5 +1,5 @@
-import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episode, type GlobalMediaKey, type MediaItem, type MediaPlayer, type MediaSegment, type PluginId, type SubtitleTrack } from '@sc/api';
-import type { PlayerView } from '@sc/player-kit';
+import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episode, type GlobalMediaKey, type MediaItem, type MediaPlayer, type MediaSegment, type PluginId, type SubtitleTrack } from '@loge/api';
+import type { PlayerView } from '@loge/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
 import { ChevronsLeft } from '@tamagui/lucide-icons-2/icons/ChevronsLeft';

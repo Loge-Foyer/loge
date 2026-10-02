@@ -1,4 +1,4 @@
-import type { GlobalMediaKey } from '@sc/api';
+import type { GlobalMediaKey } from '@loge/api';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';

@@ -1,4 +1,4 @@
-import { AppError, isTransportError, TransportError, type CancelSignal, type HttpResponse, type MediaContext } from '@sc/api';
+import { AppError, isTransportError, TransportError, type CancelSignal, type HttpResponse, type MediaContext } from '@loge/api';
 
 // A MAG box, as portals expect to see one. Some refuse anything else.
 const USER_AGENT = 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3';

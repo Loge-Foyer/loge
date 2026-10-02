@@ -1,4 +1,4 @@
-import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } from '@sc/api';
+import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } from '@loge/api';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 

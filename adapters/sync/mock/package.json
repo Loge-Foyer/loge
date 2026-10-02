@@ -1,10 +1,10 @@
 {
-  "name": "@sc/sync-mock",
+  "name": "@loge/sync-mock",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*"
+    "@loge/api": "*"
   }
 }

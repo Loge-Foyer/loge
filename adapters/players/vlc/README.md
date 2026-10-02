@@ -30,18 +30,18 @@ decoder, and a server that transcodes tone-maps it.
 
 ## How it works
 
-One Expo module, `ScVlc`, with a half per platform. Both are autolinked into
+One Expo module, `LogeVlc`, with a half per platform. Both are autolinked into
 the app's development build from this package, and both expose the same
 module name, the same `Player` class and the same view — so everything in
 `src/` is shared, unchanged, between them.
 
 - **`android/`** — Kotlin. libVLC comes from Maven Central
   (`org.videolan.android:libvlc-all`).
-  - `ScVlcPlayer` is a shared object: one `LibVLC` and one `MediaPlayer` per
+  - `LogeVlcPlayer` is a shared object: one `LibVLC` and one `MediaPlayer` per
     controller, reached on the main thread, where libVLC sends its events
     too. It holds the stream's address in memory, to open it again, and lets
     everything go when JavaScript releases it.
-  - `ScVlcView` is the view libVLC draws into — its own `VLCVideoLayout`,
+  - `LogeVlcView` is the view libVLC draws into — its own `VLCVideoLayout`,
     attached while the view is on screen.
 - **`ios/`** — Swift, against VLCKit 3 from CocoaPods — MobileVLCKit on
   iPhone and TVVLCKit on Apple TV, one pod per platform with the same API,
@@ -58,7 +58,7 @@ module name, the same `Player` class and the same view — so everything in
     track list from there would re-enter libVLC under its own lock. The
     delegate is an Objective-C protocol, so a small `NSObject` forwards to the
     player, which is a `SharedObject` and cannot be one.
-  - `ScVlcView` also sets an audio session category, which Android needs no
+  - `LogeVlcView` also sets an audio session category, which Android needs no
     equivalent for: without it the ringer switch silences playback.
 - **`src/native.ts`** — the module as JavaScript sees it, reached lazily: the
   package is imported everywhere, and the module exists only in a native
@@ -69,7 +69,7 @@ module name, the same `Player` class and the same view — so everything in
 - **`src/view.tsx`** — the `PlayerView`: the native view, handed the
   controller's libVLC player. Given another player's controller, it throws.
 
-What it tells, as `PlayerEvent`s, through `@sc/api`'s `createPlayerEvents`:
+What it tells, as `PlayerEvent`s, through `@loge/api`'s `createPlayerEvents`:
 
 - **A state once.** "Loading" until the first frame — libVLC's buffering, done
   before it plays, reads as paused, and is not — then libVLC's own.
@@ -82,7 +82,7 @@ What it tells, as `PlayerEvent`s, through `@sc/api`'s `createPlayerEvents`:
 
 ## Dependencies
 
-`@sc/api`, `@sc/player-kit`, React, React Native and `expo`, all peers: the
+`@loge/api`, `@loge/player-kit`, React, React Native and `expo`, all peers: the
 app installs them. The modules API is reached through `expo`, never
 `expo-modules-core` directly — autolinking would otherwise follow the peer
 into this repository's `node_modules` and build a second copy under the app's

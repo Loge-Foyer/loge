@@ -19,7 +19,7 @@ import {
   type PluginContext,
   type PushOutcome,
   type PushRefusal,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { AppActivity, OwnerAnswer, OwnerAuthentication } from '@/services/ports';
 

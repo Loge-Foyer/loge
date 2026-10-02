@@ -1,4 +1,4 @@
-# Streaming Center — the app
+# Loge — the app
 
 The client itself. Everything you see and tap.
 
@@ -81,7 +81,7 @@ entirely. A PIN keeps a profile, and its sign-ins, for its owner.
 ## Your account
 
 The account lives on this device alone, or on a server you run yourself —
-[PocketBase](https://pocketbase.io), set up by `../streaming_center_sync`. On
+[PocketBase](https://pocketbase.io), set up by `../foyer`. On
 your server, every device signed in to the account stays in step: profiles,
 PINs, settings and sources, with their passwords, so nobody types the Jellyfin
 password twice. Your server keeps those passwords readable, for now. It is
@@ -133,7 +133,7 @@ the design, and most of it runs today, built with
     run on this device. Connect a source through a form the plugin itself describes, and
     decide what each profile keeps for itself.
 - **One account per device,** kept on the device or on your own server —
-  PocketBase, in `../streaming_center_sync`. On your server, profiles, PINs,
+  PocketBase, in `../foyer`. On your server, profiles, PINs,
   settings and sources — their passwords too — stay in step between devices.
   Signing in replaces what the device held; creating an account there, with
   an invite, takes the device's along. Up to ten profiles, or what your server
@@ -176,7 +176,7 @@ Development builds also have a pretend account, for trying things offline.
 playback, data, adapters, development. Each folder explains what belongs there.
 
 The full architecture, with the reasoning, is in
-[`../.claude/streaming-center-architecture.md`](../.claude/streaming-center-architecture.md).
+[`../.claude/architecture.md`](../.claude/architecture.md).
 
 `CLAUDE.md` and `AGENTS.md` are written for AI coding assistants — denser, and
 full of rules. This file is the one written for you.

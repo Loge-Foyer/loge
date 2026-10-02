@@ -3,7 +3,7 @@
  * keyed by its endpoint, with the conditional writes a real target has.
  * Development builds only.
  */
-import { AppError, pluginId, type BackupStat, type ConnectedBackupTarget, type Plugin } from '@sc/api';
+import { AppError, pluginId, type BackupStat, type ConnectedBackupTarget, type Plugin } from '@loge/api';
 
 interface StoredFile {
   readonly bytes: Uint8Array;
@@ -21,7 +21,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Mock backups',
     description: 'A pretend place for your backup file, kept in memory, for working offline.',
-    backup: { location: 'Memory → Streaming Center' },
+    backup: { location: 'Memory → Loge' },
     connectionFields: [{ key: 'endpoint', label: 'Endpoint', type: 'url', placeholder: 'mock://backups' }],
     settings: [],
   },

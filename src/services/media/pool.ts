@@ -8,7 +8,7 @@ import {
   type FieldValues,
   type PluginId,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { stableJson } from '../hash';
 import { pluginContext, secretsOf, type PluginContextDeps } from '../plugin-context';

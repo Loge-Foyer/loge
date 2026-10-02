@@ -1,4 +1,4 @@
-import type { Credentials, CredentialsRef } from '@sc/api';
+import type { Credentials, CredentialsRef } from '@loge/api';
 
 import type { Logger, SecureCredentialStore } from '@/services/ports';
 
@@ -51,7 +51,7 @@ export function createWebCredentialStore(
 
   const database = () =>
     (opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = env.indexedDB.open(options.name ?? 'streaming-center-secrets', 1);
+      const opening = env.indexedDB.open(options.name ?? 'loge-secrets', 1);
       opening.onupgradeneeded = () => {
         opening.result.createObjectStore('keys', { keyPath: 'id' });
         opening.result.createObjectStore('secrets', { keyPath: 'ref' });

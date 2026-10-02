@@ -1,12 +1,12 @@
 # CLAUDE.md — adapters
 
-Every adapter Streaming Center has to the outside world, plus `api` — the
-vocabulary the app and all plugins are written in.
+Every adapter Loge has to the outside world, plus `api` — the vocabulary the
+app and all plugins are written in.
 
 ## Reading protocol — before you plan, edit or run anything
 
-1. `../../.claude/streaming-center-architecture.md` — the architecture
-   specification. Section 7 defines the plugin model; section 8 is the roster.
+1. `../../.claude/architecture.md` — the architecture specification. Section
+   7 defines the plugin model; section 8 is the roster.
 2. `../CLAUDE.md` — the app this folder lives in.
 3. `AGENTS.md` here — imported below, read it fully.
 4. `docs/` for the area you are touching, then the target plugin's `README.md`.

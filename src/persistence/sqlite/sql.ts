@@ -1,4 +1,4 @@
-import { AppError } from '@sc/api';
+import { AppError } from '@loge/api';
 
 import type { Logger } from '@/services/ports';
 

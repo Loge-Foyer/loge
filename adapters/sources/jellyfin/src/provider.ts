@@ -13,7 +13,7 @@ import {
   type MediaItem,
   type MediaItemType,
   type MediaTarget,
-} from '@sc/api';
+} from '@loge/api';
 
 import { createClient } from './client';
 import { readChapters, readItem, readItemsPage, readMediaSegments, readPlaybackInfo, readPublicInfo } from './dto';

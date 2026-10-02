@@ -1,4 +1,4 @@
-import type { MediaItem, MediaRatings } from '@sc/api';
+import type { MediaItem, MediaRatings } from '@loge/api';
 import { Award } from '@tamagui/lucide-icons-2/icons/Award';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { Star } from '@tamagui/lucide-icons-2/icons/Star';

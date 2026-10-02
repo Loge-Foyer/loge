@@ -1,4 +1,4 @@
-import { AppError, type Channel, type ConnectionId, type GlobalMediaKey, type MediaItem, type UserId } from '@sc/api';
+import { AppError, type Channel, type ConnectionId, type GlobalMediaKey, type MediaItem, type UserId } from '@loge/api';
 
 import type { Clock, FavoriteChannel, IdGenerator, LocalDatabase, Playlist, Subscription } from './ports';
 

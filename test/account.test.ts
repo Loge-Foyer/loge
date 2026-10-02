@@ -1,4 +1,4 @@
-import { AppError, isAppError } from '@sc/api';
+import { AppError, isAppError } from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AccountCreatedError, OwnerNotVerifiedError } from '@/services/account';

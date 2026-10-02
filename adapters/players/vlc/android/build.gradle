@@ -3,11 +3,11 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'expo.modules.scvlc'
+group = 'expo.modules.logevlc'
 version = '0.0.0'
 
 android {
-  namespace "expo.modules.scvlc"
+  namespace "expo.modules.logevlc"
   defaultConfig {
     versionCode 1
     versionName '0.0.0'

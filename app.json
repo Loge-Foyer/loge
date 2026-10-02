@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Streaming Center",
-    "slug": "streaming_center_app",
+    "name": "Loge",
+    "slug": "loge",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "streamingcenterapp",
+    "scheme": "loge",
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
@@ -13,12 +13,12 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "NSLocalNetworkUsageDescription": "Streaming Center reaches your media servers and sync server on this network.",
+        "NSLocalNetworkUsageDescription": "Loge reaches your media servers and sync server on this network.",
         "UIBackgroundModes": [
           "audio"
         ]
       },
-      "bundleIdentifier": "com.fkg.streamingcenter",
+      "bundleIdentifier": "com.fkg.loge",
       "appleTeamId": "UWDGY69RA7"
     },
     "android": {
@@ -33,7 +33,7 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ],
-      "package": "com.fkg.streamingcenter"
+      "package": "com.fkg.loge"
     },
     "web": {
       "output": "single",

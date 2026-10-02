@@ -32,7 +32,7 @@ const tempDirectories: string[] = [];
 
 /** A SQLite file in a directory of its own, deleted after the test file (`test/support/setup.ts`). */
 export function tempDatabasePath(): string {
-  const directory = mkdtempSync(join(tmpdir(), 'sc-db-'));
+  const directory = mkdtempSync(join(tmpdir(), 'loge-db-'));
   tempDirectories.push(directory);
   return join(directory, 'test.db');
 }
@@ -58,7 +58,7 @@ export function openTestDatabase(engine: Engine, options: TestDatabaseOptions): 
     return guarded(db);
   }
   const env = { indexedDB: options.indexedDB ?? new IDBFactory(), IDBKeyRange };
-  return guarded(createIndexedDbDatabase(env, 'streaming-center', { clock: options.clock, log }));
+  return guarded(createIndexedDbDatabase(env, 'loge', { clock: options.clock, log }));
 }
 
 /**
@@ -132,7 +132,7 @@ export async function dumpDatabase(engine: Engine, where: Pick<TestDatabaseOptio
   const factory = where.indexedDB;
   if (!factory) throw new Error('Nothing to dump: open the database with reopenable().');
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const opening = factory.open('streaming-center');
+    const opening = factory.open('loge');
     opening.onsuccess = () => resolve(opening.result);
     opening.onerror = () => reject(opening.error);
   });

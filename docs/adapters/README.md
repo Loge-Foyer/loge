@@ -16,7 +16,7 @@ Every adapter has exactly one category, which is also its folder under
 | --- | --- | --- | --- |
 | `sources` | the media role | account | Media (movies, shows, anime) and Videos (videos, files) |
 | `iptv` | the media role, with live members | account | TV: Live, Movies, Series |
-| `players` | the player role, with `@sc/player-kit`'s view | device | the player |
+| `players` | the player role, with `@loge/player-kit`'s view | device | the player |
 | `sync` | the account role (your own server) or the backup role (a file) | device | Settings → Account, and Sync |
 | `metadata` | the metadata role: what a title is | account | nowhere: watch status the app keeps is keyed by what it answers |
 
@@ -52,7 +52,7 @@ the two route segments, so no id is ever URL-encoded. There is no global list.
 
 A manifest lists its `platforms` — `ios`, `android`, `web` — and the app lists
 and runs only the plugins that include the one it is on (`runsOn` in
-`@sc/api`). iCloud appears on iOS alone; IPTV is hidden on the web, where
+`@loge/api`). iCloud appears on iOS alone; IPTV is hidden on the web, where
 portals send no CORS headers; KSPlayer is an iOS engine.
 
 A connection on the account whose plugin cannot run here stays inert. It is
@@ -64,8 +64,8 @@ in a build without the plugin.
 
 They are in `adapters/`, in this repository, as **npm workspaces** of this
 package: `adapters/api`, `adapters/player-kit`, and one folder per adapter at
-its category path — `adapters/<category>/<name>`, named `@sc/source-<name>`,
-`@sc/iptv-<name>`, `@sc/player-<name>` or `@sc/sync-<name>`. `npm install` here
+its category path — `adapters/<category>/<name>`, named `@loge/source-<name>`,
+`@loge/iptv-<name>`, `@loge/player-<name>` or `@loge/sync-<name>`. `npm install` here
 links every one of them; there is nothing else to install.
 
 They were a repository of their own between Phase 5 and Phase 9. The reason
@@ -77,8 +77,8 @@ hazard that once built that repository's `expo-modules-core` 57.0.20 under
 this app's 57.0.19. All of that machinery is gone.
 
 **One copy of everything, by construction.** One `node_modules` means one
-React, one React Native, one expo, one expo-video. Each adapter takes `@sc/api`
-as a peer dependency — a player `@sc/player-kit`, React, React Native and its
+React, one React Native, one expo, one expo-video. Each adapter takes `@loge/api`
+as a peer dependency — a player `@loge/player-kit`, React, React Native and its
 engine too — and the workspace root supplies it.
 
 **The boundary did not move**, and is still the point:
@@ -261,6 +261,6 @@ tests scan their sources for them.
 Lint fails if anything outside `src/composition/` imports a plugin, a
 repository implementation or a platform module, and if anything outside
 `src/platform/` imports `expo-local-authentication`. The plugin rule matches
-every category's packages — `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and
-`@sc/sync-*` — and so `@sc/player-kit` too, once it exists (Phase 7). See the
-`sc-verify` skill for how to prove the rules still bite.
+every category's packages — `@loge/source-*`, `@loge/iptv-*`, `@loge/player-*` and
+`@loge/sync-*` — and so `@loge/player-kit` too, once it exists (Phase 7). See the
+`loge-verify` skill for how to prove the rules still bite.

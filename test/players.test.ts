@@ -1,4 +1,4 @@
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { ENGINES, type Engine } from './support/engines';

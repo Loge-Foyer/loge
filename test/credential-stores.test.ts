@@ -1,4 +1,4 @@
-import { credentialsRef } from '@sc/api';
+import { credentialsRef } from '@loge/api';
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 
@@ -31,7 +31,7 @@ function fakeKeychain() {
 describe('the keychain credential store', () => {
   it('keeps a secret under any ref, including a session ref that SecureStore could not take as a key', async () => {
     const { keychain } = fakeKeychain();
-    const store = createKeychainCredentialStore(keychain, { service: 'sc.device', accessible: 7 });
+    const store = createKeychainCredentialStore(keychain, { service: 'loge.device', accessible: 7 });
     const ref = credentialsRef('session:3f2a-connection:shared');
     await store.write(ref, { value: 'token', identity: '{}' });
     expect(await store.read(ref)).toEqual({ value: 'token', identity: '{}' });
@@ -48,28 +48,28 @@ describe('the keychain credential store', () => {
 
   it('reads, writes and deletes in its own service with its own accessibility', async () => {
     const { keychain, calls } = fakeKeychain();
-    const passwords = createKeychainCredentialStore(keychain, { service: 'sc.credentials', accessible: 1 });
-    const tokens = createKeychainCredentialStore(keychain, { service: 'sc.device', accessible: 2 });
+    const passwords = createKeychainCredentialStore(keychain, { service: 'loge.credentials', accessible: 1 });
+    const tokens = createKeychainCredentialStore(keychain, { service: 'loge.device', accessible: 2 });
     const ref = credentialsRef('same-ref');
     await passwords.write(ref, { password: 'hunter2' });
     await tokens.write(ref, { value: 'token' });
     expect(await passwords.read(ref)).toEqual({ password: 'hunter2' });
     expect(await tokens.read(ref)).toEqual({ value: 'token' });
-    expect(new Set(calls.map((call) => `${call.service}/${call.accessible}`))).toEqual(new Set(['sc.credentials/1', 'sc.device/2']));
+    expect(new Set(calls.map((call) => `${call.service}/${call.accessible}`))).toEqual(new Set(['loge.credentials/1', 'loge.device/2']));
   });
 
   it('reads a value the keychain cannot give back as missing', async () => {
     const { keychain } = fakeKeychain();
     const failing: Keychain = { ...keychain, getItemAsync: async () => { throw new Error('Keystore key invalidated'); } };
-    const store = createKeychainCredentialStore(failing, { service: 'sc.credentials', accessible: 1, log: silentLog });
+    const store = createKeychainCredentialStore(failing, { service: 'loge.credentials', accessible: 1, log: silentLog });
     expect(await store.read(credentialsRef('pin-ref'))).toBeUndefined();
   });
 
   it('reads a value it cannot parse as missing', async () => {
     const { keychain, entries } = fakeKeychain();
-    const store = createKeychainCredentialStore(keychain, { service: 'sc.credentials', accessible: 1 });
+    const store = createKeychainCredentialStore(keychain, { service: 'loge.credentials', accessible: 1 });
     const ref = credentialsRef('broken');
-    entries.set(`sc.credentials|${keychainKey(ref)}`, 'not json');
+    entries.set(`loge.credentials|${keychainKey(ref)}`, 'not json');
     expect(await store.read(ref)).toBeUndefined();
   });
 });
@@ -80,7 +80,7 @@ describe('the web credential store', () => {
   /** Every record as IndexedDB holds it, read without the store. */
   function rawRecords(indexedDB: IDBFactory, storeName: 'keys' | 'secrets') {
     return new Promise<unknown[]>((resolve, reject) => {
-      const opening = indexedDB.open('streaming-center-secrets');
+      const opening = indexedDB.open('loge-secrets');
       opening.onerror = () => reject(opening.error);
       opening.onsuccess = () => {
         const all = opening.result.transaction(storeName).objectStore(storeName).getAll();
@@ -119,7 +119,7 @@ describe('the web credential store', () => {
     await store.write(credentialsRef('mine'), { password: 'hunter2' });
     const [sealed] = (await rawRecords(indexedDB, 'secrets')) as { iv: Uint8Array; data: ArrayBuffer }[];
     await new Promise<void>((resolve, reject) => {
-      const opening = indexedDB.open('streaming-center-secrets');
+      const opening = indexedDB.open('loge-secrets');
       opening.onsuccess = () => {
         const tx = opening.result.transaction('secrets', 'readwrite');
         tx.objectStore('secrets').put({ ...sealed, ref: 'theirs' });
@@ -148,7 +148,7 @@ describe('the web credential store', () => {
     const indexedDB = new IDBFactory();
     await open(indexedDB).write(credentialsRef('ref-1'), { password: 'hunter2' });
     await new Promise<void>((resolve, reject) => {
-      const opening = indexedDB.open('streaming-center-secrets');
+      const opening = indexedDB.open('loge-secrets');
       opening.onsuccess = () => {
         const tx = opening.result.transaction('keys', 'readwrite');
         tx.objectStore('keys').clear();

@@ -1,4 +1,4 @@
-import { ITEM_SORTS, type ContentKind, type ItemSort, type UserId } from '@sc/api';
+import { ITEM_SORTS, type ContentKind, type ItemSort, type UserId } from '@loge/api';
 
 import type { PreferencesRepository } from './ports';
 import { TAB_CONTENT } from './tab-content';

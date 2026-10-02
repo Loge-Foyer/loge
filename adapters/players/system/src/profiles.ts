@@ -1,4 +1,4 @@
-import type { PlatformId, PlayerProfile } from '@sc/api';
+import type { PlatformId, PlayerProfile } from '@loge/api';
 
 /**
  * What each platform's engine plays, stated no wider than it is: a profile

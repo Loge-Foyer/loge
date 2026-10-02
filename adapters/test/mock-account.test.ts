@@ -1,6 +1,6 @@
-import { userId, type AccountRecord, type ConnectedAccount, type ConnectedBackupTarget } from '@sc/api';
-import { plugin } from '@sc/sync-mock';
-import { plugin as backups } from '@sc/sync-mock-backup';
+import { userId, type AccountRecord, type ConnectedAccount, type ConnectedBackupTarget } from '@loge/api';
+import { plugin } from '@loge/sync-mock';
+import { plugin as backups } from '@loge/sync-mock-backup';
 import { describe, expect, it } from 'vitest';
 
 import { fakeContext, fakeHttp, target } from './support/fake-http';
@@ -110,11 +110,11 @@ describe('the mock backup target', () => {
 
   it('keeps bytes, and refuses to overwrite a file changed since its etag', async () => {
     const drive = await place('mock://drive');
-    const first = await drive.write('account.scbackup', new Uint8Array([1, 2, 3]));
-    expect(await drive.stat('account.scbackup')).toEqual(first);
-    const second = await drive.write('account.scbackup', new Uint8Array([4]), first.etag);
-    await expect(drive.write('account.scbackup', new Uint8Array([5]), first.etag)).rejects.toMatchObject({ code: 'SYNC_CONFLICT' });
-    const read = await drive.read('account.scbackup');
+    const first = await drive.write('account.logebackup', new Uint8Array([1, 2, 3]));
+    expect(await drive.stat('account.logebackup')).toEqual(first);
+    const second = await drive.write('account.logebackup', new Uint8Array([4]), first.etag);
+    await expect(drive.write('account.logebackup', new Uint8Array([5]), first.etag)).rejects.toMatchObject({ code: 'SYNC_CONFLICT' });
+    const read = await drive.read('account.logebackup');
     expect([...read.bytes]).toEqual([4]);
     expect(read.stat).toEqual(second);
     expect(await drive.list()).toEqual([second]);

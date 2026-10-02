@@ -11,7 +11,7 @@ import type {
   VideoChannel,
   VideoPlaylist,
   WatchStatus,
-} from '@sc/api';
+} from '@loge/api';
 
 /**
  * A fixed catalogue: the same titles, in the same state, on every run, so a

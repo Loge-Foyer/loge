@@ -6,7 +6,7 @@ import {
   type Credentials,
   type FieldValues,
   type PluginId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { stableJson } from '../hash';
 import { pluginContext, secretsOf, type PluginContextDeps } from '../plugin-context';

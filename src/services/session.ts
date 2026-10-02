@@ -1,4 +1,4 @@
-import type { UserId } from '@sc/api';
+import type { UserId } from '@loge/api';
 
 import { decideInitialGate, type Gate } from './boot';
 import type { AppSettingsService } from './app-settings';

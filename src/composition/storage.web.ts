@@ -1,4 +1,4 @@
-import { AppError } from '@sc/api';
+import { AppError } from '@loge/api';
 
 import { createIndexedDbDatabase } from '@/persistence/indexeddb/database';
 import { unavailableDatabase } from '@/persistence/unavailable';
@@ -17,7 +17,7 @@ export function createStorage({ clock, log }: StorageDeps): DeviceStorage {
   if (!globalThis.isSecureContext) {
     const insecure = new AppError(
       'STORAGE_FAILURE',
-      'Open Streaming Center over https, or from localhost. A browser keeps passwords safe only on a secure page.',
+      'Open Loge over https, or from localhost. A browser keeps passwords safe only on a secure page.',
       { retry: 'never' },
     );
     const refuse = async (): Promise<never> => {
@@ -32,7 +32,7 @@ export function createStorage({ clock, log }: StorageDeps): DeviceStorage {
 
   const secrets = createWebCredentialStore({ indexedDB: globalThis.indexedDB, crypto: globalThis.crypto }, { log });
   return {
-    db: createIndexedDbDatabase({ indexedDB: globalThis.indexedDB, IDBKeyRange: globalThis.IDBKeyRange }, 'streaming-center', {
+    db: createIndexedDbDatabase({ indexedDB: globalThis.indexedDB, IDBKeyRange: globalThis.IDBKeyRange }, 'loge', {
       clock,
       log,
     }),

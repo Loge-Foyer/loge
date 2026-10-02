@@ -16,7 +16,7 @@ import {
   type PluginManifest,
   type SourceInfo,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { ConnectionService } from './connections';
 import { stableJson } from './hash';

@@ -9,14 +9,14 @@ import type { DeviceStorage, StorageDeps } from './device-storage';
 /** iOS and Android: SQLite, and the keychain. The web build uses `storage.web.ts`. */
 export function createStorage({ clock, log }: StorageDeps): DeviceStorage {
   return {
-    db: createSqliteDatabase(() => openExpoSqlite('streaming-center.db', log), { clock, log }),
+    db: createSqliteDatabase(() => openExpoSqlite('loge.db', log), { clock, log }),
     credentials: createKeychainCredentialStore(SecureStore, {
-      service: 'sc.credentials',
+      service: 'loge.credentials',
       accessible: SecureStore.AFTER_FIRST_UNLOCK,
       log,
     }),
     deviceBound: createKeychainCredentialStore(SecureStore, {
-      service: 'sc.device',
+      service: 'loge.device',
       accessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
       log,
     }),

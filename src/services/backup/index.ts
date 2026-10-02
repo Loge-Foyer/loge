@@ -4,7 +4,7 @@ import {
   type AccountRecord,
   type Credentials,
   type PluginCrypto,
-} from '@sc/api';
+} from '@loge/api';
 
 import { OwnerNotVerifiedError, type AccountService } from '../account';
 import type { OwnerCheck } from '../owner-check';
@@ -225,7 +225,7 @@ export function createBackupService(deps: {
   };
 }
 
-/** `streaming-center-the-smiths-2026-09-30.scbackup`: safe on every file system, and sorted by date. */
+/** `loge-the-smiths-2026-09-30.logebackup`: safe on every file system, and sorted by date. */
 export function fileNameOf(accountName: string, now: number): string {
   const slug = accountName
     .normalize('NFKD')
@@ -234,5 +234,5 @@ export function fileNameOf(accountName: string, now: number): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40);
-  return `streaming-center-${slug || 'account'}-${new Date(now).toISOString().slice(0, 10)}.scbackup`;
+  return `loge-${slug || 'account'}-${new Date(now).toISOString().slice(0, 10)}.logebackup`;
 }

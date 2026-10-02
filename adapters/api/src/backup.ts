@@ -9,7 +9,7 @@ import type { ConnectionId } from './ids';
  */
 
 export interface BackupManifest {
-  /** Where the file goes, in words, for Settings: "iCloud Drive → Streaming Center". */
+  /** Where the file goes, in words, for Settings: "iCloud Drive → Loge". */
   readonly location: string;
 }
 

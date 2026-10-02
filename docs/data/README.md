@@ -158,7 +158,7 @@ server restored from an old backup can be told apart from a deletion.
   read from the keychain for a push, outside any transaction, and written to
   the keychain under fresh refs before a reconcile — never into the database.
   That makes the server's data folder as sensitive as every password the
-  household uses; `../streaming_center_sync` says how to keep it.
+  household uses; `../foyer` says how to keep it.
 - **The PIN travels readable**, as a lock against the wrong family member
   rather than an account secret. It arrives in the credential store, under a
   fresh ref, never in the database. A PIN this device cannot read — after a
@@ -189,7 +189,7 @@ logged — never its payload.
 
 ## The backup file
 
-A backup is one encrypted SQLite file, `.scbackup`, written by
+A backup is one encrypted SQLite file, `.logebackup`, written by
 `services/backup/`. It holds the account: its name, its profiles and
 their PINs, preferences, and source and IPTV connections with each profile's
 values — and their passwords, so nobody types a Jellyfin password again on a
@@ -207,7 +207,7 @@ tokens, the device key, the journal or sync state.
   server, the upload to a new server account, and backups
   (`services/backup/database.ts`): an export writes `recordsOfAccount`, an
   import reads records back and applies them as a sign-in's replace does. The
-  tables are plain, never WAL, with `application_id` (`SCBK`) and
+  tables are plain, never WAL, with `application_id` (`LGBK`) and
   `user_version`.
 - **Built and read in memory,** never opened as a database the app runs on:
   expo-sqlite's `serializeAsync` / `deserializeDatabaseAsync` on native, and
@@ -215,7 +215,7 @@ tokens, the device key, the journal or sync state.
   opened.
 - **Encrypted as a whole.** A 76-byte header, then AES-256-GCM over the
   serialized database (`services/backup/container.ts`). The header holds the
-  magic `SCBK`, the format and schema versions, the key id, the lineage (the
+  magic `LGBK`, the format and schema versions, the key id, the lineage (the
   account's id, hashed — the database inside holds it whole), the generation
   (+1 each save), the writer (this install, hashed), when it was created, and
   the nonce. Its first 64 bytes are the additional data, and the nonce — its
@@ -345,7 +345,7 @@ The steps, the same on both engines:
 - **v9** — `watch_progress` and `account_settings`: watch status the app keeps,
   for sources that keep none — IPTV films and series, web video, plain files —
   on the tabs the account keeps it on, and those settings themselves.
-  - **Keyed by what was watched, not where.** `watchIdentity` in `@sc/api`
+  - **Keyed by what was watched, not where.** `watchIdentity` in `@loge/api`
     names it by the catalogue a source matched it to — `tmdb:movie:603`,
     `youtube:…` — else, for an IPTV provider that keeps each language's copy
     apart, its plain title and year; an episode is its show's identity with its
@@ -429,13 +429,13 @@ the user signs in again.
 ## Phone backups
 
 A phone's own backup can carry the database to another phone. That is not the
-`.scbackup` file above, and this is what comes with it:
+`.logebackup` file above, and this is what comes with it:
 
 - **iOS** — an encrypted backup restores passwords and PINs. Session tokens,
   the device key and the backup key stay behind
   (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`), so the restored phone signs in to
   each server as a new device, rather than sharing — and ending — the old
-  phone's sessions. Opening a `.scbackup` there takes the key, typed in.
+  phone's sessions. Opening a `.logebackup` there takes the key, typed in.
 - **Android** — the database comes back, but no secret: keystore keys cannot
   be restored, so expo-secure-store's data is left out of Auto Backup.
   - A source whose saved password is gone is not signed in without it, because

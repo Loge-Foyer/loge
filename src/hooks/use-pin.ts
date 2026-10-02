@@ -1,4 +1,4 @@
-import type { Credentials, UserId } from '@sc/api';
+import type { Credentials, UserId } from '@loge/api';
 import { useMutation } from '@tanstack/react-query';
 
 import { useServices } from './services-context';

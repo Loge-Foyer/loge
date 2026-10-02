@@ -28,7 +28,7 @@ import {
   type SearchScope,
   type SourceInfo,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { ConnectionService, SecretScope, ValuesDraft } from '../connections';
 import type { Clock, DownloadRepository, Logger, MediaCacheRepository, NetworkMonitor, SavedList } from '../ports';

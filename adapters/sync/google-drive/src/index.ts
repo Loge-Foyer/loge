@@ -1,4 +1,4 @@
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 /** Manifest only: the backup role arrives with its implementation. */
 export const plugin: Plugin = {
@@ -8,7 +8,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Google Drive',
     description: 'Keeps your account’s backup in Google Drive.',
-    backup: { location: 'Google Drive → Streaming Center' },
+    backup: { location: 'Google Drive → Loge' },
     connectionFields: [],
     settings: [],
   },

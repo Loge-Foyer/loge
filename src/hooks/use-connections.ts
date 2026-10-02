@@ -1,4 +1,4 @@
-import type { ConnectionId, PluginId } from '@sc/api';
+import type { ConnectionId, PluginId } from '@loge/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import type { ConnectionDraft } from '@/services/connections';

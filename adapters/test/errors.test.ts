@@ -1,4 +1,4 @@
-import { AppError, isAppError, isTransportError, TransportError } from '@sc/api';
+import { AppError, isAppError, isTransportError, TransportError } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 describe('AppError', () => {

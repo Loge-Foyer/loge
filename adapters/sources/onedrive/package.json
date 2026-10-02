@@ -1,10 +1,10 @@
 {
-  "name": "@sc/source-onedrive",
+  "name": "@loge/source-onedrive",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*"
+    "@loge/api": "*"
   }
 }

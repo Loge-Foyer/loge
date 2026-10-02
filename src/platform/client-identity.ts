@@ -6,7 +6,7 @@ import type { ClientIdentity, ClientIdentitySource, Logger, SecureCredentialStor
 
 import { loadDeviceKey } from './device-key';
 
-const APP_NAME = 'Streaming Center';
+const APP_NAME = 'Loge';
 
 /**
  * What servers see of this install. The device key is read from `deviceStore`

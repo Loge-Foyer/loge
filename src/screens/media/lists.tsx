@@ -1,4 +1,4 @@
-import type { GlobalMediaKey, MediaItem } from '@sc/api';
+import type { GlobalMediaKey, MediaItem } from '@loge/api';
 import { ListMusic } from '@tamagui/lucide-icons-2/icons/ListMusic';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Rss } from '@tamagui/lucide-icons-2/icons/Rss';

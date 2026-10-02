@@ -2,7 +2,7 @@
 
 Layers, the composition root, state ownership, and the rules that keep plugins
 from leaking into screens. The full reasoning is in
-`../../.claude/streaming-center-architecture.md`.
+`../../../.claude/architecture.md`.
 
 This page describes the target. The four tabs, plugins by category and
 platform, and one account per device — kept here or on your own server,
@@ -75,7 +75,7 @@ chosen by file, like storage:
   in a browser. It runs natively on a phone, which matters: plain JavaScript
   on Hermes is about a hundred times slower, and a backup file can be
   megabytes. Additional data — a backup's header — goes in as base64 that
-  `@sc/api` encoded: expo-crypto reads a string of additional data as base64,
+  `@loge/api` encoded: expo-crypto reads a string of additional data as base64,
   and would turn bytes into one through `btoa`.
 - **Expanding a key** is HKDF-SHA-256 in JavaScript (noble): a few HMACs,
   cheap anywhere. The backup file's encryption key and key id come from the
@@ -140,7 +140,7 @@ any profile exists. It offers three ways in:
 - **Create an account on this device** — a name, which is also the first
   profile's.
 - **Sign in to your server** — the server's account arrives with its profiles.
-- **Restore a backup** — a `.scbackup` file and its key, which become a local
+- **Restore a backup** — a `.logebackup` file and its key, which become a local
   account.
 
 When a sync or an import brings or removes profiles, the engine tells the
@@ -158,7 +158,7 @@ first one created does.
 is left out of a production one.
 
 - **Only this platform's plugins** are listed and run: those whose `platforms`
-  include the one the app runs on (`runsOn` in `@sc/api`, against
+  include the one the app runs on (`runsOn` in `@loge/api`, against
   `Platform.OS`). An account-wide connection whose plugin cannot run here stays
   inert, labelled "not available on this device", and is kept for the devices
   that can. A stored plugin id names its category even in a build without the
@@ -185,7 +185,7 @@ resolves each connection to one of three standings:
 | off | the profile was switched off for it | nothing at all |
 
 A live source carries the values it runs with — shared values, with the
-profile's own where the mode separates them — and `@sc/api`'s
+profile's own where the mode separates them — and `@loge/api`'s
 `effectiveCapabilities(manifest, { enabled, settings })` runs on those resolved
 values. A connection switched off has nothing in effect; otherwise a declared
 capability is in effect when every toggle gating it is on. Under `all`, two
@@ -348,7 +348,7 @@ protect.
 ## Backups
 
 `services/backup/` writes and reads the account as one encrypted file,
-`.scbackup`. `docs/data` has its format.
+`.logebackup`. `docs/data` has its format.
 
 - **Writing:** the account's rows, mapped to the backup's own schema by the
   same mapper that makes the server's records, with passwords and PINs read
@@ -383,7 +383,7 @@ protect.
 
 `docs/playback` has the design and the player screen. A source's
 `getPlaybackDescriptor` says what to play, and a player plugin plays it.
-`choosePlayer` in `@sc/api`, a pure function, picks the device's default if it
+`choosePlayer` in `@loge/api`, a pure function, picks the device's default if it
 can play the item, else the best enabled player on this platform that can, and
 otherwise says which one would. Players are device settings, and the chosen
 player's view reaches the screen from the composition root.

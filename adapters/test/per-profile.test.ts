@@ -9,7 +9,7 @@ import {
   resolveValues,
   type Connection,
   type PluginManifest,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const manifest: PluginManifest = {

@@ -9,7 +9,7 @@ import {
   type PluginId,
   type PluginManifest,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { draftOf } from './connection-draft';
 import type { ConnectionDraft, ConnectionService, SavePlan } from './connections';

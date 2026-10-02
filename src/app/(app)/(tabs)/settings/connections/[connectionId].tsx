@@ -1,4 +1,4 @@
-import { connectionId as toConnectionId } from '@sc/api';
+import { connectionId as toConnectionId } from '@loge/api';
 import { useLocalSearchParams } from 'expo-router';
 
 import { EditConnectionScreen } from '@/screens/settings/connection';

@@ -1,4 +1,4 @@
-import { connectionId, credentialsRef, imageRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
+import { connectionId, credentialsRef, imageRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import type { DownloadEntry, FavoriteChannel, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription, WatchProgress } from '@/services/ports';

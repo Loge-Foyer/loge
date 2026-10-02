@@ -1,4 +1,4 @@
-import { credentialsRef, userId, type CredentialsRef } from '@sc/api';
+import { credentialsRef, userId, type CredentialsRef } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue, switchMode } from '@/services/connection-draft';

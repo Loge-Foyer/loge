@@ -1,4 +1,4 @@
-import { pluginId, validateManifest, type PluginManifest } from '@sc/api';
+import { pluginId, validateManifest, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const sound: PluginManifest = {
@@ -201,7 +201,7 @@ describe('validateManifest — categories and platforms', () => {
         account: { ownerProof: { fields: ['password'] }, signUp: { fields: [{ key: 'invite', label: 'Invite', type: 'text' }] } },
       }),
     ).toEqual([]);
-    expect(validateManifest({ ...blockless, id: pluginId('sync/drive'), category: 'sync', backup: { location: 'Drive → Streaming Center' } })).toEqual([]);
+    expect(validateManifest({ ...blockless, id: pluginId('sync/drive'), category: 'sync', backup: { location: 'Drive → Loge' } })).toEqual([]);
   });
 
   it('needs the id to be the category and a name', () => {

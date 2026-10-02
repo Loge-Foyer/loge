@@ -1,4 +1,4 @@
-import { effectiveCapabilities, pluginId, type PluginManifest } from '@sc/api';
+import { effectiveCapabilities, pluginId, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const manifest: PluginManifest = {

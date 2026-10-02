@@ -10,7 +10,7 @@ import {
   type PlayerLoad,
   type StreamProtocol,
   type SubtitleTrack,
-} from '@sc/api';
+} from '@loge/api';
 import {
   createVideoPlayer,
   type AudioTrack as EngineAudioTrack,

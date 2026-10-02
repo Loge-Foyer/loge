@@ -51,7 +51,7 @@ describe.each(ENGINES)('backup targets on %s', (engine: Engine) => {
 
     await device.services.backupTargets.saveNow();
     const first = onlyFile(target);
-    expect(first.stat.name).toMatch(/^streaming-center-[0-9a-f]{8}\.scbackup$/);
+    expect(first.stat.name).toMatch(/^loge-[0-9a-f]{8}\.logebackup$/);
     expect(generationOf(first.bytes)).toBe(1);
     expect(device.services.backupTargets.status()).toMatchObject([{ connectionId: connection.id, phase: 'saved' }]);
 

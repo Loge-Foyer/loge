@@ -1,4 +1,4 @@
-import { TransportError, type HttpClient, type HttpResponse } from '@sc/api';
+import { TransportError, type HttpClient, type HttpResponse } from '@loge/api';
 
 import type { Logger, NetworkMonitor } from '@/services/ports';
 

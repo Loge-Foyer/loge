@@ -77,11 +77,11 @@ let module: NativeModule | undefined;
 let view: ComponentType<NativeViewProps> | undefined;
 
 export function nativeModule(): NativeModule {
-  module ??= requireNativeModule<NativeModule>('ScMpv');
+  module ??= requireNativeModule<NativeModule>('LogeMpv');
   return module;
 }
 
 export function nativeView(): ComponentType<NativeViewProps> {
-  view ??= requireNativeView<NativeViewProps>('ScMpv');
+  view ??= requireNativeView<NativeViewProps>('LogeMpv');
   return view;
 }

@@ -1,12 +1,12 @@
-# CLAUDE.md — streaming_center_app
+# CLAUDE.md — loge
 
-The Streaming Center client. Expo + React Native + TypeScript, targeting iOS,
-Android and web.
+The Loge client. Expo + React Native + TypeScript, targeting iOS, Android and
+web.
 
 ## Reading protocol — before you plan, edit or run anything
 
-1. `../.claude/streaming-center-architecture.md` — the architecture
-   specification, and the source of truth for every rule below.
+1. `../.claude/architecture.md` — the architecture specification, and the
+   source of truth for every rule below.
 2. `../CLAUDE.md` — how the app and the server relate.
 3. `AGENTS.md` in this repository — imported below, read it fully.
 4. `README.md` and `docs/` here, for whichever area you are touching.
@@ -23,10 +23,10 @@ and the backup file's format, platform access (keychain, biometrics, crypto,
 files), and the composition root that wires everything together.
 
 **`src/` does not own:** domain types, adapter contracts, the player view
-contract, or any adapter. Those are in `adapters/` — `@sc/api`,
-`@sc/player-kit`, and `<category>/<name>` — which live in this repository but
+contract, or any adapter. Those are in `adapters/` — `@loge/api`,
+`@loge/player-kit`, and `<category>/<name>` — which live in this repository but
 compile as programs of their own, with no host types. If you find yourself
-writing a `MediaItem` interface in `src/`, stop: it belongs in `@sc/api`.
+writing a `MediaItem` interface in `src/`, stop: it belongs in `@loge/api`.
 
 **The adapters moved in during Phase 9**, from a repository of their own. They
 are npm workspaces, so there is one `node_modules` and one copy of React,
@@ -62,13 +62,13 @@ platform. A device holds one account, local or on your own server
 (PocketBase), with up to ten profiles. Source, IPTV and metadata connections
 are account-wide; players and sync plugins are device-wide. A server account
 syncs by pushing the journal, then reading the whole account. An encrypted
-`.scbackup` file carries a local account between devices, and players are
+`.logebackup` file carries a local account between devices, and players are
 plugins.
 
 What runs today:
 
 - One account per device, local or on your own server — PocketBase, in
-  `../streaming_center_sync`. Signing in replaces the device's account,
+  `../foyer`. Signing in replaces the device's account,
   signing up with an invite uploads it, and signing out keeps a local copy. A
   run pushes the journal, reads the whole account and reconciles; ten
   profiles at most, or the server's limit.

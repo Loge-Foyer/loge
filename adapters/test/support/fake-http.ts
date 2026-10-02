@@ -9,7 +9,7 @@ import {
   type MediaTarget,
   type NetworkKind,
   type PluginCrypto,
-} from '@sc/api';
+} from '@loge/api';
 
 import { nodeCrypto } from './node-crypto';
 
@@ -110,7 +110,7 @@ export function fakeContext(options: FakeContextOptions) {
     },
     network: { current: () => network },
     client: {
-      appName: 'Streaming Center',
+      appName: 'Loge',
       appVersion: '1.0.0',
       deviceName: 'Test Phone',
       installationId: options.installationId ?? 'install-1',

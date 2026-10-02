@@ -1,4 +1,4 @@
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 /** Manifest only: no engine yet, so it states no profile and the app never picks it. */
 export const plugin: Plugin = {

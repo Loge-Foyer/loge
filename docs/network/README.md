@@ -37,7 +37,7 @@ when `ios/` is absent, so an edit to `app.json` alone will not reach a build
 that already has native folders.
 
 Verifying, in order and at rising cost: `npx expo config --type introspect`
-(free), `plutil -p ios/StreamingCenter/Info.plist` (after prebuild), then the
+(free), `plutil -p ios/Loge/Info.plist` (after prebuild), then the
 device log — the system prints *"App Transport Security has blocked a
 cleartext HTTP (http://) resource load"* from the app's own process, and its
 presence or absence is the verdict. That OS line contains the URL, because
@@ -75,14 +75,14 @@ to play.
 
 ### The shape: a loopback proxy
 
-One app-owned Expo module, **`modules/sc-mtls`**, beside the existing
-`modules/sc-pip`. It runs an HTTP/1.1 listener bound to `127.0.0.1` and
+One app-owned Expo module, **`modules/loge-mtls`**, beside the existing
+`modules/loge-pip`. It runs an HTTP/1.1 listener bound to `127.0.0.1` and
 re-issues each request upstream over mTLS.
 
 ```
 anything in the app ──► http://127.0.0.1:<port>/<token>/<base64url(origin)>/<path>
                               │
-                        modules/sc-mtls
+                        modules/loge-mtls
                               │
                               ▼
                         https://real.host/<path>   ← with the client certificate
@@ -90,7 +90,7 @@ anything in the app ──► http://127.0.0.1:<port>/<token>/<base64url(origin)
 
 Every consumer is handed an ordinary `http://` URI, so:
 
-- **`@sc/api` does not change.** `HttpRequest` keeps its five members, and
+- **`@loge/api` does not change.** `HttpRequest` keeps its five members, and
   there is no TLS vocabulary in the contract.
 - **No adapter changes.** An adapter never learns a certificate exists.
 - **`PlayerContext` does not change.** An engine is handed a URI like any

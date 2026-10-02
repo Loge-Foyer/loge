@@ -1,4 +1,4 @@
-import { AppError, isAppError } from '@sc/api';
+import { AppError, isAppError } from '@loge/api';
 
 /** Whatever an engine threw, as the typed error the rest of the app handles. */
 export function storageError(error: unknown, message = 'The data on this device could not be read or saved.'): AppError {

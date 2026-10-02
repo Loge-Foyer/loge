@@ -17,7 +17,7 @@ import type {
   SubtitleStreamInfo,
   VideoStreamInfo,
   WatchStatus,
-} from '@sc/api';
+} from '@loge/api';
 
 import type { ItemDto, MediaSourceDto, MediaStreamDto } from './dto';
 import { itemImage, type ImageKind } from './images';

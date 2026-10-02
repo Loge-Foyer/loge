@@ -1,4 +1,4 @@
-import type { PlayerViewProps } from '@sc/player-kit';
+import type { PlayerViewProps } from '@loge/player-kit';
 import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 

@@ -7,7 +7,7 @@ expo-video on Media3 / ExoPlayer, and mpv (libmpv) is an Expo module in its own
 adapter, autolinked into the build. **Android 8 is the floor**
 (`minSdkVersion` 26, through `expo-build-properties`): libmpv's binaries ask
 for it.
-The app's own native module is `modules/sc-pip`, which asks Android for
+The app's own native module is `modules/loge-pip`, which asks Android for
 picture in picture on behalf of whichever engine is playing — packaging and
 window management are the app's, not an adapter's. Phase 4's key derivation
 module went with its vault.
@@ -50,8 +50,8 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
   whose saved password is missing is never signed in without it — servers lock
   accounts after failed logins. Instead it says it needs its password again.
   A profile whose PIN is missing opens for its owner. The backup key is gone
-  too, so opening a `.scbackup` takes the key, typed in.
-- `adb shell pm clear com.fkg.streamingcenter` starts the app from scratch
+  too, so opening a `.logebackup` takes the key, typed in.
+- `adb shell pm clear com.fkg.loge` starts the app from scratch
   (the package is `android.package` in `app.json`).
 
 ## Players
@@ -98,7 +98,7 @@ finger) is a refusal.
   is also the quickest way to see a parked source come back.
 - The development build connects to Metro through its own scheme, after
   `adb reverse tcp:8081 tcp:8081`:
-  `adb shell am start -a android.intent.action.VIEW -d "exp+streamingcenterapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"`.
+  `adb shell am start -a android.intent.action.VIEW -d "exp+loge://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"`.
 - Deep links work cold or warm, with no prompt:
-  `adb shell am start -a android.intent.action.VIEW -d "streamingcenterapp://browse/movies"`.
+  `adb shell am start -a android.intent.action.VIEW -d "loge://browse/movies"`.
 - JavaScript logs go to logcat under `ReactNativeJS`.

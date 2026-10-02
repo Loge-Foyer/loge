@@ -8,7 +8,7 @@
  * which is what exercises a toggle's effect on the TV tab. It runs in a
  * browser too, having no portal to be refused by.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 import { createProvider } from './provider';
 

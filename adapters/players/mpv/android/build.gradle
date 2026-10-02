@@ -3,7 +3,7 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'expo.modules.scmpv'
+group = 'expo.modules.logempv'
 version = '0.0.0'
 
 /*
@@ -42,7 +42,7 @@ def unpackEngine = tasks.register('unpackLibmpv', Copy) {
 }
 
 android {
-  namespace "expo.modules.scmpv"
+  namespace "expo.modules.logempv"
   defaultConfig {
     versionCode 1
     versionName '0.0.0'

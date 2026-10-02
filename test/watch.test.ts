@@ -1,4 +1,4 @@
-import { AppError, type ConnectionId, type MediaItem } from '@sc/api';
+import { AppError, type ConnectionId, type MediaItem } from '@loge/api';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

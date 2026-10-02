@@ -1,4 +1,4 @@
-import { isTransportError } from '@sc/api';
+import { isTransportError } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import type { Logger } from '@/services/ports';

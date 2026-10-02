@@ -1,4 +1,4 @@
-import { AppError, isTransportError, type CancelSignal, type HttpResponse, type PluginContext, type TransportError } from '@sc/api';
+import { AppError, isTransportError, type CancelSignal, type HttpResponse, type PluginContext, type TransportError } from '@loge/api';
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const TIMEOUT_MS = 15_000;

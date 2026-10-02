@@ -1,4 +1,4 @@
-import { isLibrarySelection, type FieldValue, type LibrariesField as LibrariesDescriptor, type Library, type LibrarySelection } from '@sc/api';
+import { isLibrarySelection, type FieldValue, type LibrariesField as LibrariesDescriptor, type Library, type LibrarySelection } from '@loge/api';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 

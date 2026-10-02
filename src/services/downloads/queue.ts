@@ -1,4 +1,4 @@
-import { AppError, type DownloadDescriptor } from '@sc/api';
+import { AppError, type DownloadDescriptor } from '@loge/api';
 
 import { isAborted, toAppError } from '../media/errors';
 import type { ProviderPool } from '../media/pool';

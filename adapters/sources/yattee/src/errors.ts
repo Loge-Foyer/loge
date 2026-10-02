@@ -1,4 +1,4 @@
-import { AppError, type TransportError } from '@sc/api';
+import { AppError, type TransportError } from '@loge/api';
 
 /** A request that got no response. */
 export function transportError(error: TransportError): AppError | TransportError {

@@ -7,7 +7,7 @@ import {
   type GlobalMediaKey,
   type Plugin,
   type Programme,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setValue } from '@/services/connection-draft';

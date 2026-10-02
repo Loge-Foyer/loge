@@ -1,4 +1,4 @@
-import { connectionId, type GlobalMediaKey, type MediaItem } from '@sc/api';
+import { connectionId, type GlobalMediaKey, type MediaItem } from '@loge/api';
 
 const TYPES = ['movie', 'show', 'season', 'episode', 'channel', 'playlist'];
 

@@ -5,12 +5,12 @@
   ],
   "apple": {
     "modules": [
-      "ScVlcModule"
+      "LogeVlcModule"
     ]
   },
   "android": {
     "modules": [
-      "expo.modules.scvlc.ScVlcModule"
+      "expo.modules.logevlc.LogeVlcModule"
     ]
   }
 }

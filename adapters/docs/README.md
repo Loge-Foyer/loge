@@ -1,4 +1,4 @@
-# Documentation — the Streaming Center adapters
+# Documentation — the Loge adapters
 
 How to build an adapter, and the contracts every adapter implements.
 
@@ -9,7 +9,7 @@ decide what the app will actually call.
 
 | Folder | What is there |
 | --- | --- |
-| `api/` | Every module of `@sc/api`, the manifest, and each contract |
+| `api/` | Every module of `@loge/api`, the manifest, and each contract |
 | `categories/` | Sources, IPTV, players, sync and metadata: what each does, and where it shows |
 | `writing-a-plugin/` | Step by step, with what matters inside each category |
 | `capabilities/` | Declared versus effective, and what each capability promises |

@@ -1,4 +1,4 @@
-import { AppError, imageRef, type ConnectionId, type MediaItem, type Plugin, type UserId } from '@sc/api';
+import { AppError, imageRef, type ConnectionId, type MediaItem, type Plugin, type UserId } from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

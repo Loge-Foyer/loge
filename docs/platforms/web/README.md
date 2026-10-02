@@ -31,10 +31,10 @@ the app requires a server to use TLS.
 Two IndexedDB databases, and no `Cross-Origin-*` headers from whatever serves
 the page:
 
-- **`streaming-center`** — the account, its profiles, connections and
+- **`loge`** — the account, its profiles, connections and
   preferences, device settings, the change journal. The same schema as SQLite
   on a phone, with the cascades done by the repositories.
-- **`streaming-center-secrets`** — passwords, PINs, session tokens and the
+- **`loge-secrets`** — passwords, PINs, session tokens and the
   backup key, as AES-GCM ciphertext under a key the page can use but never read
   out. Each value is sealed with its ref, so it cannot be moved under another
   one.
@@ -68,7 +68,7 @@ close their connection so its upgrade can run, then ask to be reloaded.
 
 ## The account in a browser
 
-- **One tab syncs at a time.** A run holds the `streaming-center-sync` Web
+- **One tab syncs at a time.** A run holds the `loge-sync` Web
   Lock, so two tabs never push the same journal or reconcile at once. Another
   tab still sees the changes only once it reloads.
 - **Forgot PIN needs a server account.** A browser cannot ask for the device's

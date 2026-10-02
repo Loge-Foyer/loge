@@ -1,4 +1,4 @@
-import { compareItems, mergeSorted, type ConnectionId, type ItemSort, type MediaItem } from '@sc/api';
+import { compareItems, mergeSorted, type ConnectionId, type ItemSort, type MediaItem } from '@loge/api';
 
 /** Several sources' lists, each already in `sort` order, as one list in that order. */
 export function mergeRows(lists: readonly (readonly MediaItem[])[], sort: ItemSort, limit: number): readonly MediaItem[] {

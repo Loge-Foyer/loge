@@ -7,7 +7,7 @@ import {
   type IdentifyQuery,
   type PluginContext,
   type PluginTarget,
-} from '@sc/api';
+} from '@loge/api';
 
 import { createClient } from './client';
 import { readNames, readSearch, type Found } from './dto';

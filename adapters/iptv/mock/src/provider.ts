@@ -8,7 +8,7 @@ import {
   type MediaItem,
   type MediaTarget,
   type PlaybackSource,
-} from '@sc/api';
+} from '@loge/api';
 
 import { createLineup, guideFor, type LineupSize } from './lineup';
 import { channelSource, episodeSource, movieSource } from './streams';

@@ -1,4 +1,4 @@
-import type { DownloadDescriptor, DownloadOption, DownloadQuality, DownloadSubtitle, HdrFormat, MediaVersion } from '@sc/api';
+import type { DownloadDescriptor, DownloadOption, DownloadQuality, DownloadSubtitle, HdrFormat, MediaVersion } from '@loge/api';
 
 import type { MediaSourceDto } from './dto';
 import { hdrOf, ours } from './playback';
@@ -120,7 +120,7 @@ export function downloadProfile(quality: DownloadQuality, version: MediaVersion 
     ? unique([...(version?.audio ?? []).flatMap((track) => (track.codec === undefined ? [] : [track.codec])), 'aac'])
     : ['aac'];
   return {
-    Name: 'Streaming Center (download)',
+    Name: 'Loge (download)',
     MaxStreamingBitrate: ceiling,
     MaxStaticBitrate: ceiling,
     DirectPlayProfiles: containers.map((container) => ({

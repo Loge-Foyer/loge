@@ -1,17 +1,17 @@
 # AGENTS.md — adapters
 
-Every adapter Streaming Center has to the outside world, plus the vocabulary
-they are written in. Read the workspace root `AGENTS.md` and
-`../../.claude/streaming-center-architecture.md` first.
+Every adapter Loge has to the outside world, plus the vocabulary they are
+written in. Read the workspace root `AGENTS.md` and
+`../../.claude/architecture.md` first.
 
 ---
 
 ## Shape
 
 ```
-api/                     @sc/api — domain types + every contract. Depends on NOTHING
+api/                     @loge/api — domain types + every contract. Depends on NOTHING
   fixtures/              records every side must judge alike (the Go server's tests read them too)
-player-kit/              @sc/player-kit — the React half of the player contract
+player-kit/              @loge/player-kit — the React half of the player contract
 plugins/
   sources/<name>/        jellyfin emby plex webdav icloud-drive google-drive onedrive yattee invidious mock
   iptv/<name>/           m3u stalker xtream mock
@@ -23,7 +23,7 @@ docs/
 ```
 
 npm workspaces (`the app's `workspaces``), source-only —
-`"exports": "./src/index.ts"`, no build step. Every plugin lists `@sc/api` as
+`"exports": "./src/index.ts"`, no build step. Every plugin lists `@loge/api` as
 a **peer** dependency: the host supplies the one instance, so branded IDs from
 the app and from a plugin are the same type.
 
@@ -56,9 +56,9 @@ create `adapters/sync/jellyfin`.
 | Package | May import | Must not import |
 | --- | --- | --- |
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
-| `player-kit` | `@sc/api`, `react`, `react-native` (peers) | any plugin, the app |
-| a sources, IPTV, sync or metadata plugin | `@sc/api` | any framework, the app, another plugin |
-| a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder, reached through `expo`) | the app, another plugin |
+| `player-kit` | `@loge/api`, `react`, `react-native` (peers) | any plugin, the app |
+| a sources, IPTV, sync or metadata plugin | `@loge/api` | any framework, the app, another plugin |
+| a player plugin | `@loge/api`, `@loge/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder, reached through `expo`) | the app, another plugin |
 
 A player's React, React Native and published engine are **peers**, which the
 app installs; this folder has them as development dependencies, for the
@@ -93,7 +93,7 @@ is what both sides test against. Change them together.
 
 Each plugin's `src/index.ts` exports `plugin: Plugin` — the same name
 everywhere, so the app's registration line is always
-`import { plugin as x } from '@sc/source-x'`.
+`import { plugin as x } from '@loge/source-x'`.
 
 ```ts
 interface PluginManifest {
@@ -323,10 +323,10 @@ the test of whether this architecture is real.
 
 `.agents/skills/` in this folder:
 
-- **`sc-add-plugin`** — create a new plugin, in the folder for its category.
-- **`sc-plugin-categories`** — which category a plugin belongs in, and how to
+- **`loge-add-plugin`** — create a new plugin, in the folder for its category.
+- **`loge-plugin-categories`** — which category a plugin belongs in, and how to
   split a service that does two jobs.
-- **`sc-verify-plugins`** — verification, including the boundary greps and the
+- **`loge-verify-plugins`** — verification, including the boundary greps and the
   cross-repository check after touching `api`.
 
 ---

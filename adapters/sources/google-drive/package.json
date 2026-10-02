@@ -1,10 +1,10 @@
 {
-  "name": "@sc/source-google-drive",
+  "name": "@loge/source-google-drive",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "peerDependencies": {
-    "@sc/api": "*"
+    "@loge/api": "*"
   }
 }

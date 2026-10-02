@@ -1,4 +1,4 @@
-import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@sc/api';
+import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@loge/api';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { PixelRatio } from 'react-native';

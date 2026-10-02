@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { decodeBase64Url, decodeUtf8, encodeBase64, encodeBase64Url, encodeHex, encodeUtf8 } from '@sc/api';
+import { decodeBase64Url, decodeUtf8, encodeBase64, encodeBase64Url, encodeHex, encodeUtf8 } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const ascii = (text: string) => Uint8Array.from(text, (char) => char.charCodeAt(0));

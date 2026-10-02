@@ -1,4 +1,4 @@
-import { pluginId, userId, type PluginManifest } from '@sc/api';
+import { pluginId, userId, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import {

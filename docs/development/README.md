@@ -11,15 +11,15 @@ npm run typecheck         # the app, then the tests: two TypeScript programs
 npm run lint              # includes the import-boundary, Hermes and SQLite rules
 npm test                  # vitest: the database, the credential stores, the services
 npx expo-doctor
-npx expo export --platform ios --output-dir /tmp/sc-ios
-npx expo export --platform web --output-dir /tmp/sc-web
+npx expo export --platform ios --output-dir /tmp/loge-ios
+npx expo export --platform web --output-dir /tmp/loge-web
 ```
 
 The exports are not optional. They are the only proof that Metro bundles one
 copy of every package the adapters share with the app, that each platform's
 bundle holds only its own storage — SQLite and the keychain for iOS, IndexedDB
 for the web — and that sql.js stays out of the native bundles and sits in a
-chunk of its own on the web. The `sc-verify` skill has the full pass, with the
+chunk of its own on the web. The `loge-verify` skill has the full pass, with the
 checks for each.
 
 `npm run typecheck` and `npm test` cover the adapters as well as `src/`: five
@@ -96,7 +96,7 @@ else is real, including the database engine:
 
 The real account adapter meets the real server in the sync repository's
 harness. The scheduler runs on fake timers against a scripted engine. Choosing
-a player is a pure function in `@sc/api`, tested there over a matrix of
+a player is a pure function in `@loge/api`, tested there over a matrix of
 descriptors and profiles.
 
 `test/support/services.ts` builds the service graph as the app wires it, and
@@ -110,7 +110,7 @@ database per test. Two things there make mistakes fail loudly:
 
 Tests run on Node, which has built-ins Hermes does not. What passes here can
 still throw on a phone — which is why lint rejects the known gaps in `src/` —
-and screens are only proven by driving the app: see the `sc-run` skill.
+and screens are only proven by driving the app: see the `loge-run` skill.
 
 ## Debugging on a device
 

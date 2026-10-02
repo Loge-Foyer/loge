@@ -1,4 +1,4 @@
-import { AppError } from '@sc/api';
+import { AppError } from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { signIn, sync, twoDevices } from './support/devices';

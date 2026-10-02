@@ -1,6 +1,6 @@
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { encodeBase64, encodeUtf8, type PluginCrypto } from '@sc/api';
+import { encodeBase64, encodeUtf8, type PluginCrypto } from '@loge/api';
 
 /**
  * AES-256-GCM as the platform offers it: expo-crypto on a phone, WebCrypto

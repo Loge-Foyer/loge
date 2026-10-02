@@ -13,7 +13,7 @@ import {
   type PerProfile,
   type PluginId,
   type UserId,
-} from '@sc/api';
+} from '@loge/api';
 
 import { hasErrors, validateDraft, type DraftErrors } from './field-values';
 import { stableJson } from './hash';

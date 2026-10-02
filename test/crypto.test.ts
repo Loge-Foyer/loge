@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { encodeUtf8, recordId, type RecordKind } from '@sc/api';
+import { encodeUtf8, recordId, type RecordKind } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { testCrypto } from './support/crypto';
@@ -11,7 +11,7 @@ const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
 
 // The vectors both sides test against: a record's id is what the server derives too.
 const vectors = (
-  JSON.parse(readFileSync(join(process.cwd(), 'node_modules/@sc/api/fixtures/account-records.json'), 'utf8')) as {
+  JSON.parse(readFileSync(join(process.cwd(), 'node_modules/@loge/api/fixtures/account-records.json'), 'utf8')) as {
     recordIds: readonly { accountId: string; kind: RecordKind; key: string; id: string }[];
   }
 ).recordIds;
@@ -57,12 +57,12 @@ describe('host crypto — sealing', () => {
 
   it('opens what it sealed, under the same key and context only', async () => {
     const crypto = testCrypto();
-    const sealed = await crypto.seal(key, plaintext, 'sc/sealed/v1|connection/c1|password');
+    const sealed = await crypto.seal(key, plaintext, 'loge/sealed/v1|connection/c1|password');
     expect(sealed.length).toBe(12 + plaintext.length + 16);
-    expect(await crypto.open(key, sealed, 'sc/sealed/v1|connection/c1|password')).toEqual(plaintext);
-    expect(await crypto.open(key, sealed, 'sc/sealed/v1|connection/c2|password')).toBeUndefined();
-    expect(await crypto.open(new Uint8Array(randomBytes(32)), sealed, 'sc/sealed/v1|connection/c1|password')).toBeUndefined();
-    expect(await crypto.open(key, sealed.subarray(0, 20), 'sc/sealed/v1|connection/c1|password')).toBeUndefined();
+    expect(await crypto.open(key, sealed, 'loge/sealed/v1|connection/c1|password')).toEqual(plaintext);
+    expect(await crypto.open(key, sealed, 'loge/sealed/v1|connection/c2|password')).toBeUndefined();
+    expect(await crypto.open(new Uint8Array(randomBytes(32)), sealed, 'loge/sealed/v1|connection/c1|password')).toBeUndefined();
+    expect(await crypto.open(key, sealed.subarray(0, 20), 'loge/sealed/v1|connection/c1|password')).toBeUndefined();
   });
 
   it('refuses a value with one byte changed', async () => {
@@ -82,7 +82,7 @@ describe('host crypto — sealing', () => {
 
   // What a phone seals, a browser opens, and the other way round: nonce ‖ ciphertext ‖ tag, with the context as UTF-8.
   it('interoperates with any other AES-GCM', async () => {
-    const context = 'sc/sealed/v1|profileValues/c1/u-é|password';
+    const context = 'loge/sealed/v1|profileValues/c1/u-é|password';
     const sealedHere = await testCrypto().seal(key, plaintext, context);
     const decipher = createDecipheriv('aes-256-gcm', key, sealedHere.subarray(0, 12));
     decipher.setAAD(Buffer.from(context, 'utf8'));

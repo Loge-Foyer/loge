@@ -1,10 +1,10 @@
 /**
- * The React half of the player contract. `@sc/api` defines the controller,
+ * The React half of the player contract. `@loge/api` defines the controller,
  * `MediaPlayer`, and imports nothing; drawing an engine's pixels needs React,
  * so the view's contract lives here. A player plugin exports both, and only
  * the app's composition root imports it.
  */
-import type { MediaPlayer, Plugin, PlayerRole } from '@sc/api';
+import type { MediaPlayer, Plugin, PlayerRole } from '@loge/api';
 import type { ComponentType } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
@@ -22,7 +22,7 @@ export interface PlayerViewProps {
  */
 export type PlayerView = ComponentType<PlayerViewProps>;
 
-/** A player plugin: its manifest and role, as `@sc/api` knows them, and the view that draws them. */
+/** A player plugin: its manifest and role, as `@loge/api` knows them, and the view that draws them. */
 export interface PlayerPlugin extends Plugin {
   readonly player: PlayerRole;
   readonly View: PlayerView;

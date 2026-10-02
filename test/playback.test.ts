@@ -8,7 +8,7 @@ import {
   type PlaybackSource,
   type PlayerEvent,
   type PlayerProfile,
-} from '@sc/api';
+} from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 import { initialDraft, setSecret, setValue } from '@/services/connection-draft';

@@ -14,7 +14,7 @@ import {
   type Programme,
   type Season,
   type Show,
-} from '@sc/api';
+} from '@loge/api';
 
 import { record, text } from './portal';
 

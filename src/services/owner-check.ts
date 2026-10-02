@@ -1,4 +1,4 @@
-import { isAppError, type CancelSignal, type Credentials, type PasswordField, type PluginManifest } from '@sc/api';
+import { isAppError, type CancelSignal, type Credentials, type PasswordField, type PluginManifest } from '@loge/api';
 
 import type { PluginCatalog } from './plugin-catalog';
 import type { LocalDatabase, Logger, OwnerAnswer, OwnerAuthentication } from './ports';

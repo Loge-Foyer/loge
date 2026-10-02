@@ -1,4 +1,4 @@
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, type Plugin } from '@loge/api';
 
 /** Manifest only: the backup role arrives with its implementation. */
 export const plugin: Plugin = {
@@ -8,7 +8,7 @@ export const plugin: Plugin = {
     platforms: ['ios'],
     displayName: 'iCloud',
     description: 'Keeps your account’s backup in iCloud Drive.',
-    backup: { location: 'iCloud Drive → Streaming Center' },
+    backup: { location: 'iCloud Drive → Loge' },
     connectionFields: [],
     settings: [],
   },

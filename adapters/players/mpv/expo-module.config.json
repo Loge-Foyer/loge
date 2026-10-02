@@ -5,12 +5,12 @@
   ],
   "apple": {
     "modules": [
-      "ScMpvModule"
+      "LogeMpvModule"
     ]
   },
   "android": {
     "modules": [
-      "expo.modules.scmpv.ScMpvModule"
+      "expo.modules.logempv.LogeMpvModule"
     ]
   }
 }

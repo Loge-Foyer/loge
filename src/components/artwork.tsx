@@ -1,4 +1,4 @@
-import type { ConnectionId, ImageRef } from '@sc/api';
+import type { ConnectionId, ImageRef } from '@loge/api';
 import { Image, type ImageContentFit } from 'expo-image';
 import { useMemo, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';

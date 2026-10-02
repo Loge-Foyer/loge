@@ -8,7 +8,7 @@ import {
   type PluginContext,
   type PluginTarget,
   type PushOutcome,
-} from '@sc/api';
+} from '@loge/api';
 
 const SLOW_MS = 1_500;
 const DEFAULT_ENDPOINT = 'mock://account';

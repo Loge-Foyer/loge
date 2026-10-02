@@ -13,7 +13,7 @@ export function BootScreen() {
     <YStack flex={1} items="center" justify="center" gap="$4" p="$6" bg="$background">
       {gate.kind === 'failed' ? (
         <>
-          <H3 color="$color12">Streaming Center could not start</H3>
+          <H3 color="$color12">Loge could not start</H3>
           <Paragraph color="$color10" text="center" maxW={px(420)}>
             {gate.message}
           </Paragraph>

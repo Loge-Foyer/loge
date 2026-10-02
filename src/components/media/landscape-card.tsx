@@ -1,4 +1,4 @@
-import type { MediaItem } from '@sc/api';
+import type { MediaItem } from '@loge/api';
 import { ListVideo } from '@tamagui/lucide-icons-2/icons/ListVideo';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { Link } from 'expo-router';

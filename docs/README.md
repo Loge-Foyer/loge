@@ -1,4 +1,4 @@
-# Documentation — Streaming Center app
+# Documentation — Loge app
 
 Everything about the client itself: how to run it, how it is put together, and
 how each platform differs.

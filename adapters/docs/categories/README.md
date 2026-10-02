@@ -70,7 +70,7 @@ engine plays.
 
 - `plugin.player.create(context)` returns the `MediaPlayer` that drives the
   engine.
-- `PlayerView`, from `@sc/player-kit`, draws it.
+- `PlayerView`, from `@loge/player-kit`, draws it.
 
 Players are the one category that may use React, React Native and native code.
 

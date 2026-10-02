@@ -1,4 +1,4 @@
-import type { Credentials, CredentialsRef } from '@sc/api';
+import type { Credentials, CredentialsRef } from '@loge/api';
 import type * as SecureStore from 'expo-secure-store';
 
 import type { Logger, SecureCredentialStore } from '@/services/ports';
@@ -12,7 +12,7 @@ export type Keychain = Pick<typeof SecureStore, 'getItemAsync' | 'setItemAsync' 
  * digits, so two refs can never share a key.
  */
 export function keychainKey(ref: CredentialsRef): string {
-  let key = 'sc.';
+  let key = 'loge.';
   for (const char of ref) {
     key += /^[A-Za-z0-9.-]$/.test(char) ? char : `_${(char.codePointAt(0) ?? 0).toString(16).padStart(6, '0')}`;
   }

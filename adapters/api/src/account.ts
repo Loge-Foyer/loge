@@ -19,7 +19,7 @@ import type { ConnectionId, PluginId, UserId } from './ids';
  * database never holds one.
  */
 
-/** Profiles an account may hold unless the server says otherwise (`SC_MAX_PROFILES`). */
+/** Profiles an account may hold unless the server says otherwise (`FOYER_MAX_PROFILES`). */
 export const DEFAULT_MAX_PROFILES = 10;
 
 export const RECORD_KINDS = [

@@ -1,4 +1,4 @@
-import { connectionId, userId } from '@sc/api';
+import { connectionId, userId } from '@loge/api';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 
@@ -255,11 +255,11 @@ describe('SQLite migrations', () => {
 });
 
 describe('IndexedDB upgrades', () => {
-  const open = (indexedDB: IDBFactory) => createIndexedDbDatabase({ indexedDB, IDBKeyRange }, 'streaming-center', { clock: fakeClock(), log: silentLog });
+  const open = (indexedDB: IDBFactory) => createIndexedDbDatabase({ indexedDB, IDBKeyRange }, 'loge', { clock: fakeClock(), log: silentLog });
 
   const rawOpen = (indexedDB: IDBFactory, version?: number) =>
     new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = version === undefined ? indexedDB.open('streaming-center') : indexedDB.open('streaming-center', version);
+      const opening = version === undefined ? indexedDB.open('loge') : indexedDB.open('loge', version);
       opening.onsuccess = () => resolve(opening.result);
       opening.onerror = () => reject(opening.error);
     });
@@ -276,7 +276,7 @@ describe('IndexedDB upgrades', () => {
   it('carry a v1 database to the newest one version at a time, each step reading what the one before it wrote', async () => {
     const indexedDB = new IDBFactory();
     const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = indexedDB.open('streaming-center', 1);
+      const opening = indexedDB.open('loge', 1);
       opening.onupgradeneeded = () => {
         const tx = opening.transaction;
         if (!tx) throw new Error('no upgrade transaction');

@@ -1,4 +1,4 @@
-import { imageRef, type ImageRef, type ImageSize, type ImageSource } from '@sc/api';
+import { imageRef, type ImageRef, type ImageSize, type ImageSource } from '@loge/api';
 
 import { queryString } from './url';
 

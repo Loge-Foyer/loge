@@ -15,7 +15,7 @@ import {
   type PlaybackDescriptor,
   type PlaybackSource,
   type SubtitleTrack,
-} from '@sc/api';
+} from '@loge/api';
 
 import { createClient } from './client';
 import {
