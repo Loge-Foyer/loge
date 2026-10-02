@@ -592,6 +592,11 @@ typecheck.
   deprecated.
 - Screen kinds come from `src/components/stack-options.tsx`: tab root,
   full-screen page, detail (transparent header), sheet.
+- **A sheet's page is `SheetScreen`** (`components/sheet.tsx`): one
+  `ScrollView`, its title the first, sticky row. An iOS form sheet stretches
+  the scroll view it finds over the whole sheet unless it is the second of
+  exactly two children, so anything put beside it — a title, Done — is drawn
+  under the content.
 - **Four tabs:** Media, Videos, TV, Settings. Settings → Adapters is four rows —
   Sources, IPTV, Players, Sync — each opening that category's list for this
   platform (`settings/adapters/[category]`, then `[category]/[name]`: the id's

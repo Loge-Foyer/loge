@@ -44,7 +44,10 @@ tabs become a top navigation bar, which is also each tab's header.
 (a large native title, with the tab's actions and the profile switcher at the
 right), a full-screen page with its own header, a detail page whose header
 floats over the artwork, and a sheet (`formSheet` on iOS and Android, a plain
-page in a browser).
+page in a browser). A sheet's page is one scroll view with its title as the
+first, sticky row (`components/sheet.tsx`): an iOS form sheet stretches the
+scroll view it finds over the whole sheet, and a title beside it ended up
+under the content.
 
 ## Four tabs
 
