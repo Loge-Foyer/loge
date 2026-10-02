@@ -56,8 +56,15 @@ and kind in `services/tab-content.ts` (`docs/adapters`), never by a plugin's
 name.
 
 - **Media** — a source's movies, shows and anime, merged across every source.
-- **Videos** — web video and files, one tab per source. It shows skeleton
-  shelves until a source lists videos or files.
+- **Videos** — web video and files, one tab per source. A source that can
+  narrow its search (`media.searchScopes`) puts the choice at the search box's
+  left — All, Video, Channel, Playlist — and a channel among the videos is
+  drawn round (`components/media/channel-card.tsx`), a playlist with how many
+  videos it holds. A channel opens its own page (`screens/media/channel.tsx`):
+  its banner and face, how many follow it, what it says about itself, Follow,
+  and its sections — Videos, Shorts, Live, Playlists — as a grid that pages on
+  as it scrolls. A playlist's page is its videos, in its order, and whose list
+  it is; a video's page leads to its channel.
 - **TV** — everything IPTV brings, in Live, Movies and Series sections, plus any
   source's `live` channels. Media and Videos never show IPTV content.
 - **Settings** — the account, profiles, plugins, about.
@@ -168,6 +175,9 @@ TV's sections.
 - **When it asks.** Once typing stops for two seconds, or at once on the
   keyboard's search key. Videos asks on the key alone: there every search is a
   request to the source. Emptying the box brings the list back at once.
+- **Narrowing it.** Where the source can, a choice at the box's left says
+  what a search answers with: All, Video, Channel or Playlist. Changing it
+  asks again at once for what is typed.
 - **The box stays put.** A list is keyed by what it lists — the source, the
   kind — never by the term. The box lives in the list's header, and a list
   remounted for each term took the keyboard away mid-word.

@@ -4,6 +4,7 @@ import {
   type ChannelGroup,
   type ChannelPage,
   type ChannelQuery,
+  type ChildQuery,
   type ConnectedMediaProvider,
   type ConnectionId,
   type ContentKind,
@@ -24,6 +25,7 @@ import {
   type PlaybackRequest,
   type PluginId,
   type Programme,
+  type SearchScope,
   type SourceInfo,
   type UserId,
 } from '@sc/api';
@@ -57,6 +59,12 @@ export interface RowSpec {
    * a kind is its catalogue, not somebody's query.
    */
   readonly term?: string;
+  /**
+   * What a search answers with — everything, or only videos, channels or
+   * playlists. Handed only to a source that lists it in `media.searchScopes`;
+   * another answers as a search always did.
+   */
+  readonly scope?: SearchScope;
 }
 
 /** What arrived, and which sources could not answer. Never an error for one source. */
@@ -80,6 +88,8 @@ export interface ItemResult {
 export interface ChildrenResult {
   readonly items: readonly MediaItem[];
   readonly sourceError?: SourceError;
+  /** The source's own token for the next page — a channel's videos run on for a while. */
+  readonly nextCursor?: string;
 }
 
 /** What one source answered for live TV — or, when it could not, what was saved from it and why. */
@@ -129,7 +139,8 @@ export interface MediaService {
   continueWatching(userId: UserId, limit?: number, signal?: CancelSignal): Promise<RowResult>;
   gridPage(userId: UserId, spec: RowSpec, state: MergeState | null, pageSize: number, signal?: CancelSignal): Promise<GridPage>;
   item(userId: UserId, key: GlobalMediaKey, signal?: CancelSignal): Promise<ItemResult>;
-  children(userId: UserId, parent: MediaItem, signal?: CancelSignal): Promise<ChildrenResult>;
+  /** An item's children: a show's seasons, a season's episodes, one section of a channel — a page at a time where the source pages. */
+  children(userId: UserId, parent: MediaItem, signal?: CancelSignal, query?: ChildQuery): Promise<ChildrenResult>;
   /**
    * What to play, for the engine the request describes. Its addresses can
    * carry credentials: it is held in memory only — never saved, never logged —
@@ -190,7 +201,8 @@ const listKey = {
   row: (spec: RowSpec) => `row:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
   grid: (spec: RowSpec) => `grid:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
   resume: 'resume',
-  children: (parent: MediaItem) => `${CHILDREN}${parent.key.externalId}`,
+  // A section's first page is kept apart from the item's other sections.
+  children: (parent: MediaItem, section?: string) => `${CHILDREN}${parent.key.externalId}${section === undefined ? '' : `#${section}`}`,
   source: (query: ItemQuery) => `source:${query.kind}:${query.sort.by}:${query.sort.order}`,
   groups: 'live:groups',
   channels: (groupId: string | undefined) => `live:channels:${groupId ?? '*'}`,
@@ -534,7 +546,14 @@ export function createMediaService(deps: {
               const page = await call(source, (provider) =>
                 listItems(
                   provider,
-                  { kind: spec.kind, sort: spec.sort, limit: pageSize, ...(next.cursor ? { cursor: next.cursor } : {}), ...(searching ? { term } : {}) },
+                  {
+                    kind: spec.kind,
+                    sort: spec.sort,
+                    limit: pageSize,
+                    ...(next.cursor ? { cursor: next.cursor } : {}),
+                    ...(searching ? { term } : {}),
+                    ...(searching && spec.scope !== undefined && source.manifest.media?.searchScopes?.includes(spec.scope) ? { scope: spec.scope } : {}),
+                  },
                   signal,
                 ),
               );
@@ -611,18 +630,20 @@ export function createMediaService(deps: {
       }
     },
 
-    children: async (userId, parent, signal) => {
+    children: async (userId, parent, signal, query) => {
       const source = await sourceFor(userId, parent.key.connectionId);
-      const key = listKey.children(parent);
+      const key = listKey.children(parent, query?.section);
+      // Only a section's first page is kept: a saved page is shown, never paged from.
+      const first = query?.cursor === undefined;
       try {
         const page = await call(source, (provider) => {
           if (!provider.getChildren) throw missing('getChildren');
-          return provider.getChildren(parent, signal);
+          return query === undefined ? provider.getChildren(parent, signal) : provider.getChildren(parent, signal, query);
         });
-        await saveList(userId, source, key, page.items);
-        return { items: await watch.overlay(userId, page.items) };
+        if (first) await saveList(userId, source, key, page.items);
+        return { items: await watch.overlay(userId, page.items), ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }) };
       } catch (error) {
-        if (isAborted(error)) throw error;
+        if (isAborted(error) || !first) throw error;
         const failure = toAppError(error, log);
         const stand = await savedFor(userId, source, key, failure);
         if (!stand) throw failure;

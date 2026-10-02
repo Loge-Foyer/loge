@@ -18,9 +18,22 @@ import {
 } from '@sc/api';
 
 import { createClient } from './client';
-import { readChannel, readInfo, readPlaylist, readVideo, readVideos, type FormatDto, type ThumbnailDto, type VideoDto } from './dto';
+import {
+  readChannel,
+  readChannelPage,
+  readInfo,
+  readPlaylist,
+  readSearchResults,
+  readVideo,
+  readVideos,
+  type ChannelDto,
+  type FormatDto,
+  type PlaylistDto,
+  type ThumbnailDto,
+  type VideoDto,
+} from './dto';
 import { unreadable } from './errors';
-import { channelToItem, parseId, pickThumbnail, playlistToItem, toDetail, toItem, toItems } from './map';
+import { CHANNEL_SECTIONS, channelToItem, parseId, pickThumbnail, playlistToItem, searchToItems, toDetail, toItems } from './map';
 import { normalizeBaseUrl, queryString } from './url';
 
 /** Every request to the server takes the same header, so one ref serves them all. */
@@ -165,10 +178,29 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   // the video or the channel.
   const thumbnails = new Map<string, readonly ThumbnailDto[]>();
   const avatars = new Map<string, readonly ThumbnailDto[]>();
+  const banners = new Map<string, readonly ThumbnailDto[]>();
+  const covers = new Map<string, readonly ThumbnailDto[]>();
   const seen = (videos: readonly VideoDto[]) => {
-    for (const video of videos) if (video.thumbnails.length > 0) thumbnails.set(video.videoId, video.thumbnails);
+    for (const video of videos) {
+      if (video.thumbnails.length > 0) thumbnails.set(video.videoId, video.thumbnails);
+      if (video.authorId !== undefined && video.authorThumbnails.length > 0) avatars.set(video.authorId, video.authorThumbnails);
+    }
     return videos;
   };
+  const seenChannel = (channel: ChannelDto) => {
+    if (channel.thumbnails.length > 0) avatars.set(channel.authorId, channel.thumbnails);
+    if (channel.banners.length > 0) banners.set(channel.authorId, channel.banners);
+    return channel;
+  };
+  const seenPlaylist = (playlist: PlaylistDto) => {
+    seen(playlist.videos);
+    if (playlist.thumbnail !== undefined) covers.set(playlist.playlistId, [{ url: playlist.thumbnail }]);
+    return playlist;
+  };
+  // What each search has answered so far, so a page that brings nothing new
+  // ends it: the server says nothing about how many pages there are, and its
+  // page is its own size, whatever `limit` asked for.
+  const searches = new Map<string, Set<string>>();
   const absolute = (url: string) => (url.startsWith('//') ? `https:${url}` : /^[a-z]+:\/\//i.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);
 
   const videoOf = async (id: string, signal?: CancelSignal): Promise<VideoDto> => {
@@ -194,13 +226,24 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const term = query.term?.trim();
       if (term) {
         const page = query.cursor === undefined ? 1 : Number(query.cursor);
-        const videos = readVideos(
-          await client.get('/api/v1/search', { q: term, type: 'video', sort: SORTS[query.sort.by], page }, signal),
+        // Absent, a search answers with what the kind holds — videos — as it always did.
+        const type = query.scope ?? 'video';
+        const results = readSearchResults(
+          await client.get('/api/v1/search', { q: term, type, sort: SORTS[query.sort.by], page }, signal),
         );
-        const items = toItems(seen(videos), connectionId);
-        // The server says nothing about how many pages there are: a full page
-        // means there may be another, an empty one ends it.
-        return { items, ...(items.length >= query.limit ? { nextCursor: String(page + 1) } : {}) };
+        for (const result of results) {
+          if (result.type === 'video') seen([result.video]);
+          else if (result.type === 'channel') seenChannel(result.channel);
+          else seenPlaylist(result.playlist);
+        }
+        const asked = `${type}\n${term}`;
+        if (page === 1) searches.set(asked, new Set());
+        const known = searches.get(asked) ?? new Set<string>();
+        const items = searchToItems(results, connectionId).filter((item) => !known.has(item.key.externalId));
+        for (const item of items) known.add(item.key.externalId);
+        // Another page while this one brought something new; a page of what
+        // was already shown, or of nothing, ends it.
+        return { items, ...(items.length > 0 ? { nextCursor: String(page + 1) } : {}) };
       }
       // Trending and popular are each a single page the server curates.
       if (query.cursor !== undefined) return { items: [] };
@@ -213,13 +256,13 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       if (parsed.kind === 'channel') {
         const channel = readChannel(await client.get(`/api/v1/channels/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!channel) throw new AppError('NOT_FOUND', 'The server no longer has this channel.');
-        if (channel.thumbnails.length > 0) avatars.set(channel.authorId, channel.thumbnails);
-        return { item: channelToItem(channel, connectionId), people: [], studios: [], externalIds: {} };
+        seenChannel(channel);
+        return { item: channelToItem(channel, connectionId), people: [], studios: [], externalIds: {}, sections: CHANNEL_SECTIONS };
       }
       if (parsed.kind === 'playlist') {
         const playlist = readPlaylist(await client.get(`/api/v1/playlists/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!playlist) throw new AppError('NOT_FOUND', 'The server no longer has this playlist.');
-        seen(playlist.videos);
+        seenPlaylist(playlist);
         return { item: playlistToItem(playlist, connectionId), people: [], studios: [], externalIds: {} };
       }
       const video = await videoOf(parsed.id, signal);
@@ -227,18 +270,29 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       return { ...toDetail(video, connectionId), ...(versions.length === 0 ? {} : { versions }) };
     },
 
-    getChildren: async (parent, signal): Promise<ItemPage> => {
+    getChildren: async (parent, signal, query): Promise<ItemPage> => {
       const parsed = parseId(parent.key.externalId);
       if (parsed.kind === 'channel') {
-        // `getChildren` is handed no cursor, so this is the first page the
-        // server gives and nothing more — its `continuation` token has nowhere
-        // to live until the contract carries one.
-        const answer = await client.get(`/api/v1/channels/${encodeURIComponent(parsed.id)}/videos`, {}, signal);
-        return { items: toItems(seen(readVideos(answer)), connectionId) };
+        // A section the channel does not have is its videos, which every channel has.
+        const section = CHANNEL_SECTIONS.find((each) => each.id === query?.section)?.id ?? 'videos';
+        const page = readChannelPage(
+          await client.get(
+            `/api/v1/channels/${encodeURIComponent(parsed.id)}/${section}`,
+            query?.cursor === undefined ? {} : { continuation: query.cursor },
+            signal,
+          ),
+        );
+        const items =
+          section === 'playlists'
+            ? page.playlists.map((playlist) => playlistToItem(seenPlaylist(playlist), connectionId))
+            : toItems(seen(page.videos), connectionId);
+        // The server's own token for the page after this one, handed back as it came.
+        return { items, ...(page.continuation === undefined || items.length === 0 ? {} : { nextCursor: page.continuation }) };
       }
       if (parsed.kind === 'playlist') {
+        // One answer holds the whole list: the server pages none.
         const playlist = readPlaylist(await client.get(`/api/v1/playlists/${encodeURIComponent(parsed.id)}`, {}, signal));
-        return { items: playlist ? toItems(seen(playlist.videos), connectionId) : [] };
+        return { items: playlist ? toItems(seenPlaylist(playlist).videos, connectionId) : [] };
       }
       // A video has nothing inside it.
       return { items: [] };
@@ -256,7 +310,8 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const at = value.indexOf('/');
       const kind = value.slice(0, at);
       const id = value.slice(at + 1);
-      const known = kind === 'v' ? thumbnails.get(id) : kind === 'c' ? avatars.get(id) : undefined;
+      const known =
+        kind === 'v' ? thumbnails.get(id) : kind === 'c' ? avatars.get(id) : kind === 'b' ? banners.get(id) : kind === 'p' ? covers.get(id) : undefined;
       const chosen = known && pickThumbnail(known, size.width);
       if (!chosen) return null;
       const uri = absolute(chosen.url);

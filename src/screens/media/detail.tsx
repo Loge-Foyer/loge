@@ -1,4 +1,4 @@
-import type { ConnectionId, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
+import type { ConnectionId, Creator, DownloadOption, Episode, ImageRef, MediaCapability, MediaDetail, MediaItem, MediaVersion, Person, PluginId, Show } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { CirclePlay } from '@tamagui/lucide-icons-2/icons/CirclePlay';
@@ -10,8 +10,6 @@ import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
-import { UserCheck } from '@tamagui/lucide-icons-2/icons/UserCheck';
-import { UserPlus } from '@tamagui/lucide-icons-2/icons/UserPlus';
 import { useMutation } from '@tanstack/react-query';
 import { Link, router, Stack } from 'expo-router';
 import { useState } from 'react';
@@ -25,7 +23,7 @@ import { EyeFilled } from '@/components/icons';
 import { Menu, MenuHeader, MenuNote, MenuRow, MoreButton } from '@/components/more-menu';
 import { CARD_FOCUSED, isTV, useRemoteFocus } from '@/components/remote';
 import { Chip, ChipRow } from '@/components/chip';
-import { episodeCode, fileSize, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
+import { episodeCode, fileSize, followersLabel, formatCommunityRating, formatName, formatRuntime, hdrName, resolutionName, spatialName, timeLeft } from '@/components/labels';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
 import { itemHref, keyHref, playHref, routeId } from '@/components/media/item-link';
 import { SourceNotices } from '@/components/media/source-notices';
@@ -35,12 +33,14 @@ import { Screen } from '@/components/screen';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useDownloadActions, useDownloadBudget, useDownloadOf, useDownloadOptions } from '@/hooks/use-downloads';
-import { useFollows, useListActions, usePlaylists } from '@/hooks/use-lists';
+import { useListActions, usePlaylists } from '@/hooks/use-lists';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import type { SourceError } from '@/services/media';
+
+import { CollectionPage } from './channel';
 import type { PlayerSummary } from '@/services/players';
 import type { Playlist } from '@/services/ports';
 
@@ -108,22 +108,19 @@ function Detail({
   /** The source could not answer; this page shows what was saved from it. */
   sourceError?: SourceError;
 }) {
-  const { item, people, studios, tagline, versions } = detail;
+  const { item, people, studios, tagline, versions, creator } = detail;
   const refresh = useRefreshMedia();
+  if (item.type === 'channel' || item.type === 'playlist') {
+    return <CollectionPage detail={{ ...detail, item }} showWatch={showWatch} canFollow={canFollow} {...(sourceError ? { sourceError } : {})} />;
+  }
   return (
     <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
       <Hero item={item} />
       <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={px(1100)} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
-        <Actions
-          item={item}
-          canPlay={canPlay}
-          canMarkWatched={canMarkWatched}
-          canDownload={canDownload}
-          offersChoices={offersChoices}
-          canFollow={canFollow}
-        />
+        <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} canDownload={canDownload} offersChoices={offersChoices} />
+        {creator ? <CreatorRow creator={creator} /> : null}
         {showWatch ? <WatchState item={item} /> : null}
         {tagline ? (
           <SizableText size="$5" color="$color11" fontStyle="italic">
@@ -252,14 +249,12 @@ function Actions({
   canMarkWatched,
   canDownload,
   offersChoices,
-  canFollow,
 }: {
   item: MediaItem;
   canPlay: boolean;
   canMarkWatched: boolean;
   canDownload: boolean;
   offersChoices: boolean;
-  canFollow: boolean;
 }) {
   const userId = useActiveUserId();
   const { watch } = useServices();
@@ -274,12 +269,9 @@ function Actions({
   const resumeAt = item.watch && !item.watch.played ? item.watch.positionMs : undefined;
   // "Play with…" offers the players that are on and can play here — and only when there is a choice.
   const here = players.filter((player) => player.enabled && player.playsHere);
-  // A channel or a playlist is a `show`: something you open to find things
-  // inside it, and the only shape worth following.
-  const followable = canFollow && item.type === 'show';
   // A list may hold anything playable from any source, so it is offered wherever Play is.
   const hasMenu = playable || keepable;
-  if (!playable && !canMarkWatched && !followable && !hasMenu) return null;
+  if (!playable && !canMarkWatched && !hasMenu) return null;
   const play = (startMs?: number, player?: PluginId) =>
     router.push(playHref(item.key, { ...(startMs ? { startMs } : {}), ...(player ? { player } : {}) }));
   const played = item.watch?.played ?? false;
@@ -306,7 +298,6 @@ function Actions({
             onPress={() => mark.mutate(!played)}
           />
         ) : null}
-        {followable ? <FollowButton channel={item} /> : null}
         {hasMenu && isTV ? <ActionButton icon={<Ellipsis size={20} />} label="More" onPress={openMenu} /> : null}
       </XStack>
       {hasMenu ? (
@@ -325,15 +316,30 @@ function Actions({
   );
 }
 
-/** Follow a channel, so its newest reaches this profile's feed. */
-function FollowButton({ channel }: { channel: MediaItem }) {
-  const { data: following } = useFollows(channel.key.connectionId, channel.key.externalId);
-  const { follow, unfollow } = useListActions();
-  const busy = follow.isPending || unfollow.isPending;
-  return following ? (
-    <ActionButton icon={<UserCheck size={18} />} label="Following" disabled={busy} onPress={() => unfollow.mutate(following.id)} />
-  ) : (
-    <ActionButton icon={<UserPlus size={18} />} label="Follow" disabled={busy} onPress={() => follow.mutate(channel)} />
+/** The channel behind a video: its face and name, opening its page. */
+function CreatorRow({ creator }: { creator: Creator }) {
+  const { focused, handlers } = useRemoteFocus();
+  return (
+    <Link href={keyHref(creator.key)} asChild>
+      <Pressable accessibilityRole="link" accessibilityLabel={`${creator.name}, the channel`} {...handlers}>
+        {({ pressed }) => (
+          <XStack gap="$3" items="center" opacity={pressed ? 0.8 : 1} self="flex-start">
+            <Artwork connectionId={creator.key.connectionId} image={creator.avatar} width={px(40)} aspect={1} label={creator.name} rounded={999} />
+            <YStack>
+              <SizableText size="$4" fontWeight="600" color={focused ? '$accent11' : '$color12'}>
+                {creator.name}
+              </SizableText>
+              {creator.followers === undefined ? null : (
+                <SizableText size="$2" color="$color10">
+                  {followersLabel(creator.followers)}
+                </SizableText>
+              )}
+            </YStack>
+            <ChevronRight size={18} color="$color10" />
+          </XStack>
+        )}
+      </Pressable>
+    </Link>
   );
 }
 

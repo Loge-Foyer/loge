@@ -20,7 +20,12 @@ export type HeadersRef = Brand<string, 'HeadersRef'>;
 export const imageRef = (value: string): ImageRef => value as ImageRef;
 export const headersRef = (value: string): HeadersRef => value as HeadersRef;
 
-export type MediaItemType = 'movie' | 'show' | 'season' | 'episode';
+/**
+ * The shape of an item. A web video is a `movie`: one playable thing with a
+ * page of its own. A `channel` and a `playlist` are what a video site keeps
+ * its videos in — opened to find them, never played as one.
+ */
+export type MediaItemType = 'movie' | 'show' | 'season' | 'episode' | 'channel' | 'playlist';
 
 export interface MediaImages {
   /** Portrait, 2:3. */
@@ -32,6 +37,8 @@ export interface MediaImages {
   readonly logo?: ImageRef;
   /** A frame at the resume position, where the source can show one. */
   readonly frame?: ImageRef;
+  /** Square, and drawn round: a channel's face. */
+  readonly avatar?: ImageRef;
 }
 
 export interface MediaRatings {
@@ -108,8 +115,44 @@ export interface Episode extends MediaItemBase {
   readonly airDate?: string;
 }
 
+/**
+ * Someone's channel on a video site. Not a show: it has no seasons, and what
+ * it holds comes in sections — its videos, shorts, live streams and playlists
+ * (`MediaDetail.sections`). Its banner is `images.backdrop`, its face
+ * `images.avatar`.
+ */
+export interface VideoChannel extends MediaItemBase {
+  readonly type: 'channel';
+  /** How many follow it, where the site says. */
+  readonly followers?: number;
+  readonly videoCount?: number;
+}
+
+/** A list of videos someone keeps on a video site. Its children are the videos, in its own order. */
+export interface VideoPlaylist extends MediaItemBase {
+  readonly type: 'playlist';
+  readonly videoCount?: number;
+  /** The channel whose list it is, where the site says. */
+  readonly owner?: { readonly key: GlobalMediaKey; readonly name: string };
+}
+
 /** Plain data throughout, so it can be cached, persisted and paged as is. */
-export type MediaItem = Movie | Show | Season | Episode;
+export type MediaItem = Movie | Show | Season | Episode | VideoChannel | VideoPlaylist;
+
+/** One of the sections an item keeps its children in: a channel's videos, shorts, live streams or playlists. */
+export interface ChildSection {
+  /** The source's own name for it, handed back in `ChildQuery.section`. */
+  readonly id: string;
+  readonly label: string;
+}
+
+/** The channel behind a video, so its page can lead there. */
+export interface Creator {
+  readonly key: GlobalMediaKey;
+  readonly name: string;
+  readonly avatar?: ImageRef;
+  readonly followers?: number;
+}
 
 export type PersonKind = 'actor' | 'director' | 'writer' | 'producer' | 'other';
 
@@ -214,6 +257,13 @@ export interface MediaDetail {
    * optional data on its answer, not a capability of its own.
    */
   readonly versions?: readonly MediaVersion[];
+  /** Who made it, where the source says: a video's channel. Absent is "not said". */
+  readonly creator?: Creator;
+  /**
+   * The sections its children come in, in order — a channel's tabs. Absent:
+   * one list, which `getChildren` answers without a section.
+   */
+  readonly sections?: readonly ChildSection[];
 }
 
 export interface Library {

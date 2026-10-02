@@ -3,6 +3,7 @@ import type { BackupManifest, BackupRole } from './backup';
 import type { CapabilityKey, MediaCapability } from './capabilities';
 import type { PlatformId, PluginCategory } from './category';
 import type { ContentKind } from './content';
+import type { SearchScope } from './query';
 import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
 import type { MediaRole } from './media-role';
@@ -12,6 +13,13 @@ export interface MediaRoleManifest {
   /** What this source can bring. */
   readonly contentKinds: readonly ContentKind[];
   readonly capabilities: readonly MediaCapability[];
+  /**
+   * What its search can be narrowed to besides everything — only videos, only
+   * channels, only playlists — honoured through `ItemQuery.scope`. Needs
+   * `search`. Absent: a search answers with what the kind holds, and the app
+   * offers no choice.
+   */
+  readonly searchScopes?: readonly SearchScope[];
 }
 
 /** A boolean setting that can switch capabilities off for one connection. */

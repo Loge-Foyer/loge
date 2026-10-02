@@ -2,6 +2,7 @@ import type { CapabilityKey } from './capabilities';
 import { categoryOfPluginId, PLATFORMS, PLUGIN_CATEGORIES, type PluginCategory } from './category';
 import { isLibrarySelection, type Field } from './fields';
 import { isToggle, type PluginManifest } from './manifest';
+import { SEARCH_SCOPES } from './query';
 
 /** The one block each category declares. */
 const CATEGORY_BLOCKS: Readonly<Record<PluginCategory, readonly Block[]>> = {
@@ -48,6 +49,13 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     if (media.contentKinds.length === 0) problems.push('media role brings no content kind');
     for (const kind of duplicates(media.contentKinds)) problems.push(`content kind "${kind}" is listed twice`);
     for (const c of duplicates(media.capabilities)) problems.push(`media capability "${c}" is listed twice`);
+    if (media.searchScopes !== undefined) {
+      if (!media.capabilities.includes('search')) problems.push('search scopes need the search capability');
+      for (const scope of media.searchScopes) {
+        if (!(SEARCH_SCOPES as readonly string[]).includes(scope)) problems.push(`search scope "${scope}" is not one of ${SEARCH_SCOPES.join(', ')}`);
+      }
+      for (const scope of duplicates(media.searchScopes)) problems.push(`search scope "${scope}" is listed twice`);
+    }
   }
 
   for (const [list, entries] of [

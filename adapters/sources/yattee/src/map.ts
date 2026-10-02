@@ -1,6 +1,6 @@
-import { imageRef, type ConnectionId, type MediaDetail, type MediaItem, type Movie } from '@sc/api';
+import { imageRef, type ChildSection, type ConnectionId, type MediaDetail, type MediaItem, type Movie, type VideoChannel, type VideoPlaylist } from '@sc/api';
 
-import type { ChannelDto, PlaylistDto, ThumbnailDto, VideoDto } from './dto';
+import type { ChannelDto, PlaylistDto, SearchResultDto, ThumbnailDto, VideoDto } from './dto';
 
 /**
  * A video is a `movie`: one playable thing with a page of its own, as against
@@ -12,7 +12,11 @@ function present<K extends string, V>(key: K, value: V | undefined): { readonly 
   return (value === undefined ? {} : { [key]: value }) as { readonly [P in K]?: V };
 }
 
-/** Artwork this adapter can resolve later: `v/<videoId>` or `c/<channelId>`. */
+/**
+ * Artwork this adapter can resolve later: `v/<videoId>`, a channel's face
+ * `c/<channelId>` and its banner `b/<channelId>`, a playlist's own picture
+ * `p/<playlistId>`.
+ */
 export function videoImage(video: VideoDto): string | undefined {
   return video.thumbnails.length > 0 ? `v/${video.videoId}` : undefined;
 }
@@ -20,6 +24,17 @@ export function videoImage(video: VideoDto): string | undefined {
 export function channelImage(channel: ChannelDto): string | undefined {
   return channel.thumbnails.length > 0 ? `c/${channel.authorId}` : undefined;
 }
+
+/** A channel's sections, as the server keeps them: `getChildren` takes their ids. */
+export const CHANNEL_SECTIONS: readonly ChildSection[] = [
+  { id: 'videos', label: 'Videos' },
+  { id: 'shorts', label: 'Shorts' },
+  { id: 'streams', label: 'Live' },
+  { id: 'playlists', label: 'Playlists' },
+];
+
+/** A channel's key: its id, apart from a video's. */
+export const channelKey = (connectionId: ConnectionId, authorId: string) => ({ connectionId, externalId: `channel:${authorId}` });
 
 /** The smallest thumbnail at least as wide as asked — sharp, and no larger — else the widest there is. */
 export function pickThumbnail(thumbnails: readonly ThumbnailDto[], width: number): ThumbnailDto | undefined {
@@ -64,38 +79,58 @@ export function toDetail(video: VideoDto, connectionId: ConnectionId): MediaDeta
     studios: video.author === undefined ? [] : [video.author],
     // The site's own id, so a later feature can reach the original page.
     externalIds: { youtube: video.videoId },
+    // Its channel, so the page leads there.
+    ...(video.author === undefined || video.authorId === undefined
+      ? {}
+      : {
+          creator: {
+            key: channelKey(connectionId, video.authorId),
+            name: video.author,
+            ...(video.authorThumbnails.length > 0 ? { avatar: imageRef(`c/${video.authorId}`) } : {}),
+          },
+        }),
   };
 }
 
 /**
- * A channel and a playlist both browse as a `show`: a thing you open to find
- * the videos inside it. `getChildren` answers with those videos.
+ * A channel: its face and its banner, how many follow it, and what it says
+ * about itself. Its videos, shorts, live streams and playlists are its
+ * children, a section at a time (`CHANNEL_SECTIONS`).
  */
-export function channelToItem(channel: ChannelDto, connectionId: ConnectionId): MediaItem {
+export function channelToItem(channel: ChannelDto, connectionId: ConnectionId): VideoChannel {
   const image = channelImage(channel);
   return {
-    type: 'show',
-    key: { connectionId, externalId: `channel:${channel.authorId}` },
+    type: 'channel',
+    key: channelKey(connectionId, channel.authorId),
     title: channel.author,
     ...present('overview', channel.description),
+    ...present('followers', channel.subCount),
+    ...present('videoCount', channel.videoCount),
     ratings: {},
     genres: [],
-    images: image === undefined ? {} : { poster: imageRef(image), thumb: imageRef(image) },
+    images: {
+      ...(image === undefined ? {} : { avatar: imageRef(image) }),
+      ...(channel.banners.length > 0 ? { backdrop: imageRef(`b/${channel.authorId}`) } : {}),
+    },
   };
 }
 
-export function playlistToItem(playlist: PlaylistDto, connectionId: ConnectionId): MediaItem {
+/** A playlist: its first video's picture, else the one the server named for it, and whose list it is. */
+export function playlistToItem(playlist: PlaylistDto, connectionId: ConnectionId): VideoPlaylist {
   const first = playlist.videos[0];
-  const image = first && videoImage(first);
+  const image = (first && videoImage(first)) ?? (playlist.thumbnail === undefined ? undefined : `p/${playlist.playlistId}`);
   return {
-    type: 'show',
+    type: 'playlist',
     key: { connectionId, externalId: `playlist:${playlist.playlistId}` },
     title: playlist.title,
     ...present('overview', playlist.description),
-    ...present('episodeCount', playlist.videoCount),
+    ...present('videoCount', playlist.videoCount),
+    ...(playlist.author === undefined || playlist.authorId === undefined
+      ? {}
+      : { owner: { key: channelKey(connectionId, playlist.authorId), name: playlist.author } }),
     ratings: {},
     genres: playlist.author === undefined ? [] : [playlist.author],
-    images: image === undefined ? {} : { poster: imageRef(image), thumb: imageRef(image) },
+    images: image === undefined ? {} : { thumb: imageRef(image), backdrop: imageRef(image) },
   };
 }
 
@@ -108,4 +143,15 @@ export function parseId(externalId: string): { readonly kind: 'video' | 'channel
   if (prefix === 'channel') return { kind: 'channel', id };
   if (prefix === 'playlist') return { kind: 'playlist', id };
   return { kind: 'video', id: externalId };
+}
+
+/** A search's answers, each as what it is. */
+export function searchToItems(results: readonly SearchResultDto[], connectionId: ConnectionId): readonly MediaItem[] {
+  return results.map((result) =>
+    result.type === 'channel'
+      ? channelToItem(result.channel, connectionId)
+      : result.type === 'playlist'
+        ? playlistToItem(result.playlist, connectionId)
+        : toItem(result.video, connectionId),
+  );
 }

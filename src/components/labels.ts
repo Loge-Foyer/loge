@@ -292,6 +292,36 @@ export function formatCommunityRating(rating: number): string {
   return rating.toFixed(1);
 }
 
+/**
+ * A count as a video site writes it: 980, 12K, 1.2M. Spelled by hand — Hermes
+ * may lack `Intl.NumberFormat`'s compact notation.
+ */
+export function compactCount(count: number): string {
+  const units: readonly (readonly [number, string])[] = [
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ];
+  for (const [size, unit] of units) {
+    if (count >= size) {
+      const value = count / size;
+      // One decimal below ten — 1.2M — and none above: 12M, 120K.
+      return `${value < 10 ? Math.floor(value * 10) / 10 : Math.floor(value)}${unit}`;
+    }
+  }
+  return String(Math.round(count));
+}
+
+/** "1.2M followers", "1 follower". */
+export function followersLabel(count: number): string {
+  return count === 1 ? '1 follower' : `${compactCount(count)} followers`;
+}
+
+/** "24 videos", "1 video". */
+export function videoCountLabel(count: number): string {
+  return count === 1 ? '1 video' : `${compactCount(count)} videos`;
+}
+
 const ERROR_TEXT: Readonly<Partial<Record<AppErrorCode, string>>> = {
   OFFLINE: 'is not reachable right now.',
   UNAUTHORIZED: 'did not accept the sign-in. Check it in Settings.',

@@ -20,6 +20,8 @@ export const plugin: Plugin = {
     media: {
       contentKinds: ['videos'],
       capabilities: ['browse', 'search', 'feed', 'playback', 'remoteImages', 'offlineMetadata', 'downloads', 'downloadOptions'],
+      // The server's search takes a `type`: everything, or only videos, channels or playlists.
+      searchScopes: ['all', 'video', 'channel', 'playlist'],
     },
     connectionFields: [
       {

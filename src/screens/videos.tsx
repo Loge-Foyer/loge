@@ -1,4 +1,4 @@
-import type { ContentKind, MediaItem } from '@sc/api';
+import { SEARCH_SCOPES, type ContentKind, type MediaItem, type SearchScope } from '@sc/api';
 import { FlashList } from '@shopify/flash-list';
 import { ListMusic } from '@tamagui/lucide-icons-2/icons/ListMusic';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
@@ -11,6 +11,7 @@ import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, listKinds, listNames } from '@/components/labels';
+import { ChannelCard } from '@/components/media/channel-card';
 import { LandscapeCard } from '@/components/media/landscape-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
@@ -27,6 +28,14 @@ import { TAB_CONTENT } from '@/services/tab-content';
 
 const PADDING = 16;
 const GAP = 12;
+
+/** What a search may be narrowed to, as the selector names it. */
+const SCOPE_LABELS: Readonly<Record<SearchScope, string>> = {
+  all: 'All',
+  video: 'Video',
+  channel: 'Channel',
+  playlist: 'Playlist',
+};
 
 /**
  * Web video and plain files, one source at a time — a tab across the top for
@@ -68,11 +77,14 @@ function SourceVideos({
 }) {
   const [term, setTerm] = useState('');
   const searching = term.trim().length > 0;
+  // What this source's search can be narrowed to, in the selector's order; "All" first where it has it.
+  const scopes = SEARCH_SCOPES.filter((each) => selected.manifest.media?.searchScopes?.includes(each) ?? false);
+  const [scope, setScope] = useState<SearchScope | undefined>(scopes[0]);
   const grid = useGrid({
     kind,
     sort: { by: 'addedAt', order: 'desc' },
     connectionId: selected.connection.id,
-    ...(searching ? { term } : {}),
+    ...(searching ? { term, ...(scope === undefined ? {} : { scope }) } : {}),
   });
   const onTerm = useCallback((next: string) => setTerm(next), []);
   const refresh = useRefreshMedia();
@@ -111,7 +123,7 @@ function SourceVideos({
       contentContainerStyle={{ paddingHorizontal: PADDING - GAP / 2, paddingTop: 12, paddingBottom: 48 }}
       renderItem={({ item }: { item: MediaItem }) => (
         <YStack px={GAP / 2} pb="$5" items="center">
-          <LandscapeCard item={item} width={cardWidth} showWatch={showWatch} />
+          {item.type === 'channel' ? <ChannelCard item={item} width={cardWidth} /> : <LandscapeCard item={item} width={cardWidth} showWatch={showWatch} />}
         </YStack>
       )}
       ListHeaderComponent={
@@ -132,7 +144,15 @@ function SourceVideos({
           ) : null}
           {canSearch ? (
             // Each search is a request to the source, so only the search key sends one.
-            <SearchField placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`} term={term} onTerm={onTerm} searchOn="submit" />
+            <SearchField
+              placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`}
+              term={term}
+              onTerm={onTerm}
+              searchOn="submit"
+              {...(scope === undefined || scopes.length < 2
+                ? {}
+                : { scope: { value: scope, options: scopes, label: (option: SearchScope) => SCOPE_LABELS[option], onChange: setScope } })}
+            />
           ) : null}
           <XStack>
             <Link href="/lists" asChild>

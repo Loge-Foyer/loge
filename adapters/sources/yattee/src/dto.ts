@@ -79,6 +79,8 @@ export interface VideoDto {
   readonly viewCount?: number;
   readonly isLive?: boolean;
   readonly thumbnails: readonly ThumbnailDto[];
+  /** Its channel's face, where the answer carries it — a video's own page does. */
+  readonly authorThumbnails: readonly ThumbnailDto[];
   readonly formatStreams: readonly FormatDto[];
   readonly adaptiveFormats: readonly FormatDto[];
   readonly captions: readonly CaptionDto[];
@@ -90,7 +92,10 @@ export interface ChannelDto {
   readonly author: string;
   readonly description?: string;
   readonly subCount?: number;
+  readonly videoCount?: number;
   readonly thumbnails: readonly ThumbnailDto[];
+  /** The wide picture across the top of its page. */
+  readonly banners: readonly ThumbnailDto[];
 }
 
 export interface PlaylistDto {
@@ -98,8 +103,24 @@ export interface PlaylistDto {
   readonly title: string;
   readonly description?: string;
   readonly author?: string;
+  readonly authorId?: string;
   readonly videoCount?: number;
+  /** A search or a channel's list names one picture for it, where it names no videos. */
+  readonly thumbnail?: string;
   readonly videos: readonly VideoDto[];
+}
+
+/** One answer of a search, which may mix videos, channels and playlists. */
+export type SearchResultDto =
+  | { readonly type: 'video'; readonly video: VideoDto }
+  | { readonly type: 'channel'; readonly channel: ChannelDto }
+  | { readonly type: 'playlist'; readonly playlist: PlaylistDto };
+
+/** One page of a channel's section: its videos — or, for its playlists, those — and where the next page starts. */
+export interface ChannelPageDto {
+  readonly videos: readonly VideoDto[];
+  readonly playlists: readonly PlaylistDto[];
+  readonly continuation?: string;
 }
 
 export interface InfoDto {
@@ -172,6 +193,7 @@ export function readVideo(value: unknown): VideoDto | undefined {
     ...present('isLive', video.liveNow === true || video.isLive === true ? true : undefined),
     ...present('genre', text(video.genre)),
     thumbnails: readThumbnails(video.videoThumbnails ?? video.thumbnails),
+    authorThumbnails: readThumbnails(video.authorThumbnails),
     formatStreams: readFormats(video.formatStreams),
     adaptiveFormats: readFormats(video.adaptiveFormats),
     captions: list(video.captions).flatMap((entry) => readCaption(entry) ?? []),
@@ -195,7 +217,9 @@ export function readChannel(value: unknown): ChannelDto | undefined {
     author,
     ...present('description', text(channel.description)),
     ...present('subCount', number(channel.subCount)),
+    ...present('videoCount', number(channel.videoCount)),
     thumbnails: readThumbnails(channel.authorThumbnails ?? channel.thumbnails),
+    banners: readThumbnails(channel.authorBanners),
   };
 }
 
@@ -209,8 +233,43 @@ export function readPlaylist(value: unknown): PlaylistDto | undefined {
     title,
     ...present('description', text(playlist.description)),
     ...present('author', text(playlist.author)),
+    ...present('authorId', text(playlist.authorId)),
     ...present('videoCount', number(playlist.videoCount)),
+    ...present('thumbnail', text(playlist.playlistThumbnail)),
     videos: list(playlist.videos).flatMap((entry) => readVideo(entry) ?? []),
+  };
+}
+
+/**
+ * A search's answers, each by the `type` it says it is — a video when it says
+ * nothing, as the server's own default is. One it cannot read is dropped,
+ * never guessed at.
+ */
+export function readSearchResults(value: unknown): readonly SearchResultDto[] {
+  const wrapped = record(value);
+  const entries = Array.isArray(value) ? value : list(wrapped?.items ?? wrapped?.results);
+  return entries.flatMap((entry): SearchResultDto[] => {
+    const type = text(record(entry)?.type) ?? 'video';
+    if (type === 'channel') {
+      const channel = readChannel(entry);
+      return channel ? [{ type: 'channel', channel }] : [];
+    }
+    if (type === 'playlist') {
+      const playlist = readPlaylist(entry);
+      return playlist ? [{ type: 'playlist', playlist }] : [];
+    }
+    const video = type === 'video' ? readVideo(entry) : undefined;
+    return video ? [{ type: 'video', video }] : [];
+  });
+}
+
+/** `/channels/{id}/{section}`: its videos, or its playlists, and the token for the next page. */
+export function readChannelPage(value: unknown): ChannelPageDto {
+  const page = record(value);
+  return {
+    videos: list(page?.videos).flatMap((entry) => readVideo(entry) ?? []),
+    playlists: list(page?.playlists).flatMap((entry) => readPlaylist(entry) ?? []),
+    ...present('continuation', text(page?.continuation)),
   };
 }
 

@@ -20,9 +20,9 @@ without learning about the others.
 | `user.ts` | `AppUser` — a profile. |
 | `effective.ts` | What a connection may actually do: declared capabilities, less what a toggle switched off. |
 | `validate.ts` | `validateManifest()` — the rules every manifest must satisfy. |
-| `media.ts` | `MediaItem` (movie, show, season, episode), `GlobalMediaKey`, `MediaDetail`, `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. Also what a file *is* — `MediaVersion` with its video, audio and subtitle streams, plus the `HdrFormat`, `SpatialAudio` and `SubtitleDelivery` vocabularies that `playback.ts` shares. |
+| `media.ts` | `MediaItem` (movie, show, season, episode, and a video site's channel and playlist), `GlobalMediaKey`, `MediaDetail` — with the `Creator` behind a video and a channel's `ChildSection`s — `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. Also what a file *is* — `MediaVersion` with its video, audio and subtitle streams, plus the `HdrFormat`, `SpatialAudio` and `SubtitleDelivery` vocabularies that `playback.ts` shares. |
 | `live.ts` | `ChannelGroup`, `Channel`, `Programme`, and the queries for channels and the guide. |
-| `query.ts` | `ItemQuery`, `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
+| `query.ts` | `ItemQuery` with a search's `SearchScope`, `ChildQuery` (a section and a cursor), `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `playback.ts` | What to play: `PlaybackDescriptor` and its sources, audio and subtitle tracks; `PlayerProfile`, what an engine plays; `PlaybackRequest`; and `PlaybackReport`, what playing reports back to a source. |
 | `player.ts` | The player role: `MediaPlayer`, `PlayerEvent`, `PlayerManifest`, and the pure `canPlay()`, `missingFor()` and `choosePlayer()`. |
 | `errors.ts` | `AppError`: a code from the spec, a retry hint, and an optional reason. |

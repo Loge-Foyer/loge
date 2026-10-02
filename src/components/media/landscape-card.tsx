@@ -1,11 +1,12 @@
 import type { MediaItem } from '@sc/api';
+import { ListVideo } from '@tamagui/lucide-icons-2/icons/ListVideo';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { Link } from 'expo-router';
 import { Pressable } from 'react-native';
 import { SizableText, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
-import { episodeCode, timeLeft } from '@/components/labels';
+import { episodeCode, timeLeft, videoCountLabel } from '@/components/labels';
 import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
 
 import { progressOf, ProgressBar, WatchedBadge } from './badges';
@@ -40,7 +41,9 @@ export function LandscapeCard({
   const subtitle =
     item.type === 'episode'
       ? [episodeCode(item), item.title].filter(Boolean).join(' · ')
-      : (timeLeft(item) ?? (item.year === undefined ? '' : String(item.year)));
+      : item.type === 'playlist'
+        ? (item.owner?.name ?? '')
+        : (timeLeft(item) ?? (item.year === undefined ? '' : String(item.year)));
 
   const card = { item, width, title, subtitle, showWatch, preferred, onFocus: () => onFocusItem?.(item) };
   return resumes ? <SplitCard {...card} /> : <WholeCard {...card} />;
@@ -136,6 +139,15 @@ function Picture({
             <Play size={20} color="white" fill="white" />
           </YStack>
         </YStack>
+      ) : null}
+      {item.type === 'playlist' && item.videoCount !== undefined ? (
+        // A playlist says how much is in it, where a video would say how long it is.
+        <XStack position="absolute" r="$1.5" b="$1.5" gap="$1" items="center" px="$1.5" py="$0.5" rounded="$2" bg="rgba(7, 9, 10, 0.72)">
+          <ListVideo size={12} color="white" />
+          <SizableText size="$1" fontWeight="700" color="white">
+            {videoCountLabel(item.videoCount)}
+          </SizableText>
+        </XStack>
       ) : null}
       {showWatch && item.watch?.played ? <WatchedBadge /> : null}
       {progress === undefined ? null : <ProgressBar value={progress} />}

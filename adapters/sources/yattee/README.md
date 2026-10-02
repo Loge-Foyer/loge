@@ -43,17 +43,24 @@ credential store once per connected provider and builds one header.
 
 ## What it can do
 
-`browse`, `search`, `playback`, `remoteImages`, `offlineMetadata`.
+`browse`, `search`, `feed`, `playback`, `remoteImages`, `offlineMetadata`,
+`downloads` and `downloadOptions` — and `searchScopes`: all, video, channel,
+playlist.
 
 - **`check()`** asks `/health`, which is open before setup, and then `/info`,
   which is not — so one press proves both the address and the sign-in.
 - **`listItems`** answers `/api/v1/trending` with no term and `/api/v1/search`
-  with one. Trending is a single page the server curates. Search pages while a
-  page comes back full, because the server says nothing about how many there
-  are. The sort is mapped to the server's nearest order; pages come in the
-  server's own.
-- **`getItem` and `getChildren`** also open a channel (`channel:<id>`) or a
-  playlist (`playlist:<id>`), each as a `show` with videos inside it.
+  with one, its `type` the query's scope — `video` when none is asked. A mixed
+  answer is mapped item by item, as what each says it is. Trending is a
+  single page the server curates. Search pages while a page brings something
+  it has not answered yet: the server says nothing about how many pages there
+  are, and its page is its own size whatever `limit` asks. The sort is mapped
+  to the server's nearest order; pages come in the server's own.
+- **`getItem` and `getChildren`** also open a channel (`channel:<id>`) — its
+  face, banner and followers, and its sections: videos, shorts, live streams
+  and playlists, each paged by the server's `continuation` — or a playlist
+  (`playlist:<id>`), whose videos come in one answer. A video's detail names
+  its channel (`creator`).
 - **`resolveImage`** draws a picture from the address the server gave for it
   — the smallest at least as wide as asked. A server that proxies pictures
   hands out its own `/api/v1/thumbnails/<id>/<file>?token=…`: its Basic
@@ -62,8 +69,9 @@ credential store once per connected provider and builds one header.
   hands out the site's CDN. Only the server's own address carries the
   `headersRef` the host resolves to the Basic header; another host never sees
   it.
-  - **The addresses live in memory**, from each answer. A ref names the video
-    or the channel (`v/<id>`, `c/<id>`) and nothing that expires, because saved
+  - **The addresses live in memory**, from each answer. A ref names the video,
+    the channel's face or banner, or a playlist (`v/<id>`, `c/<id>`, `b/<id>`,
+    `p/<id>`) and nothing that expires, because saved
     lists and kept copies hold refs for longer than a day. A picture no answer
     has named yet draws its plate until one does, and the host draws again
     when the source answers.
@@ -98,7 +106,5 @@ signed into the addresses the server hands out. Pictures use those addresses
 now (above); that is tested against the fake, and not yet seen on the real
 server. Captions already took the server's addresses as given.
 
-Still to confirm: what `/api/v1/channels/{id}/videos` returns for
-`continuation`, which has nowhere to live until `getChildren` carries a cursor.
 
 See `adapters/docs/writing-a-plugin/`.

@@ -59,6 +59,16 @@ describe('validateManifest', () => {
     expect(problems).toContain('connection field "apiToken" looks secret but is not a password field');
   });
 
+  it('takes search scopes only with search, and only known ones', () => {
+    expect(problemsWith({ media: { contentKinds: ['videos'], capabilities: ['browse', 'search', 'offlineMetadata'], searchScopes: ['all', 'channel'] } })).toEqual([]);
+    expect(problemsWith({ media: { contentKinds: ['videos'], capabilities: ['browse', 'offlineMetadata'], searchScopes: ['channel'] } })).toContain(
+      'search scopes need the search capability',
+    );
+    expect(
+      problemsWith({ media: { contentKinds: ['videos'], capabilities: ['browse', 'search', 'offlineMetadata'], searchScopes: ['channel', 'channel', 'shorts' as never] } }),
+    ).toEqual(['search scope "shorts" is not one of all, video, channel, playlist', 'search scope "channel" is listed twice']);
+  });
+
   it('rejects a gate on an undeclared capability', () => {
     const problems = problemsWith({
       settings: [...sound.settings, { key: 'showSearch', label: 'Search', type: 'boolean', default: true, gates: ['media.search'] }],

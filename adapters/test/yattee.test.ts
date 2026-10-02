@@ -7,6 +7,7 @@ import {
   type FieldValues,
   type ItemPage,
   type PlayerProfile,
+  type SearchScope,
 } from '@sc/api';
 import { plugin } from '@sc/source-yattee';
 import { describe, expect, it } from 'vitest';
@@ -42,7 +43,10 @@ async function connect(options: {
   return { provider, http, fake };
 }
 
-function listVideos(provider: ConnectedMediaProvider, options: { term?: string; cursor?: string } = {}): Promise<ItemPage> {
+function listVideos(
+  provider: ConnectedMediaProvider,
+  options: { term?: string; cursor?: string; scope?: SearchScope } = {},
+): Promise<ItemPage> {
   const listItems = provider.listItems;
   if (!listItems) throw new Error('listItems is missing');
   return listItems({
@@ -51,6 +55,7 @@ function listVideos(provider: ConnectedMediaProvider, options: { term?: string; 
     limit: 2,
     ...(options.term ? { term: options.term } : {}),
     ...(options.cursor ? { cursor: options.cursor } : {}),
+    ...(options.scope ? { scope: options.scope } : {}),
   });
 }
 
@@ -129,7 +134,7 @@ describe('Yattee — browsing', () => {
     expect(page.nextCursor).toBeUndefined();
   });
 
-  it('searches, and pages while a page comes back full', async () => {
+  it('searches, and pages while a page brings something new', async () => {
     const { provider, http } = await connect({
       routes: { 'GET /api/v1/search': { status: 200, json: fixtures.searchResults } },
     });
@@ -142,11 +147,41 @@ describe('Yattee — browsing', () => {
     expect(page.nextCursor).toBe('2');
   });
 
-  it('ends paging when a page comes back short', async () => {
+  it('pages on from a page smaller than asked for, which is the server’s own size', async () => {
     const { provider } = await connect({
       routes: { 'GET /api/v1/search': { status: 200, json: [fixtures.searchResults[0]] } },
     });
-    expect((await listVideos(provider, { term: 'one' })).nextCursor).toBeUndefined();
+    expect((await listVideos(provider, { term: 'one' })).nextCursor).toBe('2');
+  });
+
+  it('ends a search at a page that brings nothing new', async () => {
+    // A server that answers every page with the same videos.
+    const { provider } = await connect({ routes: { 'GET /api/v1/search': { status: 200, json: fixtures.searchResults } } });
+    const first = await listVideos(provider, { term: 'again' });
+    const second = await listVideos(provider, { term: 'again', cursor: first.nextCursor ?? '' });
+    expect(second.items).toEqual([]);
+    expect(second.nextCursor).toBeUndefined();
+    // A new search starts afresh, and finds them again.
+    expect((await listVideos(provider, { term: 'again' })).items).toHaveLength(2);
+  });
+
+  it('narrows a search to channels or playlists, and maps each answer as what it is', async () => {
+    const { provider, http } = await connect({ routes: { 'GET /api/v1/search': { status: 200, json: fixtures.mixedResults } } });
+    const page = await listVideos(provider, { term: 'some', scope: 'all' });
+    expect(http.to('GET /api/v1/search')[0]?.query.type).toBe('all');
+    expect(page.items.map((item) => [item.type, item.title])).toEqual([
+      ['movie', 'A found video'],
+      ['channel', 'Some Channel'],
+      ['playlist', 'Things worth rewatching'],
+    ]);
+    const channel = page.items[1];
+    expect(channel?.type === 'channel' ? channel.followers : undefined).toBe(1_234_567);
+    expect(channel?.key.externalId).toBe('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
+    const playlist = page.items[2];
+    expect(playlist?.type === 'playlist' ? playlist.owner?.name : undefined).toBe('Some Channel');
+
+    await listVideos(provider, { term: 'some', scope: 'channel' });
+    expect(http.to('GET /api/v1/search')[1]?.query.type).toBe('channel');
   });
 
   it('answers nothing for a kind it does not bring', async () => {
@@ -172,6 +207,9 @@ describe('Yattee — browsing', () => {
     expect(detail.item.year).toBe(2010);
     expect(detail.item.genres).toEqual(['Some Channel']);
     expect(detail.externalIds).toEqual({ youtube: 'dQw4w9WgXcQ' });
+    // Its channel, so the page leads there.
+    expect(detail.creator?.key.externalId).toBe('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
+    expect(detail.creator?.name).toBe('Some Channel');
   });
 
   it('opens a channel and a playlist as things with videos inside', async () => {
@@ -187,15 +225,41 @@ describe('Yattee — browsing', () => {
     if (!getItem || !getChildren) throw new Error('browse members are missing');
 
     const channel = await getItem('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
-    expect(channel.item.type).toBe('show');
+    expect(channel.item.type).toBe('channel');
     expect(channel.item.title).toBe('Some Channel');
+    expect(channel.sections?.map((section) => section.label)).toEqual(['Videos', 'Shorts', 'Live', 'Playlists']);
     const inChannel = await getChildren(channel.item);
     expect(inChannel.items.map((item) => item.title)).toEqual(['The channel’s newest', 'The one before it']);
 
     const playlist = await getItem('playlist:PLabcdefghij');
+    expect(playlist.item.type).toBe('playlist');
     expect(playlist.item.title).toBe('Things worth rewatching');
     const inPlaylist = await getChildren(playlist.item);
     expect(inPlaylist.items).toHaveLength(2);
+  });
+
+  it('pages a channel’s section by the token the server hands out', async () => {
+    const { provider, http } = await connect({
+      routes: {
+        'GET /api/v1/channels/UCuAXFkgsw1L7xaCfnd5JJOw': { status: 200, json: fixtures.channel },
+        'GET /api/v1/channels/UCuAXFkgsw1L7xaCfnd5JJOw/shorts': { status: 200, json: { ...fixtures.channelVideos, continuation: 'next-token' } },
+        'GET /api/v1/channels/UCuAXFkgsw1L7xaCfnd5JJOw/playlists': { status: 200, json: fixtures.channelPlaylists },
+      },
+    });
+    const getItem = provider.getItem;
+    const getChildren = provider.getChildren;
+    if (!getItem || !getChildren) throw new Error('browse members are missing');
+    const channel = (await getItem('channel:UCuAXFkgsw1L7xaCfnd5JJOw')).item;
+
+    const shorts = await getChildren(channel, undefined, { section: 'shorts' });
+    expect(shorts.nextCursor).toBe('next-token');
+    await getChildren(channel, undefined, { section: 'shorts', cursor: 'next-token' });
+    expect(http.to('GET /api/v1/channels/UCuAXFkgsw1L7xaCfnd5JJOw/shorts')[1]?.query.continuation).toBe('next-token');
+
+    const playlists = await getChildren(channel, undefined, { section: 'playlists' });
+    expect(playlists.items.map((item) => [item.type, item.title])).toEqual([['playlist', 'Things worth rewatching']]);
+    // No token, no next page.
+    expect(playlists.nextCursor).toBeUndefined();
   });
 });
 
@@ -285,10 +349,14 @@ describe('Yattee — artwork', () => {
     const resolveImage = provider.resolveImage;
     if (!getItem || !resolveImage) throw new Error('image members are missing');
     const detail = await getItem('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
-    const ref = detail.item.images.poster;
+    const ref = detail.item.images.avatar;
     if (!ref) throw new Error('no avatar');
     expect(resolveImage(ref, { width: 90 })?.uri).toBe('https://i.example/avatar100.jpg');
     expect(resolveImage(ref, { width: 400 })?.uri).toBe('https://i.example/avatar512.jpg');
+    // And its banner, the wide picture across its page.
+    const banner = detail.item.images.backdrop;
+    if (!banner) throw new Error('no banner');
+    expect(resolveImage(banner, { width: 1200 })?.uri).toBe('https://i.example/banner2120.jpg');
   });
 
   it('resolves the header to the same Basic sign-in', async () => {

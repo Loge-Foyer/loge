@@ -91,8 +91,17 @@ export function useGrid(spec: RowSpec | undefined) {
     [saved.data, searching],
   );
   return useInfiniteQuery({
-    // The term is part of the key: one query's answers never show under another's.
-    queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.connectionId, spec?.term?.trim() || undefined),
+    // The term and its scope are part of the key: one query's answers never show under another's.
+    queryKey: remoteKey(
+      userId,
+      'grid',
+      spec?.kind,
+      spec?.sort.by,
+      spec?.sort.order,
+      spec?.connectionId,
+      spec?.term?.trim() || undefined,
+      searching ? spec?.scope : undefined,
+    ),
     queryFn: ({ pageParam, signal }) => {
       if (!spec) throw new Error('No row to show.');
       return media.gridPage(userId, spec, pageParam, GRID_PAGE, signal);
@@ -127,6 +136,27 @@ export function useChildren(parent: MediaItem | undefined) {
       if (!parent) throw new Error('Nothing to list.');
       return media.children(userId, parent, signal);
     },
+    staleTime: 2 * MINUTE,
+    enabled: parent !== undefined,
+    ...remote,
+  });
+}
+
+/**
+ * One section of an item's children — a channel's videos, its playlists — a
+ * page at a time, for as long as the source has another.
+ */
+export function useChildPages(parent: MediaItem | undefined, section: string | undefined) {
+  const userId = useActiveUserId();
+  const { media } = useServices();
+  return useInfiniteQuery({
+    queryKey: remoteKey(userId, 'children', parent?.key.connectionId, parent?.key.externalId, 'pages', section),
+    queryFn: ({ pageParam, signal }) => {
+      if (!parent) throw new Error('Nothing to list.');
+      return media.children(userId, parent, signal, { ...(section === undefined ? {} : { section }), ...(pageParam ? { cursor: pageParam } : {}) });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor ?? null,
     staleTime: 2 * MINUTE,
     enabled: parent !== undefined,
     ...remote,

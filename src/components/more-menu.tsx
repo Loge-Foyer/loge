@@ -48,9 +48,26 @@ export function MoreButton({ label, onPress }: { label: string; onPress: () => v
  * a portal, which a native screen can cover, and the system's alert takes no
  * more than three buttons on Android.
  */
-export function Menu({ open, label, onClose, children }: { open: boolean; label: string; onClose: () => void; children: ReactNode }) {
+export function Menu({
+  open,
+  label,
+  onClose,
+  at,
+  children,
+}: {
+  open: boolean;
+  label: string;
+  onClose: () => void;
+  /** Where its top left goes, in the window — beside what opened it. Absent: below the top right. */
+  at?: { readonly x: number; readonly y: number };
+  children: ReactNode;
+}) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const cardWidth = Math.min(px(300), width - 2 * GUTTER);
+  const place = at
+    ? { t: Math.min(at.y, height * 0.3), l: Math.max(GUTTER, Math.min(at.x, width - GUTTER - cardWidth)) }
+    : { t: insets.top + px(52), r: GUTTER };
   return (
     <Modal
       visible={open}
@@ -65,9 +82,8 @@ export function Menu({ open, label, onClose, children }: { open: boolean; label:
       </Pressable>
       <YStack
         position="absolute"
-        t={insets.top + px(52)}
-        r={GUTTER}
-        width={Math.min(px(300), width - 2 * GUTTER)}
+        {...place}
+        width={cardWidth}
         maxH={height * 0.7}
         bg="$color2"
         rounded="$6"

@@ -6,7 +6,7 @@ import type { ConnectionId } from './ids';
 import type { ChannelGroup, ChannelPage, ChannelQuery, GuideQuery, Programme } from './live';
 import type { GlobalMediaKey, HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
 import type { PlaybackDescriptor, PlaybackRequest, ProgressReport } from './playback';
-import type { ItemPage, ItemQuery } from './query';
+import type { ChildQuery, ItemPage, ItemQuery } from './query';
 
 /** One connection's values, resolved for the profile it runs for. */
 export type MediaTarget = PluginTarget;
@@ -35,8 +35,12 @@ export interface ConnectedMediaProvider {
   /** Pages in exactly `compareItems(query.sort)` order, within the connection's own libraries setting. */
   listItems?(query: ItemQuery, signal?: CancelSignal): Promise<ItemPage>;
   getItem?(externalId: string, signal?: CancelSignal): Promise<MediaDetail>;
-  /** A show's seasons, or a season's episodes. */
-  getChildren?(parent: MediaItem, signal?: CancelSignal): Promise<ItemPage>;
+  /**
+   * A show's seasons, a season's episodes, a channel's or a playlist's videos.
+   * Where the item has `sections` or pages, `query` says which, and the
+   * answer's `nextCursor` leads on; a source with neither may ignore it.
+   */
+  getChildren?(parent: MediaItem, signal?: CancelSignal, query?: ChildQuery): Promise<ItemPage>;
   getLibraries?(signal?: CancelSignal): Promise<readonly Library[]>;
   /** Items in progress, most recently played first. */
   getResume?(limit: number, signal?: CancelSignal): Promise<readonly MediaItem[]>;

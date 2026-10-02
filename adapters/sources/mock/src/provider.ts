@@ -8,7 +8,7 @@ import {
   type MediaTarget,
 } from '@sc/api';
 
-import { createCatalogue, kindOf, type CatalogueSize } from './catalogue';
+import { CHILD_PAGE, createCatalogue, kindOf, type CatalogueSize } from './catalogue';
 
 const SLOW_MS = 1_500;
 
@@ -42,9 +42,8 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     listItems: (query) =>
       respond(() => {
-        const all = visible
-          .map((entry) => entry.item)
-          .filter((item) => kindOf(item) === query.kind)
+        const all = (query.kind === 'videos' ? catalogue.videos : visible.map((entry) => entry.item).filter((item) => kindOf(item) === query.kind))
+          .slice()
           .sort(compareItems(query.sort));
         const offset = query.cursor ? Number(query.cursor) : 0;
         const items = all.slice(offset, offset + query.limit);
@@ -63,8 +62,17 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         return { item: child, people: [], studios: [], externalIds: {} };
       }),
 
-    getChildren: (parent) =>
+    getChildren: (parent, _signal, query) =>
       respond(() => {
+        const held = catalogue.holds.get(parent.key.externalId);
+        if (held) {
+          // A channel's sections and a playlist's videos, a few at a time.
+          const all = held.get(query?.section ?? 'videos') ?? [];
+          const offset = query?.cursor ? Number(query.cursor) : 0;
+          const items = all.slice(offset, offset + CHILD_PAGE);
+          const next = offset + items.length;
+          return { items, total: all.length, ...(next < all.length ? { nextCursor: String(next) } : {}) };
+        }
         const children: readonly MediaItem[] =
           parent.type === 'show'
             ? (catalogue.seasons.get(parent.key.externalId) ?? [])

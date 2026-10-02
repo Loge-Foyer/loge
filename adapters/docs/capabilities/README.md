@@ -43,6 +43,18 @@ something to say and nothing when there is not, so a source that cannot report
 files costs nothing. Absent is "the source did not say", never "there are
 none" — which is why an empty list is wrong and `undefined` is right.
 
+The same holds for `MediaDetail.creator` — the channel behind a video — and
+`MediaDetail.sections`, the sections a channel keeps its children in
+(videos, shorts, live, playlists). `getChildren` then takes a `ChildQuery` —
+a section and the previous page's cursor — and answers with `nextCursor`
+while there is more; a source with neither sections nor pages ignores it.
+
+**Search is narrowed by the manifest, not a capability.** A source whose
+search can answer with only videos, only channels or only playlists lists
+them in `media.searchScopes` (`all`, `video`, `channel`, `playlist`), and
+honours `ItemQuery.scope`; `validateManifest` refuses scopes without `search`.
+The app shows the choice beside the box only for such a source.
+
 | `libraries` | It has libraries the user can choose between | `getLibraries` |
 | `watchStateRead` | Items carry what the user watched there; there is a resume list | `getResume` |
 | `remoteImages` | Items carry artwork | `resolveImage`, `resolveHeaders` |

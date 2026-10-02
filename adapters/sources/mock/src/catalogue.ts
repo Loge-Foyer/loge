@@ -8,6 +8,8 @@ import type {
   Movie,
   Season,
   Show,
+  VideoChannel,
+  VideoPlaylist,
   WatchStatus,
 } from '@sc/api';
 
@@ -22,6 +24,14 @@ export interface Catalogue {
   readonly seasons: ReadonlyMap<string, readonly Season[]>;
   readonly episodes: ReadonlyMap<string, readonly Episode[]>;
   readonly details: ReadonlyMap<string, MediaDetail>;
+  /**
+   * Web video, as a video site keeps it: a few channels, each with its
+   * videos and a playlist — so the Videos tab, a channel's page and its
+   * sections can be built with no network.
+   */
+  readonly videos: readonly (Movie | VideoChannel | VideoPlaylist)[];
+  /** Each channel's sections, and each playlist's videos, by key. */
+  readonly holds: ReadonlyMap<string, ReadonlyMap<string, readonly MediaItem[]>>;
 }
 
 export type CatalogueSize = 'small' | 'large';
@@ -164,7 +174,75 @@ export function createCatalogue(connectionId: ConnectionId, size: CatalogueSize)
     details.set(show.key.externalId, detailOf(show, pick));
   }
 
-  return { libraries: LIBRARIES, entries, seasons, episodes, details };
+  // Web video: two channels, each with a dozen videos, a few shorts and a playlist.
+  const videos: (Movie | VideoChannel | VideoPlaylist)[] = [];
+  const holds = new Map<string, Map<string, readonly MediaItem[]>>();
+  for (let channelIndex = 0; channelIndex < 2; channelIndex += 1) {
+    const name = `${pick(ADJECTIVES)} ${pick(NOUNS)} TV`;
+    const channelKey = key(`channel-${channelIndex}`);
+    const made = (prefix: string, count: number, minutes: number): Movie[] =>
+      Array.from({ length: count }, (_, at) => ({
+        type: 'movie',
+        key: key(`${prefix}-${channelIndex}-${at}`),
+        title: `${pick(ADJECTIVES)} ${pick(NOUNS)}, part ${at + 1}`,
+        addedAt: new Date(EPOCH - (channelIndex * 13 + at) * DAY_MS).toISOString(),
+        releaseDate: new Date(EPOCH - (channelIndex * 13 + at) * DAY_MS).toISOString().slice(0, 10),
+        year: 2026,
+        runtimeMs: minutes * 60_000,
+        ratings: {},
+        genres: [name],
+        images: {},
+      }));
+    const channelVideos = made('video', 12, 9 + channelIndex * 6);
+    const shorts = made('short', 4, 1);
+    const playlist: VideoPlaylist = {
+      type: 'playlist',
+      key: key(`playlist-${channelIndex}`),
+      title: `The best of ${name}`,
+      videoCount: 5,
+      owner: { key: channelKey, name },
+      ratings: {},
+      genres: [name],
+      images: {},
+    };
+    const channel: VideoChannel = {
+      type: 'channel',
+      key: channelKey,
+      title: name,
+      overview: `${name} makes up a new video every day, so a channel's page has something in each of its sections. It exists only on this device.`,
+      followers: channelIndex === 0 ? 1_234_000 : 980,
+      videoCount: channelVideos.length,
+      ratings: {},
+      genres: [],
+      images: {},
+    };
+    videos.push(channel, ...channelVideos, playlist);
+    holds.set(channelKey.externalId, new Map<string, readonly MediaItem[]>([['videos', channelVideos], ['shorts', shorts], ['playlists', [playlist]]]));
+    holds.set(playlist.key.externalId, new Map<string, readonly MediaItem[]>([['videos', channelVideos.slice(0, 5)]]));
+    details.set(channel.key.externalId, {
+      item: channel,
+      people: [],
+      studios: [],
+      externalIds: {},
+      sections: [
+        { id: 'videos', label: 'Videos' },
+        { id: 'shorts', label: 'Shorts' },
+        { id: 'playlists', label: 'Playlists' },
+      ],
+    });
+    details.set(playlist.key.externalId, { item: playlist, people: [], studios: [], externalIds: {} });
+    for (const video of channelVideos) {
+      details.set(video.key.externalId, {
+        item: { ...video, overview: `${video.title}, made up by ${name}.` },
+        people: [],
+        studios: [],
+        externalIds: {},
+        creator: { key: channelKey, name, followers: channel.followers ?? 0 },
+      });
+    }
+  }
+
+  return { libraries: LIBRARIES, entries, seasons, episodes, details, videos, holds };
 }
 
 export function kindOf(item: MediaItem): ContentKind | undefined {
@@ -172,6 +250,9 @@ export function kindOf(item: MediaItem): ContentKind | undefined {
   if (item.type === 'show') return 'shows';
   return undefined;
 }
+
+/** How many of a channel's videos one page of its section holds: small, so paging shows. */
+export const CHILD_PAGE = 5;
 
 function progressOf(watched: number, total: number): WatchStatus {
   if (watched === total) return { played: true };

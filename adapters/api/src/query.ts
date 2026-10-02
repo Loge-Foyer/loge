@@ -7,6 +7,15 @@ export type ItemSortKey = (typeof ITEM_SORTS)[number];
 
 export type SortOrder = 'asc' | 'desc';
 
+/**
+ * What a search may be narrowed to, where the source can narrow it
+ * (`media.searchScopes`): everything it holds, or only the things to watch, the
+ * channels or the playlists.
+ */
+export const SEARCH_SCOPES = ['all', 'video', 'channel', 'playlist'] as const;
+
+export type SearchScope = (typeof SEARCH_SCOPES)[number];
+
 export interface ItemSort {
   readonly by: ItemSortKey;
   readonly order: SortOrder;
@@ -27,6 +36,20 @@ export interface ItemQuery {
    * on the device matches titles, case and accents aside.
    */
   readonly term?: string;
+  /**
+   * What the search answers with, where the source lists the scope in
+   * `media.searchScopes` — set only with a term. Absent: what the kind holds,
+   * as a search always did.
+   */
+  readonly scope?: SearchScope;
+}
+
+/** Which of an item's children: one of its sections, and the page after `cursor`. */
+export interface ChildQuery {
+  /** One of `MediaDetail.sections`. Absent: the item's only list, or its first section. */
+  readonly section?: string;
+  /** The previous page's `nextCursor`. */
+  readonly cursor?: string;
 }
 
 /**

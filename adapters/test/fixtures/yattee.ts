@@ -116,6 +116,10 @@ export const channel = {
     { url: 'https://i.example/avatar512.jpg', width: 512, height: 512 },
     { url: 'https://i.example/avatar100.jpg', width: 100, height: 100 },
   ],
+  authorBanners: [
+    { url: 'https://i.example/banner1060.jpg', width: 1060, height: 175 },
+    { url: 'https://i.example/banner2120.jpg', width: 2120, height: 351 },
+  ],
 };
 
 export const channelVideos = {
@@ -134,5 +138,36 @@ export const playlist = {
   videos: [
     { ...video, videoId: 'plvid000001', title: 'First in the list' },
     { ...video, videoId: 'plvid000002', title: 'Second in the list' },
+  ],
+};
+
+/** `type=all`: a video, a channel and a playlist, each as the server lists them. */
+export const mixedResults = [
+  { ...video, videoId: 'found000001', title: 'A found video' },
+  { type: 'channel', author: 'Some Channel', authorId: 'UCuAXFkgsw1L7xaCfnd5JJOw', subCount: 1_234_567, videoCount: 321, authorThumbnails: channel.authorThumbnails },
+  {
+    type: 'playlist',
+    playlistId: 'PLabcdefghij',
+    title: 'Things worth rewatching',
+    author: 'Some Channel',
+    authorId: 'UCuAXFkgsw1L7xaCfnd5JJOw',
+    videoCount: 2,
+    playlistThumbnail: 'https://i.example/playlist.jpg',
+    videos: [],
+  },
+];
+
+export const channelPlaylists = {
+  playlists: [
+    {
+      type: 'playlist',
+      playlistId: 'PLabcdefghij',
+      title: 'Things worth rewatching',
+      author: 'Some Channel',
+      authorId: 'UCuAXFkgsw1L7xaCfnd5JJOw',
+      videoCount: 2,
+      playlistThumbnail: 'https://i.example/playlist.jpg',
+      videos: [],
+    },
   ],
 };
