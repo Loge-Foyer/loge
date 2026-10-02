@@ -6,7 +6,7 @@
  * IPTV runs on phones: portals send no CORS headers, and a browser will not
  * send the cookie a portal needs.
  */
-import { pluginId, type Plugin } from '@sc/api';
+import { pluginId, TIME_ZONES, type Plugin } from '@sc/api';
 
 import { createProvider } from './provider';
 
@@ -45,6 +45,16 @@ export const plugin: Plugin = {
         default: true,
         description: 'So the channel list opens at once, and shows — saying how old it is — while the portal is away.',
         gates: ['media.offlineMetadata'],
+      },
+      {
+        key: 'timeZone',
+        label: 'Guide time zone',
+        type: 'select',
+        default: '',
+        // Nothing changes until one is chosen: a portal whose guide is right stays right.
+        options: [{ value: '', label: 'As the portal says' }, ...TIME_ZONES.map((zone) => ({ value: zone, label: zone.replace(/_/g, ' ') }))],
+        description:
+          'If what is on now is off by an hour or more, choose the time zone the portal keeps its guide in — often its own. Summer time follows each programme’s date.',
       },
     ],
   },

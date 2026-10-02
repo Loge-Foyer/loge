@@ -1,4 +1,5 @@
 import {
+  fromZoneWallClock,
   imageRef,
   type Channel,
   type ChannelGroup,
@@ -139,19 +140,26 @@ export function toChannelRow(row: Readonly<Record<string, unknown>>, connectionI
   };
 }
 
-export function toProgramme(entry: unknown, channel: GlobalMediaKey): Programme | undefined {
+/**
+ * One programme. `zone` is the time zone the connection says the portal keeps
+ * its guide in: a portal that stamps its own wall-clock time as UTC — told the
+ * box is on UTC, as this plugin always says — puts 20:15 in Berlin at 20:15Z,
+ * two hours late in summer. Without one, the portal's times are taken as sent.
+ */
+export function toProgramme(entry: unknown, channel: GlobalMediaKey, zone?: string): Programme | undefined {
   const row = record(entry);
   const start = number(row?.start_timestamp);
   const stop = number(row?.stop_timestamp);
   const title = text(row?.name);
   if (!row || start === undefined || stop === undefined || !title || stop <= start) return undefined;
   const description = text(row.descr);
+  const at = (seconds: number) => new Date(zone ? fromZoneWallClock(seconds * 1000, zone) : seconds * 1000).toISOString();
   return {
     channel,
     title,
     ...(description ? { description } : {}),
-    startsAt: new Date(start * 1000).toISOString(),
-    endsAt: new Date(stop * 1000).toISOString(),
+    startsAt: at(start),
+    endsAt: at(stop),
   };
 }
 

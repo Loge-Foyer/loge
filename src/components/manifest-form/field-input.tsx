@@ -1,7 +1,8 @@
 import type { Field, FieldValue, PluginSettingDescriptor } from '@sc/api';
 import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
-import { useId, type ReactNode } from 'react';
+import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
+import { useId, useState, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Adapt, Label, Select, Sheet, SizableText, XStack, YStack } from 'tamagui';
 
@@ -138,7 +139,91 @@ function ToggleField({
   );
 }
 
-function SelectField({
+/** More than fits a sheet of options — every time zone — is chosen by typing some of it. */
+const LONG_LIST = 12;
+/** As many matches as a screen holds; typing narrows the rest. */
+const SHOWN_MATCHES = 40;
+
+function SelectField(props: FieldInputProps & { field: Extract<FormField, { type: 'select' }>; id: string }) {
+  return props.field.options.length > LONG_LIST ? <FilteredSelect {...props} /> : <ShortSelect {...props} />;
+}
+
+/**
+ * A long list as a filter box over its matches, drawn in place: no portal,
+ * so it works inside a native sheet, with a TV remote and in a browser alike.
+ */
+function FilteredSelect({
+  field,
+  value,
+  onChange,
+  disabled,
+  id,
+}: FieldInputProps & { field: Extract<FormField, { type: 'select' }>; id: string }) {
+  const current = typeof value === 'string' ? value : field.default;
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const chosen = field.options.find((option) => option.value === current);
+  const wanted = filter.trim().toLowerCase();
+  const matches =
+    wanted === '' ? field.options : field.options.filter((option) => option.label.toLowerCase().includes(wanted) || option.value.toLowerCase().includes(wanted));
+  const shown = matches.slice(0, SHOWN_MATCHES);
+  const choose = (next: string) => {
+    onChange(next);
+    setOpen(false);
+    setFilter('');
+  };
+  return (
+    <YStack gap="$2">
+      <Button
+        id={id}
+        size="$4"
+        justify="space-between"
+        iconAfter={open ? ChevronUp : ChevronDown}
+        disabled={disabled ?? false}
+        aria-expanded={open}
+        onPress={() => setOpen(!open)}
+      >
+        {chosen?.label ?? current}
+      </Button>
+      {open ? (
+        <YStack gap="$1" p="$2" rounded="$4" borderWidth={1} borderColor="$borderColor">
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Type to find one"
+            aria-label={`Find a ${field.label.toLowerCase()}`}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {shown.map((option) => (
+            <Button
+              key={option.value}
+              size="$3"
+              chromeless
+              justify="flex-start"
+              aria-selected={option.value === current}
+              {...(option.value === current ? { icon: Check } : {})}
+              onPress={() => choose(option.value)}
+            >
+              {option.label}
+            </Button>
+          ))}
+          {matches.length === 0 ? (
+            <SizableText size="$2" color="$color10" px="$2">
+              Nothing matches that.
+            </SizableText>
+          ) : matches.length > shown.length ? (
+            <SizableText size="$2" color="$color10" px="$2">
+              {`${matches.length - shown.length} more — type to narrow them down.`}
+            </SizableText>
+          ) : null}
+        </YStack>
+      ) : null}
+    </YStack>
+  );
+}
+
+function ShortSelect({
   field,
   value,
   onChange,

@@ -2,6 +2,7 @@ import { connectionId, type CancelSignal, type ConnectedMediaProvider, type Fiel
 import { plugin } from '@sc/iptv-stalker';
 import { describe, expect, it } from 'vitest';
 
+import { toProgramme } from '../iptv/stalker/src/map';
 import { endpointsFor } from '../iptv/stalker/src/portal';
 import { fakeContext, fakeHttp, target, type RecordedRequest, type Reply } from './support/fake-http';
 
@@ -130,13 +131,13 @@ function fakePortal(options: PortalOptions = {}) {
   };
 }
 
-async function connect(options: PortalOptions & { fields?: FieldValues; credentials?: Record<string, string> } = {}) {
+async function connect(options: PortalOptions & { fields?: FieldValues; settings?: FieldValues; credentials?: Record<string, string> } = {}) {
   const portal = fakePortal(options);
   const http = fakeHttp({ [LOAD]: portal.route });
   const fake = fakeContext({ http: http.client, credentials: options.credentials ?? { mac: MAC } });
   const media = plugin.media;
   if (!media) throw new Error('Stalker has no media role.');
-  const provider = await media.connect(target({ portalUrl: 'http://portal.test/c/', ...options.fields }), fake.context);
+  const provider = await media.connect(target({ portalUrl: 'http://portal.test/c/', ...options.fields }, options.settings), fake.context);
   return { provider, http, fake, portal };
 }
 
@@ -346,6 +347,35 @@ describe('Stalker — live TV', () => {
     fake.advance(5 * 60_000);
     await getGuide({ channels: seven, from: at(now), to: at(now + 3_600_000) });
     expect(everyGuide()).toHaveLength(2);
+  });
+
+  it('puts the guide on the clock of the time zone the portal keeps it in', () => {
+    // 20:15 in Berlin, in summer, stamped as 20:15Z: it airs at 18:15Z.
+    const stamped = Date.parse('2026-07-01T20:15:00Z') / 1000;
+    const entry = { name: 'Tagesschau', start_timestamp: stamped, stop_timestamp: stamped + 900 };
+    expect(toProgramme(entry, key('ch:101'), 'Europe/Berlin')).toMatchObject({ startsAt: '2026-07-01T18:15:00.000Z', endsAt: '2026-07-01T18:30:00.000Z' });
+    // As the portal says: its times as sent.
+    expect(toProgramme(entry, key('ch:101'))).toMatchObject({ startsAt: '2026-07-01T20:15:00.000Z' });
+  });
+
+  it('reads the zone from the connection, and asks the portal for the hours it shifts by', async () => {
+    const { provider, http } = await connect({ settings: { timeZone: 'Europe/Berlin' } });
+    const at = (ms: number) => new Date(ms).toISOString();
+    // The fake clock is in January 1970, when Berlin was an hour ahead.
+    const day = await need(provider, 'getGuide')({ channels: [key('ch:101'), key('ch:102')], from: at(now), to: at(now + 24 * 3_600_000) });
+    expect(http.to(LOAD).find((request) => request.query.action === 'get_epg_info')?.query.period).toBe('25');
+    expect(day.map((programme) => [programme.channel.externalId, programme.startsAt])).toEqual([['ch:101', at(now + 3_600_000)]]);
+    // Still told the box is on UTC, so the shift is the whole of the difference.
+    expect(http.to(LOAD).at(-1)?.headers.Cookie).toContain('timezone=UTC');
+  });
+
+  it('offers every time zone, and leaves the guide alone until one is chosen', () => {
+    const setting = plugin.manifest.settings.find((each) => each.key === 'timeZone');
+    expect(setting).toMatchObject({ type: 'select', default: '' });
+    const options = setting?.type === 'select' ? setting.options : [];
+    expect(options[0]).toEqual({ value: '', label: 'As the portal says' });
+    expect(options).toContainEqual({ value: 'Europe/Berlin', label: 'Europe/Berlin' });
+    expect(options).toContainEqual({ value: 'America/New_York', label: 'America/New York' });
   });
 
   it('makes a channel’s link when it plays — the MAG hint gone, raw MPEG-TS said as such', async () => {

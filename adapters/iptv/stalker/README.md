@@ -95,6 +95,16 @@ series.
   app may keep the channel list, each channel's day of guide, and the first
   page of films and series, per profile, and show them while the portal is
   away. Links are never kept.
+- **Guide time zone** — "As the portal says" by default, which takes its
+  times as they are sent. A portal often keeps its guide on its own wall-clock
+  time and stamps it as UTC — this plugin tells it the box is on UTC — so 20:15
+  in Berlin arrives as 20:15Z and shows two hours late in summer, one in
+  winter. Choosing the zone it keeps (an IANA id: `Europe/Berlin`,
+  `Europe/Istanbul`) turns each programme back into the instant it is, with
+  summer time taken at each programme's own date (`fromZoneWallClock` in
+  `@sc/api`, on the platform's own time-zone database). `get_epg_info` is
+  asked for the hours of the shift as well, so the end of the window is still
+  covered.
 
 ## Platforms
 

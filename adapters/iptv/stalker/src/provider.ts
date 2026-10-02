@@ -14,6 +14,7 @@ import {
   type PlaybackRequest,
   type Programme,
   type Season,
+  zoneOffsetMs,
 } from '@sc/api';
 
 import {
@@ -54,8 +55,10 @@ const READ_ON = 3;
 const SORTS: Readonly<Record<ItemSortKey, string>> = { addedAt: 'added', releaseDate: 'added', title: 'name', rating: 'rating' };
 
 export function createProvider(target: MediaTarget, context: MediaContext): ConnectedMediaProvider {
-  const { connectionId, fields } = target;
+  const { connectionId, fields, settings } = target;
   const portalUrl = typeof fields.portalUrl === 'string' ? fields.portalUrl : '';
+  // The zone the portal keeps its guide in, where the connection says; its times as sent otherwise.
+  const zone = typeof settings.timeZone === 'string' && settings.timeZone !== '' ? settings.timeZone : undefined;
   const portal = createPortal({ portalUrl, context });
   // What `create_link` takes for each id — in memory only: on some portals it is the stream's address, sign-in and all.
   const channelCmds = new Map<string, string>();
@@ -239,13 +242,16 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const now = context.clock.now();
       if (wanted.length <= SHORT_EPG_CHANNELS && to - now <= SHORT_EPG_WINDOW_MS) {
         const lists = await Promise.all(
-          wanted.map(async ({ key, id }) => epgList(await portal.call('itv', 'get_short_epg', { ch_id: id, size: 10 }, signal)).flatMap((entry) => toProgramme(entry, key) ?? [])),
+          wanted.map(async ({ key, id }) => epgList(await portal.call('itv', 'get_short_epg', { ch_id: id, size: 10 }, signal)).flatMap((entry) => toProgramme(entry, key, zone) ?? [])),
         );
         return lists.flat().filter(inWindow);
       }
-      const period = Math.min(LONGEST_GUIDE_HOURS, Math.max(1, Math.ceil((to - now) / 3_600_000)));
+      // The portal counts its hours from its own clock: a guide shifted by its
+      // zone needs that many more to reach the end of the window asked for.
+      const shift = zone ? Math.ceil(Math.abs(zoneOffsetMs(zone, now) ?? 0) / 3_600_000) : 0;
+      const period = Math.min(LONGEST_GUIDE_HOURS, Math.max(1, Math.ceil((to - now) / 3_600_000) + shift));
       const js = await guideOfEveryChannel(period, signal);
-      return wanted.flatMap(({ key, id }) => epgInfoFor(js, id).flatMap((entry) => toProgramme(entry, key) ?? [])).filter(inWindow);
+      return wanted.flatMap(({ key, id }) => epgInfoFor(js, id).flatMap((entry) => toProgramme(entry, key, zone) ?? [])).filter(inWindow);
     },
 
     listItems: (query, signal) => listing(listVod(query, signal)),

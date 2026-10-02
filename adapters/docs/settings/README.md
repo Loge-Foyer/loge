@@ -14,7 +14,7 @@ credentials.
 | `url` | URL input | same as `text`, without `credential` |
 | `password` | masked input | the only secret type; no `default`; never shown again once saved — unless `visible` |
 | `boolean` | switch | `default` required |
-| `select` | picker | `options` and a `default` that is one of them |
+| `select` | picker — and past a dozen options, a filter box over its matches | `options` and a `default` that is one of them |
 
 **`password` is the only secret.** The app sends those values to its credential
 store and keeps an opaque `credentialsRef` on the connection, plus the names of
