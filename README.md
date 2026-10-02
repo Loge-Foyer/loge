@@ -2,8 +2,8 @@
 
 The client itself. Everything you see and tap.
 
-It runs on iPhone, on Android, and in a browser, from one codebase. Built with
-Expo and React Native.
+It runs on iPhone, Android and Apple TV, and in a browser, from one codebase.
+Built with Expo and React Native.
 
 ---
 
@@ -40,10 +40,6 @@ server, add it once in Settings → Adapters → Sources → Jellyfin: its addre
 an account. The app keeps it, like everything else. In a browser, open the app
 from `localhost` — `docs/getting-started/` explains why.
 
-Until the code catches up with the design (below), the first launch offers to
-sign in or to use the device on its own, and Jellyfin sits directly under
-Settings → Adapters.
-
 ## How it is put together
 
 Four ideas, and the rest follows from them.
@@ -55,9 +51,15 @@ into that vocabulary at the edge. The home screen has never heard of Jellyfin.
 **Everything it talks to is an adapter, and adapters are kept at arm's
 length.** They live in `adapters/`, as workspaces of this package, compiled as
 programs of their own so the app cannot accidentally grow a dependency on one
-— nor they on it. There are four kinds: *sources* bring your media, *IPTV*
-brings a provider's live channels, films and series, *players* play them, and
-*sync* decides where your account lives. Adding Plex should mean one new folder
+— nor they on it. There are five kinds:
+
+- *sources* bring your media;
+- *IPTV* brings a provider's live channels, films and series;
+- *players* play them;
+- *sync* decides where your account lives;
+- *metadata* says which film or series a title is.
+
+Adding Plex should mean one new folder
 under `adapters/sources/` and one line in the composition root. The app only
 shows the adapters that work on the device you are holding.
 
@@ -81,7 +83,8 @@ entirely. A PIN keeps a profile, and its sign-ins, for its owner.
 ## Your account
 
 The account lives on this device alone, or on a server you run yourself —
-[PocketBase](https://pocketbase.io), set up by `../foyer`. On
+[Foyer](https://github.com/Loge-Foyer/foyer), which is
+[PocketBase](https://pocketbase.io) with the account's collections added. On
 your server, every device signed in to the account stays in step: profiles,
 PINs, settings and sources, with their passwords, so nobody types the Jellyfin
 password twice. Your server keeps those passwords readable, for now. It is
@@ -108,32 +111,40 @@ are the platform's own; in a browser the tabs become a top navigation bar. The
 web keeps its data in the browser's own database rather than SQLite, so it runs
 from any static host with no special headers — see `docs/platforms/web/`.
 
-Not every plugin runs everywhere, and the app only lists those that run here:
-iCloud is an iPhone thing, and IPTV runs on phones, because most providers do
-not let a browser talk to them.
+Not every adapter runs everywhere, and the app only lists those that run here:
+iCloud is an Apple thing, and IPTV stays out of the browser, because most
+providers do not let one talk to them.
 
 It runs on Apple TV too, from the same code — `npm run tvos` builds it for the
 simulator — sized for a room and driven by the remote. Android TV is next.
 
 ## Current state
 
-**Phase 7 — it plays. Phase 8 brings more players.** Everything above is
-the design, and most of it runs today, built with
-[Tamagui](https://tamagui.dev):
+**2026.10.1, the first version.** Everything above is the design, and most of
+it runs today, built with [Tamagui](https://tamagui.dev):
 
 - **Four tabs.**
-  - **Media** — films and series from every source, as one library: what you
-    are in the middle of, then a row per kind in the order and sort you choose,
-    a full-screen grid behind each row, and a page for every film, series,
-    season and episode. Jellyfin is the first real source.
-  - **Videos** — web video and plain files, one tab per source. No source
-    lists them yet.
-  - **Settings** — the account, profiles, PIN lock, and the plugins in five
-    lists — Sources, IPTV, Players, Sync, Metadata — showing only those that
-    run on this device. Connect a source through a form the plugin itself describes, and
-    decide what each profile keeps for itself.
+  - **Media** — films and series from every source, as one library.
+    - What you are in the middle of, then what this device keeps, then a row
+      per kind in the order and sort you choose.
+    - A full-screen grid behind each row.
+    - A page for every film, series, season and episode.
+    - Jellyfin is the first real source.
+  - **Videos** — web video and plain files, one source at a time. Yattee
+    Server is the first: what is trending, and a search for videos, channels
+    and playlists. A channel has a page of its own.
+  - **TV** — live channels from a Stalker portal.
+    - Channels in their groups, with what is on now and next.
+    - A day's guide, and a ★ of favourite channels.
+    - The provider's films and series.
+  - **Settings** — the account, profiles and PIN lock, watch status, what the
+    app does on this device, and downloads.
+    - The adapters in five lists — Sources, IPTV, Players, Sync, Metadata —
+      showing only those that run on this device.
+    - Connect a source through a form the adapter itself describes, and decide
+      what each profile keeps for itself.
 - **One account per device,** kept on the device or on your own server —
-  PocketBase, in `../foyer`. On your server, profiles, PINs,
+  [Foyer](https://github.com/Loge-Foyer/foyer). On your server, profiles, PINs,
   settings and sources — their passwords too — stay in step between devices.
   Signing in replaces what the device held; creating an account there, with
   an invite, takes the device's along. Up to ten profiles, or what your server
@@ -145,38 +156,47 @@ the design, and most of it runs today, built with
   at once when the app opens, and still shows — saying how old it is — when a
   server cannot be reached.
 - **A backup file** carries the account between devices — exported through
-  the share sheet or as a download, and imported with its key — and backup
-  targets keep it saved as the account changes, asking before they overwrite
-  a file another device changed.
+  the share sheet or as a download, and imported with its key. Keeping it in
+  iCloud, Google Drive or OneDrive by itself comes later.
 - **Press Play** on a film or an episode from Jellyfin — on a phone, which
-  turns the player with the device, or in a browser — and pick up where you
-  left off. Progress and "watched" go back to the server, offline too: they
-  are written on the device first and delivered when it can. The controls are
-  the app's own, the same behind every engine: chapters, Skip intro, the next
-  episode when it is due, speed, volume and brightness on the edges of the
-  picture, and picture in picture. mpv plays too, on Android and iPhone alike
-  — the files the built-in player cannot, like Matroska with DTS, as they are
-  — and each device chooses which player goes first, on each tab if you like;
-  "Play with…" on a film or an episode picks one for it.
-- **Live TV** on the TV tab, from a Stalker portal: channels in their groups
-  with what is on now and next, a day's guide, channel up and down, and the
-  provider's films and series.
+  turns the player with the device, on Apple TV, or in a browser — and pick up
+  where you left off. Progress and "watched" go back to the server, offline
+  too: they are written on the device first and delivered when it can. The
+  controls are the app's own, the same behind every engine: chapters, Skip
+  intro, the next episode when it is due, speed, volume and brightness on the
+  edges of the picture, and picture in picture.
+- **mpv and VLC play too** — the files the built-in player cannot, like
+  Matroska with DTS, as they are.
+  - They play on Android today. They are built for iPhone and Apple TV, and
+    wait for a real device there.
+  - Each device chooses which player goes first, on each tab if you like.
+    "Play with…" on a film or an episode picks one for it.
+- **Watch status for sources that keep none** — IPTV films and series, and
+  web video — is kept by the app, on the account, for every device. With a
+  TMDB key, the German and the English copy of a film share one record.
+- **Downloads:** a copy of a film or an episode from Jellyfin, or of a Yattee
+  video, kept on a phone and played with no network.
 - **Search**, on Media, Videos and TV — each box searching what is in front
   of you, never everything at once. It starts once typing stops for two
   seconds, or at once on the search key; on Videos, where each search is a
   request to the source, on the search key alone.
-- **Not yet:** M3U and Xtream, Plex and Emby, the drives, and downloads.
+- **Not yet:**
+  - M3U and Xtream;
+  - Plex, Emby and Invidious;
+  - WebDAV and the drives;
+  - backups kept in the cloud by themselves.
+
   KSPlayer is a manifest with no engine behind it.
 
-Development builds also have a pretend account, for trying things offline.
+Development builds also have a pretend account, source and IPTV portal, for
+trying things offline.
 
 ## Documentation
 
 `docs/` is broken down by topic — getting started, architecture, platforms, UI,
 playback, data, adapters, development. Each folder explains what belongs there.
 
-The full architecture, with the reasoning, is in
-[`../.claude/architecture.md`](../.claude/architecture.md).
+`docs/architecture/` explains how the pieces fit together, and why.
 
 `CLAUDE.md` and `AGENTS.md` are written for AI coding assistants — denser, and
 full of rules. This file is the one written for you.
