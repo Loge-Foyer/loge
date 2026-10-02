@@ -188,9 +188,8 @@ These are specific to Streaming Center and matter more than anything above.
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
   newer database is refused. A table rebuild is a `foreignKeysOff` step. The
-  latest three: v3 qualifies stored plugin ids by category and v4 brings the
-  account model (both Phase 6); v5 adds watch status and its outbox (Phase 7).
-  `docs/data` has what each does.
+  latest three: v6 is what this device keeps, v7 the lists a profile makes
+  (both Phase 10), v8 its favourite channels. `docs/data` has what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
   changes nothing writes nothing. Only account-wide state is journaled: device
   settings, sync-category connections, the account's own rows (`account`,
@@ -346,6 +345,10 @@ has the format. These break silently:
   janitor. A newer schema is refused, never guessed at.
 - **A lost key is an unreadable backup.** Say so plainly; never offer a way
   around it.
+- **Every schema this app ever wrote opens,** for what it holds; only a newer
+  one is refused. A reader that took only the current schema would make every
+  backup unreadable the day the schema moved on — which it did until v8, so a
+  test now opens a file of each older schema.
 - **A backup target never overwrites a file changed elsewhere.** Writes are
   conditional on the etag; `backup_state` remembers `{ lineage, generation,
   etag }` per target, and a file this device has not seen, or one changed
@@ -693,7 +696,10 @@ Everything above describes the target; what runs today:
   so there is no screen that searches everything. `RowSpec.term` goes into the
   merged grid and `ChannelQuery.term` into the TV sections; only sources whose
   `search` is in effect see one. A search is never saved, and nothing saved
-  stands in for one.
+  stands in for one. It starts once typing stops for two seconds, or at once
+  on the search key — on Videos, on the key alone — and a list is never keyed
+  by its term, because the box lives in its header and the keyboard went with
+  each remount.
 - **Settings → App:** what the app does by itself on this device, as against
   what a plugin does. The tab it opens on (`openOn`, Media by default —
   `src/app/index.tsx` redirects there at a cold start and after a profile is
@@ -706,6 +712,20 @@ Everything above describes the target; what runs today:
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages
   and Continue Watching show this device's state.
+- **Downloads:** Settings → Downloads holds Options — what to ask a source
+  for, which does not drive a download yet — then what is kept. Media's home
+  has a Downloaded row after Continue watching (home layout version 2), and a
+  kept copy's page opens and plays with no network, from where it was asked.
+- **Favourite channels (database v8, backup schema 3):** a ★ before a
+  provider's groups on TV, kept per profile on the account; holding a channel
+  — holding select, with a remote — adds it or takes it out.
+- **Artwork is resolved again once its source is ready** — connected, or
+  answered — so a card drawn from what was saved does not keep its plate.
+- **Stalker:** its MAC address and the box's other ids are shown, still
+  stored as passwords (`PasswordField.visible`); a Guide time zone setting
+  turns a guide stamped on the portal's wall clock back into instants; calls
+  share one sign-in properly, and plugin requests carry no ambient cookies.
+- **Yattee** pictures come from the addresses the server signs for them.
 - **Apple TV:** the app builds, installs and runs on the tvOS 27 simulator
   (`npm run tvos`), driven by the remote: every control focusable and
   pressable, TV-sized type and spacing, a spotlight above the home's rows, and

@@ -96,7 +96,9 @@ What runs today:
   `sources/yattee` — a Yattee Server instance — bringing web video to it.
 - Search, closed: Media's grid searches the kind it shows, TV's Live searches
   channels and its films and series each search their own. Only sources whose
-  `search` is in effect are asked, and nothing of a search is saved.
+  `search` is in effect are asked, and nothing of a search is saved. It starts
+  two seconds after the last letter, or on the search key — Videos on the key
+  alone.
 - Settings → App, device-wide: the tab the app opens on, always asking who's
   watching (on by default on a TV), and Force landscape on playback, on by
   default. Players can be reordered, and the order is the order they are tried
@@ -104,6 +106,14 @@ What runs today:
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.
+- Settings → Downloads: Options, then what is kept; a Downloaded row on Media,
+  whose copies open and play offline.
+- TV: a ★ of favourite channels before the provider's groups, per profile on
+  the account (database v8, backup schema 3), and a held channel's menu to add
+  or remove one. Stalker shows its MAC address, takes a Guide time zone, and
+  shares one sign-in properly.
+- Yattee's pictures from the addresses the server signs; artwork drawn again
+  once its source is ready.
 - Apple TV, from the same code: `npm run tvos` turns `ios/` into the TV
   project and builds it. The remote reaches every control, the type and
   spacing are sized for a room, the home has a spotlight, and what a TV lacks
