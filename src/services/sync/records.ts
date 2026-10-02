@@ -20,6 +20,7 @@ const KIND_OF: Readonly<Record<JournalEntity, RecordKind>> = {
   connectionProfileValues: 'profileValues',
   subscription: 'subscription',
   playlist: 'playlist',
+  favoriteChannel: 'favoriteChannel',
 };
 
 const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
@@ -30,6 +31,7 @@ const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
   profileValues: 'connectionProfileValues',
   subscription: 'subscription',
   playlist: 'playlist',
+  favoriteChannel: 'favoriteChannel',
 };
 
 /** Parents first: a batch writes a profile before its PIN, a connection before its profiles' values. */
@@ -39,8 +41,10 @@ export const PARENTS_FIRST: readonly RecordKind[] = [
   'preference',
   'connection',
   'profileValues',
-  // A subscription points at a profile and a connection; a playlist at a profile.
+  // A subscription and a favourite channel point at a profile and a
+  // connection; a playlist at a profile.
   'subscription',
+  'favoriteChannel',
   'playlist',
 ];
 
@@ -57,8 +61,8 @@ export function announcementOf(kind: RecordKind, key: string, owner?: string): J
       ? first
       : kind === 'profileValues'
         ? key.split('/')[1]
-        : // A subscription's and a playlist's key is a generated id and names
-          // nobody, so whose it is comes from the row.
+        : // A subscription's, a favourite's and a playlist's key is a
+          // generated id and names nobody, so whose it is comes from the row.
           owner;
   return { ...(userId ? { userId: toUserId(userId) } : {}), entity: ENTITY_OF[kind], entityId: key, operation: 'upsert', localVersion: 0 };
 }
@@ -156,6 +160,26 @@ export async function recordFor(
       };
       break;
     }
+    case 'favoriteChannel': {
+      if (entry.operation === 'delete') return tombstone;
+      const favorite = await deps.db.favoriteChannels.get(key);
+      record = favorite && {
+        kind: 'favoriteChannel',
+        key,
+        deleted: false,
+        data: {
+          favoriteId: favorite.id,
+          userId: favorite.userId,
+          connectionId: favorite.connectionId,
+          externalId: favorite.externalId,
+          name: favorite.name,
+          ...(favorite.number === undefined ? {} : { number: favorite.number }),
+          ...(favorite.logo === undefined ? {} : { logo: favorite.logo }),
+          addedAt: favorite.addedAt,
+        },
+      };
+      break;
+    }
     case 'playlist': {
       if (entry.operation === 'delete') return tombstone;
       const playlist = await deps.db.playlists.get(key);
@@ -226,6 +250,10 @@ export async function recordsOfAccount(deps: { readonly db: LocalDatabase; reado
   for (const connection of connections) {
     for (const userId of (await db.connections.profileValues(connection.id)).keys()) upsert('connectionProfileValues', `${connection.id}/${userId}`);
   }
+  // What a profile keeps for itself is the account's too, so a backup holds it.
+  for (const subscription of await db.subscriptions.listAll()) upsert('subscription', subscription.id);
+  for (const favorite of await db.favoriteChannels.listAll()) upsert('favoriteChannel', favorite.id);
+  for (const playlist of await db.playlists.listAll()) upsert('playlist', playlist.id);
   const records: AccountRecord[] = [];
   for (const entry of wanted) {
     const record = await recordFor(entry, deps);

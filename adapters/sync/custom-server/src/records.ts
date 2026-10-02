@@ -8,6 +8,7 @@ export const COLLECTIONS: readonly (readonly [RecordKind, string])[] = [
   ['connection', 'connections'],
   ['profileValues', 'connection_profile_values'],
   ['subscription', 'subscriptions'],
+  ['favoriteChannel', 'favorite_channels'],
   ['playlist', 'playlists'],
 ];
 
@@ -37,7 +38,7 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
   // Their own ids are their keys, so the parents come from the data rather
   // than from the key — and a tombstone carries neither, which is why the
   // server keeps the relations it already stored.
-  if (!record.deleted && record.kind === 'subscription') {
+  if (!record.deleted && (record.kind === 'subscription' || record.kind === 'favoriteChannel')) {
     body.profile = await idOf('profile', record.data.userId);
     body.connection = await idOf('connection', record.data.connectionId);
   }
@@ -82,6 +83,20 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
         connection_key: data.connectionId,
         external_id: data.externalId,
         title: data.title,
+        added_at: data.addedAt,
+      };
+    }
+    case 'favoriteChannel': {
+      const { data } = record;
+      return {
+        ...body,
+        profile_key: data.userId,
+        connection_key: data.connectionId,
+        external_id: data.externalId,
+        name: data.name,
+        // PocketBase has no null: no number is 0, and no logo is empty.
+        number: data.number ?? 0,
+        logo: data.logo ?? '',
         added_at: data.addedAt,
       };
     }
@@ -148,6 +163,17 @@ function dataOf(kind: RecordKind, key: string, stored: Readonly<Record<string, u
         connectionId: stored.connection_key,
         externalId: stored.external_id,
         title: stored.title,
+        addedAt: stored.added_at,
+      };
+    case 'favoriteChannel':
+      return {
+        favoriteId: key,
+        userId: stored.profile_key,
+        connectionId: stored.connection_key,
+        externalId: stored.external_id,
+        name: stored.name,
+        ...(typeof stored.number === 'number' && stored.number > 0 ? { number: stored.number } : {}),
+        ...(typeof stored.logo === 'string' && stored.logo !== '' ? { logo: stored.logo } : {}),
         addedAt: stored.added_at,
       };
     case 'playlist': {

@@ -1,7 +1,7 @@
-import { connectionId, credentialsRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
+import { connectionId, credentialsRef, imageRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { DownloadEntry, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription } from '@/services/ports';
+import type { DownloadEntry, FavoriteChannel, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -682,6 +682,58 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
 
       await db.users.delete(alex.id);
       expect(await db.playlists.listAll()).toEqual([]);
+    });
+  });
+
+  describe('favourite channels', () => {
+    const favorite = (id: string, channel: string, extra: Partial<FavoriteChannel> = {}): FavoriteChannel => ({
+      id,
+      userId: alex.id,
+      connectionId: connectionId('c-home'),
+      externalId: channel,
+      name: `Channel ${channel}`,
+      addedAt: '2026-10-02T12:00:00.000Z',
+      version: 1,
+      ...extra,
+    });
+
+    it('keeps a channel once per profile, its number and logo with it', async () => {
+      const { db } = open();
+      await household(db);
+      await db.favoriteChannels.put(favorite('f1', 'ch:101', { number: 1, logo: imageRef('http://portal.test/101.png') }));
+      await db.favoriteChannels.put(favorite('f2', 'ch:102'));
+      expect(await db.favoriteChannels.forChannel(alex.id, connectionId('c-home'), 'ch:101')).toEqual(
+        favorite('f1', 'ch:101', { number: 1, logo: imageRef('http://portal.test/101.png') }),
+      );
+      // Nothing written is nothing read: no number, no logo.
+      expect(await db.favoriteChannels.get('f2')).toEqual(favorite('f2', 'ch:102'));
+      expect(await db.favoriteChannels.list(kids.id)).toEqual([]);
+    });
+
+    it('is journaled, as everything a profile keeps for itself is', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.favoriteChannels.put(favorite('f1', 'ch:101'));
+      await db.favoriteChannels.remove('f1');
+      expect((await db.journal.entries(head)).map((entry) => `${entry.entity}/${entry.entityId}/${entry.operation}`)).toEqual([
+        'favoriteChannel/f1/upsert',
+        'favoriteChannel/f1/delete',
+      ]);
+    });
+
+    it('goes with its connection, and with its profile', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.favoriteChannels.put(favorite('f1', 'ch:101'));
+      await db.connections.delete(home.id);
+      expect(await db.favoriteChannels.listAll()).toEqual([]);
+
+      const again = connection('c-again');
+      await db.connections.insert(again);
+      await db.favoriteChannels.put(favorite('f2', 'ch:102', { connectionId: again.id }));
+      await db.users.delete(alex.id);
+      expect(await db.favoriteChannels.listAll()).toEqual([]);
     });
   });
 

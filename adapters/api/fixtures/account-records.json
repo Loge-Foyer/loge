@@ -205,6 +205,39 @@
       "kind": "playlist",
       "key": "pl3",
       "deleted": true
+    },
+    {
+      "kind": "favoriteChannel",
+      "key": "fav1",
+      "deleted": false,
+      "data": {
+        "favoriteId": "fav1",
+        "userId": "u1",
+        "connectionId": "c1",
+        "externalId": "ch:101",
+        "name": "Das Erste",
+        "number": 1,
+        "logo": "http://portal.test/stalker_portal/misc/logos/320/101.png",
+        "addedAt": "2026-10-02T12:00:00.000Z"
+      }
+    },
+    {
+      "kind": "favoriteChannel",
+      "key": "fav2",
+      "deleted": false,
+      "data": {
+        "favoriteId": "fav2",
+        "userId": "u1",
+        "connectionId": "c1",
+        "externalId": "ch:18390%3A1",
+        "name": "A channel with no number or logo",
+        "addedAt": "2026-10-02T12:00:00.000Z"
+      }
+    },
+    {
+      "kind": "favoriteChannel",
+      "key": "fav3",
+      "deleted": true
     }
   ],
   "invalid": [
@@ -511,6 +544,71 @@
           "updatedAt": "2026-10-01T12:00:00.000Z"
         }
       }
+    },
+    {
+      "why": "a favourite channel whose key is not its own id",
+      "record": {
+        "kind": "favoriteChannel",
+        "key": "other",
+        "deleted": false,
+        "data": {
+          "favoriteId": "fav1",
+          "userId": "u1",
+          "connectionId": "c1",
+          "externalId": "ch:101",
+          "name": "Das Erste",
+          "addedAt": "2026-10-02T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "why": "a favourite channel with a blank name",
+      "record": {
+        "kind": "favoriteChannel",
+        "key": "fav1",
+        "deleted": false,
+        "data": {
+          "favoriteId": "fav1",
+          "userId": "u1",
+          "connectionId": "c1",
+          "externalId": "ch:101",
+          "name": "  ",
+          "addedAt": "2026-10-02T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "why": "a favourite channel whose id would pass for another key",
+      "record": {
+        "kind": "favoriteChannel",
+        "key": "fav1",
+        "deleted": false,
+        "data": {
+          "favoriteId": "fav1",
+          "userId": "u1",
+          "connectionId": "c1",
+          "externalId": "ch/101",
+          "name": "Das Erste",
+          "addedAt": "2026-10-02T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "why": "a favourite channel whose logo is longer than any address",
+      "record": {
+        "kind": "favoriteChannel",
+        "key": "fav1",
+        "deleted": false,
+        "data": {
+          "favoriteId": "fav1",
+          "userId": "u1",
+          "connectionId": "c1",
+          "externalId": "ch:101",
+          "name": "Das Erste",
+          "logo": "http://portal.test/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "addedAt": "2026-10-02T12:00:00.000Z"
+        }
+      }
     }
   ],
   "recordIds": [
@@ -559,7 +657,7 @@
     {
       "accountId": "k4r9x2m1q8w3e5t",
       "kind": "profile",
-      "key": "Zo\u00eb",
+      "key": "Zoë",
       "id": "46ac03d0e84523d"
     },
     {
@@ -573,6 +671,12 @@
       "kind": "playlist",
       "key": "pl1",
       "id": "d2aa35bc690161b"
+    },
+    {
+      "accountId": "k4r9x2m1q8w3e5t",
+      "kind": "favoriteChannel",
+      "key": "fav1",
+      "id": "b03875251007a39"
     }
   ]
 }

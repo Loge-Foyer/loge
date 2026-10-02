@@ -4,9 +4,9 @@ The local database: what it holds, account-wide and device-wide, transactions,
 the change journal, syncing with your server, the backup file, migrations,
 secrets, and what a phone's own backup brings back.
 
-This page describes the target. Database v7 — the account model, watch status
-with its outbox, what this device keeps, and the lists a profile owns — and
-the backup file are in place. Phase 4's model —
+This page describes the target. Database v8 — the account model, watch status
+with its outbox, what this device keeps, the lists a profile owns and its
+favourite channels — and the backup file are in place. Phase 4's model —
 the account as one of the device's connections,
 synced through a log, with passwords sealed on the device — is in this page's
 history in git.
@@ -319,6 +319,22 @@ The steps, the same on both engines:
     which is also why the whole-entity conflict rule is the right one for it.
   - **Backup schema 2** adds both. A file written at 1 still opens — it simply
     has neither — because only a *newer* schema is refused.
+- **v8** — `favorite_channels`: the ★ a profile keeps before a provider's
+  groups, one row per channel per profile, with its name, number and logo as
+  they were when chosen, so the list reads while the provider is away.
+  - **Account-wide**, as subscriptions are, and the same way: journaled one
+    record each (`favoriteChannel`), so two devices adding different channels
+    never overwrite each other and a removal wins on its own.
+  - It cascades from its connection as well as its profile: a channel goes
+    with its source.
+  - **Backup schema 3** adds it. Files at 1 and 2 still open, for what they
+    hold.
+- **Two things a backup got wrong until v8**, fixed with it: the reader took
+  only a file of exactly the current schema, so a file at 1 was refused as
+  damaged and every backup would have been the day the schema moved; and the
+  export never gathered subscriptions or playlists, so no backup held them.
+  Any schema up to the current one opens now, and a backup holds everything a
+  profile keeps for itself.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the

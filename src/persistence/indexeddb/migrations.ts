@@ -22,6 +22,7 @@ export const STORES = [
   'downloads',
   'subscriptions',
   'playlists',
+  'favoriteChannels',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -142,6 +143,14 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     subscriptions.createIndex('byChannel', ['userId', 'connectionId', 'externalId'], { unique: true });
     const playlists = db.createObjectStore('playlists', { keyPath: 'id' });
     playlists.createIndex('byUser', 'userId');
+  },
+
+  // Favourite channels: as SQLite's v8.
+  (db) => {
+    const favorites = db.createObjectStore('favoriteChannels', { keyPath: 'id' });
+    favorites.createIndex('byUser', 'userId');
+    favorites.createIndex('byConnection', 'connectionId');
+    favorites.createIndex('byChannel', ['userId', 'connectionId', 'externalId'], { unique: true });
   },
 ];
 

@@ -15,6 +15,8 @@ import type {
   PlaylistRepository,
   Subscription,
   SubscriptionRepository,
+  FavoriteChannel,
+  FavoriteChannelRepository,
   JournalAnnouncement,
   JournalEntry,
   JournalRepository,
@@ -92,7 +94,8 @@ interface WatchRecord {
 }
 
 /** Newest first, with the id breaking a tie so the order is total. */
-const byAdded = (a: Subscription, b: Subscription) => b.addedAt.localeCompare(a.addedAt) || a.id.localeCompare(b.id);
+const byAdded = (a: { readonly addedAt: string; readonly id: string }, b: { readonly addedAt: string; readonly id: string }) =>
+  b.addedAt.localeCompare(a.addedAt) || a.id.localeCompare(b.id);
 const byUpdated = (a: Playlist, b: Playlist) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
 
 interface DownloadRecord {
@@ -209,7 +212,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<UserRecord>('users', id);
       if (!row) return;
       await request(store('users').delete(id));
-      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'playlists'] as const) {
+      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'favoriteChannels', 'playlists'] as const) {
         await deleteWhere(name, 'byUser', id);
       }
       await record({ userId: id, entity: 'user', entityId: id, operation: 'delete', localVersion: row.version + 1 });
@@ -244,7 +247,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<ConnectionRecord>('connections', id);
       if (!row) return;
       await request(store('connections').delete(id));
-      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions'] as const) {
+      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'favoriteChannels'] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
       await request(store('backupState').delete(id));
@@ -481,6 +484,25 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  const favoriteChannels: FavoriteChannelRepository = {
+    list: async (user) =>
+      (await request(store('favoriteChannels').index('byUser').getAll(user) as IDBRequest<FavoriteChannel[]>)).sort(byAdded),
+    listAll: async () => (await request(store('favoriteChannels').getAll() as IDBRequest<FavoriteChannel[]>)).sort(byAdded),
+    get: (id) => get<FavoriteChannel>('favoriteChannels', id),
+    forChannel: async (user, connection, external) =>
+      request(store('favoriteChannels').index('byChannel').get([user, connection, external]) as IDBRequest<FavoriteChannel | undefined>),
+    put: async (favorite) => {
+      await request(store('favoriteChannels').put(favorite));
+      await record({ userId: favorite.userId, entity: 'favoriteChannel', entityId: favorite.id, operation: 'upsert', localVersion: favorite.version });
+    },
+    remove: async (id) => {
+      const row = await get<FavoriteChannel>('favoriteChannels', id);
+      if (!row) return;
+      await request(store('favoriteChannels').delete(id));
+      await record({ userId: row.userId, entity: 'favoriteChannel', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
   const playlists: PlaylistRepository = {
     list: async (user) => (await request(store('playlists').index('byUser').getAll(user) as IDBRequest<Playlist[]>)).sort(byUpdated),
     listAll: async () => (await request(store('playlists').getAll() as IDBRequest<Playlist[]>)).sort(byUpdated),
@@ -634,7 +656,23 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, subscriptions, playlists, journal };
+  return {
+    users,
+    connections,
+    deviceSettings,
+    preferences,
+    mediaCache,
+    staleSecrets,
+    account,
+    backupState,
+    watchStatus,
+    outbox,
+    downloads,
+    subscriptions,
+    favoriteChannels,
+    playlists,
+    journal,
+  };
 }
 
 function toWatchEntry(row: WatchRecord) {

@@ -21,7 +21,7 @@ import type { ConnectionId, PluginId, UserId } from './ids';
 /** Profiles an account may hold unless the server says otherwise (`SC_MAX_PROFILES`). */
 export const DEFAULT_MAX_PROFILES = 10;
 
-export const RECORD_KINDS = ['profile', 'pin', 'preference', 'connection', 'profileValues', 'subscription', 'playlist'] as const;
+export const RECORD_KINDS = ['profile', 'pin', 'preference', 'connection', 'profileValues', 'subscription', 'playlist', 'favoriteChannel'] as const;
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -65,6 +65,26 @@ export interface RecordData {
     readonly externalId: string;
     /** As it was when followed, so a list reads while the source is away. */
     readonly title: string;
+    /** ISO 8601. */
+    readonly addedAt: string;
+  };
+  /**
+   * A live channel a profile keeps at hand on one connection — its ★. One
+   * record each, as a subscription is, so two devices adding different
+   * channels do not overwrite each other, and a removal wins on its own.
+   */
+  readonly favoriteChannel: {
+    readonly favoriteId: string;
+    readonly userId: UserId;
+    readonly connectionId: ConnectionId;
+    /** The channel's id on that source. */
+    readonly externalId: string;
+    /** As it was when chosen, so the list reads while the source is away. */
+    readonly name: string;
+    /** Its number on the source, from 1. */
+    readonly number?: number;
+    /** Its logo's reference, which only its own source resolves. */
+    readonly logo?: string;
     /** ISO 8601. */
     readonly addedAt: string;
   };
@@ -162,6 +182,8 @@ const PIN = /^\d{4}$/;
 const MAX_SECRET = 4 * 1024;
 /** A list long enough for anyone, short enough that the whole account still reads in one go. */
 const MAX_LIST = 2_000;
+/** An image reference is an address more often than not, and some run long. */
+const MAX_LOGO = 2_048;
 
 /** A record's key: the app's own id, or its natural key (`userId/name`, `connectionId/userId`). */
 export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): string {
@@ -178,6 +200,8 @@ export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): s
       return String((data as { subscriptionId?: string }).subscriptionId);
     case 'playlist':
       return String((data as { playlistId?: string }).playlistId);
+    case 'favoriteChannel':
+      return String((data as { favoriteId?: string }).favoriteId);
     default:
       return `${String(parts.connectionId)}/${String(parts.userId)}`;
   }
@@ -271,6 +295,18 @@ function isData(kind: RecordKind, data: unknown): boolean {
           (isRecord(data.source) && isId(data.source.connectionId) && isId(data.source.externalId))) &&
         isText(data.createdAt) &&
         isText(data.updatedAt)
+      );
+    case 'favoriteChannel':
+      return (
+        isId(data.favoriteId) &&
+        isId(data.userId) &&
+        isId(data.connectionId) &&
+        isId(data.externalId) &&
+        isText(data.name) &&
+        (data.name as string).trim() !== '' &&
+        (data.number === undefined || (Number.isInteger(data.number) && (data.number as number) > 0)) &&
+        (data.logo === undefined || (typeof data.logo === 'string' && data.logo !== '' && data.logo.length <= MAX_LOGO)) &&
+        isText(data.addedAt)
       );
     case 'profileValues':
       return (

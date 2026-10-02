@@ -7,6 +7,7 @@ import type {
   Credentials,
   CredentialsRef,
   GlobalMediaKey,
+  ImageRef,
   MediaDetail,
   MediaItem,
   NetworkKind,
@@ -360,6 +361,26 @@ export interface Subscription {
 }
 
 /**
+ * A live channel a profile keeps at hand on one connection (v8): what the ★
+ * before a provider's groups lists. Account-wide, like a subscription: the
+ * profile's own, and so wherever it signs in.
+ */
+export interface FavoriteChannel {
+  readonly id: string;
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  /** The channel's id on that source. */
+  readonly externalId: string;
+  /** As it was when chosen, so the list reads while the source is away. */
+  readonly name: string;
+  readonly number?: number;
+  readonly logo?: ImageRef;
+  /** ISO 8601. */
+  readonly addedAt: string;
+  readonly version: number;
+}
+
+/**
  * A profile's own list, or a mirror of one a source holds. Edited as a whole,
  * which is why its items are one column rather than rows of their own.
  */
@@ -385,6 +406,17 @@ export interface SubscriptionRepository {
   /** The one for this channel, so following twice follows once. */
   forChannel(userId: UserId, connectionId: ConnectionId, externalId: string): Promise<Subscription | undefined>;
   put(subscription: Subscription): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface FavoriteChannelRepository {
+  list(userId: UserId): Promise<readonly FavoriteChannel[]>;
+  /** For the sync engine and the backup, which take every profile's. */
+  listAll(): Promise<readonly FavoriteChannel[]>;
+  get(id: string): Promise<FavoriteChannel | undefined>;
+  /** The one for this channel, so choosing it twice chooses it once. */
+  forChannel(userId: UserId, connectionId: ConnectionId, externalId: string): Promise<FavoriteChannel | undefined>;
+  put(favorite: FavoriteChannel): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -441,7 +473,7 @@ export interface StaleSecretQueue {
 }
 
 /** A profile's PIN is journaled apart from its name, so a rename never carries a PIN away. */
-export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues' | 'subscription' | 'playlist';
+export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues' | 'subscription' | 'playlist' | 'favoriteChannel';
 
 /**
  * One local change, for the sync engine to carry later: a pointer to the
@@ -550,6 +582,7 @@ export interface Repositories {
   readonly outbox: OutboxRepository;
   readonly downloads: DownloadRepository;
   readonly subscriptions: SubscriptionRepository;
+  readonly favoriteChannels: FavoriteChannelRepository;
   readonly playlists: PlaylistRepository;
   readonly journal: JournalRepository;
 }

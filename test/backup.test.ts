@@ -103,11 +103,60 @@ describe('the database inside', () => {
       deleted: false,
       data: { connectionId: home, userId: sam, off: false, fields: { username: 'sam' }, settings: {}, secretKeys: ['password'], secrets: { password: 'sam-secret' } },
     },
+    {
+      kind: 'subscription',
+      key: 'sub-1',
+      deleted: false,
+      data: { subscriptionId: 'sub-1', userId: sam, connectionId: home, externalId: 'channel:UC1', title: 'Some Channel', addedAt: '2026-10-01T12:00:00.000Z' },
+    },
+    {
+      kind: 'favoriteChannel',
+      key: 'fav-1',
+      deleted: false,
+      data: {
+        favoriteId: 'fav-1',
+        userId: sam,
+        connectionId: home,
+        externalId: 'ch:101',
+        name: 'Das Erste',
+        number: 1,
+        logo: 'http://portal.test/logos/101.png',
+        addedAt: '2026-10-02T12:00:00.000Z',
+      },
+    },
+    {
+      kind: 'favoriteChannel',
+      key: 'fav-2',
+      deleted: false,
+      data: { favoriteId: 'fav-2', userId: sam, connectionId: home, externalId: 'ch:102', name: 'No number, no logo', addedAt: '2026-10-02T12:00:00.000Z' },
+    },
+    {
+      kind: 'playlist',
+      key: 'pl-1',
+      deleted: false,
+      data: { playlistId: 'pl-1', userId: sam, title: 'Rewatch', items: [{ connectionId: home, externalId: 'm1' }], createdAt: '2026-10-01T12:00:00.000Z', updatedAt: '2026-10-01T12:00:00.000Z' },
+    },
   ];
   const contents = { lineage: 'account-1', accountName: 'The Smiths', appVersion: '1.0.0', records };
 
   it('holds the account’s records, and gives them back as they went in', async () => {
     expect(await readBackupDatabase(sql, await writeBackupDatabase(sql, contents))).toEqual(contents);
+  });
+
+  it('opens a file from an older schema, for everything it does hold', async () => {
+    const v2 = await sql.open(await writeBackupDatabase(sql, contents));
+    await v2.exec('DROP TABLE favorite_channels; PRAGMA user_version = 2;');
+    const older = await v2.serialize();
+    await v2.close();
+    expect(await readBackupDatabase(sql, older)).toEqual({ ...contents, records: records.filter((record) => record.kind !== 'favoriteChannel') });
+
+    // And from before a profile's lists: the first schema there was.
+    const v1 = await sql.open(await writeBackupDatabase(sql, contents));
+    await v1.exec('DROP TABLE favorite_channels; DROP TABLE subscriptions; DROP TABLE playlists; PRAGMA user_version = 1;');
+    const first = await v1.serialize();
+    await v1.close();
+    const ownKinds = new Set(['subscription', 'favoriteChannel', 'playlist']);
+    expect(await readBackupDatabase(sql, first)).toEqual({ ...contents, records: records.filter((record) => !ownKinds.has(record.kind)) });
   });
 
   it('refuses what it cannot trust: not SQLite, another SQLite file, a newer schema, a row the contract refuses', async () => {
@@ -148,6 +197,10 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     await a.services.pins.create(kim, '9731');
     await a.services.homeLayout.update(smiths, () => layout.rows);
     const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, smiths));
+    // What a profile keeps for itself: a channel it follows, a favourite, a list.
+    await a.db.subscriptions.put({ id: 'sub-1', userId: kim, connectionId: home.id, externalId: 'channel:UC1', title: 'Some Channel', addedAt: '2026-10-01T12:00:00.000Z', version: 1 });
+    await a.db.favoriteChannels.put({ id: 'fav-1', userId: kim, connectionId: home.id, externalId: 'ch:101', name: 'Das Erste', number: 1, addedAt: '2026-10-02T12:00:00.000Z', version: 1 });
+    await a.db.playlists.put({ id: 'pl-1', userId: smiths, title: 'Rewatch', items: [], createdAt: '2026-10-01T12:00:00.000Z', updatedAt: '2026-10-01T12:00:00.000Z', version: 1 });
 
     const where = reopenable(engine);
     const b = buildServices({ plugins: [media.plugin], engine, device: 'b', where });
@@ -173,6 +226,9 @@ describe.each(ENGINES)('backups on %s', (engine: Engine) => {
     expect((await b.services.profiles.list()).map((profile) => profile.id)).toEqual([smiths, kim]);
     expect(await b.services.pins.verify(kim, '9731')).toEqual({ ok: true });
     expect(await b.services.homeLayout.rows(smiths)).toEqual(layout.rows);
+    expect((await b.db.subscriptions.list(kim)).map((each) => each.title)).toEqual(['Some Channel']);
+    expect((await b.db.favoriteChannels.list(kim)).map((each) => [each.externalId, each.name, each.number])).toEqual([['ch:101', 'Das Erste', 1]]);
+    expect((await b.db.playlists.list(smiths)).map((each) => each.title)).toEqual(['Rewatch']);
     await expect(b.services.connections.probeSecrets(media.manifest.id, home.id, 'shared', {})).resolves.toEqual({ password: 'family-secret' });
     expect(await b.db.connections.get(theirs.id)).toBeUndefined();
     expect(JSON.stringify([...b.credentials.entries.values()])).not.toContain('their-secret');

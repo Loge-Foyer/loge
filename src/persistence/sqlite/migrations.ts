@@ -152,7 +152,28 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   { version: 5, up: (tx) => tx.exec(V5) },
   { version: 6, up: (tx) => tx.exec(V6) },
   { version: 7, up: (tx) => tx.exec(V7) },
+  { version: 8, up: (tx) => tx.exec(V8) },
 ];
+
+// Favourite channels (after Phase 10): the ★ a profile keeps before a
+// provider's groups. Account-wide like the subscriptions of v7 — journaled,
+// carried to your own server, written into backups — and cascading from the
+// connection as well as the profile: a channel goes with its source.
+const V8 = `
+CREATE TABLE favorite_channels (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  number INTEGER,
+  logo TEXT,
+  added_at TEXT NOT NULL,
+  version INTEGER NOT NULL
+) STRICT;
+CREATE UNIQUE INDEX favorite_channels_channel ON favorite_channels (user_id, connection_id, external_id);
+CREATE INDEX favorite_channels_connection ON favorite_channels (connection_id);
+`;
 
 // Watch status, for sources that master it (Phase 7): a cache per profile,
 // and the outbox that carries this device's changes to the source. Both are

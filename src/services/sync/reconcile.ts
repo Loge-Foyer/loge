@@ -1,6 +1,7 @@
 import {
   connectionId as toConnectionId,
   credentialsRef as toCredentialsRef,
+  imageRef,
   isAccountRecord,
   userId as toUserId,
   type AccountRecord,
@@ -252,6 +253,34 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     effects.changed = true;
   }
 
+  for (const record of ofKind('favoriteChannel')) {
+    const local = await tx.favoriteChannels.get(record.key);
+    if (record.deleted) {
+      if (local) {
+        await tx.favoriteChannels.remove(record.key);
+        effects.changed = true;
+      }
+      continue;
+    }
+    const { data } = record;
+    // A child whose parent is gone is skipped: a soft delete does not cascade.
+    if (!(await tx.users.get(data.userId)) || !(await tx.connections.get(data.connectionId))) continue;
+    const row = {
+      id: data.favoriteId,
+      userId: data.userId,
+      connectionId: data.connectionId,
+      externalId: data.externalId,
+      name: data.name,
+      ...(data.number === undefined ? {} : { number: data.number }),
+      ...(data.logo === undefined ? {} : { logo: imageRef(data.logo) }),
+      addedAt: data.addedAt,
+      version: (local?.version ?? 0) + 1,
+    };
+    if (local && stableJson({ ...local, version: 0 }) === stableJson({ ...row, version: 0 })) continue;
+    await tx.favoriteChannels.put(row);
+    effects.changed = true;
+  }
+
   for (const record of ofKind('playlist')) {
     const local = await tx.playlists.get(record.key);
     if (record.deleted) {
@@ -467,6 +496,9 @@ async function localIdentities(tx: Repositories): Promise<readonly LocalIdentity
   // Their key is a generated id and names no profile, so the owner is carried.
   for (const subscription of await tx.subscriptions.listAll()) {
     identities.push({ kind: 'subscription', key: subscription.id, owner: subscription.userId });
+  }
+  for (const favorite of await tx.favoriteChannels.listAll()) {
+    identities.push({ kind: 'favoriteChannel', key: favorite.id, owner: favorite.userId });
   }
   for (const playlist of await tx.playlists.listAll()) identities.push({ kind: 'playlist', key: playlist.id, owner: playlist.userId });
   for (const connection of await tx.connections.list()) {

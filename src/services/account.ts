@@ -187,11 +187,15 @@ export function createAccountService(deps: {
       for (const name of Object.keys(await tx.preferences.get(user.id))) announced.push(announcementOf('preference', `${user.id}/${name}`));
     }
     // After the profiles and before the connections' values: a subscription
-    // points at a connection, which the loop below announces.
+    // and a favourite channel point at a connection, which the loop below
+    // announces.
     for (const playlist of await tx.playlists.listAll()) announced.push(announcementOf('playlist', playlist.id, playlist.userId));
     const children: JournalAnnouncement[] = [];
     for (const subscription of await tx.subscriptions.listAll()) {
       children.push(announcementOf('subscription', subscription.id, subscription.userId));
+    }
+    for (const favorite of await tx.favoriteChannels.listAll()) {
+      children.push(announcementOf('favoriteChannel', favorite.id, favorite.userId));
     }
     for (const connection of await tx.connections.list()) {
       if (!accountWide(connection.pluginId)) continue;

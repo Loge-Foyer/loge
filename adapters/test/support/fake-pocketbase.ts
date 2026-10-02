@@ -21,6 +21,7 @@ export const COLLECTION_KINDS: Readonly<Record<string, string>> = {
   connections: 'connection',
   connection_profile_values: 'profileValues',
   subscriptions: 'subscription',
+  favorite_channels: 'favoriteChannel',
   playlists: 'playlist',
 };
 

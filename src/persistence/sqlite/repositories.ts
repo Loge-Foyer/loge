@@ -1,6 +1,7 @@
 import {
   connectionId,
   credentialsRef,
+  imageRef,
   pluginId,
   userId,
   type AppErrorCode,
@@ -43,6 +44,8 @@ import type {
   StoredUser,
   Subscription,
   SubscriptionRepository,
+  FavoriteChannel,
+  FavoriteChannelRepository,
   UserPreferences,
   UserRepository,
   WatchEntry,
@@ -552,6 +555,48 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  // Account-wide too, and journaled the same way.
+  const favoriteChannels: FavoriteChannelRepository = {
+    list: async (user) =>
+      (await sql.all<FavoriteChannelRow>('SELECT * FROM favorite_channels WHERE user_id = ? ORDER BY added_at DESC, id', [user])).map(toFavoriteChannel),
+    listAll: async () => (await sql.all<FavoriteChannelRow>('SELECT * FROM favorite_channels ORDER BY added_at DESC, id')).map(toFavoriteChannel),
+    get: async (id) => {
+      const row = await sql.get<FavoriteChannelRow>('SELECT * FROM favorite_channels WHERE id = ?', [id]);
+      return row && toFavoriteChannel(row);
+    },
+    forChannel: async (user, connection, external) => {
+      const row = await sql.get<FavoriteChannelRow>(
+        'SELECT * FROM favorite_channels WHERE user_id = ? AND connection_id = ? AND external_id = ?',
+        [user, connection, external],
+      );
+      return row && toFavoriteChannel(row);
+    },
+    put: async (favorite) => {
+      await sql.run(
+        `INSERT INTO favorite_channels (id, user_id, connection_id, external_id, name, number, logo, added_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET name = excluded.name, number = excluded.number, logo = excluded.logo, added_at = excluded.added_at, version = excluded.version`,
+        [
+          favorite.id,
+          favorite.userId,
+          favorite.connectionId,
+          favorite.externalId,
+          favorite.name,
+          favorite.number ?? null,
+          favorite.logo ?? null,
+          favorite.addedAt,
+          favorite.version,
+        ],
+      );
+      await record({ userId: favorite.userId, entity: 'favoriteChannel', entityId: favorite.id, operation: 'upsert', localVersion: favorite.version });
+    },
+    remove: async (id) => {
+      const row = await sql.get<FavoriteChannelRow>('SELECT * FROM favorite_channels WHERE id = ?', [id]);
+      if (!row) return;
+      await sql.run('DELETE FROM favorite_channels WHERE id = ?', [id]);
+      await record({ userId: userId(row.user_id), entity: 'favoriteChannel', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
   const playlists: PlaylistRepository = {
     list: async (user) =>
       (await sql.all<PlaylistRow>('SELECT * FROM playlists WHERE user_id = ? ORDER BY updated_at DESC, id', [user])).map(toPlaylist),
@@ -760,7 +805,23 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
-  return { users, connections, deviceSettings, preferences, mediaCache, staleSecrets, account, backupState, watchStatus, outbox, downloads, subscriptions, playlists, journal };
+  return {
+    users,
+    connections,
+    deviceSettings,
+    preferences,
+    mediaCache,
+    staleSecrets,
+    account,
+    backupState,
+    watchStatus,
+    outbox,
+    downloads,
+    subscriptions,
+    favoriteChannels,
+    playlists,
+    journal,
+  };
 }
 
 interface WatchRow {
@@ -789,6 +850,32 @@ interface SubscriptionRow {
   readonly title: string;
   readonly added_at: string;
   readonly version: number;
+}
+
+interface FavoriteChannelRow {
+  readonly id: string;
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly name: string;
+  readonly number: number | null;
+  readonly logo: string | null;
+  readonly added_at: string;
+  readonly version: number;
+}
+
+function toFavoriteChannel(row: FavoriteChannelRow): FavoriteChannel {
+  return {
+    id: row.id,
+    userId: userId(row.user_id),
+    connectionId: connectionId(row.connection_id),
+    externalId: row.external_id,
+    name: row.name,
+    ...(row.number === null ? {} : { number: row.number }),
+    ...(row.logo === null ? {} : { logo: imageRef(row.logo) }),
+    addedAt: row.added_at,
+    version: row.version,
+  };
 }
 
 function toSubscription(row: SubscriptionRow): Subscription {

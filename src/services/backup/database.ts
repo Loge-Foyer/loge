@@ -17,10 +17,11 @@ import type { BackupSql, BackupSqlDatabase } from '../ports';
  */
 
 /**
- * v2 added a profile's own lists. A file at v1 still opens — it simply has
- * none — so only a *newer* schema is refused, never an older one.
+ * v2 added a profile's own lists, and v3 its favourite channels. A file at an
+ * older version still opens — it simply has none of what came later — so only
+ * a *newer* schema is refused, never an older one.
  */
-export const BACKUP_SCHEMA_VERSION = 2;
+export const BACKUP_SCHEMA_VERSION = 3;
 // 'SCBK', so a stray SQLite file is never taken for a backup's database.
 const APPLICATION_ID = 0x5343424b;
 
@@ -57,6 +58,16 @@ CREATE TABLE subscriptions (
   connection_id TEXT NOT NULL,
   external_id TEXT NOT NULL,
   title TEXT NOT NULL,
+  added_at TEXT NOT NULL
+) STRICT;
+CREATE TABLE favorite_channels (
+  favorite_id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL,
+  connection_id TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  number INTEGER,
+  logo TEXT,
   added_at TEXT NOT NULL
 ) STRICT;
 CREATE TABLE playlists (
@@ -144,6 +155,13 @@ async function insert(db: BackupSqlDatabase, record: Extract<AccountRecord, { de
         [data.subscriptionId, data.userId, data.connectionId, data.externalId, data.title, data.addedAt],
       );
     }
+    case 'favoriteChannel': {
+      const { data } = record;
+      return db.run(
+        'INSERT INTO favorite_channels (favorite_id, user_id, connection_id, external_id, name, number, logo, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [data.favoriteId, data.userId, data.connectionId, data.externalId, data.name, data.number ?? null, data.logo ?? null, data.addedAt],
+      );
+    }
     case 'playlist': {
       const { data } = record;
       return db.run(
@@ -169,6 +187,17 @@ interface SubscriptionRow {
   readonly connection_id: string;
   readonly external_id: string;
   readonly title: string;
+  readonly added_at: string;
+}
+
+interface FavoriteChannelRow {
+  readonly favorite_id: string;
+  readonly user_id: string;
+  readonly connection_id: string;
+  readonly external_id: string;
+  readonly name: string;
+  readonly number: number | null;
+  readonly logo: string | null;
   readonly added_at: string;
 }
 
@@ -225,7 +254,10 @@ export async function readBackupDatabase(sql: BackupSql, bytes: Uint8Array): Pro
     if (application?.application_id !== APPLICATION_ID) return 'damaged';
     const [version] = await db.all<{ user_version: number }>('PRAGMA user_version');
     if ((version?.user_version ?? 0) > BACKUP_SCHEMA_VERSION) return 'newer';
-    if (version?.user_version !== BACKUP_SCHEMA_VERSION) return 'damaged';
+    // Any version this app ever wrote opens: an older file is read for what
+    // it holds. Refusing all but the current one would make every backup
+    // unreadable the day the schema next moved on.
+    if ((version?.user_version ?? 0) < 1) return 'damaged';
 
     const meta = new Map((await db.all<{ key: string; value: string }>('SELECT key, value FROM meta')).map((row) => [row.key, row.value]));
     const lineage = meta.get('lineage');
@@ -299,6 +331,28 @@ export async function readBackupDatabase(sql: BackupSql, bytes: Uint8Array): Pro
           },
         } satisfies Live<'subscription'>);
       }
+    }
+    // A file before v3 has no favourite channels, and opens all the same.
+    if ((version?.user_version ?? 0) >= 3) {
+      for (const row of await db.all<FavoriteChannelRow>('SELECT * FROM favorite_channels')) {
+        records.push({
+          kind: 'favoriteChannel',
+          key: row.favorite_id,
+          deleted: false,
+          data: {
+            favoriteId: row.favorite_id,
+            userId: toUserId(row.user_id),
+            connectionId: toConnectionId(row.connection_id),
+            externalId: row.external_id,
+            name: row.name,
+            ...(row.number === null ? {} : { number: row.number }),
+            ...(row.logo === null ? {} : { logo: row.logo }),
+            addedAt: row.added_at,
+          },
+        } satisfies Live<'favoriteChannel'>);
+      }
+    }
+    if ((version?.user_version ?? 0) >= 2) {
       for (const row of await db.all<PlaylistRow>('SELECT * FROM playlists')) {
         records.push({
           kind: 'playlist',

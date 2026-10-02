@@ -1,4 +1,4 @@
-import { type AccountRecord, type ConnectionId, type UserId } from '@sc/api';
+import { imageRef, type AccountRecord, type ConnectionId, type UserId } from '@sc/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { draftOf, initialDraft } from '@/services/connection-draft';
@@ -89,6 +89,35 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
       const row = await b.services.media.row(sam, { kind: 'movies', sort: NEWEST }, 10);
       expect(row.sourceErrors).toEqual([]);
       expect(row.items.length).toBeGreaterThan(0);
+    });
+
+    it('brings a profile’s favourite channels, and their removal made elsewhere', async () => {
+      const { a, b, media, sam } = await onOneAccount();
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, sam));
+      await a.db.favoriteChannels.put({
+        id: 'fav-1',
+        userId: sam,
+        connectionId: home.id,
+        externalId: 'ch:101',
+        name: 'Das Erste',
+        number: 1,
+        logo: imageRef('http://portal.test/101.png'),
+        addedAt: '2026-10-02T12:00:00.000Z',
+        version: 1,
+      });
+      await a.db.favoriteChannels.put({ id: 'fav-2', userId: sam, connectionId: home.id, externalId: 'ch:102', name: 'Stadium One', addedAt: '2026-10-02T12:01:00.000Z', version: 1 });
+      await sync(a);
+      await sync(b);
+      expect((await b.db.favoriteChannels.list(sam)).map((entry) => [entry.externalId, entry.name, entry.number, entry.logo])).toEqual([
+        ['ch:102', 'Stadium One', undefined, undefined],
+        ['ch:101', 'Das Erste', 1, 'http://portal.test/101.png'],
+      ]);
+
+      // Removed on B, and the removal reaches A — the other favourite stays.
+      await b.db.favoriteChannels.remove('fav-1');
+      await sync(b);
+      await sync(a);
+      expect((await a.db.favoriteChannels.listAll()).map((entry) => entry.id)).toEqual(['fav-2']);
     });
 
     it('brings a profile’s own lists, and a delete made elsewhere', async () => {
