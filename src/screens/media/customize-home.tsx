@@ -50,7 +50,7 @@ export function CustomizeHomeScreen({ rowId }: { rowId?: string }) {
         />
       ))}
       {!rowId && kinds.length > 0 ? (
-        <YStack gap="$2" p="$4" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor">
+        <YStack gap="$3" p="$5" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor">
           <SizableText size="$3" fontWeight="600" color="$color12">
             Add a row
           </SizableText>
@@ -105,7 +105,7 @@ function RowEditor({
   onRemove: () => void;
 }) {
   return (
-    <YStack gap="$3" p="$4" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor" opacity={row.available ? 1 : 0.6}>
+    <YStack gap="$3" p="$5" rounded="$6" bg="$color2" borderWidth={1} borderColor="$borderColor" opacity={row.available ? 1 : 0.6}>
       <XStack items="center" gap="$2">
         <YStack flex={1}>
           <SizableText size="$4" fontWeight="600" color="$color12">
