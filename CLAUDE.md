@@ -108,6 +108,10 @@ What runs today:
   project and builds it. The remote reaches every control, the type and
   spacing are sized for a room, the home has a spotlight, and what a TV lacks
   — files, Face ID, downloads — has a stand-in (`docs/platforms/tvos`).
+- A real iPhone or Apple TV gets a Release build — `npm run ios:device`,
+  `npm run tvos:device` — with no development client, no Metro and nothing
+  attached: a development build on a phone kept it busy for the computer, and
+  warm (`docs/platforms/ios`).
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

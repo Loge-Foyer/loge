@@ -15,6 +15,55 @@ Phase 4's key derivation module went with its vault.
 Metro serves the JavaScript as usual. Change native code, or add a player, and
 build again.
 
+## On your own iPhone
+
+```bash
+npm run ios:device                               # asks which device
+npm run ios:device -- "<device name or UDID>"    # one of: xcrun devicectl list devices
+```
+
+A phone you carry gets a **Release build**: the JavaScript compiled into the
+app, no development client, no Metro, and nothing attached once it is
+installed. It is the build to live with, and the one that leaves the phone
+cool.
+
+**Why not the development build.** A development build is tied to the
+computer for as long as it runs, and on a phone paired over Wi-Fi all of it
+rides the radio:
+
+- it fetches the JavaScript from Metro at every launch — a development
+  bundle, unminified, which the phone compiles itself;
+- it keeps sockets open to Metro: Fast Refresh, React Native DevTools, and the
+  console, which it relays line by line;
+- the development client's network inspector copies every response, up to
+  1 MB each, to Metro — every poster on a page included;
+- React runs its development checks on every render.
+
+A Release build has none of it. Expo links the development client into the
+Debug configuration only (`debugOnly` in its module config), and React
+Native compiles its own connections out of a Release build. Keep the development build for the
+simulator, and for a phone only to debug what only a phone does — on a cable,
+and for as long as that takes.
+
+**Not with Xcode's Run button.** It attaches the debugger and streams the
+device's log to Xcode while the app runs. `ios:device` installs with Expo's
+own installer or `devicectl` and launches the app without attaching anything.
+
+**A cable, when you can.** A phone paired with "Connect via network" installs
+over Wi-Fi, and moving a build of this size keeps its radio busy for minutes.
+And the first time Xcode prepares a phone for an iOS version, it copies the
+phone's system symbols — several gigabytes — which over Wi-Fi is long and
+hot. Let that happen once, on a cable, or not at all: `ios:device` does not
+need them.
+
+**The data stays.** A Release build installed over a development one is the
+same app, signed by the same team, so it keeps the account and everything
+else. The development-only adapters — the mock source, portal, account and
+backup target — are not in a Release build, and nothing on a phone should
+depend on them. It is signed for development, so it installs on phones
+registered to the team in `ios.appleTeamId`, and runs for as long as its
+provisioning profile lasts.
+
 ## Servers over plain HTTP
 
 App Transport Security refuses plain `http` unless the app says otherwise.

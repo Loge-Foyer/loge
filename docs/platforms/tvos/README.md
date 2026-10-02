@@ -11,11 +11,15 @@ the ordinary screens, not screens of their own (spec §20).
 ## Building and running
 
 ```bash
-npm run tvos      # turns ios/ into the Apple TV project if it is not one, then builds and installs
-npm start         # Metro, for the development build already installed
-npm run ios       # turns ios/ back into the iPhone project if needed, then builds for the phone
+npm run tvos         # turns ios/ into the Apple TV project if it is not one, then builds and installs
+npm start            # Metro, for the development build already installed
+npm run ios          # turns ios/ back into the iPhone project if needed, then builds for the phone
+npm run tvos:device  # a real Apple TV: a Release build, with nothing tied to this computer
 ```
 
+- **A real Apple TV gets a Release build**, for the reasons an iPhone does
+  (`docs/platforms/ios`, "On your own iPhone") — and it has no cable to fall
+  back on: an Apple TV 4K pairs over the network only. Not tried on one yet.
 - **One `ios/` folder, two kinds.** Expo's TV support makes the generated
   `ios/` an Apple TV project with `EXPO_TV=1 npx expo prebuild -p ios --clean`,
   and an iPhone one again without it. `scripts/ios-target.js` does whichever

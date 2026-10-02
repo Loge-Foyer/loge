@@ -6,12 +6,23 @@ description: Launch the Streaming Center app on the iOS simulator, Android emula
 # Run the Streaming Center app
 
 ```bash
-npm run ios        # builds the development client, installs it on the simulator, opens it
-npm run tvos       # the same on an Apple TV simulator — ios/ becomes the TV project first
-npm run android    # the same on the emulator
-npm run web        # browser — no build
-npm start          # Metro alone, for a development client already installed
+npm run ios          # builds the development client, installs it on the simulator, opens it
+npm run tvos         # the same on an Apple TV simulator — ios/ becomes the TV project first
+npm run android      # the same on the emulator
+npm run web          # browser — no build
+npm start            # Metro alone, for a development client already installed
+npm run ios:device   # someone's own iPhone: a Release build — no Metro, nothing attached
+npm run tvos:device  # the same on a real Apple TV
 ```
+
+**A real device gets a Release build**, never the development client: that
+one keeps the phone working for the computer — the bundle from Metro at every
+launch, sockets for Fast Refresh, DevTools and the console, and a network
+inspector that copies every response to Metro, over Wi-Fi when the phone is
+paired that way. Pass the device as the last argument
+(`npm run ios:device -- <UDID>`, from `xcrun devicectl list devices`) — with
+none, Expo asks. Never install with Xcode's Run button: it attaches the
+debugger and streams the log. `docs/platforms/ios` has the rest.
 
 **`ios/` is one kind at a time.** `npm run ios` and `npm run tvos` each turn it
 into the project they need (`scripts/ios-target.js`), with a clean prebuild,

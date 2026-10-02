@@ -5,9 +5,11 @@ npm install          # the adapters are workspaces of this package; nothing else
 npm run android      # or npm run ios: builds the development client, the first time
 npm start            # later: Metro alone, for the build already installed
 npm run web          # the browser needs no build
+npm run ios:device   # your own iPhone: a Release build instead (docs/platforms/ios)
 ```
 
-Phones and simulators run a **development build**, not Expo Go. The app
+Simulators and the emulator run a **development build**, not Expo Go; a phone
+you carry gets a Release build, which is not tied to this computer. The app
 carries native code — mpv's engine, picture in picture, and the keychain — and
 Face ID needs the app's own usage text. Building it needs the Android SDK or
 Xcode, and takes several minutes the first time; after that, JavaScript changes

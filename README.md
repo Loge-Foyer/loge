@@ -22,13 +22,16 @@ you want to.
 ## Running it
 
 ```bash
-npm install       # the adapters are workspaces here; nothing else to link
-npm run ios       # or: npm run android, npm run web
+npm install          # the adapters are workspaces here; nothing else to link
+npm run ios          # or: npm run android, npm run web
+npm run ios:device   # your own iPhone: a Release build, nothing tied to this computer
 ```
 
-On a phone or simulator this builds a development client first — the app
-carries native code, mpv's engine among it — so the first run takes several
-minutes. After that, changes to the JavaScript load as usual. The web needs no
+On a simulator or the emulator this builds a development client first — the
+app carries native code, mpv's engine among it — so the first run takes
+several minutes. After that, changes to the JavaScript load as usual. A phone
+you carry gets the Release build instead: the JavaScript inside it, and
+nothing that keeps the phone talking to this computer. The web needs no
 build.
 
 The first launch asks how to begin: create an account on this device, sign in

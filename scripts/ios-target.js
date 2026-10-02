@@ -4,8 +4,8 @@
 // other kind would build the wrong thing, or fail to install. So this
 // prebuilds again only when the folder is the other kind, or missing.
 //
-//   node scripts/ios-target.js phone    (npm run ios)
-//   node scripts/ios-target.js tv       (npm run tvos)
+//   node scripts/ios-target.js phone    (npm run ios, npm run ios:device)
+//   node scripts/ios-target.js tv       (npm run tvos, npm run tvos:device)
 
 const { execSync } = require('node:child_process');
 const { existsSync, readFileSync } = require('node:fs');

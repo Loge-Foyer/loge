@@ -66,9 +66,15 @@ Docs: https://docs.expo.dev/eas/index.md
 - Expo Go only includes its bundled native modules. After adding a library with
   native code, the app needs a development build: `npx expo run:ios|android`
   locally, or `eas build --profile development`.
-- **This app is past that point.** Phones run a development build:
-  `npm run android` / `npm run ios` build and install it, then Metro serves the
-  JavaScript as before.
+- **This app is past that point.** Simulators and the emulator run a
+  development build: `npm run android` / `npm run ios` build and install it,
+  then Metro serves the JavaScript as before. **A real iPhone or Apple TV gets
+  a Release build** — `npm run ios:device` / `npm run tvos:device` — never the
+  development client, which keeps a phone working for the computer while it
+  runs: the bundle from Metro, sockets for Fast Refresh, DevTools and the
+  console, and a network inspector copying every response to Metro, all over
+  Wi-Fi on a phone paired that way. Never install from Xcode's Run button
+  either: it attaches the debugger (`docs/platforms/ios`).
   - Player engines are native code: expo-video for the built-in player
     (Phase 7), and an Expo module for mpv.
   - Face ID needs the app's usage text, which Expo Go cannot carry.
