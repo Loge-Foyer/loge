@@ -35,6 +35,21 @@ describe('the HTTP client plugins get', () => {
     });
   });
 
+  it('keeps no cookies, and sends none but the plugin’s own', async () => {
+    let credentials: string | undefined;
+    const client = createHttpClient({
+      fetch: (_url, init) => {
+        credentials = init.credentials;
+        return answer(200);
+      },
+      network: fakeNetwork(),
+      log: recordingLog().log,
+      now: () => 0,
+    });
+    await client.request({ method: 'GET', url: 'http://portal/load.php', headers: { Cookie: 'mac=00:1A:79:12:34:56' } });
+    expect(credentials).toBe('omit');
+  });
+
   it('calls fetch unbound, as a browser requires', async () => {
     const strictFetch: FetchLike = function (this: unknown) {
       // A browser throws "Illegal invocation" when fetch runs with another `this`.

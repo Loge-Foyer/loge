@@ -35,13 +35,20 @@ import {
   type VodRow,
   type VodType,
 } from './map';
-import { createPortal, unreadable } from './portal';
+import { abandonable, createPortal, isPortalAnswer, unreadable } from './portal';
 
 // Now and next, for a few channels, is one short call each; a longer window is one call for all.
 const SHORT_EPG_CHANNELS = 6;
 const SHORT_EPG_WINDOW_MS = 6 * 3_600_000;
 const LONGEST_GUIDE_HOURS = 48;
 const EPISODE_PAGES = 20;
+// Every channel, or every channel's guide, in one answer: far more than a page,
+// so given the client's longest wait rather than a page's.
+const WHOLE_PORTAL_MS = 60_000;
+// One answer about the whole portal's guide serves every list that asks within it.
+const GUIDE_SLOT_MS = 5 * 60_000;
+// Where films and series share pages, how far to read on for one of the kind asked for.
+const READ_ON = 3;
 
 // The portal's orders closest to each sort. Its pages come in its own order.
 const SORTS: Readonly<Record<ItemSortKey, string>> = { addedAt: 'added', releaseDate: 'added', title: 'name', rating: 'rating' };
@@ -65,8 +72,10 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
     listings.add(work);
     return work.finally(() => listings.delete(work));
   };
-  // Whether this portal keeps its series apart from its films, asked once.
+  // Whether this portal keeps its series apart from its films, once it has said.
   let seriesSection: Promise<boolean> | undefined;
+  // The whole portal's guide for a five-minute slot, shared by whoever asks in it.
+  let wholeGuide: { readonly slot: number; readonly period: number; readonly answer: Promise<unknown> } | undefined;
 
   const remember = (rows: readonly ChannelRow[]) => {
     for (const row of rows) if (row.cmd) channelCmds.set(row.channel.key.externalId, row.cmd);
@@ -75,7 +84,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   // A channel played before its list was read, since a restart: the whole list, once.
   const loadEveryChannel = (signal?: CancelSignal) => {
     everyChannel ??= (async () => {
-      remember(toChannels(await portal.call('itv', 'get_all_channels', {}, signal), 1, connectionId, portal.root()).rows);
+      remember(toChannels(await portal.call('itv', 'get_all_channels', {}, signal, { timeoutMs: WHOLE_PORTAL_MS }), 1, connectionId, portal.root()).rows);
     })().catch((error: unknown) => {
       everyChannel = undefined;
       throw error;
@@ -88,15 +97,37 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   /**
    * Whether the portal has a series section of its own. Its categories are the
    * honest question: a portal without one answers nothing, while asking it for
-   * a list of series can hand back the films. Asked once, and never again —
-   * a refusal counts as no.
+   * a list of series can hand back the films. What the portal answers is kept,
+   * a "no such thing" included. A failure to ask it is not: a portal that was
+   * slow once, or a list left while it loaded, still has its series — and the
+   * one portal seen keeps every series there and none among its films, so
+   * taking that failure for "no" emptied Series for the rest of the session.
    */
   const hasSeriesSection = (signal?: CancelSignal) => {
-    seriesSection ??= portal
-      .call('series', 'get_categories', {}, signal)
-      .then((js) => Array.isArray(js) && js.length > 0)
-      .catch(() => false);
-    return seriesSection;
+    seriesSection ??= portal.call('series', 'get_categories', {}).then(
+      (js) => Array.isArray(js) && js.length > 0,
+      (error: unknown) => {
+        if (isPortalAnswer(error)) return false;
+        seriesSection = undefined;
+        throw error;
+      },
+    );
+    return abandonable(seriesSection, signal);
+  };
+
+  /** The whole portal's guide, once for a five-minute slot however many lists ask in it. */
+  const guideOfEveryChannel = (period: number, signal?: CancelSignal) => {
+    const slot = Math.floor(context.clock.now() / GUIDE_SLOT_MS);
+    if (!wholeGuide || wholeGuide.slot !== slot || wholeGuide.period < period) {
+      // On no caller's signal: one list giving up must not fail the others sharing it.
+      const answer = portal.call('itv', 'get_epg_info', { period }, undefined, { timeoutMs: WHOLE_PORTAL_MS });
+      const asked = { slot, period, answer };
+      wholeGuide = asked;
+      answer.catch(() => {
+        if (wholeGuide === asked) wholeGuide = undefined;
+      });
+    }
+    return abandonable(wholeGuide.answer, signal);
   };
 
   const describe = async (request: PlaybackRequest, type: 'itv' | VodType, params: Readonly<Record<string, string | number>>, live: boolean, signal?: CancelSignal): Promise<PlaybackDescriptor> => {
@@ -137,23 +168,25 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     const term = query.term?.trim();
     const ask = async (from: VodType) => {
-      const js = await portal.call(
-        from,
-        'get_ordered_list',
-        { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: page, ...(term ? { search: term } : {}) },
-        signal,
-      );
-      const result = toVod(js, page, connectionId, portal.root(), from);
-      for (const row of result.rows) vod.set(row.item.key.externalId, row);
-      const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
-      // Where films and series share pages, each kind takes its own from
-      // them — and a term is checked again here, as the channels are.
-      return {
-        items: result.rows
-          .map((row) => row.item)
-          .filter((item) => item.type === wanted && (term ? matchesTerm(term, item.title) : true)),
-        ...(more ? { nextCursor: String(result.page + 1) } : {}),
-      };
+      // Where films and series share pages, each kind takes its own from them
+      // — and a term is checked again here, as the channels are. A page can
+      // then hold none of the kind asked for: read on, a few pages at most,
+      // rather than answer an empty page that claims more, which a grid pages
+      // through one request at a time.
+      for (let at = page, read = 1; ; read += 1) {
+        const js = await portal.call(
+          from,
+          'get_ordered_list',
+          { category: '*', sortby: SORTS[query.sort.by], fav: 0, hd: 0, not_ended: 0, p: at, ...(term ? { search: term } : {}) },
+          signal,
+        );
+        const result = toVod(js, at, connectionId, portal.root(), from);
+        for (const row of result.rows) vod.set(row.item.key.externalId, row);
+        const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
+        const items = result.rows.map((row) => row.item).filter((item) => item.type === wanted && (term ? matchesTerm(term, item.title) : true));
+        if (items.length > 0 || !more || read >= READ_ON) return { items, ...(more ? { nextCursor: String(result.page + 1) } : {}) };
+        at = result.page + 1;
+      }
     };
 
     if (wanted === 'movie') return ask('vod');
@@ -211,7 +244,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         return lists.flat().filter(inWindow);
       }
       const period = Math.min(LONGEST_GUIDE_HOURS, Math.max(1, Math.ceil((to - now) / 3_600_000)));
-      const js = await portal.call('itv', 'get_epg_info', { period }, signal);
+      const js = await guideOfEveryChannel(period, signal);
       return wanted.flatMap(({ key, id }) => epgInfoFor(js, id).flatMap((entry) => toProgramme(entry, key) ?? [])).filter(inWindow);
     },
 

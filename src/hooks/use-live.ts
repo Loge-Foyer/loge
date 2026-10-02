@@ -2,6 +2,7 @@ import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } f
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+import type { SourceError } from '@/services/media';
 import { remoteKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
@@ -11,6 +12,17 @@ const MINUTE = 60_000;
 const CHANNEL_PAGE = 60;
 // The guide's window starts on a five-minute mark, so the key — and the answer — hold for five minutes.
 const GUIDE_STEP_MS = 5 * MINUTE;
+
+/**
+ * What was saved, standing in for a provider that could not answer, is old
+ * news from the moment it arrives: nothing waits out the usual freshness to ask
+ * again, and while the provider said to try later, it is asked in half a
+ * minute — as the Media rows are. Before, one failure at launch kept its notice
+ * up for ten minutes or half an hour.
+ */
+const BACKING_OFF_MS = 30_000;
+const freshFor = (error: SourceError | undefined, fresh: number) => (error ? 0 : fresh);
+const askAgain = (error: SourceError | undefined) => (error?.retry === 'backoff' ? BACKING_OFF_MS : false);
 
 export function useChannelGroups(connectionId: ConnectionId | undefined) {
   const userId = useActiveUserId();
@@ -22,7 +34,8 @@ export function useChannelGroups(connectionId: ConnectionId | undefined) {
       return media.channelGroups(userId, connectionId, signal);
     },
     enabled: connectionId !== undefined,
-    staleTime: 30 * MINUTE,
+    staleTime: (query) => freshFor(query.state.data?.sourceError, 30 * MINUTE),
+    refetchInterval: (query) => askAgain(query.state.data?.sourceError),
   });
 }
 
@@ -46,7 +59,8 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.value.nextCursor ?? null,
     enabled: connectionId !== undefined,
-    staleTime: 10 * MINUTE,
+    staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
+    refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
   });
 }
 
@@ -75,8 +89,8 @@ export function useGuide(connectionId: ConnectionId | undefined, channels: reado
       return media.guide(userId, connectionId, channels, from, to, signal);
     },
     enabled: connectionId !== undefined && channels.length > 0,
-    staleTime: 5 * MINUTE,
-    refetchInterval: 5 * MINUTE,
+    staleTime: (query) => freshFor(query.state.data?.sourceError, 5 * MINUTE),
+    refetchInterval: (query) => askAgain(query.state.data?.sourceError) || 5 * MINUTE,
   });
 }
 
@@ -109,6 +123,7 @@ export function useSourcePage(connectionId: ConnectionId | undefined, kind: Cont
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor ?? null,
     enabled: connectionId !== undefined && kind !== undefined,
-    staleTime: 10 * MINUTE,
+    staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
+    refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
   });
 }

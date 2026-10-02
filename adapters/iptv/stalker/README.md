@@ -32,17 +32,27 @@ series.
 - **Signing in** is a handshake for a token, then `get_profile`, which says
   whether this MAC address may use the portal. A refusal — or a blocked
   subscription — is remembered, and nothing asks that portal again by itself.
-  One sign-in serves every call that starts together.
+- **Calls that start together share everything,** because a portal keeps one
+  token per MAC address and every handshake ends the one before it: one read
+  of the saved session, one sign-in, one renewal. The sign-in runs on no
+  caller's signal, so a list left while it loads fails nobody else.
 - **As a MAG box:** its user agent, `X-User-Agent`, and
   `Cookie: mac=…; stb_lang=en; timezone=UTC`, with the token as a Bearer, and
   `JsHttpRequest=1-xml` on every call.
 - **A token that runs out** answers "Authorization failed.": one more
-  handshake for that call, never a loop; a second refusal is the portal no
-  longer accepting this device.
+  handshake for that call, never a loop — and none when another call renewed
+  it meanwhile, which would end the token that call just got. A token refused
+  straight after a sign-in the profile accepted means the session was ended
+  from elsewhere, the same MAC address signing in on another device: the call
+  says so, and it is not latched as a refusal.
 - **Live TV:** `itv get_genres` (without "All") and `get_ordered_list`, paged as
   the portal pages. Catch-up comes from `tv_archive_duration`. The guide is
   `get_short_epg` for now and next on a few channels, and one `get_epg_info`
-  for a longer window.
+  for a longer window — the guide of every channel on the portal, which is
+  shared by every list that asks in the same five minutes.
+- **Answers about the whole portal** — `get_all_channels`, which a channel
+  played before its list was read needs, and `get_epg_info` — get a minute,
+  where a page gets fifteen seconds.
 - **Playing** is `create_link` when something plays, its `ffmpeg ` hint
   stripped. A live link with no `.m3u8` is raw MPEG-TS, which AVPlayer does
   not play — the app then says which player would. `limit` means the
@@ -53,8 +63,14 @@ series.
   **section of its own**: `series get_categories` answers, and then every
   series is in `series get_ordered_list` — never among the films. An older one
   has no such section and mixes its series into `vod`, marked `is_series`. The
-  categories are the question asked, once per session: asking a portal without
-  the section for a list of series can hand back the films.
+  categories are the question asked: asking a portal without the section for
+  a list of series can hand back the films. Its answer is kept for the
+  session, a "no such thing" included; a failure to ask is not — a portal that
+  was slow once still has its series — so the question is asked again, and
+  Series says what went wrong meanwhile.
+  - **Where they share pages,** a page can hold none of the kind asked for. It
+    reads on, three pages at most, rather than answer an empty page that
+    claims more.
   - **Seasons and episodes** come from the same section, with `movie_id` and
     `season_id`. Where a season lists its episodes as numbers (`series: [1, 2,
     3]`) rather than rows — which is what the real portal does — those numbers
@@ -99,8 +115,9 @@ this plugin's:
   into that header — on iOS `URLSession` seeds the header from the shared
   store and then *appends* the caller's with a comma, which stops the portal
   parsing past the first `;`, and the portal then refuses the MAC it never
-  saw. The plugin must never come to rely on a jar, and a host should not give
-  it one.
+  saw; on Android the jar replaces it, and `mac=` is lost. Either way it lasts
+  until the stored cookie expires. The plugin must never come to rely on a
+  jar, and the app's client gives it none (`credentials: 'omit'`).
 
 ## Status
 

@@ -1,4 +1,4 @@
-import { AppError, isTransportError, type CancelSignal, type HttpResponse, type MediaContext } from '@sc/api';
+import { AppError, isTransportError, TransportError, type CancelSignal, type HttpResponse, type MediaContext } from '@sc/api';
 
 // A MAG box, as portals expect to see one. Some refuse anything else.
 const USER_AGENT = 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3';
@@ -15,9 +15,14 @@ interface Session {
   readonly token: string;
 }
 
+export interface CallOptions {
+  /** For an answer about the whole portal — every channel, every channel's guide — which takes longer than a page. */
+  readonly timeoutMs?: number;
+}
+
 export interface Portal {
   /** One call — `type` and `action` as the portal names them — signed in first when needed. Answers the `js` part. */
-  call(type: string, action: string, params?: Readonly<Record<string, QueryValue>>, signal?: CancelSignal): Promise<unknown>;
+  call(type: string, action: string, params?: Readonly<Record<string, QueryValue>>, signal?: CancelSignal, options?: CallOptions): Promise<unknown>;
   /** Finds the portal behind the address, signs in and reads the profile: Test connection. */
   check(signal?: CancelSignal): Promise<void>;
   /** The portal's root, for a logo it names by path. Known once a call has found it. */
@@ -46,12 +51,18 @@ export function endpointsFor(portalUrl: string): readonly string[] {
  * A Stalker portal session. The MAC address is what signs in: a portal that
  * refuses it is remembered, and never asked again by this session — nor is a
  * handshake repeated more than once for one call.
+ *
+ * A portal keeps one token per MAC address, so every handshake ends the token
+ * before it. Calls that start together therefore share everything: one read
+ * of the saved session, one sign-in, and one renewal when the token runs out —
+ * a call that finds the token already renewed takes the new one, rather than
+ * shaking hands again and ending it for the others.
  */
 export function createPortal(options: { readonly portalUrl: string; readonly context: MediaContext }): Portal {
   const { context } = options;
   const candidates = endpointsFor(options.portalUrl);
   let session: Session | undefined;
-  let loaded = false;
+  let loading: Promise<void> | undefined;
   let signingIn: Promise<Session> | undefined;
   let refused: AppError | undefined;
 
@@ -62,7 +73,7 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
     return { mac, serialNumber: secrets.serialNumber, deviceId: secrets.deviceId, signature: secrets.signature };
   };
 
-  const send = async (endpoint: string, params: Readonly<Record<string, QueryValue>>, token: string | undefined, signal?: CancelSignal) => {
+  const send = async (endpoint: string, params: Readonly<Record<string, QueryValue>>, token: string | undefined, signal?: CancelSignal, timeoutMs = TIMEOUT_MS) => {
     const { mac } = await identity();
     const base = endpoint.replace(/\/(server\/load|portal)\.php$/i, '').replace(/\/stalker_portal$/i, '');
     try {
@@ -77,7 +88,7 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
           Accept: '*/*',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        timeoutMs: TIMEOUT_MS,
+        timeoutMs,
         ...(signal ? { signal } : {}),
       });
     } catch (error) {
@@ -89,15 +100,15 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
     }
   };
 
-  const handshake = async (endpoint: string, signal?: CancelSignal): Promise<string | undefined> => {
-    const response = await send(endpoint, { type: 'stb', action: 'handshake', token: '' }, undefined, signal);
+  const handshake = async (endpoint: string): Promise<string | undefined> => {
+    const response = await send(endpoint, { type: 'stb', action: 'handshake', token: '' }, undefined);
     if (response.status !== 200) return undefined;
     const token = text(record(record(parse(response))?.js)?.token);
     return token;
   };
 
   /** The profile says whether this MAC address may use the portal. Anything but yes is a refusal, remembered. */
-  const readProfile = async (candidate: Session, signal?: CancelSignal) => {
+  const readProfile = async (candidate: Session) => {
     const { serialNumber, deviceId, signature } = await identity();
     const response = await send(
       candidate.endpoint,
@@ -120,7 +131,6 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
         api_signature: 262,
       },
       candidate.token,
-      signal,
     );
     const profile = record(record(response.status === 200 ? parse(response) : undefined)?.js);
     if (response.status === 401 || response.status === 403 || response.text.trim() === AUTHORIZATION_FAILED) throw refusal();
@@ -136,33 +146,42 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
     return refused;
   };
 
+  /**
+   * The session an earlier run saved, read once however many calls start
+   * together: a second read racing the first would see no session, shake hands,
+   * and end the saved token the first was using.
+   */
   const stored = async (): Promise<Session | undefined> => {
-    if (loaded) return session;
-    loaded = true;
-    try {
-      const saved = record(JSON.parse((await context.session.read()) ?? 'null'));
-      const endpoint = text(saved?.endpoint);
-      const token = text(saved?.token);
-      if (endpoint && token && candidates.includes(endpoint)) session = { endpoint, token };
-    } catch {
-      // Not this plugin's: sign in again.
-    }
+    loading ??= (async () => {
+      try {
+        const saved = record(JSON.parse((await context.session.read()) ?? 'null'));
+        const endpoint = text(saved?.endpoint);
+        const token = text(saved?.token);
+        // A sign-in that finished meanwhile is newer than anything saved.
+        if (!session && endpoint && token && candidates.includes(endpoint)) session = { endpoint, token };
+      } catch {
+        // Not this plugin's: sign in again.
+      }
+    })();
+    await loading;
     return session;
   };
 
   /**
    * One sign-in at a time, shared by every caller: the endpoint this address
-   * answers on — tried in order, once — a token, and the profile.
+   * answers on — tried in order, once — a token, and the profile. It runs on
+   * no caller's signal, so one caller giving up fails nobody else; each stops
+   * waiting on its own.
    */
   const signIn = (signal?: CancelSignal): Promise<Session> => {
     if (refused) return Promise.reject(refused);
     signingIn ??= (async () => {
       const known = session?.endpoint;
       for (const endpoint of known ? [known] : candidates) {
-        const token = await handshake(endpoint, signal);
+        const token = await handshake(endpoint);
         if (!token) continue;
         const next = { endpoint, token };
-        await readProfile(next, signal);
+        await readProfile(next);
         session = next;
         await context.session.write(JSON.stringify(next));
         return next;
@@ -171,21 +190,33 @@ export function createPortal(options: { readonly portalUrl: string; readonly con
     })().finally(() => {
       signingIn = undefined;
     });
-    return signingIn;
+    return abandonable(signingIn, signal);
   };
 
-  const call: Portal['call'] = async (type, action, params = {}, signal) => {
+  const expired = (response: HttpResponse) => response.status === 401 || response.text.trim() === AUTHORIZATION_FAILED;
+
+  const call: Portal['call'] = async (type, action, params = {}, signal, options = {}) => {
     if (refused) throw refused;
     const first = (await stored()) ?? (await signIn(signal));
-    let response = await send(first.endpoint, { type, action, ...params }, first.token, signal);
-    if (response.status === 401 || response.text.trim() === AUTHORIZATION_FAILED) {
-      // The token ran out: one more handshake for this call, and no more.
-      const renewed = await signIn(signal);
-      response = await send(renewed.endpoint, { type, action, ...params }, renewed.token, signal);
-      if (response.status === 401 || response.text.trim() === AUTHORIZATION_FAILED) {
-        session = undefined;
-        await context.session.clear();
-        throw refusal('The portal no longer accepts this device.');
+    let response = await send(first.endpoint, { type, action, ...params }, first.token, signal, options.timeoutMs);
+    if (expired(response)) {
+      // The token ran out: one more handshake for this call, and no more —
+      // and none at all when another call has renewed it meanwhile.
+      const renewed = session && session.token !== first.token ? session : await signIn(signal);
+      response = await send(renewed.endpoint, { type, action, ...params }, renewed.token, signal, options.timeoutMs);
+      if (expired(response)) {
+        // A token the portal handed out a moment ago, refused at once: the
+        // session was ended from elsewhere — the same MAC address signing in
+        // on another device — rather than this device refused. So it is not
+        // latched, and nothing loops: this call fails, and the next sign-in
+        // waits for the next call.
+        if (session === renewed) {
+          session = undefined;
+          await context.session.clear();
+        }
+        throw new AppError('PROVIDER_UNAVAILABLE', 'The portal ended this device’s session. If this MAC address is in use somewhere else, close it there.', {
+          retry: 'never',
+        });
       }
     }
     if (response.status >= 400) throw statusError(response.status);
@@ -215,14 +246,50 @@ function parse(response: HttpResponse): unknown {
   }
 }
 
+// Errors that are the portal's answer — it was reached, and said no, or said
+// something that is no answer at all — as against failing to reach it.
+const answers = new WeakSet<AppError>();
+const answer = (error: AppError) => {
+  answers.add(error);
+  return error;
+};
+
+/** Whether an error is what the portal answered, rather than a failure to ask it: the portal was reached. */
+export function isPortalAnswer(error: unknown): boolean {
+  return error instanceof AppError && answers.has(error);
+}
+
 function statusError(status: number): AppError {
-  if (status === 404) return new AppError('NOT_FOUND', 'The portal has no such thing.');
+  if (status === 404) return answer(new AppError('NOT_FOUND', 'The portal has no such thing.'));
   if (status >= 500) return new AppError('PROVIDER_UNAVAILABLE', 'The portal ran into a problem.', { retry: 'backoff' });
-  return new AppError('PROVIDER_UNAVAILABLE', `The portal refused the request (${status}).`, { retry: 'never' });
+  return answer(new AppError('PROVIDER_UNAVAILABLE', `The portal refused the request (${status}).`, { retry: 'never' }));
 }
 
 export function unreadable(): AppError {
-  return new AppError('PROVIDER_UNAVAILABLE', 'The portal sent an answer that could not be read.', { retry: 'backoff' });
+  return answer(new AppError('PROVIDER_UNAVAILABLE', 'The portal sent an answer that could not be read.', { retry: 'backoff' }));
+}
+
+/**
+ * Work several callers share, waited on by one of them: when its signal
+ * aborts, that caller stops waiting, and the work goes on for the others.
+ */
+export function abandonable<T>(work: Promise<T>, signal: CancelSignal | undefined): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(new TransportError('aborted'));
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new TransportError('aborted'));
+    signal.addEventListener('abort', abort);
+    work.then(
+      (value) => {
+        signal.removeEventListener('abort', abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      },
+    );
+  });
 }
 
 export function record(value: unknown): Readonly<Record<string, unknown>> | undefined {

@@ -8,13 +8,19 @@ const MAX_TIMEOUT_MS = 60_000;
 /** The part of `fetch` this client uses, so a test can supply its own. */
 export type FetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body?: string; signal: AbortSignal },
+  init: { method: string; headers: Record<string, string>; body?: string; signal: AbortSignal; credentials: 'omit' },
 ) => Promise<{ status: number; headers: { forEach(callback: (value: string, key: string) => void): void }; text(): Promise<string> }>;
 
 /**
  * The HTTP client every plugin gets. It answers every status, fails only with
  * a `TransportError`, gives up after the request's timeout — reading the body
  * included — and never logs a query string, a header or a body.
+ *
+ * It keeps no cookies, and sends none but a plugin's own. The platform's jar
+ * would otherwise join in: on iOS a stored cookie is comma-appended to the
+ * plugin's `Cookie` header, and on Android the jar replaces it — so a portal
+ * that sets any cookie stopped reading the `mac=` it signs in with, until that
+ * cookie expired. Every plugin says who it is in its own headers.
  */
 export function createHttpClient(deps: { fetch: FetchLike; network: NetworkMonitor; log: Logger; now: () => number }): HttpClient {
   // Called unbound: a browser's fetch refuses to run with anything else as `this`.
@@ -42,6 +48,7 @@ export function createHttpClient(deps: { fetch: FetchLike; network: NetworkMonit
           headers: { ...request.headers },
           ...(request.body === undefined ? {} : { body: request.body }),
           signal: controller.signal,
+          credentials: 'omit',
         });
         const text = await response.text();
         const headers: Record<string, string> = {};

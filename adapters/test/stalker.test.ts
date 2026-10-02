@@ -1,4 +1,4 @@
-import { connectionId, type ConnectedMediaProvider, type FieldValues } from '@sc/api';
+import { connectionId, type CancelSignal, type ConnectedMediaProvider, type FieldValues, type MediaContext } from '@sc/api';
 import { plugin } from '@sc/iptv-stalker';
 import { describe, expect, it } from 'vitest';
 
@@ -61,12 +61,20 @@ interface PortalOptions {
   readonly link?: (request: RecordedRequest) => Reply;
   /** A portal that keeps its series apart from its films, as newer ones do. */
   readonly seriesSection?: boolean;
+  /** How many times its series categories fail, as a busy portal's do, before they answer. */
+  readonly failCategories?: number;
+  /** How many calls find the session ended — the same MAC address signing in elsewhere — whatever the token. */
+  readonly stolen?: number;
+  /** Its films' pages, where a test needs pages of its own. */
+  readonly vod?: (page: number) => unknown;
 }
 
 /** A Ministra portal at /stalker_portal/, answering by `type` and `action`. */
 function fakePortal(options: PortalOptions = {}) {
   let handshakes = 0;
   let expired = false;
+  let categoriesFailed = 0;
+  let stolen = 0;
   return {
     handshakes: () => handshakes,
     route: (request: RecordedRequest): Reply => {
@@ -76,6 +84,10 @@ function fakePortal(options: PortalOptions = {}) {
         return { status: 200, json: { js: { token: `token-${handshakes}` } } };
       }
       if (request.headers.Authorization !== `Bearer token-${handshakes}`) return { status: 200, text: 'Authorization failed.' };
+      if (type !== 'stb' && stolen < (options.stolen ?? 0)) {
+        stolen += 1;
+        return { status: 200, text: 'Authorization failed.' };
+      }
       if (options.expireAlways || (options.expireOnce && !expired && type !== 'stb')) {
         expired = true;
         return { status: 200, text: 'Authorization failed.' };
@@ -95,7 +107,13 @@ function fakePortal(options: PortalOptions = {}) {
       if (action === 'create_link') return options.link?.(request) ?? { status: 200, json: { js: { id: '1', cmd: 'ffmpeg http://stream.test/live/abc123/101.ts?play_token=t0k3n', error: '' } } };
       if (type === 'series') {
         if (!options.seriesSection) return { status: 404 };
-        if (action === 'get_categories') return { status: 200, json: seriesCategories };
+        if (action === 'get_categories') {
+          if (categoriesFailed < (options.failCategories ?? 0)) {
+            categoriesFailed += 1;
+            return { status: 503 };
+          }
+          return { status: 200, json: seriesCategories };
+        }
         if (action === 'get_ordered_list') {
           if (request.query.movie_id === '18390:18390') return { status: 200, json: seriesSeasons };
           return { status: 200, json: seriesPage };
@@ -104,6 +122,7 @@ function fakePortal(options: PortalOptions = {}) {
       if (type === 'vod' && action === 'get_ordered_list') {
         if (request.query.movie_id === '601') return { status: 200, json: request.query.season_id === '0' ? seasons : episodes };
         if (request.query.movie_id === '701') return { status: 200, json: { js: { total_items: 0, data: [] } } };
+        if (options.vod) return { status: 200, json: options.vod(Number(request.query.p)) };
         return { status: 200, json: vodPage };
       }
       return { status: 404 };
@@ -120,6 +139,49 @@ async function connect(options: PortalOptions & { fields?: FieldValues; credenti
   const provider = await media.connect(target({ portalUrl: 'http://portal.test/c/', ...options.fields }), fake.context);
   return { provider, http, fake, portal };
 }
+
+/** A session saved by an earlier run, read back a moment later, as a keychain answers. */
+async function connectWithSession(saved: { readonly endpoint: string; readonly token: string }, options: PortalOptions = {}) {
+  const portal = fakePortal(options);
+  const http = fakeHttp({ [LOAD]: portal.route });
+  const fake = fakeContext({ http: http.client, credentials: { mac: MAC }, session: JSON.stringify(saved) });
+  const context: MediaContext = {
+    ...fake.context,
+    session: {
+      ...fake.context.session,
+      read: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return fake.context.session.read();
+      },
+    },
+  };
+  const media = plugin.media;
+  if (!media) throw new Error('Stalker has no media role.');
+  const provider = await media.connect(target({ portalUrl: 'http://portal.test/c/' }), context);
+  return { provider, http, fake, portal };
+}
+
+/** A signal a test can abort, shaped as the contract's. */
+function cancellable() {
+  const listeners = new Set<() => void>();
+  let aborted = false;
+  const signal: CancelSignal = {
+    get aborted() {
+      return aborted;
+    },
+    addEventListener: (_type, listener) => listeners.add(listener),
+    removeEventListener: (_type, listener) => listeners.delete(listener),
+  };
+  return {
+    signal,
+    abort: () => {
+      aborted = true;
+      for (const listener of listeners) listener();
+    },
+  };
+}
+
+const ENDPOINT = 'http://portal.test/stalker_portal/server/load.php';
 
 function need<K extends keyof ConnectedMediaProvider>(provider: ConnectedMediaProvider, member: K): NonNullable<ConnectedMediaProvider[K]> {
   const found = provider[member];
@@ -181,6 +243,48 @@ describe('Stalker — finding the portal and signing in', () => {
   });
 });
 
+describe('Stalker — calls that start together', () => {
+  it('reads the saved session once, and every call uses its token — no handshake to end it', async () => {
+    const { provider, portal, http } = await connectWithSession({ endpoint: ENDPOINT, token: 'token-0' });
+    const [groups, channels] = await Promise.all([need(provider, 'listChannelGroups')(), need(provider, 'listChannels')({ limit: 50 })]);
+    expect(groups).toHaveLength(2);
+    expect(channels.channels).toHaveLength(2);
+    expect(portal.handshakes()).toBe(0);
+    expect(http.to(LOAD).every((request) => request.headers.Authorization === 'Bearer token-0')).toBe(true);
+  });
+
+  it('renews a token that ran out once, for every call that found it so', async () => {
+    const { provider, portal } = await connectWithSession({ endpoint: ENDPOINT, token: 'token-stale' });
+    const [groups, channels, again] = await Promise.all([
+      need(provider, 'listChannelGroups')(),
+      need(provider, 'listChannels')({ limit: 50 }),
+      need(provider, 'listChannelGroups')(),
+    ]);
+    expect([groups.length, channels.channels.length, again.length]).toEqual([2, 2, 2]);
+    expect(portal.handshakes()).toBe(1);
+  });
+
+  it('signs in for everyone even when the call that started it is given up', async () => {
+    const { provider, portal } = await connect();
+    const first = cancellable();
+    const leaving = need(provider, 'listChannelGroups')(first.signal);
+    const staying = need(provider, 'listChannels')({ limit: 50 });
+    first.abort();
+    await expect(leaving).rejects.toMatchObject({ name: 'TransportError', kind: 'aborted' });
+    expect((await staying).channels).toHaveLength(2);
+    expect(portal.handshakes()).toBe(1);
+  });
+
+  it('says the session was ended elsewhere, and does not hold it against the next call', async () => {
+    const { provider, portal } = await connect({ stolen: 2 });
+    await expect(need(provider, 'listChannelGroups')()).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE', retry: 'never' });
+    expect(portal.handshakes()).toBe(2);
+    // Not latched: the next call signs in again, once, and is answered.
+    expect(await need(provider, 'listChannelGroups')()).toHaveLength(2);
+    expect(portal.handshakes()).toBe(3);
+  });
+});
+
 describe('Stalker — live TV', () => {
   it('lists the genres as groups, leaving out "All"', async () => {
     const { provider } = await connect();
@@ -226,6 +330,24 @@ describe('Stalker — live TV', () => {
     expect(day[0]).toEqual({ channel: key('ch:101'), title: `Show at ${now / 1000}`, description: 'About it.', startsAt: at(now), endsAt: at(now + 1_800_000) });
   });
 
+  it('asks the whole portal’s guide once for every list in the same five minutes, and gives it time', async () => {
+    const { provider, http, fake } = await connect();
+    const getGuide = need(provider, 'getGuide');
+    const at = (ms: number) => new Date(ms).toISOString();
+    const seven = ['101', '102', '103', '104', '105', '106', '107'].map((id) => key(`ch:${id}`));
+    const everyGuide = () => http.to(LOAD).filter((request) => request.query.action === 'get_epg_info');
+    await getGuide({ channels: seven, from: at(now), to: at(now + 3_600_000) });
+    // Another group's channels, a minute later: the same answer serves.
+    fake.advance(60_000);
+    const other = await getGuide({ channels: [key('ch:101'), ...seven.slice(2)], from: at(now), to: at(now + 3_600_000) });
+    expect(other.map((programme) => programme.channel.externalId)).toContain('ch:101');
+    expect(everyGuide()).toHaveLength(1);
+    expect(everyGuide()[0]?.timeoutMs).toBe(60_000);
+    fake.advance(5 * 60_000);
+    await getGuide({ channels: seven, from: at(now), to: at(now + 3_600_000) });
+    expect(everyGuide()).toHaveLength(2);
+  });
+
   it('makes a channel’s link when it plays — the MAG hint gone, raw MPEG-TS said as such', async () => {
     const { provider, http } = await connect();
     await need(provider, 'listChannels')({ limit: 50 });
@@ -241,7 +363,10 @@ describe('Stalker — live TV', () => {
     const descriptor = await getPlaybackDescriptor({ key: key('ch:103'), profile });
     expect(descriptor.sources[0]).toMatchObject({ protocol: 'hls', live: true });
     await getPlaybackDescriptor({ key: key('ch:101'), profile });
-    expect(http.to(LOAD).filter((request) => request.query.action === 'get_all_channels')).toHaveLength(1);
+    const everyChannel = http.to(LOAD).filter((request) => request.query.action === 'get_all_channels');
+    expect(everyChannel).toHaveLength(1);
+    // Every channel in one answer takes longer than a page.
+    expect(everyChannel[0]?.timeoutMs).toBe(60_000);
   });
 
   it('says so when the subscription is busy on other devices', async () => {
@@ -369,6 +494,32 @@ describe('Stalker — films and series', () => {
     // A portal's series section lists; every link is made on the films' side.
     await need(provider, 'getPlaybackDescriptor')({ key: key('episode:s:18390%3A18390:18390%3A1:2'), profile });
     expect(http.to(LOAD).at(-1)?.query).toMatchObject({ type: 'vod', action: 'create_link', cmd: 'L3Nlcmllcy8xODM5MC5ta3Y=', series: '2' });
+  });
+
+  it('asks again whether there is a series section after it could not ask, rather than taking that for no', async () => {
+    const { provider, http } = await connect({ seriesSection: true, failCategories: 1 });
+    const listItems = need(provider, 'listItems');
+    const shows = { kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 } as const;
+    await expect(listItems(shows)).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE', retry: 'backoff' });
+    expect((await listItems(shows)).items.map((item) => item.title)).toEqual(['Harbour Nights']);
+    // Known now, and not asked a third time.
+    await listItems(shows);
+    expect(http.to(LOAD).filter((request) => request.query.action === 'get_categories')).toHaveLength(2);
+  });
+
+  it('reads on past pages that hold none of the kind asked for, rather than answer them empty', async () => {
+    const films = (page: number) => ({ id: `${page}01`, name: `Film ${page}`, is_series: '0' });
+    const { provider, http } = await connect({
+      vod: (page) => ({ js: { total_items: 20, max_page_items: 2, cur_page: page, data: page === 3 ? [films(page), { id: '901', name: 'A Series', is_series: '1' }] : [films(page)] } }),
+    });
+    const listItems = need(provider, 'listItems');
+    const first = await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 });
+    expect(first.items.map((item) => item.title)).toEqual(['A Series']);
+    expect(first.nextCursor).toBe('4');
+    expect(http.to(LOAD).filter((request) => request.query.type === 'vod').map((request) => request.query.p)).toEqual(['1', '2', '3']);
+    // At most three pages at a time: past that, an empty page that says where to go on.
+    const next = await listItems({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20, cursor: '4' });
+    expect(next).toEqual({ items: [], nextCursor: '7' });
   });
 
   it('refuses to play a series as a whole', async () => {
