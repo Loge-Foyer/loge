@@ -40,6 +40,11 @@ web for one thing only — sql.js, loaded to write or open a backup file.
 - **A profile's own values** on a connection that keeps values per profile:
   fields, settings, a credentials ref, or `off` when the profile does not use
   that connection.
+- **What a profile watched, where the app keeps it** (v9): for a source that
+  keeps no watch status of its own, on a tab the account keeps it on — one row
+  per profile and thing watched, keyed by what it is apart from any source.
+- **The account's own settings** (v9): which tabs it keeps watch status on.
+  The account's, no profile's.
 
 **Device-wide** — never leave the device:
 
@@ -335,6 +340,32 @@ The steps, the same on both engines:
   export never gathered subscriptions or playlists, so no backup held them.
   Any schema up to the current one opens now, and a backup holds everything a
   profile keeps for itself.
+- **v9** — `watch_progress` and `account_settings`: watch status the app keeps,
+  for sources that keep none — IPTV films and series, web video, plain files —
+  on the tabs the account keeps it on, and those settings themselves.
+  - **Keyed by what was watched, not where.** `watchIdentity` in `@sc/api`
+    names it by the catalogue a source matched it to — `tmdb:movie:603`,
+    `youtube:…` — else, for an IPTV provider that keeps each language's copy
+    apart, its plain title and year; an episode is its show's identity with its
+    season and number. A row's id is `<profile>/<hash of that>`: two devices
+    that start the same film offline write the same row, so no second unique
+    index can be broken.
+  - **Account-wide**: journaled, on your server, in backups. It cascades from
+    its profile alone: history outlives a source, as a list does.
+  - **Merged field by field** on the client (spec §10): a later `round` —
+    "mark as unwatched" — wins whole; within a round watched holds and the
+    position is the last push's, so a rewind reaches every device.
+  - **A snapshot** of the item last played — which source, which item, its
+    title and cover — so the TV tab lists what is being watched with no
+    request; it comes back from the account untrusted, and is checked first.
+  - While something plays, a minute's progress at a time is written, every
+    pause and stop always: each write is journaled, and an account on your
+    server syncs soon after.
+  - **Backup schema 4** adds both. Files at 1 to 3 still open.
+- **Fixed with v9:** two devices that favourited or followed the *same*
+  channel offline made two records of it, and the second broke every later
+  reconcile on the unique index. The smaller id now wins on every device, and
+  the other is deleted on the account.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the

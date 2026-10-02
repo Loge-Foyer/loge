@@ -91,6 +91,21 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       put: (playlist) => write((r) => r.playlists.put(playlist)),
       remove: (id) => write((r) => r.playlists.remove(id)),
     },
+    watchProgress: {
+      get: (id) => read((r) => r.watchProgress.get(id)),
+      getMany: (ids) => read((r) => r.watchProgress.getMany(ids)),
+      list: (userId) => read((r) => r.watchProgress.list(userId)),
+      listAll: () => read((r) => r.watchProgress.listAll()),
+      put: (progress) => write((r) => r.watchProgress.put(progress)),
+      remove: (id) => write((r) => r.watchProgress.remove(id)),
+    },
+    accountSettings: {
+      get: (name) => read((r) => r.accountSettings.get(name)),
+      list: () => read((r) => r.accountSettings.list()),
+      put: (setting) => write((r) => r.accountSettings.put(setting)),
+      remove: (name) => write((r) => r.accountSettings.remove(name)),
+      clear: () => write((r) => r.accountSettings.clear()),
+    },
     downloads: {
       get: (id) => read((r) => r.downloads.get(id)),
       forItem: (userId, key) => read((r) => r.downloads.forItem(userId, key)),

@@ -64,4 +64,6 @@ export async function removeAccountRowsIn(tx: Repositories): Promise<void> {
   for (const connection of await tx.connections.list()) {
     if (accountWide(connection.pluginId)) await removeConnectionIn(tx, connection.id);
   }
+  // The account's own settings are no profile's, so no cascade takes them.
+  await tx.accountSettings.clear();
 }

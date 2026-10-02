@@ -23,6 +23,8 @@ export const COLLECTION_KINDS: Readonly<Record<string, string>> = {
   subscriptions: 'subscription',
   favorite_channels: 'favoriteChannel',
   playlists: 'playlist',
+  watch_progress: 'watchProgress',
+  account_settings: 'setting',
 };
 
 const json = (status: number, body?: unknown): Reply => ({ status, json: body ?? {} });

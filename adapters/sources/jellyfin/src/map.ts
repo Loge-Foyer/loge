@@ -126,14 +126,13 @@ export function toDetail(dto: ItemDto, connectionId: ConnectionId): MediaDetail 
   const item = toMediaItem(dto, connectionId);
   if (!item) return undefined;
   const tagline = dto.taglines[0];
+  // The catalogues the server matched it to — `tmdb`, `imdb`, `tvdb` — on the item itself.
+  const externalIds = Object.fromEntries(Object.entries(dto.providerIds).map(([catalogue, id]) => [catalogue.toLowerCase(), id]));
   return {
-    item,
+    item: Object.keys(externalIds).length === 0 ? item : { ...item, externalIds },
     ...(tagline ? { tagline } : {}),
     people: dto.people.map(toPerson),
     studios: dto.studios,
-    externalIds: Object.fromEntries(
-      Object.entries(dto.providerIds).map(([catalogue, id]) => [catalogue.toLowerCase(), id]),
-    ),
     // Absent rather than empty when the server said nothing: a screen must be
     // able to tell "no files reported" from "a file with nothing in it".
     ...(dto.mediaSources.length === 0 ? {} : { versions: dto.mediaSources.map(toVersion) }),

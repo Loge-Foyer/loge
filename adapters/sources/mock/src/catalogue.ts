@@ -223,20 +223,18 @@ export function createCatalogue(connectionId: ConnectionId, size: CatalogueSize)
       item: channel,
       people: [],
       studios: [],
-      externalIds: {},
       sections: [
         { id: 'videos', label: 'Videos' },
         { id: 'shorts', label: 'Shorts' },
         { id: 'playlists', label: 'Playlists' },
       ],
     });
-    details.set(playlist.key.externalId, { item: playlist, people: [], studios: [], externalIds: {} });
+    details.set(playlist.key.externalId, { item: playlist, people: [], studios: [] });
     for (const video of channelVideos) {
       details.set(video.key.externalId, {
         item: { ...video, overview: `${video.title}, made up by ${name}.` },
         people: [],
         studios: [],
-        externalIds: {},
         creator: { key: channelKey, name, followers: channel.followers ?? 0 },
       });
     }
@@ -269,7 +267,6 @@ function detailOf(item: Movie | Show, pick: <T>(values: readonly T[]) => T): Med
       { name: pick(NAMES), kind: 'director' },
     ],
     studios: ['Mock Pictures'],
-    externalIds: {},
   };
 }
 

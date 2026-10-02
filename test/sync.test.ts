@@ -1,8 +1,9 @@
-import { imageRef, type AccountRecord, type ConnectionId, type UserId } from '@sc/api';
+import { identityHash, imageRef, type AccountRecord, type ConnectionId, type UserId } from '@sc/api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { draftOf, initialDraft } from '@/services/connection-draft';
 import type { ConnectionDraft, ProfileDraft } from '@/services/connections';
+import type { WatchProgress } from '@/services/ports';
 import { checkRestoredDevice } from '@/services/restored-device';
 import { sessionRef } from '@/services/sessions';
 
@@ -54,7 +55,118 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
     return { ...devices, sam, robin };
   }
 
+  describe('watch progress the app keeps', () => {
+    const MINUTE = 60_000;
+    const identity = 'tmdb:movie:603';
+    const idOf = (profile: UserId) => `${profile}/${identityHash(identity)}`;
+    /** What the watch service writes: one journaled row, its version moved on. */
+    async function keep(device: Device, profile: UserId, change: Partial<WatchProgress>) {
+      const current = await device.db.watchProgress.get(idOf(profile));
+      const row: WatchProgress = {
+        id: idOf(profile),
+        userId: profile,
+        identity,
+        round: 0,
+        watched: false,
+        createdAt: '2026-10-02T10:00:00.000Z',
+        updatedAt: '2026-10-02T10:00:00.000Z',
+        ...current,
+        ...change,
+        version: (current?.version ?? 0) + 1,
+      };
+      await device.db.watchProgress.put(row);
+    }
+    const stateOn = async (device: Device, profile: UserId) => {
+      const row = await device.db.watchProgress.get(idOf(profile));
+      return row && { round: row.round, watched: row.watched, positionMs: row.positionMs };
+    };
+
+    it('brings where a profile got to, one record for one film on both devices', async () => {
+      const { a, b, server, sam } = await onOneAccount();
+      await keep(a, sam, { positionMs: 20 * MINUTE, durationMs: 100 * MINUTE });
+      await sync(a);
+      await sync(b);
+      expect(await stateOn(b, sam)).toEqual({ round: 0, watched: false, positionMs: 20 * MINUTE });
+      expect(recordOf(server, 'watchProgress', idOf(sam))?.deleted).toBe(false);
+    });
+
+    it('keeps watched when a device that had not heard plays it on', async () => {
+      const { a, b, sam } = await onOneAccount();
+      await keep(a, sam, { positionMs: 10 * MINUTE });
+      await sync(a);
+      await sync(b);
+      // Finished on A; meanwhile B, not yet told, plays a little further.
+      await keep(a, sam, { watched: true });
+      await sync(a);
+      await keep(b, sam, { positionMs: 12 * MINUTE });
+      await sync(b);
+      // A puts watched back, and B hears it.
+      await sync(a);
+      await sync(a);
+      await sync(b);
+      expect(await stateOn(a, sam)).toMatchObject({ watched: true });
+      expect(await stateOn(b, sam)).toMatchObject({ watched: true });
+    });
+
+    it('lets "mark as unwatched" win over a device that still thought it watched', async () => {
+      const { a, b, sam } = await onOneAccount();
+      await keep(a, sam, { watched: true });
+      await sync(a);
+      await sync(b);
+      await keep(a, sam, { round: 1, watched: false, positionMs: undefined as never });
+      await sync(a);
+      // B, which changed nothing, takes the new round.
+      await sync(b);
+      expect(await stateOn(b, sam)).toMatchObject({ round: 1, watched: false });
+
+      // And a stale "watched" B sends after it gives way too.
+      await keep(b, sam, { round: 0, watched: true });
+      await sync(b);
+      await sync(a);
+      await sync(a);
+      await sync(b);
+      expect(await stateOn(a, sam)).toMatchObject({ round: 1, watched: false });
+      expect(await stateOn(b, sam)).toMatchObject({ round: 1, watched: false });
+    });
+
+    it('brings a rewind made on one device to the other', async () => {
+      const { a, b, sam } = await onOneAccount();
+      await keep(a, sam, { positionMs: 80 * MINUTE });
+      await sync(a);
+      await sync(b);
+      await keep(a, sam, { positionMs: 20 * MINUTE });
+      await sync(a);
+      await sync(b);
+      expect(await stateOn(b, sam)).toMatchObject({ positionMs: 20 * MINUTE });
+    });
+
+    it('carries which tabs the account keeps watch status on', async () => {
+      const { a, b } = await onOneAccount();
+      await a.services.accountSettings.setWatchStatus({ media: true, videos: false });
+      await sync(a);
+      await sync(b);
+      expect(await b.services.accountSettings.watchStatus()).toEqual({ media: true, videos: false, tv: true });
+    });
+  });
+
   describe('what reaches the other device', () => {
+    it('keeps one of a channel two devices chose offline, the same one on both', async () => {
+      const { a, b, server, media, sam } = await onOneAccount();
+      const home = await a.services.connections.create(media.manifest.id, mediaDraft(media, sam));
+      await sync(a);
+      await sync(b);
+      const same = { userId: sam, connectionId: home.id, externalId: 'ch:101', name: 'Das Erste', addedAt: '2026-10-02T12:00:00.000Z', version: 1 };
+      await a.db.favoriteChannels.put({ ...same, id: 'fav-b' });
+      await b.db.favoriteChannels.put({ ...same, id: 'fav-a' });
+      await sync(a);
+      await sync(b);
+      await sync(a);
+      await sync(b);
+      expect((await a.db.favoriteChannels.listAll()).map((entry) => entry.id)).toEqual(['fav-a']);
+      expect((await b.db.favoriteChannels.listAll()).map((entry) => entry.id)).toEqual(['fav-a']);
+      expect(recordOf(server, 'favoriteChannel', 'fav-b')?.deleted).toBe(true);
+    });
+
     it('brings the account’s profiles to a device signing in', async () => {
       const { b, server, sam, robin } = await onOneAccount();
       expect(server.profileNames()).toEqual(['Robin', 'Sam']);

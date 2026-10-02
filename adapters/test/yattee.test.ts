@@ -206,7 +206,7 @@ describe('Yattee — browsing', () => {
     expect(detail.item.releaseDate).toBe('2010-10-29');
     expect(detail.item.year).toBe(2010);
     expect(detail.item.genres).toEqual(['Some Channel']);
-    expect(detail.externalIds).toEqual({ youtube: 'dQw4w9WgXcQ' });
+    expect(detail.item.externalIds).toEqual({ youtube: 'dQw4w9WgXcQ' });
     // Its channel, so the page leads there.
     expect(detail.creator?.key.externalId).toBe('channel:UCuAXFkgsw1L7xaCfnd5JJOw');
     expect(detail.creator?.name).toBe('Some Channel');

@@ -49,6 +49,12 @@ export interface MediaRatings {
 }
 
 /**
+ * Ids in public catalogues, keyed by catalogue — `tmdb`, `imdb`, `tvdb`,
+ * `kinopoisk`, and a video site's own (`youtube`) — as the source states them.
+ */
+export type ExternalIds = Readonly<Record<string, string>>;
+
+/**
  * Watch status as the source reports it. The source is its master: the app
  * keeps a cache of it and never treats it as its own record.
  */
@@ -68,6 +74,13 @@ export interface WatchStatus {
 interface MediaItemBase {
   readonly key: GlobalMediaKey;
   readonly title: string;
+  /**
+   * Where the source says: what makes it the same thing on another source, or
+   * in another language's copy — a profile's watch state follows these.
+   */
+  readonly externalIds?: ExternalIds;
+  /** Its title in its own language, where the source gives a translated one. */
+  readonly originalTitle?: string;
   readonly sortTitle?: string;
   readonly overview?: string;
   readonly year?: number;
@@ -96,7 +109,14 @@ export interface Show extends MediaItemBase {
   readonly episodeCount?: number;
 }
 
-export interface Season extends MediaItemBase {
+/** What an episode and a season know of their show, so either is known by it on another source. */
+interface OfShow {
+  readonly showExternalIds?: ExternalIds;
+  readonly showOriginalTitle?: string;
+  readonly showYear?: number;
+}
+
+export interface Season extends MediaItemBase, OfShow {
   readonly type: 'season';
   readonly show: GlobalMediaKey;
   readonly showTitle?: string;
@@ -104,7 +124,7 @@ export interface Season extends MediaItemBase {
   readonly episodeCount?: number;
 }
 
-export interface Episode extends MediaItemBase {
+export interface Episode extends MediaItemBase, OfShow {
   readonly type: 'episode';
   readonly show: GlobalMediaKey;
   readonly season?: GlobalMediaKey;
@@ -248,8 +268,6 @@ export interface MediaDetail {
   readonly tagline?: string;
   readonly people: readonly Person[];
   readonly studios: readonly string[];
-  /** Ids in public catalogues, keyed by catalogue: `imdb`, `tmdb`, `tvdb`. */
-  readonly externalIds: Readonly<Record<string, string>>;
   /**
    * The files behind this item, where the source reports them. Absent means
    * the source does not say — not that there are none — so a screen shows

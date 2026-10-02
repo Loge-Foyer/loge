@@ -88,6 +88,25 @@ series.
   it is the stream's address, sign-in and all. The session keeps only the
   endpoint and the token.
 
+## What a film is
+
+A portal keeps each language's and each quality's copy of a film as a title of
+its own — "Matrix (1999) DE 4K HDR", "Matrix HQ" — so a profile's watch state
+follows them by what the portal matched them to:
+
+- **`tmdb_id`** (or `tmdb`), as a number or a string, then `imdb_id` and
+  `kinopoisk_id`, become the item's `externalIds`; "", 0 and "N/A" are none.
+  Run against a real portal: most films and series carry their TMDB id, and
+  every copy carries the same one.
+- **`year`** is a date more often than a year (`1999-03-31`), or "N/A" — and
+  then the year the name carries, "(2003)". A date is also the release date.
+- **`time`** of 1 is the portal's "not known", never a one-minute film.
+- **`o_name`** is the original title only where it differs from the name;
+  many portals repeat the name there.
+- **Seasons and episodes carry their series'** catalogue ids, year, original
+  title and cover (`ofShow`, `fromSeason`), so an episode is the same one in
+  every copy of its series, and has a picture.
+
 ## Settings
 
 - **Keep channels and the guide on this device** — on by default. Gates

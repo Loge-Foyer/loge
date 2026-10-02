@@ -65,6 +65,8 @@ export function toItem(video: VideoDto, connectionId: ConnectionId): Movie {
     // someone scans a row for.
     genres: video.author === undefined ? [] : [video.author],
     images: image === undefined ? {} : { thumb: imageRef(image), backdrop: imageRef(image) },
+    // The site's own id: the same video on another server, or another connection, is this one.
+    externalIds: { youtube: video.videoId },
   };
 }
 
@@ -77,8 +79,6 @@ export function toDetail(video: VideoDto, connectionId: ConnectionId): MediaDeta
     item: toItem(video, connectionId),
     people: video.author === undefined ? [] : [{ name: video.author, kind: 'other', role: 'Channel' }],
     studios: video.author === undefined ? [] : [video.author],
-    // The site's own id, so a later feature can reach the original page.
-    externalIds: { youtube: video.videoId },
     // Its channel, so the page leads there.
     ...(video.author === undefined || video.authorId === undefined
       ? {}

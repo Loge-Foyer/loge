@@ -624,7 +624,7 @@ export function createMediaService(deps: {
         const copy = await quietly(kept.forItem(userId, key));
         if (copy?.state !== 'done') throw failure;
         return {
-          detail: await withWatch(userId, { item: copy.item, people: [], studios: [], externalIds: {} }),
+          detail: await withWatch(userId, { item: copy.item, people: [], studios: [] }),
           sourceError: sourceError(source, failure, copy.createdAt),
         };
       }

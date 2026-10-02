@@ -219,6 +219,8 @@ export function useMediaEffects() {
   useEffect(
     () =>
       watch.subscribe(({ userId, key }) => {
+        // What the app keeps is drawn from the device: those lists are read again at once, and no source is asked.
+        for (const part of ['kept-watch', 'in-progress'] as const) void client.invalidateQueries({ queryKey: userKey(userId, part) });
         for (const part of ['continue', 'children'] as const) void client.invalidateQueries({ queryKey: remoteKey(userId, part) });
         void client.invalidateQueries({ queryKey: remoteKey(userId, 'saved', 'continue') });
         void client.invalidateQueries({ queryKey: remoteKey(userId, 'item', key.connectionId, key.externalId) });

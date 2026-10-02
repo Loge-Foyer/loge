@@ -20,10 +20,13 @@ export function PosterCard({
   showWatch,
   onFocusItem,
   preferred = false,
+  caption,
 }: {
   item: MediaItem;
   width: number;
   showWatch: boolean;
+  /** In place of the year: where a series someone is watching got to — "S2 · E5". */
+  caption?: string;
   /** On a TV: the remote is on it now. */
   onFocusItem?: (item: MediaItem) => void;
   /** On a TV: where the focus starts. */
@@ -51,8 +54,8 @@ export function PosterCard({
               <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
                 {item.title}
               </SizableText>
-              <SizableText size="$2" color="$color10" numberOfLines={1}>
-                {item.year ?? ' '}
+              <SizableText size="$2" color={caption ? '$accent11' : '$color10'} numberOfLines={1}>
+                {caption ?? item.year ?? ' '}
               </SizableText>
             </YStack>
           </YStack>

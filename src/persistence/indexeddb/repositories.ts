@@ -17,6 +17,10 @@ import type {
   SubscriptionRepository,
   FavoriteChannel,
   FavoriteChannelRepository,
+  AccountSetting,
+  AccountSettingsRepository,
+  WatchProgress,
+  WatchProgressRepository,
   JournalAnnouncement,
   JournalEntry,
   JournalRepository,
@@ -96,7 +100,8 @@ interface WatchRecord {
 /** Newest first, with the id breaking a tie so the order is total. */
 const byAdded = (a: { readonly addedAt: string; readonly id: string }, b: { readonly addedAt: string; readonly id: string }) =>
   b.addedAt.localeCompare(a.addedAt) || a.id.localeCompare(b.id);
-const byUpdated = (a: Playlist, b: Playlist) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
+const byUpdated = (a: { readonly updatedAt: string; readonly id: string }, b: { readonly updatedAt: string; readonly id: string }) =>
+  b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
 
 interface DownloadRecord {
   readonly id: string;
@@ -212,7 +217,19 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<UserRecord>('users', id);
       if (!row) return;
       await request(store('users').delete(id));
-      for (const name of ['connectionProfileValues', 'preferences', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'favoriteChannels', 'playlists'] as const) {
+      for (const name of [
+        'connectionProfileValues',
+        'preferences',
+        'mediaLists',
+        'mediaDetails',
+        'watchStatus',
+        'outbox',
+        'downloads',
+        'subscriptions',
+        'favoriteChannels',
+        'playlists',
+        'watchProgress',
+      ] as const) {
         await deleteWhere(name, 'byUser', id);
       }
       await record({ userId: id, entity: 'user', entityId: id, operation: 'delete', localVersion: row.version + 1 });
@@ -656,6 +673,54 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  // Account-wide, journaled, going with the profile alone.
+  const watchProgress: WatchProgressRepository = {
+    get: (id) => get<WatchProgress>('watchProgress', id),
+    getMany: async (ids) => {
+      const found: WatchProgress[] = [];
+      for (const id of ids) {
+        const row = await get<WatchProgress>('watchProgress', id);
+        if (row) found.push(row);
+      }
+      return found;
+    },
+    list: async (user) => (await request(store('watchProgress').index('byUser').getAll(user) as IDBRequest<WatchProgress[]>)).sort(byUpdated),
+    listAll: async () => (await request(store('watchProgress').getAll() as IDBRequest<WatchProgress[]>)).sort(byUpdated),
+    put: async (progress) => {
+      // A row whose profile is gone is refused: there is no cascade to take it later.
+      if (!(await get('users', progress.userId))) throw missingRow('profile', progress.userId);
+      await request(store('watchProgress').put(progress));
+      await record({ userId: progress.userId, entity: 'watchProgress', entityId: progress.id, operation: 'upsert', localVersion: progress.version });
+    },
+    remove: async (id) => {
+      const row = await get<WatchProgress>('watchProgress', id);
+      if (!row) return;
+      await request(store('watchProgress').delete(id));
+      await record({ userId: row.userId, entity: 'watchProgress', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
+  // The account's own, no profile's: journaled with no user.
+  const accountSettings: AccountSettingsRepository = {
+    get: (name) => get<AccountSetting>('accountSettings', name),
+    list: async () => (await request(store('accountSettings').getAll() as IDBRequest<AccountSetting[]>)).sort((a, b) => a.name.localeCompare(b.name)),
+    put: async (setting) => {
+      const row = await get<AccountSetting>('accountSettings', setting.name);
+      if (row && JSON.stringify(row.value) === JSON.stringify(setting.value)) return;
+      await request(store('accountSettings').put({ ...setting }));
+      await record({ entity: 'accountSetting', entityId: setting.name, operation: 'upsert', localVersion: setting.version });
+    },
+    remove: async (name) => {
+      const row = await get<AccountSetting>('accountSettings', name);
+      if (!row) return;
+      await request(store('accountSettings').delete(name));
+      await record({ entity: 'accountSetting', entityId: name, operation: 'delete', localVersion: row.version + 1 });
+    },
+    clear: async () => {
+      await request(store('accountSettings').clear());
+    },
+  };
+
   return {
     users,
     connections,
@@ -671,6 +736,8 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     subscriptions,
     favoriteChannels,
     playlists,
+    watchProgress,
+    accountSettings,
     journal,
   };
 }

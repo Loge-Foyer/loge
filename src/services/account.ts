@@ -190,6 +190,9 @@ export function createAccountService(deps: {
     // and a favourite channel point at a connection, which the loop below
     // announces.
     for (const playlist of await tx.playlists.listAll()) announced.push(announcementOf('playlist', playlist.id, playlist.userId));
+    // What a profile watched, and the account's own settings, go up with it.
+    for (const progress of await tx.watchProgress.listAll()) announced.push(announcementOf('watchProgress', progress.id));
+    for (const setting of await tx.accountSettings.list()) announced.push(announcementOf('setting', setting.name));
     const children: JournalAnnouncement[] = [];
     for (const subscription of await tx.subscriptions.listAll()) {
       children.push(announcementOf('subscription', subscription.id, subscription.userId));

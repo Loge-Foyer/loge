@@ -69,9 +69,8 @@ export function MediaHomeScreen() {
   if (!rows || !sources) return <Screen>{null}</Screen>;
   if (sources.length === 0) return pending.length > 0 ? <SetUpScreen pending={pending} /> : <MediaEmptyState />;
 
-  const watching = new Set(
-    sources.filter((source) => source.effective.media?.capabilities.has('watchStateRead')).map((source) => source.connection.id),
-  );
+  // Whoever keeps it — the source, or the app for one that keeps none.
+  const watching = new Set(sources.filter((source) => source.watch !== undefined).map((source) => source.connection.id));
   const watchFrom = (item: MediaItem) => watching.has(item.key.connectionId);
   const playing = new Set(sources.filter((source) => source.effective.media?.capabilities.has('playback')).map((source) => source.connection.id));
   // Continuing is the one row whose picture plays: a film or an episode, from a source that can play it.

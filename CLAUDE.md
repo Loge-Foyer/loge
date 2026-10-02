@@ -103,6 +103,10 @@ What runs today:
   watching (on by default on a TV), and Force landscape on playback, on by
   default. Players can be reordered, and the order is the order they are tried
   in.
+- Watch status the app keeps (database v9): for IPTV films and series, web
+  video and files, chosen per tab on the account; one row per thing watched,
+  every language's copy of a film at once, and the TV tab lists what was
+  begun first.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.

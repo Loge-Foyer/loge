@@ -16,10 +16,11 @@ import {
 } from '@sc/api';
 
 import { stableJson } from '../hash';
-import type { JournalAnnouncement, ProfileValues, Repositories, UserPreferences } from '../ports';
+import type { JournalAnnouncement, ProfileValues, Repositories, UserPreferences, WatchProgress } from '../ports';
 import { removeConnectionIn, removeProfileIn } from '../removal';
 import { accountWide } from '../scope';
 import { sessionRef } from '../sessions';
+import { snapshotOf } from '../watch/snapshot';
 import type { Applied, SyncParts } from './parts';
 import { announcementOf, identityOf, identityOfEntry } from './records';
 
@@ -45,6 +46,29 @@ export interface ApplyOptions {
   /** Records the server refused as invalid: missing there for that reason, not lost. */
   readonly refused?: ReadonlySet<string>;
 }
+
+/**
+ * Watch progress is the one entity resolved field by field (spec §10), on the
+ * client — the server stores what it is sent and returns it. A later round —
+ * someone chose "mark as unwatched" — wins whole. Within one round, watched
+ * holds once either side says so, and where it got to is the last push's: a
+ * deliberate rewind on one device must reach the others, which "the furthest
+ * position" would undo. While this device's own change waits to go, its
+ * position is the one that counts.
+ */
+export function mergeWatchProgress(local: WatchProgress, server: WatchProgress, localPending: boolean): WatchProgress {
+  if (server.round !== local.round) return server.round > local.round ? server : local;
+  const latest = localPending ? local : server;
+  return {
+    ...latest,
+    watched: local.watched || server.watched,
+    // Every catalogue either side knows it by.
+    ...(local.externalIds || server.externalIds ? { externalIds: { ...server.externalIds, ...local.externalIds } } : {}),
+    createdAt: local.createdAt < server.createdAt ? local.createdAt : server.createdAt,
+  };
+}
+
+const sameProgress = (a: WatchProgress, b: WatchProgress) => stableJson({ ...a, version: 0 }) === stableJson({ ...b, version: 0 });
 
 /**
  * Makes this device hold what the account holds — the server's collections
@@ -227,6 +251,19 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     effects.changed = true;
   }
 
+  // Two devices that chose the same channel offline made two records for it,
+  // which this device may hold only one of. The smaller id wins everywhere —
+  // every device decides alike — and the other is deleted, so the server stops
+  // sending it.
+  const deduped: JournalAnnouncement[] = [];
+  const deletion = (entity: 'subscription' | 'favoriteChannel', entityId: string, userId: UserId): JournalAnnouncement => ({
+    userId,
+    entity,
+    entityId,
+    operation: 'delete',
+    localVersion: 0,
+  });
+
   for (const record of ofKind('subscription')) {
     const local = await tx.subscriptions.get(record.key);
     if (record.deleted) {
@@ -239,6 +276,15 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     const { data } = record;
     // A child whose parent is gone is skipped: a soft delete does not cascade.
     if (!(await tx.users.get(data.userId)) || !(await tx.connections.get(data.connectionId))) continue;
+    const twin = local ? undefined : await tx.subscriptions.forChannel(data.userId, data.connectionId, data.externalId);
+    if (twin) {
+      if (twin.id < record.key) {
+        deduped.push(deletion('subscription', record.key, data.userId));
+        continue;
+      }
+      await tx.subscriptions.remove(twin.id);
+      deduped.push(deletion('subscription', twin.id, data.userId));
+    }
     const row = {
       id: data.subscriptionId,
       userId: data.userId,
@@ -265,6 +311,15 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     const { data } = record;
     // A child whose parent is gone is skipped: a soft delete does not cascade.
     if (!(await tx.users.get(data.userId)) || !(await tx.connections.get(data.connectionId))) continue;
+    const twin = local ? undefined : await tx.favoriteChannels.forChannel(data.userId, data.connectionId, data.externalId);
+    if (twin) {
+      if (twin.id < record.key) {
+        deduped.push(deletion('favoriteChannel', record.key, data.userId));
+        continue;
+      }
+      await tx.favoriteChannels.remove(twin.id);
+      deduped.push(deletion('favoriteChannel', twin.id, data.userId));
+    }
     const row = {
       id: data.favoriteId,
       userId: data.userId,
@@ -307,6 +362,62 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     await tx.playlists.put(row);
     effects.changed = true;
   }
+
+  // Watch progress: merged field by field, pending or not — see mergeWatchProgress.
+  const remerged: JournalAnnouncement[] = [];
+  for (const record of records) {
+    if (record.kind !== 'watchProgress') continue;
+    const local = await tx.watchProgress.get(record.key);
+    const waiting = pending.has(identityOf(record));
+    if (record.deleted) {
+      // Only a profile's deletion ends its history, and that one cascades; a
+      // tombstone that comes anyway is taken, unless this device has more to say.
+      if (local && !waiting) {
+        await tx.watchProgress.remove(record.key);
+        effects.changed = true;
+      }
+      continue;
+    }
+    const { data } = record;
+    if (!(await tx.users.get(data.userId))) continue;
+    const item = data.item === undefined ? undefined : snapshotOf(data.item);
+    const server: WatchProgress = {
+      id: record.key,
+      userId: data.userId,
+      identity: data.identity,
+      ...(data.externalIds === undefined ? {} : { externalIds: data.externalIds }),
+      round: data.round,
+      watched: data.watched,
+      ...(data.positionMs === undefined ? {} : { positionMs: data.positionMs }),
+      ...(data.durationMs === undefined ? {} : { durationMs: data.durationMs }),
+      ...(item === undefined ? {} : { item }),
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      version: local?.version ?? 0,
+    };
+    const merged = local ? mergeWatchProgress(local, server, waiting) : server;
+    if (!local || !sameProgress(local, merged)) {
+      await tx.watchProgress.put({ ...merged, version: (local?.version ?? 0) + 1 });
+      effects.changed = true;
+    }
+    // What the server holds is behind what the merge says: the next push sets it right.
+    if (!waiting && !sameProgress(merged, server)) remerged.push(announcementOf('watchProgress', record.key));
+  }
+
+  for (const record of ofKind('setting')) {
+    const local = await tx.accountSettings.get(record.key);
+    if (record.deleted) {
+      if (local) {
+        await tx.accountSettings.remove(record.key);
+        effects.changed = true;
+      }
+      continue;
+    }
+    if (local && stableJson(local.value) === stableJson(record.data.value)) continue;
+    await tx.accountSettings.put({ name: record.key, value: record.data.value, version: (local?.version ?? 0) + 1 });
+    effects.changed = true;
+  }
+  if (deduped.length > 0 || remerged.length > 0) await tx.journal.announce([...deduped, ...remerged]);
 
   // Rule 4: what the server has no record of, it lost.
   const here = new Set((await tx.users.list()).map((user) => user.id));
@@ -501,6 +612,8 @@ async function localIdentities(tx: Repositories): Promise<readonly LocalIdentity
     identities.push({ kind: 'favoriteChannel', key: favorite.id, owner: favorite.userId });
   }
   for (const playlist of await tx.playlists.listAll()) identities.push({ kind: 'playlist', key: playlist.id, owner: playlist.userId });
+  for (const progress of await tx.watchProgress.listAll()) identities.push({ kind: 'watchProgress', key: progress.id, owner: progress.userId });
+  for (const setting of await tx.accountSettings.list()) identities.push({ kind: 'setting', key: setting.name });
   for (const connection of await tx.connections.list()) {
     if (!accountWide(connection.pluginId)) continue;
     identities.push({ kind: 'connection', key: connection.id });

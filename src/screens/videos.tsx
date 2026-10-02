@@ -20,6 +20,7 @@ import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
+import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
@@ -97,8 +98,9 @@ function SourceVideos({
   const cardWidth = Math.floor((width - 2 * PADDING - (columns - 1) * GAP) / columns);
   const items = grid.data?.pages.flatMap((page) => page.items) ?? [];
   const errors = grid.data?.pages.flatMap((page) => page.sourceErrors) ?? [];
-  // Only a source that masters watch status has any to show.
-  const showWatch = selected.effective.media?.capabilities.has('watchStateRead') ?? false;
+  // Whoever keeps it: the source, or the app for one that keeps none.
+  const showWatch = selected.watch !== undefined;
+  const withKept = useKeptWatch(items);
   const canSearch = selected.effective.media?.capabilities.has('search') ?? false;
 
   const onRefresh = async () => {
@@ -123,7 +125,7 @@ function SourceVideos({
       contentContainerStyle={{ paddingHorizontal: PADDING - GAP / 2, paddingTop: 12, paddingBottom: 48 }}
       renderItem={({ item }: { item: MediaItem }) => (
         <YStack px={GAP / 2} pb="$5" items="center">
-          {item.type === 'channel' ? <ChannelCard item={item} width={cardWidth} /> : <LandscapeCard item={item} width={cardWidth} showWatch={showWatch} />}
+          {item.type === 'channel' ? <ChannelCard item={item} width={cardWidth} /> : <LandscapeCard item={withKept(item)} width={cardWidth} showWatch={showWatch} />}
         </YStack>
       )}
       ListHeaderComponent={

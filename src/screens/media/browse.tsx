@@ -14,6 +14,7 @@ import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
+import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
 
 const PADDING = 16;
@@ -39,6 +40,8 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
   const posterWidth = usePosterWidth();
   const landscapeWidth = useLandscapeWidth();
   const [refreshing, setRefreshing] = useState(false);
+  const items = grid.data?.pages.flatMap((page) => page.items) ?? [];
+  const withKept = useKeptWatch(items);
 
   if (!rows) return null;
   if (!kindRow) {
@@ -53,12 +56,10 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
   const target = card === 'poster' ? posterWidth : landscapeWidth;
   const columns = Math.min(12, Math.max(card === 'poster' ? 3 : 1, Math.floor((width - 2 * PADDING + GAP) / (target + GAP))));
   const cardWidth = Math.floor((width - 2 * PADDING - (columns - 1) * GAP) / columns);
-  const items = grid.data?.pages.flatMap((page) => page.items) ?? [];
   const errors = grid.data?.pages.flatMap((page) => page.sourceErrors) ?? [];
   const total = grid.data?.pages[0]?.total;
-  const watching = new Set(
-    (sources ?? []).filter((source) => source.effective.media?.capabilities.has('watchStateRead')).map((source) => source.connection.id),
-  );
+  // Whoever keeps it — the source, or the app for one that keeps none.
+  const watching = new Set((sources ?? []).filter((source) => source.watch !== undefined).map((source) => source.connection.id));
   const showWatch = (item: MediaItem) => watching.has(item.key.connectionId);
 
   const onRefresh = async () => {
@@ -93,9 +94,9 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
         renderItem={({ item }) => (
           <YStack px={GAP / 2} pb="$5" items="center">
             {card === 'poster' ? (
-              <PosterCard item={item} width={cardWidth} showWatch={showWatch(item)} />
+              <PosterCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} />
             ) : (
-              <LandscapeCard item={item} width={cardWidth} showWatch={showWatch(item)} />
+              <LandscapeCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} />
             )}
           </YStack>
         )}

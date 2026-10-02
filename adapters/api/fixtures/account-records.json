@@ -238,13 +238,82 @@
       "kind": "favoriteChannel",
       "key": "fav3",
       "deleted": true
+    },
+    {
+      "kind": "watchProgress",
+      "key": "u1/d536ee13b7c5c6a1",
+      "deleted": false,
+      "data": {
+        "userId": "u1",
+        "identity": "tmdb:movie:603",
+        "externalIds": {
+          "tmdb": "603",
+          "imdb": "tt0133093"
+        },
+        "round": 1,
+        "watched": false,
+        "positionMs": 1234000,
+        "durationMs": 8160000,
+        "item": {
+          "type": "movie",
+          "key": {
+            "connectionId": "c1",
+            "externalId": "vod:11"
+          },
+          "title": "Matrix (1999) DE 4K HDR",
+          "year": 1999,
+          "ratings": {},
+          "genres": [],
+          "images": {
+            "poster": "http://cdn.test/11.jpg"
+          }
+        },
+        "createdAt": "2026-10-01T20:00:00.000Z",
+        "updatedAt": "2026-10-02T21:15:00.000Z"
+      }
+    },
+    {
+      "kind": "watchProgress",
+      "key": "u1/38c0617abe0dabb0",
+      "deleted": false,
+      "data": {
+        "userId": "u1",
+        "identity": "youtube:dQw4w9WgXcQ",
+        "round": 0,
+        "watched": true,
+        "createdAt": "2026-10-01T20:00:00.000Z",
+        "updatedAt": "2026-10-01T20:03:33.000Z"
+      }
+    },
+    {
+      "kind": "watchProgress",
+      "key": "u1/38c0617abe0dabb0",
+      "deleted": true
+    },
+    {
+      "kind": "setting",
+      "key": "watchStatus",
+      "deleted": false,
+      "data": {
+        "name": "watchStatus",
+        "value": {
+          "media": false,
+          "videos": true,
+          "tv": true
+        }
+      }
+    },
+    {
+      "kind": "setting",
+      "key": "watchStatus",
+      "deleted": true
     }
   ],
   "invalid": [
     {
       "why": "an unknown kind",
       "record": {
-        "kind": "watchProgress",
+        "kind": "comment",
         "key": "u1",
         "deleted": false,
         "data": {
@@ -609,6 +678,92 @@
           "addedAt": "2026-10-02T12:00:00.000Z"
         }
       }
+    },
+    {
+      "why": "a watch position below nought",
+      "record": {
+        "kind": "watchProgress",
+        "key": "u1/d536ee13b7c5c6a1",
+        "deleted": false,
+        "data": {
+          "userId": "u1",
+          "identity": "tmdb:movie:603",
+          "round": 0,
+          "watched": false,
+          "positionMs": -5,
+          "createdAt": "x",
+          "updatedAt": "x"
+        }
+      }
+    },
+    {
+      "why": "a watch round that is not a whole number",
+      "record": {
+        "kind": "watchProgress",
+        "key": "u1/d536ee13b7c5c6a1",
+        "deleted": false,
+        "data": {
+          "userId": "u1",
+          "identity": "tmdb:movie:603",
+          "round": 1.5,
+          "watched": false,
+          "createdAt": "x",
+          "updatedAt": "x"
+        }
+      }
+    },
+    {
+      "why": "watched that is not a boolean",
+      "record": {
+        "kind": "watchProgress",
+        "key": "u1/d536ee13b7c5c6a1",
+        "deleted": false,
+        "data": {
+          "userId": "u1",
+          "identity": "tmdb:movie:603",
+          "round": 0,
+          "watched": "yes",
+          "createdAt": "x",
+          "updatedAt": "x"
+        }
+      }
+    },
+    {
+      "why": "a snapshot that is not an object",
+      "record": {
+        "kind": "watchProgress",
+        "key": "u1/d536ee13b7c5c6a1",
+        "deleted": false,
+        "data": {
+          "userId": "u1",
+          "identity": "tmdb:movie:603",
+          "round": 0,
+          "watched": false,
+          "item": "Matrix",
+          "createdAt": "x",
+          "updatedAt": "x"
+        }
+      }
+    },
+    {
+      "why": "a watch key that names no profile",
+      "record": {
+        "kind": "watchProgress",
+        "key": "d536ee13b7c5c6a1",
+        "deleted": true
+      }
+    },
+    {
+      "why": "a setting whose name is not camelCase",
+      "record": {
+        "kind": "setting",
+        "key": "watch status",
+        "deleted": false,
+        "data": {
+          "name": "watch status",
+          "value": true
+        }
+      }
     }
   ],
   "recordIds": [
@@ -677,6 +832,18 @@
       "kind": "favoriteChannel",
       "key": "fav1",
       "id": "b03875251007a39"
+    },
+    {
+      "accountId": "k4r9x2m1q8w3e5t",
+      "kind": "watchProgress",
+      "key": "u1/d536ee13b7c5c6a1",
+      "id": "d3de3d69cc14430"
+    },
+    {
+      "accountId": "k4r9x2m1q8w3e5t",
+      "kind": "setting",
+      "key": "watchStatus",
+      "id": "86dcebb0f806a4d"
     }
   ]
 }

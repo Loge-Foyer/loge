@@ -369,7 +369,7 @@ describe('Jellyfin — mapping', () => {
     expect(detail).toMatchObject({
       tagline: 'Why are they here?',
       studios: ['Paramount'],
-      externalIds: { imdb: 'tt2543164', tmdb: '329865' },
+      item: { externalIds: { imdb: 'tt2543164', tmdb: '329865' } },
       people: [
         { name: 'Amy Adams', role: 'Louise Banks', kind: 'actor', image: 'i/person-1/Primary/-/amy-tag' },
         { name: 'Denis Villeneuve', kind: 'director' },

@@ -137,7 +137,7 @@ export function createLineup(connectionId: ConnectionId, size: LineupSize): Line
 
   const details = new Map<string, MediaDetail>();
   for (const item of [...movies, ...shows]) {
-    details.set(item.key.externalId, { item: { ...item, overview: `${item.title}, as the mock portal offers it.` }, people: [], studios: ['Mock Portal'], externalIds: {} });
+    details.set(item.key.externalId, { item: { ...item, overview: `${item.title}, as the mock portal offers it.` }, people: [], studios: ['Mock Portal'] });
   }
 
   return { groups: GROUPS, channels, transportStreamOnly, movies, shows, seasons, episodes, details };

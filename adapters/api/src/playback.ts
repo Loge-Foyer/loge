@@ -148,9 +148,9 @@ export interface PlaybackRequest {
  * player, so it survives airplane mode.
  */
 export type PlaybackReport =
-  | { readonly kind: 'started'; readonly key: GlobalMediaKey; readonly positionMs: number }
-  | { readonly kind: 'progress'; readonly key: GlobalMediaKey; readonly positionMs: number; readonly paused: boolean }
-  | { readonly kind: 'stopped'; readonly key: GlobalMediaKey; readonly positionMs: number }
+  | { readonly kind: 'started'; readonly key: GlobalMediaKey; readonly positionMs: number; readonly durationMs?: number }
+  | { readonly kind: 'progress'; readonly key: GlobalMediaKey; readonly positionMs: number; readonly paused: boolean; readonly durationMs?: number }
+  | { readonly kind: 'stopped'; readonly key: GlobalMediaKey; readonly positionMs: number; readonly durationMs?: number }
   | { readonly kind: 'played'; readonly key: GlobalMediaKey; readonly played: boolean };
 
 /** Where playback got to — what `reportPlayback` takes. Watched or not goes through `setPlayed`. */

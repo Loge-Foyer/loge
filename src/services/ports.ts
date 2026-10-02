@@ -6,6 +6,7 @@ import type {
   ConnectionValues,
   Credentials,
   CredentialsRef,
+  ExternalIds,
   GlobalMediaKey,
   ImageRef,
   MediaDetail,
@@ -427,6 +428,67 @@ export interface FavoriteChannelRepository {
   remove(id: string): Promise<void>;
 }
 
+/**
+ * Where a profile got to in one thing it watched, kept by the app for a source
+ * that keeps no watch status of its own (v9). Account-wide, as the lists are:
+ * journaled, carried to your own server, written into backups — and keyed by
+ * what it is apart from any source (`watchIdentity`), so every device and
+ * every copy of it on the account's sources shares one row.
+ */
+export interface WatchProgress {
+  /** `${userId}/${identityHash(identity)}`: the same on every device. */
+  readonly id: string;
+  readonly userId: UserId;
+  readonly identity: string;
+  readonly externalIds?: ExternalIds;
+  /** Bumped by "mark as unwatched": the later round wins whole (spec §10). */
+  readonly round: number;
+  readonly watched: boolean;
+  /** Absent rather than nought: nothing to resume from. */
+  readonly positionMs?: number;
+  readonly durationMs?: number;
+  /** The item as it was last played, without a watch state of its own — for what screens list. */
+  readonly item?: MediaItem;
+  /** ISO 8601. For ordering what is shown, never for deciding a conflict. */
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly version: number;
+}
+
+export interface WatchProgressRepository {
+  get(id: string): Promise<WatchProgress | undefined>;
+  /** Those of these ids there are, for laying over a list. */
+  getMany(ids: readonly string[]): Promise<readonly WatchProgress[]>;
+  /** A profile's, the most recently updated first. */
+  list(userId: UserId): Promise<readonly WatchProgress[]>;
+  /** For the sync engine and the backup, which take every profile's. */
+  listAll(): Promise<readonly WatchProgress[]>;
+  put(progress: WatchProgress): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+/** One of the account's own settings (v9): the same for every profile and device. */
+export interface AccountSetting {
+  readonly name: string;
+  readonly value: unknown;
+  readonly version: number;
+}
+
+/**
+ * The account's settings. Journaled — they travel with the account — but no
+ * profile's: deleting one takes none of them. All of them go when the device
+ * changes account, as the account's other rows do.
+ */
+export interface AccountSettingsRepository {
+  get(name: string): Promise<AccountSetting | undefined>;
+  list(): Promise<readonly AccountSetting[]>;
+  /** A value that is already the stored one writes nothing. */
+  put(setting: AccountSetting): Promise<void>;
+  remove(name: string): Promise<void>;
+  /** Unjournaled: the account they belonged to is leaving the device. */
+  clear(): Promise<void>;
+}
+
 export interface PlaylistRepository {
   list(userId: UserId): Promise<readonly Playlist[]>;
   listAll(): Promise<readonly Playlist[]>;
@@ -480,7 +542,17 @@ export interface StaleSecretQueue {
 }
 
 /** A profile's PIN is journaled apart from its name, so a rename never carries a PIN away. */
-export type JournalEntity = 'user' | 'userPin' | 'preferences' | 'connection' | 'connectionProfileValues' | 'subscription' | 'playlist' | 'favoriteChannel';
+export type JournalEntity =
+  | 'user'
+  | 'userPin'
+  | 'preferences'
+  | 'connection'
+  | 'connectionProfileValues'
+  | 'subscription'
+  | 'playlist'
+  | 'favoriteChannel'
+  | 'watchProgress'
+  | 'accountSetting';
 
 /**
  * One local change, for the sync engine to carry later: a pointer to the
@@ -591,6 +663,8 @@ export interface Repositories {
   readonly subscriptions: SubscriptionRepository;
   readonly favoriteChannels: FavoriteChannelRepository;
   readonly playlists: PlaylistRepository;
+  readonly watchProgress: WatchProgressRepository;
+  readonly accountSettings: AccountSettingsRepository;
   readonly journal: JournalRepository;
 }
 

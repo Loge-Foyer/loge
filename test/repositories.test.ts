@@ -1,7 +1,7 @@
 import { connectionId, credentialsRef, imageRef, pluginId, userId, type Connection, type ConnectionId, type MediaDetail } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
-import type { DownloadEntry, FavoriteChannel, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription } from '@/services/ports';
+import type { DownloadEntry, FavoriteChannel, LocalDatabase, Playlist, ProfileValues, StoredAccount, Subscription, WatchProgress } from '@/services/ports';
 
 import { ENGINES, openTestDatabase, reopenable, type Engine, type TestDatabaseOptions } from './support/engines';
 import { fakeClock } from './support/fakes';
@@ -36,7 +36,7 @@ function savedList(connection: ConnectionId, savedAt = 1) {
 }
 
 function detailOf(connection: ConnectionId, id: string): MediaDetail {
-  return { item: movie(connection, id, 2020), people: [], studios: [], externalIds: {} };
+  return { item: movie(connection, id, 2020), people: [], studios: [] };
 }
 
 describe.each(ENGINES)('the database on %s', (engine: Engine) => {
@@ -734,6 +734,71 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       await db.favoriteChannels.put(favorite('f2', 'ch:102', { connectionId: again.id }));
       await db.users.delete(alex.id);
       expect(await db.favoriteChannels.listAll()).toEqual([]);
+    });
+  });
+
+  describe('watch progress the app keeps', () => {
+    const progress = (id: string, extra: Partial<WatchProgress> = {}): WatchProgress => ({
+      id: `${alex.id}/${id}`,
+      userId: alex.id,
+      identity: `tmdb:movie:${id}`,
+      round: 0,
+      watched: false,
+      createdAt: '2026-10-02T12:00:00.000Z',
+      updatedAt: '2026-10-02T12:00:00.000Z',
+      version: 1,
+      ...extra,
+    });
+
+    it('keeps where a profile got to, and what it was, newest first', async () => {
+      const { db } = open();
+      await household(db);
+      const item = movie(connectionId('c-home'), 'vod:11', 1999);
+      await db.watchProgress.put(progress('a', { positionMs: 60_000, durationMs: 600_000, externalIds: { tmdb: 'a' }, item }));
+      await db.watchProgress.put(progress('b', { watched: true, updatedAt: '2026-10-03T12:00:00.000Z' }));
+      expect(await db.watchProgress.get(`${alex.id}/a`)).toEqual(progress('a', { positionMs: 60_000, durationMs: 600_000, externalIds: { tmdb: 'a' }, item }));
+      // Nothing written is nothing read: no position, no snapshot.
+      expect(await db.watchProgress.get(`${alex.id}/b`)).toEqual(progress('b', { watched: true, updatedAt: '2026-10-03T12:00:00.000Z' }));
+      expect((await db.watchProgress.list(alex.id)).map((each) => each.id)).toEqual([`${alex.id}/b`, `${alex.id}/a`]);
+      expect((await db.watchProgress.getMany([`${alex.id}/a`, `${alex.id}/missing`])).map((each) => each.id)).toEqual([`${alex.id}/a`]);
+      expect(await db.watchProgress.list(kids.id)).toEqual([]);
+    });
+
+    it('is journaled, and goes with its profile — but not with a source', async () => {
+      const { db } = open();
+      const home = await household(db);
+      const head = await db.journal.head();
+      await db.watchProgress.put(progress('a'));
+      await db.watchProgress.remove(`${alex.id}/a`);
+      expect((await db.journal.entries(head)).map((entry) => `${entry.entity}/${entry.entityId}/${entry.operation}`)).toEqual([
+        `watchProgress/${alex.id}/a/upsert`,
+        `watchProgress/${alex.id}/a/delete`,
+      ]);
+      await db.watchProgress.put(progress('b'));
+      // History outlives a source: what was watched is the profile's.
+      await db.connections.delete(home.id);
+      expect(await db.watchProgress.listAll()).toHaveLength(1);
+      await db.users.delete(alex.id);
+      expect(await db.watchProgress.listAll()).toEqual([]);
+    });
+  });
+
+  describe('the account’s own settings', () => {
+    it('keeps a setting for the whole account, journaled with no profile, and writes nothing that changes nothing', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.accountSettings.put({ name: 'watchStatus', value: { media: false, videos: true, tv: true }, version: 1 });
+      await db.accountSettings.put({ name: 'watchStatus', value: { media: false, videos: true, tv: true }, version: 2 });
+      expect(await db.accountSettings.get('watchStatus')).toEqual({ name: 'watchStatus', value: { media: false, videos: true, tv: true }, version: 1 });
+      const entries = await db.journal.entries(head);
+      expect(entries.map((entry) => `${entry.entity}/${entry.entityId}/${entry.operation}`)).toEqual(['accountSetting/watchStatus/upsert']);
+      expect(entries[0]?.userId).toBeUndefined();
+      // No profile's: deleting every one leaves it, and only leaving the account clears it.
+      await db.users.delete(alex.id);
+      expect(await db.accountSettings.list()).toHaveLength(1);
+      await db.accountSettings.clear();
+      expect(await db.accountSettings.list()).toEqual([]);
     });
   });
 

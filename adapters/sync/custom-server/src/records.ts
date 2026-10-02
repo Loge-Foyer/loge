@@ -10,6 +10,8 @@ export const COLLECTIONS: readonly (readonly [RecordKind, string])[] = [
   ['subscription', 'subscriptions'],
   ['favoriteChannel', 'favorite_channels'],
   ['playlist', 'playlists'],
+  ['watchProgress', 'watch_progress'],
+  ['setting', 'account_settings'],
 ];
 
 export const collectionOf = (kind: RecordKind): string => COLLECTIONS.find(([of]) => of === kind)?.[1] ?? kind;
@@ -30,7 +32,7 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
     deleted: record.deleted,
   };
   const [first = '', second = ''] = record.key.split('/');
-  if (record.kind === 'pin' || record.kind === 'preference') body.profile = await idOf('profile', first);
+  if (record.kind === 'pin' || record.kind === 'preference' || record.kind === 'watchProgress') body.profile = await idOf('profile', first);
   if (record.kind === 'profileValues') {
     body.connection = await idOf('connection', first);
     body.profile = await idOf('profile', second);
@@ -115,6 +117,24 @@ export async function bodyOf(record: AccountRecord, accountId: string, sha256: S
         updated_at: data.updatedAt,
       };
     }
+    case 'watchProgress': {
+      const { data } = record;
+      return {
+        ...body,
+        identity: data.identity,
+        // PocketBase has no null: no ids or snapshot is `{}`, no position or duration 0.
+        external_ids: data.externalIds ?? {},
+        round: data.round,
+        watched: data.watched,
+        position_ms: data.positionMs ?? 0,
+        duration_ms: data.durationMs ?? 0,
+        item: data.item ?? {},
+        created_at: data.createdAt,
+        updated_at: data.updatedAt,
+      };
+    }
+    case 'setting':
+      return { ...body, value: record.data.value };
   }
 }
 
@@ -189,7 +209,27 @@ function dataOf(kind: RecordKind, key: string, stored: Readonly<Record<string, u
         updatedAt: stored.updated_at,
       };
     }
+    case 'watchProgress':
+      return {
+        userId: first,
+        identity: stored.identity,
+        ...(isFilled(stored.external_ids) ? { externalIds: stored.external_ids } : {}),
+        round: stored.round,
+        watched: stored.watched,
+        ...(typeof stored.position_ms === 'number' && stored.position_ms > 0 ? { positionMs: stored.position_ms } : {}),
+        ...(typeof stored.duration_ms === 'number' && stored.duration_ms > 0 ? { durationMs: stored.duration_ms } : {}),
+        ...(isFilled(stored.item) ? { item: stored.item } : {}),
+        createdAt: stored.created_at,
+        updatedAt: stored.updated_at,
+      };
+    case 'setting':
+      return { name: key, value: stored.value };
   }
+}
+
+/** `{}` is how "none" is stored, where PocketBase has no null. */
+function isFilled(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0;
 }
 
 /** `{}` is how "not a mirror of anything" is stored, and is not a source. */

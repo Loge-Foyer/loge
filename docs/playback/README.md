@@ -266,10 +266,25 @@ refresh  the source wins, except over entries still in the outbox
   Continue Watching, the item and its season refetch; rows and grids only go
   stale. Progress along the way is not news.
 
-Sources that cannot keep watch status — files, web video, IPTV movies and
-series — get app-owned watch state on the account later. It will be resolved
-field-aware — completed first, then the furthest position — so a device that
-reports position 0 a second after stopping never erases real progress.
+**Sources that keep no watch status** — IPTV films and series, web video,
+plain files — have it kept by the app, on the account, where Settings →
+Watch status keeps it for the tab they show on (Media off by default, Videos
+and TV on). `Source.watch` says who keeps it — the source, the app, or nobody
+— and is the only thing screens ask: a badge, Resume and the eye follow it.
+
+- **Written here, journaled, carried to your server** — no outbox: nothing
+  waits on the source, which keeps nothing (`WatchService.report`,
+  `setPlayed`). A stop at 90 % of the engine's own length is watched; a
+  report at nought never lowers where it got to.
+- **One row per thing watched, not per copy.** A provider that keeps a film's
+  German and English copies apart — and its HQ and 4K ones — matches them to
+  one TMDB id, and watching one marks them all (`watchIdentity`).
+- **Laid over lists where they are drawn** (`useKeptWatch`): local state, so a
+  mark shows at once and no source is asked again. The TV tab lists what was
+  begun first (`keptInProgress`).
+- **Resolved field by field** (spec §10): a later round wins whole; within one,
+  watched holds and the position is the last push's — a deliberate rewind on
+  one device reaches the others, which "the furthest position" would undo.
 
 ## Reporting progress
 

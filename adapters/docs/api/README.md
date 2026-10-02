@@ -22,6 +22,7 @@ without learning about the others.
 | `validate.ts` | `validateManifest()` — the rules every manifest must satisfy. |
 | `media.ts` | `MediaItem` (movie, show, season, episode, and a video site's channel and playlist), `GlobalMediaKey`, `MediaDetail` — with the `Creator` behind a video and a channel's `ChildSection`s — `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. Also what a file *is* — `MediaVersion` with its video, audio and subtitle streams, plus the `HdrFormat`, `SpatialAudio` and `SubtitleDelivery` vocabularies that `playback.ts` shares. |
 | `live.ts` | `ChannelGroup`, `Channel`, `Programme`, and the queries for channels and the guide. |
+| `identity.ts` | What something is apart from any source — `watchIdentity()`, by catalogue id or, where a provider keeps each language's copy apart, its `plainTitle()` and year — and `identityHash()`, the short name a watch record's key carries. |
 | `query.ts` | `ItemQuery` with a search's `SearchScope`, `ChildQuery` (a section and a cursor), `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `playback.ts` | What to play: `PlaybackDescriptor` and its sources, audio and subtitle tracks; `PlayerProfile`, what an engine plays; `PlaybackRequest`; and `PlaybackReport`, what playing reports back to a source. |
 | `player.ts` | The player role: `MediaPlayer`, `PlayerEvent`, `PlayerManifest`, and the pure `canPlay()`, `missingFor()` and `choosePlayer()`. |

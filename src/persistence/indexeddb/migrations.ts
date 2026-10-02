@@ -23,6 +23,8 @@ export const STORES = [
   'subscriptions',
   'playlists',
   'favoriteChannels',
+  'watchProgress',
+  'accountSettings',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -151,6 +153,12 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     favorites.createIndex('byUser', 'userId');
     favorites.createIndex('byConnection', 'connectionId');
     favorites.createIndex('byChannel', ['userId', 'connectionId', 'externalId'], { unique: true });
+  },
+
+  // Watch progress the app keeps, and the account's own settings: as SQLite's v9.
+  (db) => {
+    db.createObjectStore('watchProgress', { keyPath: 'id' }).createIndex('byUser', 'userId');
+    db.createObjectStore('accountSettings', { keyPath: 'name' });
   },
 ];
 

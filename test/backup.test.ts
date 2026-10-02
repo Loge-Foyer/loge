@@ -1,4 +1,4 @@
-import { connectionId, encodeUtf8, pluginId, userId, type AccountRecord } from '@sc/api';
+import { connectionId, encodeUtf8, pluginId, recordKey, userId, type AccountRecord } from '@sc/api';
 import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
 
@@ -18,6 +18,11 @@ import { ACCOUNT_PASSWORD, fakeAccountServer, fakeOwnerAuthentication } from './
 const sql = createSqlJsBackup(() => initSqlJs());
 const crypto = testCrypto();
 const layout = { version: 1 as const, rows: [{ id: 'continue', type: 'continue' as const, hidden: true }] };
+
+/** A watch record, keyed as the contract derives it. */
+function watched(data: Extract<AccountRecord, { kind: 'watchProgress'; deleted: false }>['data']): AccountRecord {
+  return { kind: 'watchProgress', key: recordKey('watchProgress', data), deleted: false, data };
+}
 
 describe('the backup key', () => {
   it('is 20 bytes shown as nine groups of four, the last a checksum, and reads back however it is typed', async () => {
@@ -136,6 +141,20 @@ describe('the database inside', () => {
       deleted: false,
       data: { playlistId: 'pl-1', userId: sam, title: 'Rewatch', items: [{ connectionId: home, externalId: 'm1' }], createdAt: '2026-10-01T12:00:00.000Z', updatedAt: '2026-10-01T12:00:00.000Z' },
     },
+    watched({
+      userId: sam,
+      identity: 'tmdb:movie:603',
+      externalIds: { tmdb: '603' },
+      round: 1,
+      watched: false,
+      positionMs: 1_234_000,
+      durationMs: 8_160_000,
+      item: { type: 'movie', key: { connectionId: home, externalId: 'vod:11' }, title: 'Matrix (1999) DE', ratings: {}, genres: [], images: {} },
+      createdAt: '2026-10-01T20:00:00.000Z',
+      updatedAt: '2026-10-02T21:15:00.000Z',
+    }),
+    watched({ userId: sam, identity: 'youtube:dQw4w9WgXcQ', round: 0, watched: true, createdAt: '2026-10-01T20:00:00.000Z', updatedAt: '2026-10-01T20:03:33.000Z' }),
+    { kind: 'setting', key: 'watchStatus', deleted: false, data: { name: 'watchStatus', value: { media: false, videos: true, tv: true } } },
   ];
   const contents = { lineage: 'account-1', accountName: 'The Smiths', appVersion: '1.0.0', records };
 
@@ -144,18 +163,28 @@ describe('the database inside', () => {
   });
 
   it('opens a file from an older schema, for everything it does hold', async () => {
+    const later = new Set(['watchProgress', 'setting']);
+    const v3 = await sql.open(await writeBackupDatabase(sql, contents));
+    await v3.exec('DROP TABLE watch_progress; DROP TABLE settings; PRAGMA user_version = 3;');
+    const third = await v3.serialize();
+    await v3.close();
+    expect(await readBackupDatabase(sql, third)).toEqual({ ...contents, records: records.filter((record) => !later.has(record.kind)) });
+
     const v2 = await sql.open(await writeBackupDatabase(sql, contents));
-    await v2.exec('DROP TABLE favorite_channels; PRAGMA user_version = 2;');
+    await v2.exec('DROP TABLE favorite_channels; DROP TABLE watch_progress; DROP TABLE settings; PRAGMA user_version = 2;');
     const older = await v2.serialize();
     await v2.close();
-    expect(await readBackupDatabase(sql, older)).toEqual({ ...contents, records: records.filter((record) => record.kind !== 'favoriteChannel') });
+    expect(await readBackupDatabase(sql, older)).toEqual({
+      ...contents,
+      records: records.filter((record) => record.kind !== 'favoriteChannel' && !later.has(record.kind)),
+    });
 
     // And from before a profile's lists: the first schema there was.
     const v1 = await sql.open(await writeBackupDatabase(sql, contents));
-    await v1.exec('DROP TABLE favorite_channels; DROP TABLE subscriptions; DROP TABLE playlists; PRAGMA user_version = 1;');
+    await v1.exec('DROP TABLE favorite_channels; DROP TABLE subscriptions; DROP TABLE playlists; DROP TABLE watch_progress; DROP TABLE settings; PRAGMA user_version = 1;');
     const first = await v1.serialize();
     await v1.close();
-    const ownKinds = new Set(['subscription', 'favoriteChannel', 'playlist']);
+    const ownKinds = new Set(['subscription', 'favoriteChannel', 'playlist', ...later]);
     expect(await readBackupDatabase(sql, first)).toEqual({ ...contents, records: records.filter((record) => !ownKinds.has(record.kind)) });
   });
 

@@ -34,6 +34,7 @@ import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useDownloadActions, useDownloadBudget, useDownloadOf, useDownloadOptions } from '@/hooks/use-downloads';
 import { useListActions, usePlaylists } from '@/hooks/use-lists';
+import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useChildren, useItem, useRefreshMedia } from '@/hooks/use-media';
 import { usePlayers } from '@/hooks/use-players';
 import { useActiveUserId } from '@/hooks/use-session';
@@ -49,9 +50,12 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
   const detail = useItem({ connectionId, externalId: itemId });
   // Every source of the profile: an IPTV provider's films open here from the TV tab.
   const { data: sources = [] } = useSources();
-  const capabilities = sources.find((source) => source.connection.id === connectionId)?.effective.media?.capabilities;
+  const source = sources.find((candidate) => candidate.connection.id === connectionId);
+  const capabilities = source?.effective.media?.capabilities;
   const can = (capability: MediaCapability) => capabilities?.has(capability) ?? false;
-  const showWatch = can('watchStateRead');
+  // Whoever keeps it: the source, or the app for one that keeps none.
+  const showWatch = source?.watch !== undefined;
+  const withKept = useKeptWatch(detail.data ? [detail.data.detail.item] : []);
 
   if (detail.isPending) {
     return (
@@ -71,10 +75,11 @@ export function DetailScreen({ connectionId, itemId, season }: { connectionId: C
   }
   return (
     <Detail
-      detail={detail.data.detail}
+      detail={{ ...detail.data.detail, item: withKept(detail.data.detail.item) }}
       showWatch={showWatch}
       canPlay={can('playback')}
-      canMarkWatched={can('watchStateWrite')}
+      // The app takes the mark itself where it keeps watch status; a source that keeps its own hears it later.
+      canMarkWatched={source?.watch === 'app' || can('watchStateWrite')}
       canDownload={can('downloads')}
       offersChoices={can('downloadOptions')}
       canFollow={can('feed')}
@@ -661,6 +666,7 @@ function Seasons({ show, initial, showWatch }: { show: Show; initial?: string; s
   const unfinished = list.find((season) => season.watch !== undefined && !season.watch.played);
   const selected = list.find((season) => season.key.externalId === chosen) ?? unfinished ?? list[0];
   const episodes = useChildren(selected);
+  const withKept = useKeptWatch(episodes.data?.items ?? []);
 
   if (seasons.isPending) return <Spinner color="$accent9" self="flex-start" />;
   if (list.length === 0) return null;
@@ -673,9 +679,10 @@ function Seasons({ show, initial, showWatch }: { show: Show; initial?: string; s
       />
       {episodes.isPending ? <Spinner color="$accent9" self="flex-start" /> : null}
       <YStack gap="$4">
-        {(episodes.data?.items ?? []).map((episode) =>
-          episode.type === 'episode' ? <EpisodeRow key={episode.key.externalId} episode={episode} showWatch={showWatch} /> : null,
-        )}
+        {(episodes.data?.items ?? []).map((child) => {
+          const episode = withKept(child);
+          return episode.type === 'episode' ? <EpisodeRow key={episode.key.externalId} episode={episode} showWatch={showWatch} /> : null;
+        })}
       </YStack>
     </YStack>
   );

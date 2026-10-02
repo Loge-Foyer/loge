@@ -59,7 +59,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
           .flat()
           .find((item) => item.key.externalId === externalId);
         if (!child) throw new AppError('NOT_FOUND', 'The mock has no such item.');
-        return { item: child, people: [], studios: [], externalIds: {} };
+        return { item: child, people: [], studios: [] };
       }),
 
     getChildren: (parent, _signal, query) =>

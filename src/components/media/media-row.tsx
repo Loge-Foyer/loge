@@ -8,6 +8,7 @@ import { H3, XStack, YStack } from 'tamagui';
 import { GUTTER, px } from '@/components/density';
 import { useRemoteFocus } from '@/components/remote';
 import { PosterSkeleton, ThumbnailSkeleton } from '@/components/shelf';
+import { useKeptWatch } from '@/hooks/use-kept-watch';
 import type { CardStyle } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 
@@ -55,6 +56,7 @@ export function MediaRow({
   onRetry?: () => void;
 }) {
   const { focused, handlers } = useRemoteFocus();
+  const withKept = useKeptWatch(items);
   const heading: ReactNode = (
     <XStack items="center" gap="$1">
       <H3 size="$6" color={focused ? '$accent11' : '$color12'}>
@@ -97,9 +99,9 @@ export function MediaRow({
           renderItem={({ item, index }) => {
             const focus = { ...(onFocusItem ? { onFocusItem } : {}), preferred: preferFirst && index === 0 };
             return card === 'poster' ? (
-              <PosterCard item={item} width={width} showWatch={watchFrom(item)} {...focus} />
+              <PosterCard item={withKept(item)} width={width} showWatch={watchFrom(item)} {...focus} />
             ) : (
-              <LandscapeCard item={item} width={width} showWatch={watchFrom(item)} resumes={resumesFrom?.(item) ?? false} {...focus} />
+              <LandscapeCard item={withKept(item)} width={width} showWatch={watchFrom(item)} resumes={resumesFrom?.(item) ?? false} {...focus} />
             );
           }}
         />

@@ -4,6 +4,7 @@ import { PER_PROFILE_MODES, type PerProfile } from './connection';
 import type { PluginContext, PluginTarget } from './context';
 import type { Credentials, Field, FieldValues } from './fields';
 import { isFieldValues, isId, isJson, isKey, isKeyList, isRecord, isText } from './guards';
+import { identityHash } from './identity';
 import type { CancelSignal } from './http';
 import type { ConnectionId, PluginId, UserId } from './ids';
 
@@ -21,7 +22,18 @@ import type { ConnectionId, PluginId, UserId } from './ids';
 /** Profiles an account may hold unless the server says otherwise (`SC_MAX_PROFILES`). */
 export const DEFAULT_MAX_PROFILES = 10;
 
-export const RECORD_KINDS = ['profile', 'pin', 'preference', 'connection', 'profileValues', 'subscription', 'playlist', 'favoriteChannel'] as const;
+export const RECORD_KINDS = [
+  'profile',
+  'pin',
+  'preference',
+  'connection',
+  'profileValues',
+  'subscription',
+  'playlist',
+  'favoriteChannel',
+  'watchProgress',
+  'setting',
+] as const;
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -106,6 +118,33 @@ export interface RecordData {
     readonly createdAt: string;
     readonly updatedAt: string;
   };
+  /**
+   * Where a profile got to in something, and whether it is done — kept by the
+   * app for a source that keeps no watch status of its own (spec §9). Keyed by
+   * what it is apart from any source (`watchIdentity`), so every device, and
+   * every copy of it on the account's sources, shares one record. Conflicts
+   * resolve on the client, field by field (spec §10): a later `round` wins
+   * whole, `watched` holds within one, and the position is the last push's.
+   */
+  readonly watchProgress: {
+    readonly userId: UserId;
+    /** `tmdb:movie:603`, `youtube:dQw4w9WgXcQ`, `title:movie:matrix:1999`. */
+    readonly identity: string;
+    /** Every catalogue id known for it, for a later match on another source. */
+    readonly externalIds?: Readonly<Record<string, string>>;
+    /** Bumped by "mark as unwatched", so that undoing it on one device is not undone by another. */
+    readonly round: number;
+    readonly watched: boolean;
+    readonly positionMs?: number;
+    readonly durationMs?: number;
+    /** The item as it was last played — which source, which item, its title and picture — for the screens that list it. Untrusted: read it with care. */
+    readonly item?: Readonly<Record<string, unknown>>;
+    /** ISO 8601. For ordering what is shown — never for deciding a conflict. */
+    readonly createdAt: string;
+    readonly updatedAt: string;
+  };
+  /** One of the account's own settings, the same for every profile and device: `watchStatus`. */
+  readonly setting: { readonly name: string; readonly value: unknown };
 }
 
 /**
@@ -184,6 +223,9 @@ const MAX_SECRET = 4 * 1024;
 const MAX_LIST = 2_000;
 /** An image reference is an address more often than not, and some run long. */
 const MAX_LOGO = 2_048;
+/** An identity is a catalogue id, or a title and a year: never long. */
+const MAX_IDENTITY = 300;
+const HASH = /^[0-9a-f]{16}$/;
 
 /** A record's key: the app's own id, or its natural key (`userId/name`, `connectionId/userId`). */
 export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): string {
@@ -202,6 +244,11 @@ export function recordKey<K extends RecordKind>(kind: K, data: RecordData[K]): s
       return String((data as { playlistId?: string }).playlistId);
     case 'favoriteChannel':
       return String((data as { favoriteId?: string }).favoriteId);
+    case 'watchProgress':
+      // Derived, never generated: two devices that start the same film offline write the same record.
+      return `${String(parts.userId)}/${identityHash(String((data as { identity?: string }).identity))}`;
+    case 'setting':
+      return String(parts.name);
     default:
       return `${String(parts.connectionId)}/${String(parts.userId)}`;
   }
@@ -241,6 +288,8 @@ function isKeyOf(kind: RecordKind, key: string): boolean {
   const parts = key.split('/');
   if (kind === 'preference') return parts.length === 2 && isId(parts[0]) && isKey(parts[1]);
   if (kind === 'profileValues') return parts.length === 2 && isId(parts[0]) && isId(parts[1]);
+  if (kind === 'watchProgress') return parts.length === 2 && isId(parts[0]) && HASH.test(parts[1] ?? '');
+  if (kind === 'setting') return parts.length === 1 && isKey(parts[0]);
   return parts.length === 1 && isId(parts[0]);
 }
 
@@ -308,6 +357,23 @@ function isData(kind: RecordKind, data: unknown): boolean {
         (data.logo === undefined || (typeof data.logo === 'string' && data.logo !== '' && data.logo.length <= MAX_LOGO)) &&
         isText(data.addedAt)
       );
+    case 'watchProgress':
+      return (
+        isId(data.userId) &&
+        typeof data.identity === 'string' &&
+        data.identity !== '' &&
+        data.identity.length <= MAX_IDENTITY &&
+        (data.externalIds === undefined || isIdMap(data.externalIds)) &&
+        isCount(data.round) &&
+        typeof data.watched === 'boolean' &&
+        (data.positionMs === undefined || isCount(data.positionMs)) &&
+        (data.durationMs === undefined || isCount(data.durationMs)) &&
+        (data.item === undefined || (isRecord(data.item) && isJson(data.item))) &&
+        isText(data.createdAt) &&
+        isText(data.updatedAt)
+      );
+    case 'setting':
+      return isKey(data.name) && isJson(data.value);
     case 'profileValues':
       return (
         isId(data.connectionId) &&
@@ -326,6 +392,16 @@ function isAccountWide(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   const category = categoryOfPluginId(value);
   return category !== undefined && CATEGORY_SCOPE[category] === 'account';
+}
+
+/** A whole number from nought: a position, a duration, a round. */
+function isCount(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/** Catalogue ids, each a short text under a camelCase name. */
+function isIdMap(value: unknown): boolean {
+  return isRecord(value) && Object.entries(value).every(([key, id]) => isKey(key) && isId(id));
 }
 
 /** Passwords, only for the names the record lists. */

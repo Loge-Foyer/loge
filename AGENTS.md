@@ -188,8 +188,9 @@ These are specific to Streaming Center and matter more than anything above.
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
   newer database is refused. A table rebuild is a `foreignKeysOff` step. The
-  latest three: v6 is what this device keeps, v7 the lists a profile makes
-  (both Phase 10), v8 its favourite channels. `docs/data` has what each does.
+  latest three: v7 the lists a profile makes, v8 its favourite channels, v9
+  watch status the app keeps and the account's own settings. `docs/data` has
+  what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
   changes nothing writes nothing. Only account-wide state is journaled: device
   settings, sync-category connections, the account's own rows (`account`,
@@ -386,6 +387,9 @@ design; these are the rules:
 - **A descriptor lives in memory only.** Never persisted, never in the media
   cache, never logged; redaction covers URLs and MAC addresses. `headersRef` is
   resolved by the engine at load time, never inlined.
+- **Who keeps watch status is `Source.watch`** — the source, the app, or
+  nobody — and nothing else decides it. A source that keeps its own keeps it;
+  the app never keeps it a second time.
 - **Progress goes through the outbox,** never straight from the player to the
   source: the `watch_status` cache and an outbox entry in one transaction (v5),
   through `WatchService` — which tells a source without `watchStateWrite`
@@ -718,6 +722,12 @@ Everything above describes the target; what runs today:
   playback stopped land in `watch_status` and the outbox together; the
   drainer carries them to the source, and until it has, rows, detail pages
   and Continue Watching show this device's state.
+- **Watch status the app keeps (database v9, backup schema 4):** for a source
+  that keeps none, on the tabs Settings → Watch status keeps it on — the
+  account's setting. One journaled row per profile and thing watched, keyed
+  by `watchIdentity` (the TMDB id a portal matched it to, else its title),
+  merged field by field on sync; the TV tab lists what was begun first, and
+  every card has its check.
 - **Downloads:** Settings → Downloads holds Options — what to ask a source
   for, which does not drive a download yet — then what is kept. Media's home
   has a Downloaded row after Continue watching (home layout version 2), and a

@@ -22,6 +22,8 @@ import {
   epgList,
   ids,
   linkOf,
+  fromSeason,
+  ofShow,
   parseId,
   sourceFor,
   toChannels,
@@ -186,7 +188,9 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         const result = toVod(js, at, connectionId, portal.root(), from);
         for (const row of result.rows) vod.set(row.item.key.externalId, row);
         const more = result.total !== undefined && result.perPage !== undefined && result.rows.length > 0 && result.page * result.perPage < result.total;
-        const items = result.rows.map((row) => row.item).filter((item) => item.type === wanted && (term ? matchesTerm(term, item.title) : true));
+        const items = result.rows
+          .map((row) => row.item)
+          .filter((item) => item.type === wanted && (term ? matchesTerm(term, item.title, item.originalTitle) : true));
         if (items.length > 0 || !more || read >= READ_ON) return { items, ...(more ? { nextCursor: String(result.page + 1) } : {}) };
         at = result.page + 1;
       }
@@ -261,7 +265,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       if (!known() && listings.size > 0) await Promise.allSettled([...listings]);
       const row = known();
       if (!row) throw new AppError('NOT_FOUND', 'Open it from the portal’s list again.');
-      return { item: row.item, people: [], studios: [], externalIds: {} };
+      return { item: row.item, people: [], studios: [] };
     },
 
     getChildren: async (parent, signal) => {
@@ -282,7 +286,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
           seasonNumber: 1,
           ratings: {},
           genres: [],
-          images: {},
+          ...ofShow(parent),
         };
         return { items: [season], total: 1 };
       }
@@ -307,7 +311,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
                 episodeNumber: number,
                 ratings: {},
                 genres: [],
-                images: {},
+                ...fromSeason(parent),
               },
               ...(cmd ? { cmd } : {}),
               series: number,

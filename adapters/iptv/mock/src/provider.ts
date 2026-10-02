@@ -76,7 +76,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         if (detail) return detail;
         const child = children.get(externalId);
         if (!child) throw new AppError('NOT_FOUND', 'The mock portal has no such title.');
-        return { item: child, people: [], studios: [], externalIds: {} };
+        return { item: child, people: [], studios: [] };
       }),
 
     getChildren: (parent) =>

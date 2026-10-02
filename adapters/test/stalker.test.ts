@@ -552,6 +552,48 @@ describe('Stalker — films and series', () => {
     expect(next).toEqual({ items: [], nextCursor: '7' });
   });
 
+  it('knows a film by the catalogue the portal matched it to, and its year by its date or its name', async () => {
+    // As a real portal sends them: a date for a year, TMDB's id twice, as a number or a string, and 1 minute for "not known".
+    const { provider } = await connect({
+      vod: (page) => ({
+        js: {
+          total_items: 3,
+          max_page_items: 14,
+          cur_page: page,
+          data: [
+            { id: '11', name: 'Matrix (1999) DE 4K HDR', o_name: 'Matrix (1999) DE 4K HDR', year: '1999-03-31', tmdb_id: '603', tmdb: '603', time: 136, is_series: 0 },
+            { id: '12', name: 'Matrix HQ', o_name: 'Matrix HQ', year: '1999-03-31', tmdb_id: 603, tmdb: 603, time: 136, is_series: 0 },
+            { id: '13', name: 'Matrix Revolutions (2003) DE', o_name: 'The Matrix Revolutions', year: 'N/A', tmdb_id: '', tmdb: '', time: 1, is_series: 0 },
+          ],
+        },
+      }),
+    });
+    const { items } = await need(provider, 'listItems')({ kind: 'movies', sort: { by: 'addedAt', order: 'desc' }, limit: 20 });
+    const [german, high, unknown] = items;
+    expect(german).toMatchObject({ year: 1999, releaseDate: '1999-03-31', externalIds: { tmdb: '603' }, runtimeMs: 136 * 60_000 });
+    expect(german?.originalTitle).toBeUndefined();
+    expect(high?.externalIds).toEqual({ tmdb: '603' });
+    // No catalogue, no date: the year is the one the name carries, and a minute is no runtime.
+    expect(unknown).toMatchObject({ year: 2003, originalTitle: 'The Matrix Revolutions' });
+    expect(unknown?.externalIds).toBeUndefined();
+    expect(unknown?.runtimeMs).toBeUndefined();
+  });
+
+  it('gives a series’ seasons and episodes its catalogue ids, year and cover', async () => {
+    const { provider } = await connect({
+      vod: (page) => ({
+        js: { total_items: 1, max_page_items: 14, cur_page: page, data: [{ id: '601', name: 'The Relay (2021) DE', year: '2021-05-01', tmdb_id: '1396', screenshot_uri: 'http://cdn.test/601.jpg', is_series: '1', cmd: 'x' }] },
+      }),
+    });
+    const [show] = (await need(provider, 'listItems')({ kind: 'shows', sort: { by: 'title', order: 'asc' }, limit: 20 })).items;
+    if (!show) throw new Error('no series');
+    const [season] = (await need(provider, 'getChildren')(show)).items;
+    if (!season) throw new Error('no season');
+    expect(season).toMatchObject({ showExternalIds: { tmdb: '1396' }, showYear: 2021, images: { poster: 'http://cdn.test/601.jpg' } });
+    const [episode] = (await need(provider, 'getChildren')(season)).items;
+    expect(episode).toMatchObject({ showExternalIds: { tmdb: '1396' }, showYear: 2021, images: { poster: 'http://cdn.test/601.jpg' } });
+  });
+
   it('refuses to play a series as a whole', async () => {
     const { provider } = await connect();
     await expect(need(provider, 'getPlaybackDescriptor')({ key: key('show:v:601'), profile })).rejects.toMatchObject({ code: 'INVALID_STATE' });

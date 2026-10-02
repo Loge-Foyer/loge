@@ -20,6 +20,7 @@ import { isTV, useRemoteFocus } from '@/components/remote';
 import { Scrim } from '@/components/scrim';
 import { useLandscapeWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
+import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useFollows, useListActions } from '@/hooks/use-lists';
 import { useChildPages, useRefreshMedia } from '@/hooks/use-media';
 import type { SourceError } from '@/services/media';
@@ -51,6 +52,7 @@ export function CollectionPage({
   const section = sections.find((each) => each.id === chosen)?.id ?? sections[0]?.id;
   const pages = useChildPages(item, section);
   const children = pages.data?.pages.flatMap((page) => page.items) ?? [];
+  const withKept = useKeptWatch(children);
   const refresh = useRefreshMedia();
   const { width } = useWindowDimensions();
   const cardTarget = useLandscapeWidth();
@@ -83,7 +85,7 @@ export function CollectionPage({
       }
       renderItem={({ item: child }: { item: MediaItem }) => (
         <YStack px={GAP / 2} pb="$5" items="center">
-          {child.type === 'channel' ? <ChannelCard item={child} width={cardWidth} /> : <LandscapeCard item={child} width={cardWidth} showWatch={showWatch} />}
+          {child.type === 'channel' ? <ChannelCard item={child} width={cardWidth} /> : <LandscapeCard item={withKept(child)} width={cardWidth} showWatch={showWatch} />}
         </YStack>
       )}
       ListEmptyComponent={

@@ -23,16 +23,25 @@ import type { DownloadBudget } from '@/services/downloads';
 import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
+import { useAccountSettingActions, useWatchStatusSetting } from '@/hooks/use-account-settings';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
 import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
+import { WATCH_STATUS_DEFAULTS } from '@/services/account-settings';
 import { APP_DEFAULTS } from '@/services/app-settings';
 import { BUTTON_LABELS, type ButtonLabels } from '@/services/ports';
-import { CONTENT_TABS } from '@/services/tab-content';
+import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
 import { downloadOptionsSummary } from './download-options';
 import { categoryHref } from './plugin-route';
+
+/** What each tab's switch keeps watch status for. */
+const WATCH_STATUS_ROWS: Readonly<Record<ContentTab, { readonly title: string; readonly subtitle: string }>> = {
+  media: { title: 'Media', subtitle: 'Films and series from a source that keeps none' },
+  videos: { title: 'Videos', subtitle: 'Web videos and files: where you got to' },
+  tv: { title: 'TV films & series', subtitle: 'An IPTV provider’s — never live channels' },
+};
 
 const BUTTON_LABEL_NAMES: Readonly<Record<ButtonLabels, string>> = {
   symbols: 'Symbols',
@@ -65,6 +74,8 @@ export function SettingsScreen() {
   const forceLandscape = appSettings.data?.forceLandscape ?? APP_DEFAULTS.forceLandscape;
   const openOn = appSettings.data?.openOn ?? APP_DEFAULTS.openOn;
   const asks = appSettings.data?.alwaysChooseProfile;
+  const watchStatus = useWatchStatusSetting();
+  const { setWatchStatus } = useAccountSettingActions();
   const buttonLabels = appSettings.data?.buttonLabels ?? APP_DEFAULTS.buttonLabels;
   const defaultProfile = profiles.find((profile) => profile.id === defaultUserId);
 
@@ -107,6 +118,27 @@ export function SettingsScreen() {
           icon={<Lock size={20} color="$color11" />}
           href="/settings/pin"
         />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Watch status"
+        footer="Kept with your account, for each profile, on every device. A source that keeps its own — a media server — keeps it there."
+      >
+        {CONTENT_TABS.map((tab) => (
+          <SettingsRow
+            key={tab}
+            title={WATCH_STATUS_ROWS[tab].title}
+            subtitle={WATCH_STATUS_ROWS[tab].subtitle}
+            trailing={
+              <AppSwitch
+                label={`Keep watch status on ${WATCH_STATUS_ROWS[tab].title}`}
+                checked={(watchStatus.data ?? WATCH_STATUS_DEFAULTS)[tab]}
+                disabled={watchStatus.data === undefined || setWatchStatus.isPending}
+                onCheckedChange={(next) => setWatchStatus.mutate({ [tab]: next })}
+              />
+            }
+          />
+        ))}
       </SettingsSection>
 
       <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">

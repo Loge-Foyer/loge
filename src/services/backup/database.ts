@@ -2,6 +2,7 @@ import {
   connectionId as toConnectionId,
   isAccountRecord,
   pluginId as toPluginId,
+  recordKey,
   userId as toUserId,
   type AccountRecord,
   type PerProfile,
@@ -17,11 +18,12 @@ import type { BackupSql, BackupSqlDatabase } from '../ports';
  */
 
 /**
- * v2 added a profile's own lists, and v3 its favourite channels. A file at an
- * older version still opens — it simply has none of what came later — so only
- * a *newer* schema is refused, never an older one.
+ * v2 added a profile's own lists, v3 its favourite channels, and v4 what it
+ * watched where the app keeps that, and the account's own settings. A file at
+ * an older version still opens — it simply has none of what came later — so
+ * only a *newer* schema is refused, never an older one.
  */
-export const BACKUP_SCHEMA_VERSION = 3;
+export const BACKUP_SCHEMA_VERSION = 4;
 // 'SCBK', so a stray SQLite file is never taken for a backup's database.
 const APPLICATION_ID = 0x5343424b;
 
@@ -80,6 +82,20 @@ CREATE TABLE playlists (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 ) STRICT;
+CREATE TABLE watch_progress (
+  user_id TEXT NOT NULL,
+  identity TEXT NOT NULL,
+  external_ids TEXT,
+  round INTEGER NOT NULL,
+  watched INTEGER NOT NULL,
+  position_ms INTEGER,
+  duration_ms INTEGER,
+  item TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, identity)
+) STRICT;
+CREATE TABLE settings (name TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) STRICT;
 `;
 
 /** What a backup holds: the account, as records, and what names it. */
@@ -178,7 +194,41 @@ async function insert(db: BackupSqlDatabase, record: Extract<AccountRecord, { de
         ],
       );
     }
+    case 'watchProgress': {
+      const { data } = record;
+      return db.run(
+        `INSERT INTO watch_progress (user_id, identity, external_ids, round, watched, position_ms, duration_ms, item, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          data.userId,
+          data.identity,
+          data.externalIds === undefined ? null : json(data.externalIds),
+          data.round,
+          data.watched ? 1 : 0,
+          data.positionMs ?? null,
+          data.durationMs ?? null,
+          data.item === undefined ? null : json(data.item),
+          data.createdAt,
+          data.updatedAt,
+        ],
+      );
+    }
+    case 'setting':
+      return db.run('INSERT INTO settings (name, value) VALUES (?, ?)', [record.data.name, json(record.data.value)]);
   }
+}
+
+interface WatchProgressRow {
+  readonly user_id: string;
+  readonly identity: string;
+  readonly external_ids: string | null;
+  readonly round: number;
+  readonly watched: number;
+  readonly position_ms: number | null;
+  readonly duration_ms: number | null;
+  readonly item: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 interface SubscriptionRow {
@@ -371,6 +421,27 @@ export async function readBackupDatabase(sql: BackupSql, bytes: Uint8Array): Pro
             updatedAt: row.updated_at,
           },
         } satisfies Live<'playlist'>);
+      }
+    }
+    // Before v4 a file holds no watch progress and no settings, and opens all the same.
+    if ((version?.user_version ?? 0) >= 4) {
+      for (const row of await db.all<WatchProgressRow>('SELECT * FROM watch_progress')) {
+        const data: Live<'watchProgress'>['data'] = {
+          userId: toUserId(row.user_id),
+          identity: row.identity,
+          ...(row.external_ids === null ? {} : { externalIds: JSON.parse(row.external_ids) as Readonly<Record<string, string>> }),
+          round: row.round,
+          watched: row.watched === 1,
+          ...(row.position_ms === null ? {} : { positionMs: row.position_ms }),
+          ...(row.duration_ms === null ? {} : { durationMs: row.duration_ms }),
+          ...(row.item === null ? {} : { item: JSON.parse(row.item) as Readonly<Record<string, unknown>> }),
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+        records.push({ kind: 'watchProgress', key: recordKey('watchProgress', data), deleted: false, data } satisfies Live<'watchProgress'>);
+      }
+      for (const row of await db.all<{ name: string; value: string }>('SELECT name, value FROM settings')) {
+        records.push({ kind: 'setting', key: row.name, deleted: false, data: { name: row.name, value: JSON.parse(row.value) as unknown } } satisfies Live<'setting'>);
       }
     }
     // The file came from outside: what the contract refuses, the app never stores.

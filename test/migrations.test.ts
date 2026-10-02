@@ -29,6 +29,7 @@ describe('SQLite migrations', () => {
     );
     expect(tables).toEqual([
       'account',
+      'account_settings',
       'account_sync',
       'backup_state',
       'change_journal',
@@ -45,6 +46,7 @@ describe('SQLite migrations', () => {
       'stale_secrets',
       'subscriptions',
       'users',
+      'watch_progress',
       'watch_status',
     ]);
     expect((await db.get<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(MIGRATIONS.length);

@@ -18,6 +18,7 @@ export * from './effective';
 export * from './validate';
 export * from './download';
 export * from './media';
+export * from './identity';
 export * from './query';
 export * from './errors';
 export * from './http';

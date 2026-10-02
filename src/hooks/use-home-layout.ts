@@ -23,7 +23,8 @@ export function useHomeRows() {
     const kinds = new Set(
       sources.filter((source) => source.effective.media?.capabilities.has('browse')).flatMap((source) => source.kinds),
     );
-    const canContinue = sources.some((source) => source.effective.media?.capabilities.has('watchStateRead'));
+    // A source's resume list, or what the app keeps for one that keeps none.
+    const canContinue = sources.some((source) => source.watch !== undefined);
     return normalizeLayout({ version: 2, rows: layout.data }, kinds, canContinue, canKeep);
   }, [layout.data, sources, canKeep]);
   return { rows, sources };

@@ -21,6 +21,8 @@ const KIND_OF: Readonly<Record<JournalEntity, RecordKind>> = {
   subscription: 'subscription',
   playlist: 'playlist',
   favoriteChannel: 'favoriteChannel',
+  watchProgress: 'watchProgress',
+  accountSetting: 'setting',
 };
 
 const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
@@ -32,6 +34,8 @@ const ENTITY_OF: Readonly<Record<RecordKind, JournalEntity>> = {
   subscription: 'subscription',
   playlist: 'playlist',
   favoriteChannel: 'favoriteChannel',
+  watchProgress: 'watchProgress',
+  setting: 'accountSetting',
 };
 
 /** Parents first: a batch writes a profile before its PIN, a connection before its profiles' values. */
@@ -46,6 +50,9 @@ export const PARENTS_FIRST: readonly RecordKind[] = [
   'subscription',
   'favoriteChannel',
   'playlist',
+  // A watch record's profile is in its key; a setting has no parent at all.
+  'watchProgress',
+  'setting',
 ];
 
 /** A record's identity across the journal and the account: its kind and key. Journal ids are record keys already. */
@@ -57,8 +64,10 @@ export const identityOfEntry = (entry: Pick<JournalEntry, 'entity' | 'entityId'>
 export function announcementOf(kind: RecordKind, key: string, owner?: string): JournalAnnouncement {
   const [first] = key.split('/');
   const userId =
-    kind === 'profile' || kind === 'pin' || kind === 'preference'
+    kind === 'profile' || kind === 'pin' || kind === 'preference' || kind === 'watchProgress'
       ? first
+      : kind === 'setting'
+        ? undefined
       : kind === 'profileValues'
         ? key.split('/')[1]
         : // A subscription's, a favourite's and a playlist's key is a
@@ -200,6 +209,34 @@ export async function recordFor(
       };
       break;
     }
+    case 'watchProgress': {
+      if (entry.operation === 'delete') return tombstone;
+      const progress = await deps.db.watchProgress.get(key);
+      record = progress && {
+        kind: 'watchProgress',
+        key,
+        deleted: false,
+        data: {
+          userId: progress.userId,
+          identity: progress.identity,
+          ...(progress.externalIds === undefined ? {} : { externalIds: progress.externalIds }),
+          round: progress.round,
+          watched: progress.watched,
+          ...(progress.positionMs === undefined ? {} : { positionMs: progress.positionMs }),
+          ...(progress.durationMs === undefined ? {} : { durationMs: progress.durationMs }),
+          ...(progress.item === undefined ? {} : { item: progress.item as unknown as Readonly<Record<string, unknown>> }),
+          createdAt: progress.createdAt,
+          updatedAt: progress.updatedAt,
+        },
+      };
+      break;
+    }
+    case 'accountSetting': {
+      if (entry.operation === 'delete') return tombstone;
+      const setting = await deps.db.accountSettings.get(key);
+      record = setting ? { kind: 'setting', key, deleted: false, data: { name: setting.name, value: setting.value } } : tombstone;
+      break;
+    }
     case 'connectionProfileValues': {
       const [ofConnection = '', ofUser = ''] = key.split('/');
       if (entry.operation === 'delete') return tombstone;
@@ -254,6 +291,8 @@ export async function recordsOfAccount(deps: { readonly db: LocalDatabase; reado
   for (const subscription of await db.subscriptions.listAll()) upsert('subscription', subscription.id);
   for (const favorite of await db.favoriteChannels.listAll()) upsert('favoriteChannel', favorite.id);
   for (const playlist of await db.playlists.listAll()) upsert('playlist', playlist.id);
+  for (const progress of await db.watchProgress.listAll()) upsert('watchProgress', progress.id);
+  for (const setting of await db.accountSettings.list()) upsert('accountSetting', setting.name);
   const records: AccountRecord[] = [];
   for (const entry of wanted) {
     const record = await recordFor(entry, deps);

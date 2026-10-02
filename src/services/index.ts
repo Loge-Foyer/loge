@@ -7,6 +7,7 @@ import type { MediaService } from './media';
 import type { OwnerCheck } from './owner-check';
 import type { PinService } from './pins';
 import type { PlaybackService } from './playback';
+import type { AccountSettingsService } from './account-settings';
 import type { AppSettingsService } from './app-settings';
 import type { PlayerService } from './players';
 import type { FileExchange, PictureInPicture, ScreenBrightness, ScreenOrientationControl } from './ports';
@@ -51,6 +52,8 @@ export interface Services {
   readonly players: PlayerService;
   /** What the app does by itself on this device — how the player turns, for now. */
   readonly appSettings: AppSettingsService;
+  /** The account's own settings — which tabs it keeps watch status on — the same for every profile and device. */
+  readonly accountSettings: AccountSettingsService;
   /** The screen's brightness, for the player's edge slider. */
   readonly brightness: ScreenBrightness;
   /** Picture in picture where the platform gives it, rather than an engine. */

@@ -8,6 +8,7 @@ import {
   matchesTerm,
   pluginId,
   type ConnectedMediaProvider,
+  type ContentKind,
   type HttpClient,
   type MediaItem,
   type GlobalMediaKey,
@@ -39,6 +40,7 @@ import { createMediaService } from '@/services/media';
 import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
+import { createAccountSettingsService } from '@/services/account-settings';
 import { appDefaults, createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService, type PlayerDefaults } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
@@ -122,6 +124,11 @@ export interface FakeSourceOptions {
   readonly failWritesWith?: () => AppError | undefined;
   /** Says what to play (`playback`), given the request — recorded in `stats.playbackRequests`. */
   readonly playback?: (request: PlaybackRequest) => PlaybackDescriptor;
+  /** Keeps no watch status of its own — no `watchStateRead` — as a portal or a web video site. */
+  readonly keepsNoWatchState?: boolean;
+  /** An IPTV provider's rather than a source's. */
+  readonly category?: 'sources' | 'iptv';
+  readonly kinds?: readonly ContentKind[];
 }
 
 /** A media plugin backed by lists, with the counters a test needs to see what was asked. */
@@ -141,17 +148,18 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     /** The term each `listItems` was given — `undefined` where it was asked to browse. */
     terms: [] as (string | undefined)[],
   };
+  const category = options.category ?? 'sources';
   const manifest: PluginManifest = {
-    id: pluginId(`sources/${id}`),
-    category: 'sources',
+    id: pluginId(`${category}/${id}`),
+    category,
     platforms: ['ios', 'android', 'web'],
     displayName: id,
     description: `The ${id} test source.`,
     media: {
-      contentKinds: ['movies', 'shows'],
+      contentKinds: options.kinds ?? ['movies', 'shows'],
       capabilities: [
         'browse',
-        'watchStateRead',
+        ...(options.keepsNoWatchState ? [] : (['watchStateRead'] as const)),
         ...(options.writesWatchState ? (['watchStateWrite'] as const) : []),
         ...(options.playback ? (['playback'] as const) : []),
         ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
@@ -207,16 +215,20 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
             await fail();
             const item = (options.movies?.(target.connectionId) ?? []).find((candidate) => candidate.key.externalId === externalId);
             if (!item) throw new AppError('NOT_FOUND', 'No such item.');
-            return { item, people: [], studios: [], externalIds: {} };
+            return { item, people: [], studios: [] };
           },
           getChildren: async (parent) => {
             await fail();
             return { items: options.children?.(parent) ?? [] };
           },
-          getResume: async (limit) => {
-            await fail();
-            return (options.resume?.(target.connectionId) ?? []).slice(0, limit);
-          },
+          ...(options.keepsNoWatchState
+            ? {}
+            : {
+                getResume: async (limit: number) => {
+                  await fail();
+                  return (options.resume?.(target.connectionId) ?? []).slice(0, limit);
+                },
+              }),
           ...(options.withImages
             ? { resolveImage: (ref: string, size: { width: number }) => ({ uri: `https://img.test/${ref}?w=${size.width}` }) }
             : {}),
@@ -322,7 +334,8 @@ export function buildServices(options: {
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
   const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings, defaults: appDefaults({ tv: options.tv ?? false }) });
   const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins, appSettings });
-  const sources = createSourceService({ catalog, connections: db.connections });
+  const sources = createSourceService({ catalog, connections: db.connections, accountSettings: db.accountSettings });
+  const accountSettings = createAccountSettingsService({ db });
   const pool = createProviderPool({ catalog, credentials, sessions, http: unusedHttp, network, identity, clock, crypto, log: silentLog });
   const connections = createConnectionService({
     db,
@@ -469,6 +482,7 @@ export function buildServices(options: {
       files: options.files ?? unusedFiles,
       players,
       appSettings,
+      accountSettings,
       watch,
       downloads,
       downloadSettings,

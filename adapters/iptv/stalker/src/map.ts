@@ -1,6 +1,8 @@
 import {
   fromZoneWallClock,
   imageRef,
+  plainTitle,
+  type ExternalIds,
   type Channel,
   type ChannelGroup,
   type ConnectionId,
@@ -70,6 +72,36 @@ const number = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 const yes = (value: unknown) => value === 1 || value === '1' || value === true;
+
+/** A year a portal writes as a year, a date (`1999-03-31`) or "N/A". */
+const yearOf = (value: unknown): number | undefined => {
+  const digits = typeof value === 'number' ? String(value) : (text(value) ?? '');
+  const found = /^(1[89]\d\d|20\d\d)\b/.exec(digits.trim());
+  return found ? Number(found[1]) : undefined;
+};
+
+/** An id a portal sends as a number or a string — and "", 0 or "N/A" for none. */
+const idOf = (value: unknown): string | undefined => {
+  const id = typeof value === 'number' ? String(value) : text(value)?.trim();
+  return id && id !== '0' && /^[A-Za-z0-9]+$/.test(id) ? id : undefined;
+};
+
+/**
+ * The catalogues a portal matched a film or series to — TMDB above all, which
+ * many fill in — so its copies in other languages and qualities, each a title
+ * of its own on the portal, are known as one.
+ */
+function externalIdsOf(row: Readonly<Record<string, unknown>>): ExternalIds | undefined {
+  const tmdb = idOf(row.tmdb_id) ?? idOf(row.tmdb);
+  const imdb = idOf(row.imdb_id);
+  const kinopoisk = idOf(row.kinopoisk_id);
+  const ids = {
+    ...(tmdb ? { tmdb } : {}),
+    ...(imdb && /^tt\d+$/.test(imdb) ? { imdb } : {}),
+    ...(kinopoisk ? { kinopoisk } : {}),
+  };
+  return Object.keys(ids).length === 0 ? undefined : ids;
+}
 
 /** Artwork: an address, or a path on the portal. */
 export function image(value: unknown, root: string | undefined): ImageRef | undefined {
@@ -206,8 +238,13 @@ function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: Connecti
   const id = text(row.id);
   const title = text(row.name);
   if (!id || !title) return undefined;
-  const year = number(row.year);
+  // A date more often than a year, else "N/A" — and then the year the name carries, as "Matrix (1999) DE" does.
+  const year = yearOf(row.year) ?? plainTitle(title).year;
+  const released = /^\d{4}-\d{2}-\d{2}$/.test(text(row.year) ?? '') ? text(row.year) : undefined;
+  // A portal says 1 minute where it does not know.
   const minutes = number(row.time);
+  const original = text(row.o_name);
+  const externalIds = externalIdsOf(row);
   const rating = number(row.rating_imdb);
   const overview = text(row.description);
   const poster = image(row.screenshot_uri, root);
@@ -217,10 +254,12 @@ function toVodRow(row: Readonly<Record<string, unknown>>, connectionId: Connecti
     .filter((genre) => genre !== '' && genre !== 'N/A');
   const common = {
     title,
-    ...(text(row.o_name) && text(row.o_name) !== title ? { sortTitle: title } : {}),
+    ...(original && original !== title ? { originalTitle: original } : {}),
+    ...(externalIds ? { externalIds } : {}),
     ...(overview ? { overview } : {}),
     ...(year ? { year } : {}),
-    ...(minutes ? { runtimeMs: minutes * 60_000 } : {}),
+    ...(released ? { releaseDate: released } : {}),
+    ...(minutes && minutes > 1 ? { runtimeMs: minutes * 60_000 } : {}),
     ratings: rating && rating > 0 ? { community: Math.round(rating * 10) / 10 } : {},
     genres,
     images: poster ? { poster } : {},
@@ -248,6 +287,30 @@ export interface SeasonRow {
   readonly episodes?: readonly number[];
 }
 
+/**
+ * What a season and an episode know of their series: its catalogue ids, its
+ * year and original title — so an episode is the same one in every language's
+ * copy — and its cover, which a portal's episodes have none of their own.
+ */
+export function ofShow(show: Pick<Show, 'externalIds' | 'originalTitle' | 'year' | 'images'>) {
+  return {
+    ...(show.externalIds ? { showExternalIds: show.externalIds } : {}),
+    ...(show.originalTitle ? { showOriginalTitle: show.originalTitle } : {}),
+    ...(show.year === undefined ? {} : { showYear: show.year }),
+    images: show.images.poster ? { poster: show.images.poster } : {},
+  };
+}
+
+/** The same, handed on from a season to its episodes. */
+export function fromSeason(season: Season) {
+  return {
+    ...(season.showExternalIds ? { showExternalIds: season.showExternalIds } : {}),
+    ...(season.showOriginalTitle ? { showOriginalTitle: season.showOriginalTitle } : {}),
+    ...(season.showYear === undefined ? {} : { showYear: season.showYear }),
+    images: season.images.poster ? { poster: season.images.poster } : {},
+  };
+}
+
 export function toSeasons(js: unknown, show: Show, connectionId: ConnectionId): readonly SeasonRow[] {
   const showId = parseId(show.key.externalId);
   if (showId?.kind !== 'show') return [];
@@ -272,7 +335,7 @@ export function toSeasons(js: unknown, show: Show, connectionId: ConnectionId): 
           seasonNumber,
           ratings: {},
           genres: [],
-          images: {},
+          ...ofShow(show),
         },
         ...(cmd ? { cmd } : {}),
         ...(numbered.length > 0 ? { episodes: numbered } : {}),
@@ -310,7 +373,7 @@ export function toEpisodes(js: unknown, season: Season, connectionId: Connection
           episodeNumber,
           ratings: {},
           genres: [],
-          images: {},
+          ...fromSeason(season),
         },
         ...(cmd ? { cmd } : {}),
         series: episodeNumber,

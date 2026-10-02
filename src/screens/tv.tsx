@@ -13,7 +13,7 @@ import { ActionMenu } from '@/components/action-menu';
 import { Artwork } from '@/components/artwork';
 import { px } from '@/components/density';
 import { EmptyState } from '@/components/empty-state';
-import { CONTENT_KIND_LABELS, listNames } from '@/components/labels';
+import { CONTENT_KIND_LABELS, episodeCode, listNames } from '@/components/labels';
 import { FAVORITES_GROUP, fromRouteId, isFavorites, liveHref, routeId } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
@@ -26,12 +26,14 @@ import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useFavoriteChannels, useListActions } from '@/hooks/use-lists';
 import { nowAndNext, useChannelGroups, useChannels, useGuide, useNow, useSourcePage } from '@/hooks/use-live';
+import { useInProgress, useKeptWatch } from '@/hooks/use-kept-watch';
 import { useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
 import { asChannel } from '@/services/lists';
 import type { SourceError } from '@/services/media';
 import type { TabSource } from '@/services/sources';
+import { itemKeyOf } from '@/services/watch/item-key';
 
 const NEWEST = { by: 'addedAt', order: 'desc' } as const;
 // The guide is asked for the channels near the top of the list; the rest fill in as they come up.
@@ -355,6 +357,11 @@ function ChannelRow({
   );
 }
 
+const captionOf = (captions: ReadonlyMap<string, string>, item: MediaItem) => {
+  const caption = captions.get(itemKeyOf(item.key));
+  return caption ? { caption } : {};
+};
+
 /** "20:15", in the device's own time. */
 export function clockOf(iso: string): string {
   const at = new Date(iso);
@@ -363,12 +370,24 @@ export function clockOf(iso: string): string {
 
 function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: ContentKind | undefined; term: string; header: React.ReactElement }) {
   const page = useSourcePage(source.connection.id, kind, NEWEST, term);
+  // What this profile has begun here comes first — where the app keeps watch status for this provider, and not in a search.
+  const searching = term.trim() !== '';
+  const type = kind === 'movies' ? 'movie' : kind === 'shows' ? 'show' : undefined;
+  const begun = useInProgress(source.connection.id, type, !searching && source.watch === 'app');
   const { width } = useWindowDimensions();
   const posterWidth = usePosterWidth();
   const { onRefresh, control } = useRefresh();
   const columns = Math.min(10, Math.max(3, Math.floor((width - 32 + 12) / (posterWidth + 12))));
   const cardWidth = Math.floor((width - 32 - (columns - 1) * 12) / columns);
-  const items = page.data?.pages.flatMap((each) => each.items) ?? [];
+  const firsts = searching ? [] : (begun.data ?? []);
+  const firstKeys = new Set(firsts.map((each) => itemKeyOf(each.item.key)));
+  const captions = new Map(firsts.flatMap((each) => (each.episode ? [[itemKeyOf(each.item.key), episodeCode(each.episode)] as const] : [])));
+  // Then the provider's own pages, without what is already at the top.
+  const items = [
+    ...firsts.map((each) => each.item),
+    ...(page.data?.pages.flatMap((each) => each.items) ?? []).filter((item) => !firstKeys.has(itemKeyOf(item.key))),
+  ];
+  const withKept = useKeptWatch(items);
   const errors = page.data?.pages[0]?.sourceError ? [page.data.pages[0].sourceError] : [];
   const scroller = useRef<FlashListRef<MediaItem>>(null);
   useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
@@ -390,7 +409,7 @@ function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: C
       }
       renderItem={({ item }) => (
         <YStack px={6} pb="$5" items="center">
-          <PosterCard item={item} width={cardWidth} showWatch={false} />
+          <PosterCard item={withKept(item)} width={cardWidth} showWatch={source.watch !== undefined} {...captionOf(captions, item)} />
         </YStack>
       )}
       ListEmptyComponent={

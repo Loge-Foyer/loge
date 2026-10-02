@@ -157,7 +157,10 @@ browser, that providers can't be reached there). Otherwise:
   now marked, and Watch live.
 - **Movies** and **Shows** — posters in the provider's own order, one provider,
   never merged with the library; a poster opens the ordinary detail page, with
-  Play where the provider can play.
+  Play where the provider can play. Where the app keeps watch status for the
+  provider, what was begun comes first — films part-way, and series with an
+  episode watched in the last month, saying "S2 · E5" — then the provider's
+  pages without them; every card has its check or its bar.
 - **Offline** — the groups, each group's first page of channels, each
   channel's day of guide and the first page of films and series are kept per
   profile, where the provider allows it (`offlineMetadata`), and shown with how
@@ -194,6 +197,10 @@ TV's sections.
   and says so. A local copy kept after signing out that holds more than ten
   keeps them all, but adds none until there are fewer.
 - **PIN lock**, per profile.
+- **Watch status** — which tabs the account keeps watch status on, for the
+  sources there that keep none: Media, Videos, TV's films and series. The
+  account's, the same for every profile and device; a source that keeps its
+  own — a media server — keeps it there.
 - **App** — how this device behaves, whoever is watching: the tab it opens on
   (Media, Videos or TV), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;

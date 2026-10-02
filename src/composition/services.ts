@@ -28,6 +28,7 @@ import { createProviderPool } from '@/services/media/pool';
 import { accountOwnerCheck, createOwnerCheck } from '@/services/owner-check';
 import { createPinService } from '@/services/pins';
 import { createPlaybackService } from '@/services/playback';
+import { createAccountSettingsService } from '@/services/account-settings';
 import { appDefaults, createAppSettingsService } from '@/services/app-settings';
 import { createPlayerService } from '@/services/players';
 import { createPluginCatalog } from '@/services/plugin-catalog';
@@ -87,7 +88,8 @@ export function createServices(): AppServices {
   const pins = createPinService({ db, credentials, janitor, ids, clock, owner });
   const appSettings = createAppSettingsService({ deviceSettings: db.deviceSettings, defaults: appDefaults({ tv: isTV() }) });
   const session = createSessionService({ users: db.users, deviceSettings: db.deviceSettings, account: db.account, pins, appSettings });
-  const sources = createSourceService({ catalog, connections: db.connections });
+  const sources = createSourceService({ catalog, connections: db.connections, accountSettings: db.accountSettings });
+  const accountSettings = createAccountSettingsService({ db });
   const pool = createProviderPool({ catalog, credentials, sessions, http, network, identity, clock, crypto, log });
   const connections = createConnectionService({
     db,
@@ -237,6 +239,7 @@ export function createServices(): AppServices {
       files: createFileExchange(log),
       players,
       appSettings,
+      accountSettings,
       watch,
       downloads,
       downloadSettings,

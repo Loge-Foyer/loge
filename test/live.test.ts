@@ -74,7 +74,7 @@ function fakePortal(options: { keeps?: boolean } = {}) {
             const films = ['Zulu', 'Alpha', 'Mike'].map((title, index) => movie(target.connectionId, `f${index}`, 2020, { title }));
             return query.kind === 'movies' ? { items: films.filter((film) => !query.term || film.title.includes(query.term)) } : { items: [] };
           },
-          getItem: async (externalId) => ({ item: movie(target.connectionId, externalId, 2020), people: [], studios: [], externalIds: {} }),
+          getItem: async (externalId) => ({ item: movie(target.connectionId, externalId, 2020), people: [], studios: [] }),
           getChildren: async () => ({ items: [] }),
           dispose: async () => undefined,
         };

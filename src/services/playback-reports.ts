@@ -47,10 +47,13 @@ export function playbackReports(deps: {
     return queue;
   };
 
+  // How long the engine says it is, once it has: truer than a provider's runtime, which is often rounded or missing.
+  const length = () => (durationMs === undefined ? {} : { durationMs });
+
   const stopAt = (at: number) => {
     if (!started || stopped || deps.live) return queue;
     stopped = true;
-    return send({ kind: 'stopped', key, positionMs: at });
+    return send({ kind: 'stopped', key, positionMs: at, ...length() });
   };
 
   return {
@@ -61,7 +64,7 @@ export function playbackReports(deps: {
         durationMs = event.durationMs ?? durationMs;
         if (started && deps.clock.now() - lastProgressAt >= PROGRESS_EVERY_MS) {
           lastProgressAt = deps.clock.now();
-          void send({ kind: 'progress', key, positionMs, paused: false });
+          void send({ kind: 'progress', key, positionMs, paused: false, ...length() });
         }
         return;
       }
@@ -69,10 +72,10 @@ export function playbackReports(deps: {
       if (event.state === 'playing' && !started) {
         started = true;
         lastProgressAt = deps.clock.now();
-        void send({ kind: 'started', key, positionMs });
+        void send({ kind: 'started', key, positionMs, ...length() });
       } else if (event.state === 'paused' && started) {
         lastProgressAt = deps.clock.now();
-        void send({ kind: 'progress', key, positionMs, paused: true });
+        void send({ kind: 'progress', key, positionMs, paused: true, ...length() });
       } else if (event.state === 'ended') {
         void stopAt(durationMs ?? positionMs);
       }

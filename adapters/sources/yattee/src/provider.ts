@@ -257,13 +257,13 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         const channel = readChannel(await client.get(`/api/v1/channels/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!channel) throw new AppError('NOT_FOUND', 'The server no longer has this channel.');
         seenChannel(channel);
-        return { item: channelToItem(channel, connectionId), people: [], studios: [], externalIds: {}, sections: CHANNEL_SECTIONS };
+        return { item: channelToItem(channel, connectionId), people: [], studios: [], sections: CHANNEL_SECTIONS };
       }
       if (parsed.kind === 'playlist') {
         const playlist = readPlaylist(await client.get(`/api/v1/playlists/${encodeURIComponent(parsed.id)}`, {}, signal));
         if (!playlist) throw new AppError('NOT_FOUND', 'The server no longer has this playlist.');
         seenPlaylist(playlist);
-        return { item: playlistToItem(playlist, connectionId), people: [], studios: [], externalIds: {} };
+        return { item: playlistToItem(playlist, connectionId), people: [], studios: [] };
       }
       const video = await videoOf(parsed.id, signal);
       const versions = toVersions(video);

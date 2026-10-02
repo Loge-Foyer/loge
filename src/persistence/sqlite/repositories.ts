@@ -46,6 +46,10 @@ import type {
   SubscriptionRepository,
   FavoriteChannel,
   FavoriteChannelRepository,
+  AccountSetting,
+  AccountSettingsRepository,
+  WatchProgress,
+  WatchProgressRepository,
   UserPreferences,
   UserRepository,
   WatchEntry,
@@ -790,6 +794,84 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  // Account-wide, journaled, cascading from the profile alone.
+  const watchProgress: WatchProgressRepository = {
+    get: async (id) => {
+      const row = await sql.get<WatchProgressRow>('SELECT * FROM watch_progress WHERE id = ?', [id]);
+      return row && toWatchProgress(row);
+    },
+    getMany: async (ids) => {
+      const found: WatchProgress[] = [];
+      // A few hundred at a time keeps every statement well within SQLite's limit on parameters.
+      for (let at = 0; at < ids.length; at += 400) {
+        const some = ids.slice(at, at + 400);
+        const rows = await sql.all<WatchProgressRow>(`SELECT * FROM watch_progress WHERE id IN (${some.map(() => '?').join(', ')})`, some);
+        found.push(...rows.map(toWatchProgress));
+      }
+      return found;
+    },
+    list: async (user) =>
+      (await sql.all<WatchProgressRow>('SELECT * FROM watch_progress WHERE user_id = ? ORDER BY updated_at DESC, id', [user])).map(toWatchProgress),
+    listAll: async () => (await sql.all<WatchProgressRow>('SELECT * FROM watch_progress ORDER BY updated_at DESC, id')).map(toWatchProgress),
+    put: async (progress) => {
+      await sql.run(
+        `INSERT INTO watch_progress (id, user_id, identity, external_ids, round, watched, position_ms, duration_ms, item, created_at, updated_at, version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET identity = excluded.identity, external_ids = excluded.external_ids, round = excluded.round,
+           watched = excluded.watched, position_ms = excluded.position_ms, duration_ms = excluded.duration_ms, item = excluded.item,
+           created_at = excluded.created_at, updated_at = excluded.updated_at, version = excluded.version`,
+        [
+          progress.id,
+          progress.userId,
+          progress.identity,
+          progress.externalIds === undefined ? null : JSON.stringify(progress.externalIds),
+          progress.round,
+          progress.watched ? 1 : 0,
+          progress.positionMs ?? null,
+          progress.durationMs ?? null,
+          progress.item === undefined ? null : JSON.stringify(progress.item),
+          progress.createdAt,
+          progress.updatedAt,
+          progress.version,
+        ],
+      );
+      await record({ userId: progress.userId, entity: 'watchProgress', entityId: progress.id, operation: 'upsert', localVersion: progress.version });
+    },
+    remove: async (id) => {
+      const row = await sql.get<WatchProgressRow>('SELECT * FROM watch_progress WHERE id = ?', [id]);
+      if (!row) return;
+      await sql.run('DELETE FROM watch_progress WHERE id = ?', [id]);
+      await record({ userId: userId(row.user_id), entity: 'watchProgress', entityId: id, operation: 'delete', localVersion: row.version + 1 });
+    },
+  };
+
+  // The account's own, no profile's: journaled with no user.
+  const accountSettings: AccountSettingsRepository = {
+    get: async (name) => {
+      const row = await sql.get<AccountSettingRow>('SELECT * FROM account_settings WHERE name = ?', [name]);
+      return row && toAccountSetting(row);
+    },
+    list: async () => (await sql.all<AccountSettingRow>('SELECT * FROM account_settings ORDER BY name')).map(toAccountSetting),
+    put: async (setting) => {
+      const row = await sql.get<AccountSettingRow>('SELECT * FROM account_settings WHERE name = ?', [setting.name]);
+      if (row && row.value === JSON.stringify(setting.value)) return;
+      await sql.run(
+        'INSERT INTO account_settings (name, value, version) VALUES (?, ?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value, version = excluded.version',
+        [setting.name, JSON.stringify(setting.value), setting.version],
+      );
+      await record({ entity: 'accountSetting', entityId: setting.name, operation: 'upsert', localVersion: setting.version });
+    },
+    remove: async (name) => {
+      const row = await sql.get<AccountSettingRow>('SELECT * FROM account_settings WHERE name = ?', [name]);
+      if (!row) return;
+      await sql.run('DELETE FROM account_settings WHERE name = ?', [name]);
+      await record({ entity: 'accountSetting', entityId: name, operation: 'delete', localVersion: row.version + 1 });
+    },
+    clear: async () => {
+      await sql.run('DELETE FROM account_settings');
+    },
+  };
+
   const journal: JournalRepository = {
     entries: async (after = 0, limit) =>
       (await sql.all<JournalRow>('SELECT * FROM change_journal WHERE seq > ? ORDER BY seq LIMIT ?', [after, limit ?? -1])).map(
@@ -820,8 +902,52 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     subscriptions,
     favoriteChannels,
     playlists,
+    watchProgress,
+    accountSettings,
     journal,
   };
+}
+
+interface WatchProgressRow {
+  readonly id: string;
+  readonly user_id: string;
+  readonly identity: string;
+  readonly external_ids: string | null;
+  readonly round: number;
+  readonly watched: number;
+  readonly position_ms: number | null;
+  readonly duration_ms: number | null;
+  readonly item: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly version: number;
+}
+
+function toWatchProgress(row: WatchProgressRow): WatchProgress {
+  return {
+    id: row.id,
+    userId: userId(row.user_id),
+    identity: row.identity,
+    ...(row.external_ids === null ? {} : { externalIds: JSON.parse(row.external_ids) as Readonly<Record<string, string>> }),
+    round: row.round,
+    watched: row.watched === 1,
+    ...(row.position_ms === null ? {} : { positionMs: row.position_ms }),
+    ...(row.duration_ms === null ? {} : { durationMs: row.duration_ms }),
+    ...(row.item === null ? {} : { item: JSON.parse(row.item) as MediaItem }),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    version: row.version,
+  };
+}
+
+interface AccountSettingRow {
+  readonly name: string;
+  readonly value: string;
+  readonly version: number;
+}
+
+function toAccountSetting(row: AccountSettingRow): AccountSetting {
+  return { name: row.name, value: JSON.parse(row.value) as unknown, version: row.version };
 }
 
 interface WatchRow {

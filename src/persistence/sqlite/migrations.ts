@@ -153,7 +153,38 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   { version: 6, up: (tx) => tx.exec(V6) },
   { version: 7, up: (tx) => tx.exec(V7) },
   { version: 8, up: (tx) => tx.exec(V8) },
+  { version: 9, up: (tx) => tx.exec(V9) },
 ];
+
+// Watch progress the app keeps, for sources that keep none (spec §9), and the
+// account's own settings — which tabs it is kept on among them. Both are
+// account-wide: journaled, carried to your own server, written into backups.
+// Progress cascades from its profile alone: history outlives a source, as a
+// list does, and is keyed by what was watched rather than where. Its id is
+// derived from the profile and that, so no second unique index is needed —
+// and two devices that start the same film offline write the same row.
+const V9 = `
+CREATE TABLE watch_progress (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  identity TEXT NOT NULL,
+  external_ids TEXT,
+  round INTEGER NOT NULL,
+  watched INTEGER NOT NULL,
+  position_ms INTEGER,
+  duration_ms INTEGER,
+  item TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  version INTEGER NOT NULL
+) STRICT;
+CREATE INDEX watch_progress_recent ON watch_progress (user_id, updated_at);
+CREATE TABLE account_settings (
+  name TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL,
+  version INTEGER NOT NULL
+) STRICT;
+`;
 
 // Favourite channels (after Phase 10): the ★ a profile keeps before a
 // provider's groups. Account-wide like the subscriptions of v7 — journaled,
