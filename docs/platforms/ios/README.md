@@ -9,6 +9,9 @@ played here yet. VLC is an Expo module in its adapter too, against VLCKit 3.7
 (MobileVLCKit here, TVVLCKit on Apple TV); KSPlayer never arrived. Face ID needs the app's usage text,
 which Expo Go cannot carry. Picture in picture on
 iPhone belongs to mpv's own module, so `modules/loge-pip` is Android-only.
+`modules/loge-volume` is the app's own here. It sets the device's volume
+through MPVolumeView for the player's edge, and has no tvOS build: a
+television sets its own volume.
 Phase 4's key derivation module went with its vault.
 
 `npm run ios` builds the client and installs it on the simulator; after that,

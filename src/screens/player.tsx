@@ -6,6 +6,7 @@ import { ChevronsLeft } from '@tamagui/lucide-icons-2/icons/ChevronsLeft';
 import { ChevronsRight } from '@tamagui/lucide-icons-2/icons/ChevronsRight';
 import { Sun } from '@tamagui/lucide-icons-2/icons/Sun';
 import { Volume2 } from '@tamagui/lucide-icons-2/icons/Volume2';
+import { VolumeX } from '@tamagui/lucide-icons-2/icons/VolumeX';
 import { Gauge } from '@tamagui/lucide-icons-2/icons/Gauge';
 import { List } from '@tamagui/lucide-icons-2/icons/List';
 import { SkipForward } from '@tamagui/lucide-icons-2/icons/SkipForward';
@@ -19,7 +20,7 @@ import { X } from '@tamagui/lucide-icons-2/icons/X';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
+import { Animated, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 import { SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
 import { px } from '@/components/density';
@@ -41,6 +42,8 @@ import { useRemoteKeys } from '@/hooks/use-remote-keys';
 import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
+/** How bright a double tap's side flashes at its peak: barely, a white veil over the picture. */
+const FLASH_ALPHA = 0.04;
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 /**
@@ -213,25 +216,48 @@ function Controls({
     if (!live) skip(key === 'left' ? -seekMs : seekMs);
   });
 
-  // What a drag down an edge is showing, while it is showing it.
-  const [adjust, setAdjust] = useState<{ readonly kind: PlayerSlider; readonly value: number }>();
+  // What a drag down an edge is showing, while it is showing it, and where
+  // it started: the drag is measured from there, so a change it hears back —
+  // the device telling it the volume it just set — cannot move its start.
+  const [adjust, setAdjust] = useState<{ readonly kind: Exclude<PlayerSlider, 'off'>; readonly start: number; readonly value: number }>();
   const [boosted, setBoosted] = useState(false);
-  const { brightness } = useServices();
+  const { brightness, volume } = useServices();
   const [levels, setLevels] = useState({ brightness: 0.5, volume: 1 });
+  // Which levels this device has to show: a browser sets no brightness, and has no volume of its own but the engine's.
+  const [known, setKnown] = useState({ brightness: false, deviceVolume: false });
   const [size, setSize] = useState({ width: 0, height: 0 });
   const lastTap = useRef({ at: 0, x: 0 });
 
-  // The screen's own brightness is read once, and put back when the player goes.
+  // The screen's own brightness and the device's volume are read once, and
+  // the brightness put back when the player goes.
   useEffect(() => {
     let left = false;
     void brightness.get().then((value) => {
-      if (!left && value !== undefined) setLevels((now) => ({ ...now, brightness: value }));
+      if (left || value === undefined) return;
+      setKnown((now) => ({ ...now, brightness: true }));
+      setLevels((now) => ({ ...now, brightness: value }));
+    });
+    void volume.attach();
+    void volume.get().then((value) => {
+      if (left || value === undefined) return;
+      setKnown((now) => ({ ...now, deviceVolume: true }));
+      setLevels((now) => ({ ...now, volume: value }));
+    });
+    // The side buttons move the same volume. The slider follows them, and the
+    // controls come up to show where it went — the system's own banner stays
+    // away on an iPhone while the player is open.
+    const stop = volume.subscribe((value) => {
+      setLevels((now) => ({ ...now, volume: value }));
+      setVisible(true);
+      setTouchedAt(Date.now());
     });
     return () => {
       left = true;
+      stop();
       void brightness.restore();
+      void volume.release();
     };
-  }, [brightness]);
+  }, [brightness, volume]);
 
   /**
    * `by` is how far the whole drag has come, not the step since the last call:
@@ -240,11 +266,26 @@ function Controls({
    */
   const drag = (kind: PlayerSlider, by: number) => {
     if (kind === 'off') return;
-    const next = Math.min(1, Math.max(0, levels[kind] + by));
-    setAdjust({ kind, value: next });
+    const start = adjust?.kind === kind ? adjust.start : levels[kind];
+    const next = Math.min(1, Math.max(0, start + by));
+    setAdjust({ kind, start, value: next });
     if (kind === 'brightness') void brightness.set(next);
+    // The device's volume where it has one; a browser's is the engine's.
+    else if (known.deviceVolume) void volume.set(next);
     else controller?.setVolume?.(next);
   };
+
+  /** The level a drag left behind, which the next one starts from. */
+  const settle = () => {
+    if (adjust) {
+      const { kind, value } = adjust;
+      setLevels((now) => ({ ...now, [kind]: value }));
+    }
+  };
+
+  /** Whether a slider has anything behind it here. */
+  const offers = (kind: Exclude<PlayerSlider, 'off'>) =>
+    kind === 'brightness' ? known.brightness : known.deviceVolume || controller?.setVolume !== undefined;
 
   // Only a deliberate vertical drag down an edge takes over; a tap falls
   // through to the controls underneath, which is what makes both possible on
@@ -256,20 +297,42 @@ function Controls({
       const third = size.width / 3;
       return state.x0 < third || state.x0 > size.width - third;
     },
+    // The sliders show with the controls only, so a drag brings them up. It
+    // starts from where the last one left the level, however recently.
+    onPanResponderGrant: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
+      const kind = state.x0 < size.width / 2 ? app.leftSlider : app.rightSlider;
+      if (kind !== 'off') {
+        const from = adjust?.kind === kind ? adjust.value : levels[kind];
+        setAdjust({ kind, start: from, value: from });
+      }
+      touch();
+    },
     onPanResponderMove: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
       // Up is more, as every phone does it.
       drag(state.x0 < size.width / 2 ? app.leftSlider : app.rightSlider, -state.dy / (size.height || 1) / 2);
     },
     // Where it ended is where it starts from next time.
-    onPanResponderRelease: (_event: GestureResponderEvent, state: PanResponderGestureState) => {
-      const kind = state.x0 < size.width / 2 ? app.leftSlider : app.rightSlider;
-      if (kind !== 'off') {
-        const next = Math.min(1, Math.max(0, levels[kind] + -state.dy / (size.height || 1) / 2));
-        setLevels((now) => ({ ...now, [kind]: next }));
-      }
+    onPanResponderRelease: () => {
+      settle();
+      touch();
       setTimeout(() => setAdjust(undefined), 600);
     },
+    // Taken by something else mid-drag: where it got to still stands.
+    onPanResponderTerminate: () => {
+      settle();
+      setAdjust(undefined);
+    },
   });
+
+  // The side a double tap jumped from lights up, faintly, and fades: the
+  // picture answers the finger without covering the film.
+  const [flash] = useState(() => ({ left: new Animated.Value(0), right: new Animated.Value(0) }));
+  const flashSide = (side: 'left' | 'right') => {
+    const value = flash[side];
+    value.stopAnimation();
+    value.setValue(1);
+    Animated.timing(value, { toValue: 0, duration: 400, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  };
 
   /** A tap, unless another followed it quickly on the same side — then a jump. */
   const onTap = (x: number) => {
@@ -277,6 +340,7 @@ function Controls({
     const sameSide = x < size.width / 2 === lastTap.current.x < size.width / 2;
     if (app.doubleTap !== 'off' && !live && now - lastTap.current.at < 300 && sameSide) {
       lastTap.current = { at: 0, x };
+      flashSide(x < size.width / 2 ? 'left' : 'right');
       jump(app.doubleTap, x < size.width / 2 ? -1 : 1);
       return;
     }
@@ -517,7 +581,36 @@ function Controls({
         </YStack>
       ) : null}
       </Pressable>
-      {adjust && adjust.kind !== 'off' ? <EdgeReadout kind={adjust.kind} value={adjust.value} /> : null}
+      {(['left', 'right'] as const).map((side) => (
+        <Animated.View
+          key={`flash-${side}`}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            width: '50%',
+            ...(side === 'left' ? { left: 0 } : { right: 0 }),
+            backgroundColor: `rgba(255, 255, 255, ${FLASH_ALPHA})`,
+            opacity: flash[side],
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+      {shown && !isTV
+        ? (['left', 'right'] as const).map((side) => {
+            const kind = side === 'left' ? app.leftSlider : app.rightSlider;
+            if (kind === 'off' || !offers(kind)) return null;
+            return (
+              <EdgeSlider
+                key={side}
+                side={side}
+                kind={kind}
+                value={adjust?.kind === kind ? adjust.value : levels[kind]}
+                active={adjust?.kind === kind}
+              />
+            );
+          })
+        : null}
       {boosted ? (
         <YStack position="absolute" t="$8" l={0} r={0} items="center" pointerEvents="none">
           <SizableText size="$5" fontWeight="700" color="white" bg="rgba(0,0,0,0.6)" px="$3" py="$2" rounded="$10">
@@ -529,16 +622,32 @@ function Controls({
   );
 }
 
-/** What a drag down an edge is doing, while it is doing it. */
-function EdgeReadout({ kind, value }: { kind: Exclude<PlayerSlider, 'off'>; value: number }) {
+/**
+ * A level down one edge of the picture, shown with the controls: where it
+ * stands, and while a drag moves it, the number. It draws only — the drag is
+ * the whole picture's, so a finger anywhere along the edge moves it.
+ */
+function EdgeSlider({ side, kind, value, active }: { side: 'left' | 'right'; kind: Exclude<PlayerSlider, 'off'>; value: number; active: boolean }) {
+  const level = Math.round(value * 100);
+  const icon = kind === 'brightness' ? <Sun size={20} color="white" /> : level === 0 ? <VolumeX size={20} color="white" /> : <Volume2 size={20} color="white" />;
   return (
-    <YStack position="absolute" t={0} b={0} l={0} r={0} items="center" justify="center" pointerEvents="none">
-      <YStack items="center" gap="$2" bg="rgba(0,0,0,0.6)" px="$4" py="$3" rounded="$6">
-        {kind === 'brightness' ? <Sun size={24} color="white" /> : <Volume2 size={24} color="white" />}
-        <SizableText size="$4" fontWeight="600" color="white">
-          {Math.round(value * 100)}%
-        </SizableText>
+    <YStack
+      position="absolute"
+      t="28%"
+      b="28%"
+      {...(side === 'left' ? { l: '$5' } : { r: '$5' })}
+      items="center"
+      gap="$2"
+      pointerEvents="none"
+      accessibilityLabel={`${kind === 'brightness' ? 'Brightness' : 'Volume'}, ${level}%`}
+    >
+      {icon}
+      <YStack flex={1} width={px(6)} rounded="$10" bg="rgba(255, 255, 255, 0.3)" overflow="hidden" justify="flex-end">
+        <YStack height={`${level}%`} bg="white" />
       </YStack>
+      <SizableText size="$2" fontWeight="600" color="white" opacity={active ? 1 : 0}>
+        {level}%
+      </SizableText>
     </YStack>
   );
 }

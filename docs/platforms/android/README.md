@@ -7,9 +7,10 @@ expo-video on Media3 / ExoPlayer, and mpv (libmpv) is an Expo module in its own
 adapter, autolinked into the build. **Android 8 is the floor**
 (`minSdkVersion` 26, through `expo-build-properties`): libmpv's binaries ask
 for it.
-The app's own native module is `modules/loge-pip`, which asks Android for
+The app's own native modules are `modules/loge-pip`, which asks Android for
 picture in picture on behalf of whichever engine is playing — packaging and
-window management are the app's, not an adapter's. Phase 4's key derivation
+window management are the app's, not an adapter's — and `modules/loge-volume`,
+the music stream's volume that the player's edge moves. Phase 4's key derivation
 module went with its vault.
 
 `npm run android` builds the client and installs it; after that, Metro serves

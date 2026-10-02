@@ -262,7 +262,7 @@ function PlayerControlsSection() {
         />
       </SettingsSection>
 
-      <SettingsSection title="Edges" footer="Drag down an edge of the picture. Brightness is this app’s window only, and goes back to the system’s when the player closes.">
+      <SettingsSection title="Edges" footer="Drag up or down an edge of the picture; with the controls up, each edge shows where it stands. Volume is the device’s own, the one its buttons move. Brightness is this app’s window only, and goes back to the system’s when the player closes.">
         <ChoiceRow
           title="Left edge"
           options={PLAYER_SLIDERS}

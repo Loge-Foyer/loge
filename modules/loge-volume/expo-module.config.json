@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LogeVolumeModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.logevolume.LogeVolumeModule"]
+  }
+}

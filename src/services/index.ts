@@ -11,7 +11,7 @@ import type { PlaybackService } from './playback';
 import type { AccountSettingsService } from './account-settings';
 import type { AppSettingsService } from './app-settings';
 import type { PlayerService } from './players';
-import type { FileExchange, PictureInPicture, ScreenBrightness, ScreenOrientationControl } from './ports';
+import type { FileExchange, PictureInPicture, ScreenBrightness, ScreenOrientationControl, SystemVolume } from './ports';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
 import type { SessionService } from './session';
@@ -57,6 +57,8 @@ export interface Services {
   readonly accountSettings: AccountSettingsService;
   /** The screen's brightness, for the player's edge slider. */
   readonly brightness: ScreenBrightness;
+  /** The device's media volume, for the other edge slider: the one its buttons move. */
+  readonly volume: SystemVolume;
   /** Picture in picture where the platform gives it, rather than an engine. */
   readonly pictureInPicture: PictureInPicture;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */

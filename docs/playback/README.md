@@ -104,6 +104,25 @@ device's. A button with nothing behind it is not drawn: no second audio track,
 no subtitles, no chapters, or an engine with no rate to set. `setRate` is
 optional on `MediaPlayer` for exactly that reason.
 
+**The edges.** With the controls up, each edge of the picture shows its
+level: brightness on one, volume on the other, as Settings → Adapters →
+Players arranges them.
+- A drag along an edge moves the level, and brings the controls up with it.
+- **Volume is the device's own**, the one its buttons move: `modules/loge-volume`.
+  - On iPhone it goes through MPVolumeView, which also keeps the system's own
+    banner away while the player is open.
+  - On Android it is the music stream.
+  - A browser has no device volume, so there the edge moves the engine's.
+- A double tap on a side flashes that side, faintly, as it jumps.
+
+**Picture in picture is armed only while something plays.** The system
+starts it by itself as the app is left, so a film paused, finished or closed
+shrinks nothing.
+- The built-in player's view follows the flag as it changes
+  (`watchPictureInPicture`).
+- mpv lets go of its controller when it is released.
+- Android's auto-enter is set and cleared with it.
+
 **Chapters and segments ride on the descriptor.** `PlaybackDescriptor.chapters`
 marks the scrubber; `PlaybackDescriptor.segments` says which stretches are an
 intro, outro, recap, preview or advert. Inside one the player offers a single

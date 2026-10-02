@@ -783,6 +783,22 @@ export interface ScreenBrightness {
   restore(): Promise<void>;
 }
 
+/**
+ * The device's own media volume, 0 to 1, for the slider down an edge of the
+ * player: the one its side buttons move, not a second one inside an engine.
+ * `undefined` from `get` means there is none an app may set — a browser, a
+ * television — and the player keeps to its engine's own.
+ */
+export interface SystemVolume {
+  get(): Promise<number | undefined>;
+  set(value: number): Promise<void>;
+  /** Told whenever it changes, by any hand: the side buttons, a headset, the control centre. */
+  subscribe(listener: (volume: number) => void): () => void;
+  /** While the player is open. On iPhone the system's own volume banner stays away meanwhile. */
+  attach(): Promise<void>;
+  release(): Promise<void>;
+}
+
 /** Which ways the screen may turn: upright, as the app is laid out, or any way — a film fills a phone on its side. */
 export interface ScreenOrientationControl {
   upright(): Promise<void>;
