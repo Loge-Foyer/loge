@@ -28,7 +28,7 @@ export function MoreButton({ label, onPress }: { label: string; onPress: () => v
           rounded={999}
           items="center"
           justify="center"
-          bg={SYSTEM_GLASS ? 'transparent' : 'rgba(7, 9, 10, 0.55)'}
+          bg={SYSTEM_GLASS ? 'transparent' : 'rgba(15, 6, 6, 0.55)'}
           opacity={pressed ? 0.7 : 1}
           {...(focused ? FOCUSED : {})}
         >

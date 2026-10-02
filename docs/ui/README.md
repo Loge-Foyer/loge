@@ -17,8 +17,17 @@ tied to an Expo SDK, so nothing else keeps them in step.
 There is exactly **one theme entry point**: `src/tamagui.config.ts`. Colours,
 spacing and type all come from there; nothing sits beside it.
 
-- **Dark only.** A cool blue-grey "ink" for surfaces and a single teal accent
-  for primary actions and selection. No borrowed brand colours.
+- **Dark only, in the icon's colours.** Surfaces are a velvet-black, red-brown
+  in the dark steps and ivory at the light end. A single brass accent marks
+  primary actions and selection. No borrowed brand colours.
+  - Each surface step keeps the lightness of the cool blue-grey it replaced,
+    so no contrast moved.
+  - The theme fills with accent10 and writes accent3 on it, so the top of the
+    brass ramp is the icon's own (#d9a441, #f4cf6a, #fff1b8).
+  - Tamagui emits the steps as rounded `hsla()`. Check a contrast on what it
+    emits, not on the hex in the ramp, and write a colour that must match it
+    — the splash's, the native root view's in `app.json` — as the emitted
+    value (`#1b0e0e` for the background, not the ramp's `#1a0d0d`).
 - **Shorthands.** The v5 preset only accepts the short form of a style prop:
   `bg`, `p`, `px`, `rounded`, `items`, `justify`, `self`, `maxW`…
 - **Media queries are min-width**: `$sm` ≥ 640, `$md` ≥ 768, `$lg` ≥ 1024,

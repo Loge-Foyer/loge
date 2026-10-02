@@ -4,52 +4,57 @@ import { animations } from '@tamagui/config/v5-css';
 import { Platform } from 'react-native';
 import { createTamagui } from 'tamagui';
 
-// The app's own identity (spec §13 — no borrowed brand colours): a cool,
-// blue-grey ink for surfaces, darkest to lightest…
-const ink = [
-  '#07090a',
-  '#0e1214',
-  '#13181b',
-  '#1a2024',
-  '#232b30',
-  '#2e373d',
-  '#434e55',
-  '#5b676e',
-  '#76838a',
-  '#9aa6ac',
-  '#c4ccd0',
-  '#f4f7f8',
+// The app's own identity (spec §13 — no borrowed brand colours), drawn from
+// Loge's icon: a velvet-black for surfaces, red-brown in the dark steps and
+// ivory at the light end, darkest to lightest… Each step keeps the lightness
+// of the blue-grey it replaced, so every contrast the screens had, they keep.
+const velvet = [
+  '#0f0606',
+  '#1a0d0d',
+  '#221212',
+  '#2b1a18',
+  '#372422',
+  '#44302c',
+  '#5b4741',
+  '#736059',
+  '#8d7d75',
+  '#ada199',
+  '#d3c8bf',
+  '#fbf6ee',
 ];
 
-// …and one accent, a teal ramp, used for primary actions and selection.
-const tealLight = {
-  accent1: '#fafefd',
-  accent2: '#f3fbf9',
-  accent3: '#e0f8f3',
-  accent4: '#ccf3ea',
-  accent5: '#b8eae0',
-  accent6: '#a1ded2',
-  accent7: '#83cdc1',
-  accent8: '#53b9ab',
-  accent9: '#12a594',
-  accent10: '#0d9b8a',
-  accent11: '#008573',
-  accent12: '#0d3d38',
+// …and one accent, the icon's brass, used for primary actions and selection.
+// The theme fills with accent10 and writes accent3 on it, so the top three are
+// the icon's own brass, and accent8 — under a pressed button's label — is
+// lighter than the ramp would make it.
+const brassLight = {
+  accent1: '#fefdfa',
+  accent2: '#fbf9f2',
+  accent3: '#f9f2de',
+  accent4: '#f4e9c8',
+  accent5: '#ecddb4',
+  accent6: '#e2ce9d',
+  accent7: '#d2ba81',
+  accent8: '#c2a055',
+  accent9: '#b18828',
+  accent10: '#a77f23',
+  accent11: '#916b16',
+  accent12: '#443112',
 };
 
-const tealDark = {
-  accent1: '#0d1514',
-  accent2: '#111c1b',
-  accent3: '#0d2d2a',
-  accent4: '#023b37',
-  accent5: '#084843',
-  accent6: '#145750',
-  accent7: '#1c6961',
-  accent8: '#207e73',
-  accent9: '#12a594',
-  accent10: '#0eb39e',
-  accent11: '#0bd8b6',
-  accent12: '#adf0dd',
+const brassDark = {
+  accent1: '#17120d',
+  accent2: '#1e1911',
+  accent3: '#32240f',
+  accent4: '#422e0b',
+  accent5: '#503912',
+  accent6: '#60471b',
+  accent7: '#725723',
+  accent8: '#93712f',
+  accent9: '#c08f34',
+  accent10: '#d9a441',
+  accent11: '#f4cf6a',
+  accent12: '#fff1b8',
 };
 
 // A TV is read from across the room: its type is built about 1.6 times the
@@ -84,8 +89,8 @@ export const config = createTamagui({
   ...defaultConfig,
   ...(TV ? { tokens: tvTokens, fonts: tvFonts } : {}),
   themes: createV5Theme({
-    darkPalette: ink,
-    accent: { light: tealLight, dark: tealDark },
+    darkPalette: velvet,
+    accent: { light: brassLight, dark: brassDark },
     childrenThemes: defaultChildrenThemes,
   }),
   animations,

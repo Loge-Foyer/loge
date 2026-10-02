@@ -7,7 +7,7 @@ import { Circle, SizableText, XStack, YStack } from 'tamagui';
 import { formatCommunityRating } from '@/components/labels';
 
 // Over artwork of any colour, a dark translucent pill stays legible.
-const PILL = 'rgba(7, 9, 10, 0.72)';
+const PILL = 'rgba(15, 6, 6, 0.72)';
 
 /** The source's ratings, stacked top to bottom: the audience's, then the critics'. */
 export function RatingBadges({ ratings }: { ratings: MediaRatings }) {

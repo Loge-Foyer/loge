@@ -142,7 +142,7 @@ function Picture({
       ) : null}
       {item.type === 'playlist' && item.videoCount !== undefined ? (
         // A playlist says how much is in it, where a video would say how long it is.
-        <XStack position="absolute" r="$1.5" b="$1.5" gap="$1" items="center" px="$1.5" py="$0.5" rounded="$2" bg="rgba(7, 9, 10, 0.72)">
+        <XStack position="absolute" r="$1.5" b="$1.5" gap="$1" items="center" px="$1.5" py="$0.5" rounded="$2" bg="rgba(15, 6, 6, 0.72)">
           <ListVideo size={12} color="white" />
           <SizableText size="$1" fontWeight="700" color="white">
             {videoCountLabel(item.videoCount)}
