@@ -28,10 +28,25 @@ const engines = new WeakMap<MediaPlayer, VideoPlayer>();
  * handle while it is mounted, and takes it back when it goes.
  */
 const wanted = new WeakMap<MediaPlayer, boolean>();
+const watchers = new WeakMap<MediaPlayer, Set<() => void>>();
 
 /** Whether this controller's view should let the system take its picture. */
 export function pictureInPictureOf(player: MediaPlayer): boolean {
   return wanted.get(player) ?? false;
+}
+
+/**
+ * Told whenever the app arms or disarms it. The system reads the view's flag
+ * as the app is left, so the view has to follow every change — armed while a
+ * film plays, never while it is paused or over.
+ */
+export function watchPictureInPicture(player: MediaPlayer, listener: () => void): () => void {
+  const listeners = watchers.get(player) ?? new Set<() => void>();
+  watchers.set(player, listeners);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function engineOf(player: MediaPlayer): VideoPlayer | undefined {
@@ -218,7 +233,9 @@ export function createEngine(context: PlayerContext): MediaPlayer {
     },
     setPictureInPicture: (on) => {
       if (disposed) throw playerReleased();
+      if (pictureInPictureOf(player) === on) return;
       wanted.set(player, on);
+      for (const listener of [...(watchers.get(player) ?? [])]) listener();
     },
     setAudioTrack: (id) => {
       if (disposed) throw playerReleased();

@@ -9,7 +9,7 @@ import {
 } from '@loge/api';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createEngine as createNativeEngine, engineOf } from '../players/system/src/engine';
+import { createEngine as createNativeEngine, engineOf, pictureInPictureOf, watchPictureInPicture } from '../players/system/src/engine';
 import { createEngine as createWebEngine } from '../players/system/src/engine.web';
 import { PROFILES } from '../players/system/src/profiles';
 import { created, type FakeVideoPlayer } from './support/fake-expo-video';
@@ -52,6 +52,27 @@ describe('the built-in player on a phone (expo-video)', () => {
     ready(engine);
     expect(engine.currentTime).toBe(90);
     expect(log.states()).toEqual(['idle', 'loading', 'paused']);
+  });
+
+  it('tells its view each time picture in picture is armed or disarmed', () => {
+    const { player } = native();
+    const heard = vi.fn();
+    const stop = watchPictureInPicture(player, heard);
+    expect(pictureInPictureOf(player)).toBe(false);
+    // Armed while the film plays…
+    player.setPictureInPicture?.(true);
+    expect(pictureInPictureOf(player)).toBe(true);
+    expect(heard).toHaveBeenCalledTimes(1);
+    // …said again, nothing changed to tell…
+    player.setPictureInPicture?.(true);
+    expect(heard).toHaveBeenCalledTimes(1);
+    // …and disarmed the moment it pauses, so leaving the app shrinks nothing.
+    player.setPictureInPicture?.(false);
+    expect(pictureInPictureOf(player)).toBe(false);
+    expect(heard).toHaveBeenCalledTimes(2);
+    stop();
+    player.setPictureInPicture?.(true);
+    expect(heard).toHaveBeenCalledTimes(2);
   });
 
   it('hands raw MPEG-TS to Media3 as a progressive stream', async () => {

@@ -74,7 +74,7 @@ export function PlayerScreen({
   });
   const report = usePlaybackReports(item, live !== undefined, startMs);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
-  const shrunk = usePlayerLeaving(controller, live !== undefined);
+  const shrunk = usePlayerLeaving(controller, live !== undefined, snapshot.state === 'playing');
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;
   const next = useNextEpisode(item?.type === 'episode' ? item : undefined);
@@ -738,24 +738,39 @@ function chapterBeside(chapters: readonly Chapter[] | undefined, positionMs: num
  * one. Both are the device's settings, and an engine without either simply
  * carries on as before. A channel is neither: it is live, and shrinking it
  * into a corner to keep the sound is not what anyone means by it.
+ *
+ * Picture in picture is armed only while something plays. The system starts
+ * it by itself as the app is left, so a film paused, finished or closed must
+ * not be armed by then — or leaving shrinks a still or empty picture.
  */
-function usePlayerLeaving(controller: MediaPlayer | undefined, live: boolean) {
+function usePlayerLeaving(controller: MediaPlayer | undefined, live: boolean, playing: boolean) {
   const { data } = useAppSettings();
   const { pictureInPicture: platform } = useServices();
-  const wanted = (data ?? APP_DEFAULTS).pictureInPicture && !live;
+  const armed = (data ?? APP_DEFAULTS).pictureInPicture && !live && playing;
   const backgroundPlayback = (data ?? APP_DEFAULTS).backgroundPlayback;
   const [shrunk, setShrunk] = useState(false);
 
   useEffect(() => {
     if (!controller) return;
-    // Two ways in, and a platform may have both. On Android the activity
-    // shrinks, so it is asked once for whatever is playing; on iPhone only an
-    // engine that draws into a layer the system can take has anything to give.
-    controller.setPictureInPicture?.(wanted);
     controller.setBackgroundPlayback?.(backgroundPlayback);
-    platform.setAutoEnter(wanted);
-    return () => platform.setAutoEnter(false);
-  }, [controller, wanted, backgroundPlayback, platform]);
+  }, [controller, backgroundPlayback]);
+
+  useEffect(() => {
+    if (!controller) return;
+    // Two ways in, and a platform may have both. On Android the activity
+    // shrinks, so it is asked for whatever is playing; on iPhone only an
+    // engine that draws into a layer the system can take has anything to give.
+    controller.setPictureInPicture?.(armed);
+    platform.setAutoEnter(armed);
+    return () => {
+      platform.setAutoEnter(false);
+      try {
+        controller.setPictureInPicture?.(false);
+      } catch {
+        // Already released, with the screen: it shrinks nothing any more.
+      }
+    };
+  }, [controller, armed, platform]);
 
   // In that window there is room for the picture and nothing else.
   useEffect(() => platform.subscribe(setShrunk), [platform]);

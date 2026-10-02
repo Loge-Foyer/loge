@@ -491,6 +491,18 @@ public final class LogeMpvPlayer: SharedObject {
     if released { return }
     released = true
     cancelStall()
+    // A released player's picture is never the system's to take: armed and
+    // left in place, the controller shrank an empty layer the next time
+    // anyone left the app.
+    DispatchQueue.main.async { [weak self] in
+      guard let self, let pip = self.pip else { return }
+      #if os(iOS)
+      pip.canStartPictureInPictureAutomaticallyFromInline = false
+      #endif
+      if pip.isPictureInPictureActive { pip.stopPictureInPicture() }
+      self.pip = nil
+      self.pipDelegate = nil
+    }
     guard let handle = mpv else { return }
     mpv = nil
     leaving.lock()
