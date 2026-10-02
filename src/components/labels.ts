@@ -428,9 +428,10 @@ export function describeProofVerdict(verdict: OwnerVerdict): string | undefined 
   return verdict === 'refused' ? 'That password isn’t right.' : describeOwnerVerdict(verdict);
 }
 
-/** "Continue watching", "Movies", or "Movies · Date added" for a row a profile added. */
+/** "Continue watching", "Downloaded", "Movies", or "Movies · Date added" for a row a profile added. */
 export function rowTitle(row: HomeRow): string {
   if (row.type === 'continue') return 'Continue watching';
+  if (row.type === 'downloads') return 'Downloaded';
   const base = CONTENT_KIND_LABELS[row.kind];
   return row.extra ? `${base} · ${SORT_LABELS[row.sort.by]}` : base;
 }

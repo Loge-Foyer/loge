@@ -132,6 +132,7 @@ export function createServices(): AppServices {
     network,
     cache: db.mediaCache,
     watch,
+    kept: db.downloads,
     clock,
     log,
   });

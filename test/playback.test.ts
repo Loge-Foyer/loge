@@ -119,6 +119,18 @@ describe('pressing Play', () => {
     expect(t.source.stats.playbackRequests).toEqual([]);
   });
 
+  it('starts a kept copy where it is asked to, not where it stood when it was kept', async () => {
+    const t = await setUp();
+    const entry = await t.services.downloads.start(t.kids, t.item);
+    const stale = { ...t.item, watch: { played: false, progress: 0.1, positionMs: 600_000 } };
+    await t.db.downloads.put({ ...entry, item: stale, state: 'done', fileName: `${entry.id}.mkv`, container: 'mkv', bytesDone: 1_000 });
+
+    expect(await t.services.playback.plan(t.kids, t.item.key, { startMs: 1_200_000 })).toMatchObject({ kind: 'play', descriptor: { startMs: 1_200_000 } });
+    const fromTheStart = await t.services.playback.plan(t.kids, t.item.key);
+    expect(fromTheStart.kind === 'play' && fromTheStart.descriptor.startMs).toBe(undefined);
+    expect(t.source.stats.playbackRequests).toEqual([]);
+  });
+
   it('asks the source while a copy is still coming down', async () => {
     const t = await setUp();
     // Queued, not finished: a half-written file is not something to hand a player.

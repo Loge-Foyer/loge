@@ -29,7 +29,7 @@ import {
 } from '@sc/api';
 
 import type { ConnectionService, SecretScope, ValuesDraft } from '../connections';
-import type { Clock, Logger, MediaCacheRepository, NetworkMonitor, SavedList } from '../ports';
+import type { Clock, DownloadRepository, Logger, MediaCacheRepository, NetworkMonitor, SavedList } from '../ports';
 import type { Source, SourceService } from '../sources';
 import { showsOn } from '../tab-content';
 import { inProgress, type WatchService } from '../watch';
@@ -205,10 +205,12 @@ export function createMediaService(deps: {
   cache: MediaCacheRepository;
   /** This device's watch state, laid over what sources answer until they have heard it. */
   watch: Pick<WatchService, 'overlay' | 'waiting'>;
+  /** What this device keeps: a kept copy's page opens with no network at all. */
+  kept: Pick<DownloadRepository, 'forItem'>;
   clock: Clock;
   log: Logger;
 }): MediaService {
-  const { sources, pool, probeSecrets, network, cache, watch, clock, log } = deps;
+  const { sources, pool, probeSecrets, network, cache, watch, kept, clock, log } = deps;
   const listeners = new Set<() => void>();
   // The sources each profile last used, for work that cannot wait on a lookup.
   const live = new Map<UserId, ReadonlyMap<ConnectionId, Source>>();
@@ -557,15 +559,24 @@ export function createMediaService(deps: {
         if (keeps(source)) await quietly(cache.putDetail(userId, fingerprintOf(source), { detail, savedAt: clock.now() }));
         return { detail: await withWatch(userId, detail) };
       } catch (error) {
-        if (isAborted(error) || !keeps(source)) throw error;
+        if (isAborted(error)) throw error;
         const failure = toAppError(error, log);
-        if (invalidates(failure)) {
-          await quietly(cache.removeDetail(userId, key));
-          throw failure;
+        if (keeps(source)) {
+          if (invalidates(failure)) {
+            await quietly(cache.removeDetail(userId, key));
+          } else {
+            const stand = await quietly(cache.detail(userId, key, fingerprintOf(source)));
+            if (stand) return { detail: await withWatch(userId, stand.detail), sourceError: sourceError(source, failure, stand.savedAt) };
+          }
         }
-        const stand = await quietly(cache.detail(userId, key, fingerprintOf(source)));
-        if (!stand) throw failure;
-        return { detail: await withWatch(userId, stand.detail), sourceError: sourceError(source, failure, stand.savedAt) };
+        // A copy on this device plays with no network, and gone from the
+        // source or not, so its page opens from the item as it was kept.
+        const copy = await quietly(kept.forItem(userId, key));
+        if (copy?.state !== 'done') throw failure;
+        return {
+          detail: await withWatch(userId, { item: copy.item, people: [], studios: [], externalIds: {} }),
+          sourceError: sourceError(source, failure, copy.createdAt),
+        };
       }
     },
 

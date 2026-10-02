@@ -16,13 +16,14 @@ function films(connectionId: ConnectionId): MediaItem[] {
   return [2024, 2020, 2016].map((year) => movie(connectionId, `m${year}`, year, { images: { poster: imageRef(`poster-${year}`) } }));
 }
 
-async function setUp(options: { keeps?: boolean; engine?: Engine; where?: ReturnType<typeof reopenable> } = {}) {
+async function setUp(options: { keeps?: boolean; downloads?: boolean; engine?: Engine; where?: ReturnType<typeof reopenable> } = {}) {
   let failing: AppErrorCode | undefined;
   const source = fakeMediaPlugin('home', {
     movies: films,
     resume: (id) => [movie(id, 'r1', 2020, { watch: { played: false, progress: 0.5, lastPlayedAt: '2026-09-01T00:00:00Z' } })],
     children: (parent) => [movie(parent.key.connectionId, `${parent.key.externalId}-child`, 2021)],
     withImages: options.keeps ?? true,
+    ...(options.downloads ? { downloads: true } : {}),
     failWith: () => (failing ? new AppError(failing, 'The source failed.', { retry: failing === 'OFFLINE' ? 'network-change' : 'backoff' }) : undefined),
   });
   const credentials = memoryCredentialStore();
@@ -52,6 +53,21 @@ async function setUp(options: { keeps?: boolean; engine?: Engine; where?: Return
 const titles = (items: readonly MediaItem[]) => items.map((item) => item.title);
 
 describe('what sources answered, kept on the device', () => {
+  it('opens the page of a copy this device keeps, with no network and nothing saved', async () => {
+    const t = await setUp({ keeps: false, downloads: true });
+    const [film, other] = films(t.connection.id);
+    if (!film || !other) throw new Error('setup');
+    const entry = await t.services.downloads.start(t.kids, film);
+    await t.db.downloads.put({ ...entry, state: 'done', fileName: `${entry.id}.mkv`, container: 'mkv', bytesDone: 1_000 });
+    await t.services.downloads.start(t.kids, other);
+    t.fail('OFFLINE');
+    const page = await t.services.media.item(t.kids, film.key);
+    expect(page.detail.item.title).toBe('m2024');
+    expect(page.sourceError).toMatchObject({ code: 'OFFLINE', savedAt: entry.createdAt });
+    // Still coming down is not kept: there is nothing to play yet.
+    await expect(t.services.media.item(t.kids, other.key)).rejects.toMatchObject({ code: 'OFFLINE' });
+  });
+
   it('is saved only where the source allows it', async () => {
     const kept = await setUp();
     await kept.services.media.row(kept.kids, MOVIES, 10);

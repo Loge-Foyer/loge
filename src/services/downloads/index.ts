@@ -147,9 +147,6 @@ export function createDownloadService(deps: {
         audioTracks: [],
         subtitleTracks: [],
         ...(entry.item.runtimeMs === undefined ? {} : { durationMs: entry.item.runtimeMs }),
-        ...(entry.item.watch?.played === false && entry.item.watch.positionMs !== undefined
-          ? { startMs: entry.item.watch.positionMs }
-          : {}),
       };
     },
 

@@ -64,8 +64,11 @@ bar compact on narrow screens; today it wraps below about 400 px wide.
 
 ## Media
 
-**Home** (`screens/media/home.tsx`) is Continue Watching, then one row per kind
-in the profile's own order and sort. A row a source cannot fill is hidden; a
+**Home** (`screens/media/home.tsx`) is Continue Watching, then Downloaded, then
+one row per kind in the profile's own order and sort. Downloaded is this
+device's finished copies of the library — a web video kept from Videos stays
+Videos' — newest first, as scenes; a card opens the item's page, which opens
+with no network at all, and it is hidden where nothing can be kept. A row a source cannot fill is hidden; a
 source that could not answer gets one line at the top, however many rows it
 would have filled; a profile that has not set up a connection sees "Finish
 setting up" for it. Pull to refresh on a phone; a Refresh button beside
@@ -108,6 +111,11 @@ simply not there.
 render behind a native sheet: per row, up and down, shown or hidden, sort and
 direction, poster or scene cards. Rows a profile adds can be removed; the
 default ones can only be hidden. Reset puts the default back.
+
+The layout is a preference, so it travels with the profile to every device.
+Version 2 brought the Downloaded row: this app adds it to a version 1 layout,
+right after Continue Watching, and an app that knows only 1 reads a 2 as no
+layout and shows its defaults, rather than drawing a row it does not know.
 
 ## TV
 

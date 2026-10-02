@@ -339,6 +339,7 @@ export function buildServices(options: {
     network,
     cache: db.mediaCache,
     watch,
+    kept: db.downloads,
     clock,
     log: silentLog,
   });

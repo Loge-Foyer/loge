@@ -52,7 +52,12 @@ space, will any engine on this device still open in a month".
 - **A copy plays before the source is asked.** `PlaybackService.plan` looks in
   the downloads first and synthesises a `file://` progressive source — which
   every engine opens, and which needs no network at all. Only a finished one:
-  a half-written file is not something to hand a player.
+  a half-written file is not something to hand a player. It starts where it
+  was asked to — Resume's position, or the beginning — as a stream would,
+  never where it stood when it was kept.
+- **Its page opens offline too.** When neither the source nor a saved page
+  answers, the detail page is drawn from the item as it was kept — gone from
+  the source or not, the file is still on this device.
 - **On-device conversion is not built**, and the switch says why: a phone
   would still pull the whole film down to shrink it, so only disk is saved and
   not bandwidth, and on iPhone AVFoundation cannot read Matroska — which is

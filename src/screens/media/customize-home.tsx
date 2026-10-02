@@ -77,7 +77,7 @@ export function CustomizeHomeScreen({ rowId }: { rowId?: string }) {
             label="Reset to default"
             icon={<RotateCcw size={16} />}
             title="Reset the home screen?"
-            description="Continue watching, then films and series by release date, newest first. Rows you added are removed."
+            description="Continue watching and what is downloaded, then films and series by release date, newest first. Rows you added are removed."
             confirmLabel="Reset"
             onConfirm={() => reset.mutate()}
           />
@@ -113,7 +113,7 @@ function RowEditor({
           </SizableText>
           {!row.available ? (
             <SizableText size="$2" color="$color10">
-              No source brings this right now
+              {row.type === 'downloads' ? 'This device keeps no downloads' : 'No source brings this right now'}
             </SizableText>
           ) : null}
         </YStack>

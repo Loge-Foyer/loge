@@ -19,6 +19,7 @@ import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useServices } from '@/hooks/services-context';
+import { useDownloads } from '@/hooks/use-downloads';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useContinueWatching, useHomeRowQueries, useRefreshMedia } from '@/hooks/use-media';
 import { useActiveUserId } from '@/hooks/use-session';
@@ -52,6 +53,7 @@ export function MediaHomeScreen() {
   const showContinue = visible.some((row) => row.type === 'continue');
   const results = useHomeRowQueries(kindRows.map((row) => ({ kind: row.kind, sort: row.sort })));
   const continuing = useContinueWatching(showContinue);
+  const { data: kept = [] } = useDownloads();
   // On a TV: the card the remote is on, shown large above the rows.
   const [spotlit, setSpotlit] = useState<MediaItem>();
 
@@ -75,14 +77,19 @@ export function MediaHomeScreen() {
   // Continuing is the one row whose picture plays: a film or an episode, from a source that can play it.
   const resumesFrom = (item: MediaItem) => playing.has(item.key.connectionId) && (item.type === 'movie' || item.type === 'episode');
   const cannotList = sources.filter((source) => !source.effective.media?.capabilities.has('browse'));
+  // The library's own kept copies — a web video kept from Videos is Videos' — finished, newest first.
+  const onMedia = new Set(sources.map((source) => source.connection.id));
+  const downloaded = kept.filter((entry) => entry.state === 'done' && onMedia.has(entry.key.connectionId)).map((entry) => entry.item);
   const errors: SourceError[] = [
     ...(showContinue ? (continuing.data?.sourceErrors ?? []) : []),
     ...results.flatMap((result) => result.data?.sourceErrors ?? []),
   ];
 
+  const itemsOf = (row: HomeRowView): readonly MediaItem[] | undefined =>
+    row.type === 'continue' ? continuing.data?.items : row.type === 'downloads' ? downloaded : results[kindRows.indexOf(row)]?.data?.items;
   // The first row with something in it takes the focus first on a TV, and fills the spotlight until the remote moves.
-  const firstRow = visible.find((row) => (row.type === 'continue' ? (continuing.data?.items.length ?? 0) > 0 : (results[kindRows.indexOf(row)]?.data?.items.length ?? 0) > 0));
-  const firstItems = firstRow?.type === 'continue' ? continuing.data?.items : firstRow ? results[kindRows.indexOf(firstRow)]?.data?.items : undefined;
+  const firstRow = visible.find((row) => (itemsOf(row)?.length ?? 0) > 0);
+  const firstItems = firstRow ? itemsOf(firstRow) : undefined;
   const tv = (row: HomeRowView) => (isTV ? { onFocusItem: setSpotlit, preferFirst: row.id === firstRow?.id } : {});
 
   return (
@@ -128,6 +135,23 @@ export function MediaHomeScreen() {
               width={landscapeWidth}
               watchFrom={watchFrom}
               resumesFrom={resumesFrom}
+              {...tv(row)}
+            />
+          );
+        }
+        if (row.type === 'downloads') {
+          if (downloaded.length === 0) return null;
+          return (
+            <MediaRow
+              key={row.id}
+              title={rowTitle(row)}
+              items={downloaded}
+              loading={false}
+              sourceErrors={[]}
+              card="landscape"
+              width={landscapeWidth}
+              // As it was when it was kept: its watch state is no longer news.
+              watchFrom={() => false}
               {...tv(row)}
             />
           );

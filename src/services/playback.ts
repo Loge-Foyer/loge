@@ -99,7 +99,11 @@ export function createPlaybackService(deps: {
       // server nothing, and is what the user asked for by keeping it. Only when
       // one is finished — a half-written file is not something to open.
       const kept = await deps.downloads.ready(userId, key);
-      const descriptor = kept ?? (await media.playbackDescriptor(userId, { key, profile: first.profile, ...wanted }, signal));
+      // From where it was asked to start — Resume's position, or the beginning
+      // — as a stream would, not from where it stood when it was kept.
+      const descriptor = kept
+        ? { ...kept, ...(wanted.startMs === undefined ? {} : { startMs: wanted.startMs }) }
+        : await media.playbackDescriptor(userId, { key, profile: first.profile, ...wanted }, signal);
       const choice = choosePlayer(descriptor.sources, candidates, preferred);
       if (choice.kind === 'play') return { kind: 'play', player: choice.player, source: choice.source, descriptor };
       const best = descriptor.sources[0];

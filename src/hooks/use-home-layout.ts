@@ -5,6 +5,7 @@ import { normalizeLayout, type HomeRow } from '@/services/home-layout';
 import { userKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
+import { useDownloadBudget } from './use-downloads';
 import { useActiveUserId } from './use-session';
 import { useTabSources } from './use-sources';
 
@@ -14,14 +15,17 @@ export function useHomeRows() {
   const { homeLayout } = useServices();
   const layout = useQuery({ queryKey: userKey(userId, 'home-layout'), queryFn: () => homeLayout.rows(userId) });
   const { data: sources } = useTabSources('media');
+  // A TV and a browser have nowhere to keep a film.
+  const { data: budget } = useDownloadBudget();
+  const canKeep = (budget?.limitBytes ?? 0) > 0;
   const rows = useMemo(() => {
     if (!layout.data || !sources) return undefined;
     const kinds = new Set(
       sources.filter((source) => source.effective.media?.capabilities.has('browse')).flatMap((source) => source.kinds),
     );
     const canContinue = sources.some((source) => source.effective.media?.capabilities.has('watchStateRead'));
-    return normalizeLayout({ version: 1, rows: layout.data }, kinds, canContinue);
-  }, [layout.data, sources]);
+    return normalizeLayout({ version: 2, rows: layout.data }, kinds, canContinue, canKeep);
+  }, [layout.data, sources, canKeep]);
   return { rows, sources };
 }
 
