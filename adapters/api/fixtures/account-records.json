@@ -101,6 +101,26 @@
       }
     },
     {
+      "kind": "connection",
+      "key": "c3",
+      "deleted": false,
+      "data": {
+        "connectionId": "c3",
+        "pluginId": "metadata/tmdb",
+        "label": "TMDB",
+        "enabled": true,
+        "perProfile": "none",
+        "fields": {},
+        "settings": {},
+        "secretKeys": [
+          "apiKey"
+        ],
+        "secrets": {
+          "apiKey": "0123456789abcdef0123456789abcdef"
+        }
+      }
+    },
+    {
       "kind": "profileValues",
       "key": "c1/u1",
       "deleted": false,

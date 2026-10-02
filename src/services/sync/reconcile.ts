@@ -188,8 +188,9 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
     if (!local) await tx.connections.insert(row);
     else if (stableJson(local) !== stableJson(row)) await tx.connections.update(row);
     else continue;
-    // What the source answered under other values may not hold now.
+    // What the source answered under other values may not hold now, nor what its items were found to be.
     await tx.mediaCache.purge(id);
+    await tx.identities.purge(id);
     effects.connections.add(id);
     effects.changed = true;
   }
@@ -247,6 +248,7 @@ export async function applyRecords(tx: Repositories, parts: SyncParts, plan: Pla
       await tx.connections.putProfileValues(connection.id, userId, row);
     }
     await tx.mediaCache.purge(connection.id, userId);
+    await tx.identities.purge(connection.id, userId);
     effects.connections.add(connection.id);
     effects.changed = true;
   }

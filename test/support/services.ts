@@ -59,6 +59,7 @@ import { createListsService } from '@/services/lists';
 import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createPlaybackService } from '@/services/playback';
 import { createWatchService } from '@/services/watch';
+import { createIdentityService } from '@/services/identity';
 import { createOutboxDrainer } from '@/services/watch/drainer';
 
 import { testCrypto } from './crypto';
@@ -347,7 +348,22 @@ export function buildServices(options: {
   });
   const activity = fakeActivity();
   const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log: silentLog, afterQueueMs: 0 });
-  const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
+  const identities = createIdentityService({
+    db,
+    connections: db.connections,
+    catalog,
+    sources,
+    credentials,
+    sessions,
+    probeSecrets: connections.probeSecrets,
+    http: unusedHttp,
+    network,
+    identity,
+    clock,
+    crypto,
+    log: silentLog,
+  });
+  const watch = createWatchService({ db, sources, clock, identities, onQueued: () => drainer.kick() });
   const media = createMediaService({
     sources,
     pool,
@@ -484,6 +500,7 @@ export function buildServices(options: {
       appSettings,
       accountSettings,
       watch,
+      identity: identities,
       downloads,
       downloadSettings,
       lists,

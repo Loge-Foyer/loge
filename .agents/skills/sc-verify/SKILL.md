@@ -96,7 +96,7 @@ log either.
 
 | Import | Allowed only in |
 | --- | --- |
-| `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*` and `@sc/sync-*` | `src/composition/**` |
+| `@sc/source-*`, `@sc/iptv-*`, `@sc/player-*`, `@sc/sync-*` and `@sc/metadata-*` | `src/composition/**` |
 | `@sc/player-kit` — covered by `@sc/player-*` (Phase 7) | `src/composition/**` — screens get a player's view from the service graph |
 | `@/persistence/*` (and relative `…/persistence/…`) | `src/composition/**` |
 | `@/platform/*` (and relative `…/platform/…`) | `src/composition/**` |

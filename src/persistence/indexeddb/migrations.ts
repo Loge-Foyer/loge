@@ -25,6 +25,7 @@ export const STORES = [
   'favoriteChannels',
   'watchProgress',
   'accountSettings',
+  'identities',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -159,6 +160,13 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
   (db) => {
     db.createObjectStore('watchProgress', { keyPath: 'id' }).createIndex('byUser', 'userId');
     db.createObjectStore('accountSettings', { keyPath: 'name' });
+  },
+
+  // What a metadata adapter said an item is: as SQLite's v10.
+  (db) => {
+    const identities = db.createObjectStore('identities', { keyPath: ['userId', 'connectionId', 'externalId'] });
+    identities.createIndex('byUser', 'userId');
+    identities.createIndex('byConnection', 'connectionId');
   },
 ];
 

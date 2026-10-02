@@ -163,11 +163,12 @@ is left out of a production one.
   inert, labelled "not available on this device", and is kept for the devices
   that can. A stored plugin id names its category even in a build without the
   plugin.
-- **One list per category** — sources, IPTV, players, sync — for the four rows
-  of Settings → Adapters. There is no global list.
+- **One list per category** — sources, IPTV, players, sync, metadata — for
+  the five rows of Settings → Adapters. There is no global list.
 - **Each role goes to one service:** `media` to the media service, `player` to
   playback (Phase 7), `account` to the account service and its sync engine,
-  `backup` to the backup service. Nothing else ever holds one.
+  `backup` to the backup service, `metadata` to the identity service. Nothing
+  else ever holds one.
 
 ## Where a source comes from
 

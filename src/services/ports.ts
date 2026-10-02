@@ -489,6 +489,27 @@ export interface AccountSettingsRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * What a metadata adapter said one item is (v10): its catalogue ids, or that
+ * nothing matched closely enough. For a series' seasons and episodes, the
+ * series is asked, under its own key. Device state, like the media cache:
+ * never journaled, never synced, never in a backup.
+ */
+export interface KnownIdentity {
+  readonly key: GlobalMediaKey;
+  /** Absent: asked, and nothing close enough was found — asked again after a while. */
+  readonly externalIds?: ExternalIds;
+  readonly resolvedAt: number;
+}
+
+export interface IdentityRepository {
+  getMany(userId: UserId, keys: readonly GlobalMediaKey[]): Promise<readonly KnownIdentity[]>;
+  /** Skipped when the profile or the connection is gone. */
+  put(userId: UserId, known: KnownIdentity): Promise<void>;
+  /** Everything known of a connection's items — or of one profile's use of it: its values changed, and its ids may now mean others. */
+  purge(connectionId: ConnectionId, userId?: UserId): Promise<void>;
+}
+
 export interface PlaylistRepository {
   list(userId: UserId): Promise<readonly Playlist[]>;
   listAll(): Promise<readonly Playlist[]>;
@@ -665,6 +686,7 @@ export interface Repositories {
   readonly playlists: PlaylistRepository;
   readonly watchProgress: WatchProgressRepository;
   readonly accountSettings: AccountSettingsRepository;
+  readonly identities: IdentityRepository;
   readonly journal: JournalRepository;
 }
 

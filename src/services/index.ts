@@ -3,6 +3,7 @@ import type { BackupService } from './backup';
 import type { BackupTargets } from './backup/targets';
 import type { ConnectionService } from './connections';
 import type { HomeLayoutService } from './home-layout';
+import type { IdentityService } from './identity';
 import type { MediaService } from './media';
 import type { OwnerCheck } from './owner-check';
 import type { PinService } from './pins';
@@ -60,6 +61,8 @@ export interface Services {
   readonly pictureInPicture: PictureInPicture;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */
   readonly watch: WatchService;
+  /** What a title is, from a metadata connection — so watch status the app keeps covers every copy of a film. */
+  readonly identity: IdentityService;
   /** Copies kept on this device, and the budget they live within. */
   readonly downloads: DownloadService;
   readonly downloadSettings: DownloadSettingsService;

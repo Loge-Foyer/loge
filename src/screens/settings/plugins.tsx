@@ -28,6 +28,8 @@ const FOOTERS: Readonly<Record<PluginCategory, string>> = {
   iptv: 'Live TV, and a provider’s films and series, appear on TV — never in your library.',
   players: 'Players are set up on each device: which are on, and which plays first. Move one up to try it before the others.',
   sync: 'Where your account lives — on this device, or on your own server — and where its backups go. Each device chooses its own.',
+  metadata:
+    'Finds which film or series an IPTV provider’s title is, so watch status the app keeps covers every copy — the German and the English one alike. Set up once, with your account.',
 };
 
 /** Why a list is empty: its plugins do not run here. */
@@ -36,6 +38,7 @@ const NONE_HERE: Readonly<Record<PluginCategory, string>> = {
   iptv: 'IPTV providers can’t be reached from a browser. Add one in the app on your phone or tablet.',
   players: 'No player runs on this device.',
   sync: 'Nothing can keep your account on this device yet.',
+  metadata: 'No metadata adapter runs on this device.',
 };
 
 /** One category's plugins, as they run on this platform. */
@@ -103,9 +106,9 @@ function PlayerChip({ state }: { state: PlayerSummary | undefined }) {
   return state.firstOn.length > 0 ? <Chip label={`First on ${state.firstOn.map((tab) => TAB_LABELS[tab]).join(', ')}`} tone="accent" /> : null;
 }
 
-/** What a plugin brings, from its manifest. */
+/** What a plugin brings — or, for a metadata adapter, what it names — from its manifest. */
 export function PluginChips({ manifest }: { manifest: PluginManifest }) {
-  const kinds = manifest.media?.contentKinds ?? [];
+  const kinds = manifest.media?.contentKinds ?? manifest.metadata?.identifies ?? [];
   if (kinds.length === 0) return null;
   return (
     <ChipRow>

@@ -74,16 +74,16 @@ Adapters sit at `<category>/<name>/src`, relative to `adapters/`.
 grep -rn "from '" api/src/ | grep -v "from '\./" | grep -v "from '\.\./"
 
 # no adapter may import another adapter — player-kit is a contract, not an adapter
-grep -rnE "(from|import\(|require\()\s*['\"]@sc/(source|iptv|player|sync)-" sources/ iptv/ players/ sync/ \
+grep -rnE "(from|import\(|require\()\s*['\"]@sc/(source|iptv|player|sync|metadata)-" sources/ iptv/ players/ sync/ metadata/ \
   | grep -v "@sc/player-kit'"
 
 
 # no framework in api or any non-player plugin
-find api/src sources iptv sync -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
+find api/src sources iptv sync metadata -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
   -exec grep -HnE "from 'react|from 'expo|react-native" {} +
 
 # no host globals outside players: everything goes through the injected context
-find api/src sources iptv sync -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
+find api/src sources iptv sync metadata -type f -name '*.ts' -path '*/src/*' -not -path '*/node_modules/*' \
   -exec grep -HnE "\bfetch\(|new URL\(|\bconsole\.|\bsetTimeout\(|\bbtoa\(|\batob\(" {} +
 ```
 

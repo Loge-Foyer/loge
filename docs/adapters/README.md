@@ -6,11 +6,11 @@ them. They live in `adapters/`, beside `src/`, as workspaces of this package.
 This page describes the target. Several adapters are manifests with no role
 behind them yet.
 
-## Four categories
+## Five categories
 
 Every adapter has exactly one category, which is also its folder under
 `adapters/` and the first half of its id: `sources/jellyfin`, `iptv/stalker`,
-`players/system`, `sync/custom-server`.
+`players/system`, `sync/custom-server`, `metadata/tmdb`.
 
 | Category | Its contract | Scope | Where it shows |
 | --- | --- | --- | --- |
@@ -18,14 +18,15 @@ Every adapter has exactly one category, which is also its folder under
 | `iptv` | the media role, with live members | account | TV: Live, Movies, Series |
 | `players` | the player role, with `@sc/player-kit`'s view | device | the player |
 | `sync` | the account role (your own server) or the backup role (a file) | device | Settings → Account, and Sync |
+| `metadata` | the metadata role: what a title is | account | nowhere: watch status the app keeps is keyed by what it answers |
 
 A service with two jobs is two plugins in two folders: Google Drive's files
 are `sources/google-drive`, and Google Drive as a place for backups is
 `sync/google-drive`. They share no code, and the app treats them as strangers.
 
-## Four lists
+## Five lists
 
-Settings → Adapters is four rows — Sources, IPTV, Players, Sync — and each opens
+Settings → Adapters is five rows — Sources, IPTV, Players, Sync, Metadata — and each opens
 that category's list for this platform (`settings/adapters/[category]`). A
 plugin's page is `settings/adapters/[category]/[name]`: the id's two parts are
 the two route segments, so no id is ever URL-encoded. There is no global list.
@@ -35,12 +36,15 @@ the two route segments, so no id is ever URL-encoded. There is no global list.
 - **Players** list this device's engines: each one's switch and settings, and
   the default.
 - **Sync** has your own server, the backup targets, and the backup file.
+- **Metadata** lists its connections like a source's: the key, an `enabled`
+  switch, and Test connection. A manifest's `attribution` — what TMDB's terms
+  ask an app to say — is shown in Settings → About, so no screen names it.
 
 ## Account-wide or device-wide
 
 | Category | Scope | What that means |
 | --- | --- | --- |
-| sources, IPTV | account | Connections belong to the account: journaled, carried to your server, written into backups. Every device on the account has them. |
+| sources, IPTV, metadata | account | Connections belong to the account: journaled, carried to your server, written into backups. Every device on the account has them. |
 | players | device | Which are on, the default and their settings are device settings. |
 | sync | device | Your server's sign-in, a backup target and its key are this device's alone: never journaled, never pushed, never in a backup. |
 

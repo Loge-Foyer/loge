@@ -1,6 +1,6 @@
 ---
 name: sc-add-plugin
-description: Create a new Streaming Center plugin in its category folder — a source, an IPTV provider, a player, or a sync plugin (your own server, or a backup target) — with a manifest, its one block, capabilities and settings. Use when adding support for a new service or engine like Plex, a Stalker portal, mpv or OneDrive.
+description: Create a new Streaming Center plugin in its category folder — a source, an IPTV provider, a player, a sync plugin (your own server, or a backup target) or a metadata catalogue — with a manifest, its one block, capabilities and settings. Use when adding support for a new service or engine like Plex, a Stalker portal, mpv, OneDrive or TMDB.
 ---
 
 # Adding a plugin
@@ -26,6 +26,7 @@ First decide the category (`sc-plugin-categories` if in doubt):
 | brings live TV, and maybe a provider's films and series | `iptv` | `media`, with `live` |
 | plays | `players` | `player` |
 | keeps the account, or its backup | `sync` | `account` or `backup` |
+| says what a film or series is, by its name | `metadata` | `metadata` |
 
 A service with two jobs is **two plugins**: `sources/google-drive` and
 `sync/google-drive`, each with its own sign-in. A **media server** (Jellyfin,
@@ -35,7 +36,7 @@ through the media role.
 ## Checklist
 
 1. **Create `adapters/<category>/<name>/`** with:
-   - a `package.json`: `@sc/<source|iptv|player|sync>-<name>`,
+   - a `package.json`: `@sc/<source|iptv|player|sync|metadata>-<name>`,
      `"exports": "./src/index.ts"`, and `@sc/api` as a **peer** dependency, so
      the host supplies the one instance and branded IDs match. A player adds
      `@sc/player-kit`, `react`, `react-native` and its engine as peers.
@@ -77,6 +78,9 @@ through the media role.
      `account: { connect }`.
    - **A backup target** declares `backup: { location }` and exports
      `backup: { connect }`.
+   - **A metadata catalogue** declares `metadata: { identifies }` and exports
+     `metadata: { connect }`; where its terms ask the app to credit it, the
+     manifest's `attribution` says how, and Settings → About shows it.
 
    The provider reaches the host only through `context`: `http` for requests,
    `session` for a token, `credentials` for passwords, and `network`,
@@ -166,6 +170,22 @@ export const account: AccountRole = {
 `stat`, `read`, `list`, and `write(name, bytes, ifMatch)`, which refuses with
 `SYNC_CONFLICT` when the file changed since that etag. Bytes only: the file's
 format and encryption are the app's.
+
+## If it is a metadata catalogue
+
+`check`, and `identify({ type, title, originalTitle?, year? })`, answering
+with the catalogue's ids or nothing.
+
+- **Nothing rather than a guess.** The app keys watch status by what you
+  answer, so a wrong id merges two films' history. Take a name in another
+  language only once the film's own translations or alternative titles hold
+  it, and refuse a name several films share when no year tells them apart.
+- **A year either side.** A portal writes the year it saw, and a film comes
+  out a year apart in two countries.
+- **The key is a password field**, read once, and latched when refused. A
+  catalogue that counts requests gets `backoff`; the app pauses.
+- **The workspace:** `adapters/metadata/*` in the app's `workspaces`, and
+  `metadata/*/src/**/*.ts` in `adapters/tsconfig.json`.
 
 ## If it is a player
 

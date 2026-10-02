@@ -64,6 +64,7 @@ import {
 } from '@/services/connections';
 import { hasErrors, hasFieldErrors, validateDraft, type DraftErrors } from '@/services/field-values';
 import type { ProbeTarget } from '@/services/media';
+import { accountWide } from '@/services/scope';
 import { showsOn } from '@/services/tab-content';
 
 const NO_ERRORS: DraftErrors = { shared: {}, profiles: {} };
@@ -102,9 +103,8 @@ export function NewConnectionScreen({ pluginId }: { pluginId: PluginId }) {
   const { data: existing } = usePluginConnections(pluginId);
   const { create } = useConnectionActions();
   if (!manifest || !existing) return <Missing loading={!!manifest} />;
-  // Only sources and IPTV are connected here: an account is chosen in Settings → Account.
-  // Sources and IPTV, and the places backups go; an account is chosen in Settings → Account.
-  if (!manifest.media && !manifest.backup) return <NotHere manifest={manifest} />;
+  // Sources, IPTV and metadata, and the places backups go; an account is chosen in Settings → Account.
+  if (!manifest.media && !manifest.backup && !manifest.metadata) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={`New ${manifest.displayName} connection`}
@@ -125,8 +125,8 @@ export function EditConnectionScreen({ connectionId }: { connectionId: Connectio
   if (data === null) return <Missing loading={false} />;
   // Kept for the devices that can run it — IPTV on the web.
   if (!manifest) return <Unavailable label={data.connection.label} />;
-  // Sources and IPTV, and the places backups go; an account is chosen in Settings → Account.
-  if (!manifest.media && !manifest.backup) return <NotHere manifest={manifest} />;
+  // Sources, IPTV and metadata, and the places backups go; an account is chosen in Settings → Account.
+  if (!manifest.media && !manifest.backup && !manifest.metadata) return <NotHere manifest={manifest} />;
   return (
     <ConnectionForm
       title={data.connection.label}
@@ -181,6 +181,15 @@ function NotHere({ manifest }: { manifest: PluginManifest }) {
 }
 
 function enabledField(manifest: PluginManifest): BooleanField {
+  if (manifest.metadata) {
+    return {
+      key: 'enabled',
+      label: 'Switched on',
+      type: 'boolean',
+      default: true,
+      description: 'Looks up what an IPTV provider’s films and series are, for watch status the app keeps. Switched off, nothing is asked of it.',
+    };
+  }
   const kinds = manifest.media?.contentKinds ?? [];
   const tabs = [
     ...(showsOn('media', manifest.category, kinds) ? ['Media'] : []),
@@ -228,7 +237,7 @@ interface FormProps {
 function ConnectionForm({ title, manifest, connectionId, stored, initial, saved, submitLabel, onSubmit, onRemove }: FormProps) {
   const userId = useActiveUserId();
   const params = useLocalSearchParams<{ profile?: string }>();
-  const { catalog, media, pins } = useServices();
+  const { catalog, media, identity, pins } = useServices();
   const { data: profiles = [] } = useProfiles();
   const [draft, setDraft] = useState(initial);
   const [tab, setTab] = useState<UserId>(
@@ -245,7 +254,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const tabProfile = profiles.find((profile) => profile.id === tab);
   const locked = separate && tab !== userId && tabProfile?.pinProtected === true && !unlocked.has(tab);
   const tabOff = isOffInDraft(draft, tab);
-  const canProbe = catalog.mediaRole(manifest.id) !== undefined && draft.enabled;
+  const canProbe = (catalog.mediaRole(manifest.id) !== undefined || catalog.metadataRole(manifest.id) !== undefined) && draft.enabled;
   const shown = useShownSecrets(manifest, connectionId, secretScope(draft, tab));
 
   const target = (): ProbeTarget => {
@@ -260,7 +269,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
     };
   };
   // Mutations, not queries: a secret being typed must never become a cache key.
-  const test = useMutation({ mutationFn: () => media.test(target()) });
+  const test = useMutation({ mutationFn: () => (manifest.metadata ? identity.test(target()) : media.test(target())) });
   const libraries = useMutation({ mutationFn: () => media.libraries(target()) });
   const probeReady = manifest.connectionFields.every((field) => {
     if ((field.type !== 'text' && field.type !== 'url') || !field.required) return true;
@@ -469,7 +478,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         <Paragraph color="$color10">Nothing to fill in — this adapter needs no details to connect.</Paragraph>
       )}
 
-      {manifest.media ? (
+      {manifest.media || manifest.metadata ? (
         <FormSection title="Use this connection">
           <FieldInput
             field={enabledField(manifest)}
@@ -501,7 +510,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
       <Paragraph size="$2" color="$color10">
         {separate
           ? `${setUpCount} of ${profiles.length} ${profiles.length === 1 ? 'profile is' : 'profiles are'} set up${offNames.length > 0 ? `, and ${listAll(offNames)} ${offNames.length === 1 ? 'doesn’t' : 'don’t'} use it` : ''}. A profile that is not set up is asked to finish on its Media tab.`
-          : manifest.media
+          : accountWide(manifest.id)
             ? 'Shared by every profile of your account.'
             : 'Kept on this device only: another device chooses its own.'}{' '}
         Passwords are kept in secure storage and never shown again.
@@ -523,7 +532,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
             icon={<Trash2 size={16} />}
             title={`Remove ${draft.label}?`}
             description={
-              manifest.media
+              accountWide(manifest.id)
                 ? 'Its details, and every profile’s saved password, are deleted from your account.'
                 : 'Its details and saved password are deleted from this device. The backup already there stays.'
             }

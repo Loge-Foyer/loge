@@ -387,7 +387,7 @@ function isData(kind: RecordKind, data: unknown): boolean {
   }
 }
 
-/** Only sources and IPTV travel with the account; players and sync plugins stay on each device. */
+/** Sources, IPTV and metadata travel with the account; players and sync plugins stay on each device. */
 function isAccountWide(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   const category = categoryOfPluginId(value);

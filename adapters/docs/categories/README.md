@@ -1,9 +1,9 @@
 # Categories
 
-Every plugin does one of four jobs, and lives in that job's folder under
-`plugins/`. Its id is the folder path — `sources/jellyfin`, `iptv/stalker`,
-`players/system`, `sync/custom-server` — and its manifest names the same
-category and declares that category's one block.
+Every plugin does one of five jobs, and lives in that job's folder under
+`adapters/`. Its id is the folder path — `sources/jellyfin`, `iptv/stalker`,
+`players/system`, `sync/custom-server`, `metadata/tmdb` — and its manifest
+names the same category and declares that category's one block.
 
 | Category | Its block | What the app does with it | Travels with |
 | --- | --- | --- | --- |
@@ -11,8 +11,9 @@ category and declares that category's one block.
 | `iptv` | `media`, with `live` | shows everything it brings on TV: Live, Movies, Series | the account |
 | `players` | `player` | plays with it | the device |
 | `sync` | `account` or `backup` | keeps the account there, or its backup | the device |
+| `metadata` | `metadata` | asks it what a film or a series is, for watch status the app keeps | the account |
 
-The app's Settings → Adapters has the same four lists, and shows only plugins
+The app's Settings → Adapters has the same five lists, and shows only plugins
 whose `platforms` include the one it runs on.
 
 ## Sources
@@ -98,6 +99,28 @@ Sync plugins are device-wide: each device chooses its own. Choosing one is an
 account action, in Settings — never a side effect of adding a source.
 For development, `sync/mock` plays at being your own server and
 `sync/mock-backup` at being a backup target — two plugins, one block each.
+
+## Metadata
+
+Say what a film or a series *is*, by its name — for a source that does not.
+A metadata plugin declares a `metadata` block, `identifies`: `movies`,
+`shows`, or both. Its role connects (`plugin.metadata.connect`) and answers
+one question, `identify({ type, title, originalTitle?, year })`, with a
+catalogue's ids — `{ tmdb: '603' }` — or nothing where no match is close
+enough to be sure of.
+
+The app asks it about the films and series of an IPTV provider whose watch
+status it keeps, that carry no catalogue id of their own: a portal keeping a
+copy of a film for each language, each under its own name. Watch status is
+keyed by what a thing is (`watchIdentity`), so once each copy carries the
+same id, watching one checks every other. A wrong answer is worse than none
+— it would merge two films' watch status — so a metadata plugin answers only
+when it is sure.
+
+It brings nothing to any tab. Its connections are account-wide, like a
+source's: the household's own key, set up once, on every device.
+
+Metadata: `tmdb`.
 
 ## One service, two jobs
 

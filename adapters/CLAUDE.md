@@ -28,9 +28,10 @@ own package, `player-kit`, for exactly that reason.
 
 ## One category per plugin
 
-A plugin does one job — serve media, bring IPTV, play, or keep the account —
-and lives in that job's folder: `adapters/sources`, `adapters/iptv`,
-`adapters/players`, `adapters/sync`. Its id is the path: `sources/jellyfin`.
+A plugin does one job — serve media, bring IPTV, play, keep the account, or
+say what a title is — and lives in that job's folder: `adapters/sources`,
+`adapters/iptv`, `adapters/players`, `adapters/sync`, `adapters/metadata`. Its
+id is the path: `sources/jellyfin`.
 
 A service that does two jobs is two plugins. Google Drive's files are
 `sources/google-drive`; Google Drive as a backup place is `sync/google-drive`.
@@ -93,7 +94,8 @@ Phase 8 added players; Phase 9 dropped VLC, and it is back.
     for a source that matches on the device
   - per-profile values, the media contract with live TV and playback members,
     and watch state written back (`reportPlayback`, `setPlayed`)
-  - the player contract, the account role (records), the backup role
+  - the player contract, the account role (records), the backup role, the
+    metadata role
   - errors, the HTTP port and the host's crypto port
 - **`player-kit`:** `PlayerView`'s props and `PlayerPlugin`.
 - **Built-in player:** `players/system` implements the player role —
@@ -128,6 +130,9 @@ Phase 8 added players; Phase 9 dropped VLC, and it is back.
   guide, and a series' episodes played.
 - **Custom server:** implements the account role on PocketBase — sign-in,
   reading the whole account, batches, sign-up with an invite, the owner check.
+- **TMDB:** implements the metadata role — what a film or series is, by a
+  name in any language TMDB knows it by, and nothing where it is not sure.
+  Tested against recorded answers, and run against TMDB with a real key.
 - **Every other plugin:** a manifest — the other IPTV plugins, KSPlayer, and
   the backup targets included.
 - **`npm run typecheck`:** three programs — `api` and the non-player plugins

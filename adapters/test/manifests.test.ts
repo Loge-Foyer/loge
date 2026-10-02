@@ -4,6 +4,7 @@ import {
   BACKUP_MEMBERS,
   categoryOfPluginId,
   MEDIA_CAPABILITY_MEMBERS,
+  METADATA_MEMBERS,
   validateManifest,
   type Plugin,
 } from '@sc/api';
@@ -11,6 +12,7 @@ import { plugin as m3u } from '@sc/iptv-m3u';
 import { plugin as mockIptv } from '@sc/iptv-mock';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
+import { plugin as tmdb } from '@sc/metadata-tmdb';
 import { plugin as ksplayer } from '@sc/player-ksplayer';
 import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
@@ -60,6 +62,7 @@ const plugins: readonly Plugin[] = [
   onedriveBackup,
   mockAccount,
   mockBackup,
+  tmdb,
 ];
 
 const context = () => fakeContext({ http: fakeHttp({}).client }).context;
@@ -114,6 +117,14 @@ describe.each(plugins.map((plugin) => [plugin.manifest.id, plugin] as const))('%
     const backup = await plugin.backup.connect(target({}), context());
     for (const member of BACKUP_MEMBERS) expect(typeof backup[member], `the backup role needs ${member}`).toBe('function');
     await backup.dispose();
+  });
+
+  it('has every member its metadata role promises, and the role its block promises', async () => {
+    expect(plugin.metadata === undefined).toBe(manifest.metadata === undefined);
+    if (!plugin.metadata) return;
+    const provider = await plugin.metadata.connect(target({}), context());
+    for (const member of METADATA_MEMBERS) expect(typeof provider[member], `the metadata role needs ${member}`).toBe('function');
+    await provider.dispose();
   });
 });
 

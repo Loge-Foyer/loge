@@ -106,6 +106,11 @@ export function standaloneRepositories(read: Run, write: Run): Repositories {
       remove: (name) => write((r) => r.accountSettings.remove(name)),
       clear: () => write((r) => r.accountSettings.clear()),
     },
+    identities: {
+      getMany: (...args) => read((r) => r.identities.getMany(...args)),
+      put: (...args) => write((r) => r.identities.put(...args)),
+      purge: (...args) => write((r) => r.identities.purge(...args)),
+    },
     downloads: {
       get: (id) => read((r) => r.downloads.get(id)),
       forItem: (userId, key) => read((r) => r.downloads.forItem(userId, key)),

@@ -56,12 +56,12 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 **Phase 7 — it plays. Phase 8 brought more players; VLC left in Phase 9, and is back.**
 
-The design: four tabs — Media, Videos, TV, Settings. Plugins come in four
+The design: four tabs — Media, Videos, TV, Settings. Plugins come in five
 categories, and Settings → Adapters shows one list per category for this
 platform. A device holds one account, local or on your own server
-(PocketBase), with up to ten profiles. Source and IPTV connections are
-account-wide; players and sync plugins are device-wide. A server account syncs
-by pushing the journal, then reading the whole account. An encrypted
+(PocketBase), with up to ten profiles. Source, IPTV and metadata connections
+are account-wide; players and sync plugins are device-wide. A server account
+syncs by pushing the journal, then reading the whole account. An encrypted
 `.scbackup` file carries a local account between devices, and players are
 plugins.
 
@@ -72,7 +72,7 @@ What runs today:
   signing up with an invite uploads it, and signing out keeps a local copy. A
   run pushes the journal, reads the whole account and reconciles; ten
   profiles at most, or the server's limit.
-- Four tabs, and Settings → Adapters as four lists by category, of the plugins
+- Four tabs, and Settings → Adapters as five lists by category, of the plugins
   that run on this platform. TV holds IPTV: live channels with now and next,
   a day guide, channels played live, and the provider's films and series —
   Stalker and, in development, the mock portal.
@@ -107,6 +107,11 @@ What runs today:
   video and files, chosen per tab on the account; one row per thing watched,
   every language's copy of a film at once, and the TV tab lists what was
   begun first.
+- A fifth adapter category, metadata, and TMDB in it (database v10): with the
+  household's own key, it says which film or series an IPTV title is when the
+  portal does not, so the German and the English copy share their watch
+  status. Answers are kept on the device, and what was kept under a title
+  moves to the TMDB id.
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.

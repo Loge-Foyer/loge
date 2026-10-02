@@ -21,6 +21,7 @@ import { createAccountService } from '@/services/account';
 import { createBackupService } from '@/services/backup';
 import { createBackupTargets } from '@/services/backup/targets';
 import { createConnectionService } from '@/services/connections';
+import { createIdentityService } from '@/services/identity';
 import { createHomeLayoutService } from '@/services/home-layout';
 import type { Services } from '@/services';
 import { createMediaService } from '@/services/media';
@@ -101,7 +102,22 @@ export function createServices(): AppServices {
   });
   const activity = createAppActivity();
   const drainer = createOutboxDrainer({ outbox: db.outbox, sources, pool, network, activity, clock, log });
-  const watch = createWatchService({ db, sources, clock, onQueued: () => drainer.kick() });
+  const identities = createIdentityService({
+    db,
+    connections: db.connections,
+    catalog,
+    sources,
+    credentials,
+    sessions,
+    probeSecrets: connections.probeSecrets,
+    http,
+    network,
+    identity,
+    clock,
+    crypto,
+    log,
+  });
+  const watch = createWatchService({ db, sources, clock, identities, onQueued: () => drainer.kick() });
   const lists = createListsService({ db, ids, clock });
   const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });
   const files = createFileStore();
@@ -241,6 +257,7 @@ export function createServices(): AppServices {
       appSettings,
       accountSettings,
       watch,
+      identity: identities,
       downloads,
       downloadSettings,
       lists,

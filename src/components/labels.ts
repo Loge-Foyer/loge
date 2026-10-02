@@ -37,12 +37,13 @@ export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {
   live: 'Live TV',
 };
 
-/** Settings → Adapters' four lists. */
+/** Settings → Adapters' five lists. */
 export const CATEGORY_LABELS: Readonly<Record<PluginCategory, string>> = {
   sources: 'Sources',
   iptv: 'IPTV',
   players: 'Players',
   sync: 'Sync',
+  metadata: 'Metadata',
 };
 
 /** What each list is for, in a line. */
@@ -51,13 +52,14 @@ export const CATEGORY_DESCRIPTIONS: Readonly<Record<PluginCategory, string>> = {
   iptv: 'Live TV, with a provider’s films and series',
   players: 'What plays on this device',
   sync: 'Where your account and its backups live',
+  metadata: 'What a film or series is, for watch status',
 };
 
 /** What an account holds, in words: all of it, on every device of the account. */
 export const ACCOUNT_HOLDS: readonly string[] = [
   'Profiles and their PINs',
   'Each profile’s settings, like its home',
-  'Sources and IPTV, with their passwords',
+  'Sources, IPTV and metadata, with their passwords and keys',
 ];
 
 export const PER_PROFILE_LABELS: Readonly<Record<PerProfile, string>> = {

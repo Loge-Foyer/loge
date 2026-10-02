@@ -15,6 +15,7 @@ describe('qualified plugin ids', () => {
   it('reads the category back, and nothing from an id without one', () => {
     expect(categoryOfPluginId('iptv/stalker')).toBe('iptv');
     expect(categoryOfPluginId('players/system')).toBe('players');
+    expect(categoryOfPluginId('metadata/tmdb')).toBe('metadata');
     for (const id of ['jellyfin', 'movies/jellyfin', 'sources/', 'sources/Jellyfin', 'sources/a/b', '/jellyfin']) {
       expect(categoryOfPluginId(id), id).toBeUndefined();
       expect(isQualifiedPluginId(id), id).toBe(false);
@@ -23,12 +24,13 @@ describe('qualified plugin ids', () => {
 });
 
 describe('scope', () => {
-  it('keeps sources and IPTV with the account, players and sync on the device', () => {
+  it('keeps sources, IPTV and metadata with the account, players and sync on the device', () => {
     expect(PLUGIN_CATEGORIES.map((category) => [category, CATEGORY_SCOPE[category]])).toEqual([
       ['sources', 'account'],
       ['iptv', 'account'],
       ['players', 'device'],
       ['sync', 'device'],
+      ['metadata', 'account'],
     ]);
   });
 });

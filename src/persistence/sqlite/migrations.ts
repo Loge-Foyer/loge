@@ -154,7 +154,25 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   { version: 7, up: (tx) => tx.exec(V7) },
   { version: 8, up: (tx) => tx.exec(V8) },
   { version: 9, up: (tx) => tx.exec(V9) },
+  { version: 10, up: (tx) => tx.exec(V10) },
 ];
+
+// What a metadata adapter — TMDB — said an item of a source is: its catalogue
+// ids, or that nothing matched closely enough (NULL), which is asked again
+// after a while. Device state, like the media cache: never journaled, never
+// synced, never in a backup; a device that lacks it asks again. It cascades
+// from the profile and from the source whose item it names.
+const V10 = `
+CREATE TABLE identities (
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  external_ids TEXT,
+  resolved_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, connection_id, external_id)
+) STRICT;
+CREATE INDEX identities_connection ON identities (connection_id);
+`;
 
 // Watch progress the app keeps, for sources that keep none (spec §9), and the
 // account's own settings — which tabs it is kept on among them. Both are

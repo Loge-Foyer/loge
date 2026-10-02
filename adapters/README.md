@@ -19,7 +19,7 @@ The payoff is that adding a new service should be one new folder here plus one
 line registering it — not a redesign of the home screen. If it ever costs more
 than that, something shared is wrong, and that is what should be fixed.
 
-## Four kinds of plugin
+## Five kinds of plugin
 
 Every plugin does one job, and lives in the folder for that job:
 
@@ -29,8 +29,9 @@ Every plugin does one job, and lives in the folder for that job:
 | `adapters/iptv/` | bring live TV — and a provider's films and series | the account | M3U playlists, Stalker portals, Xtream Codes |
 | `adapters/players/` | play it | the device | the phone's or browser's own player, KSPlayer, mpv, VLC |
 | `adapters/sync/` | keep the account somewhere | the device | your own server; a backup in iCloud, Google Drive or OneDrive |
+| `adapters/metadata/` | say what a film or series is, by its name | the account | TMDB, with your own key |
 
-The app's Settings has the same four lists, and shows only the plugins that
+The app's Settings has the same five lists, and shows only the plugins that
 work on the device in your hand: iCloud on an iPhone, not in a browser.
 
 A service that does two jobs is two plugins. Google Drive can hold your films
@@ -39,8 +40,9 @@ A service that does two jobs is two plugins. Google Drive can hold your films
 
 ## Account-wide or device-wide
 
-Sources and IPTV belong to the account. Add Jellyfin once and every device on
-the account has it — for every profile, or with each profile's own sign-in.
+Sources, IPTV and metadata belong to the account. Add Jellyfin once and every
+device on the account has it — for every profile, or with each profile's own
+sign-in. A TMDB key the same.
 
 Players and sync belong to each device. Your phone may play MKV files with mpv
 while the browser uses its own player; one device may keep its backups in
@@ -55,7 +57,11 @@ back. The Jellyfin web client and the app always agree.
 
 Everything else the app knows — your profiles, their preferences, your sources
 — belongs to **the account**: on the device alone, or on your own server,
-which keeps it in step between devices.
+which keeps it in step between devices. So does what you watched on a source
+that keeps nothing of it — an IPTV provider's films, web video — keyed by what
+it is. A portal that keeps a copy of a film for each language rarely says
+which film it is; a metadata plugin — TMDB — does, so watching the German copy
+checks the English one too.
 
 ## Plugins say what they can do
 
@@ -85,7 +91,7 @@ it.
 ## Current state
 
 **Phase 6 moved the code to the new architecture; Phase 7, playback, is
-under way.** The plugins are in their four folders, each with an id that names
+under way.** The plugins are in their five folders, each with an id that names
 its category, and every manifest declares one block.
 
 What is real today:
@@ -112,6 +118,10 @@ What is real today:
 - **The built-in player** plays through expo-video on phones and the
   browser's `<video>` on the web, with hls.js fetched only when a browser has
   no HLS of its own. Its profile per platform says what each plays.
+- **TMDB** (`metadata/tmdb`) says which film or series a title is, with the
+  household's own key — a name in any language TMDB knows, within a year
+  either side, and nothing where it is not sure. Tested against recorded
+  answers, and run against TMDB itself.
 - **Every other plugin** still describes itself with a manifest, and declares
   nothing it cannot do yet.
 
@@ -126,7 +136,7 @@ Phase 4's roles, its change log and its sealed passwords are retired.
 
 ## Documentation
 
-`docs/` covers the API, the four categories, writing a plugin, the capability
+`docs/` covers the API, the five categories, writing a plugin, the capability
 model, settings, testing and publishing.
 
 The full architecture is in

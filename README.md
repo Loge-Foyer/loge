@@ -128,9 +128,9 @@ the design, and most of it runs today, built with
     season and episode. Jellyfin is the first real source.
   - **Videos** — web video and plain files, one tab per source. No source
     lists them yet.
-  - **Settings** — the account, profiles, PIN lock, and the plugins in four
-    lists — Sources, IPTV, Players, Sync — showing only those that run on this
-    device. Connect a source through a form the plugin itself describes, and
+  - **Settings** — the account, profiles, PIN lock, and the plugins in five
+    lists — Sources, IPTV, Players, Sync, Metadata — showing only those that
+    run on this device. Connect a source through a form the plugin itself describes, and
     decide what each profile keeps for itself.
 - **One account per device,** kept on the device or on your own server —
   PocketBase, in `../streaming_center_sync`. On your server, profiles, PINs,

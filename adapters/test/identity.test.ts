@@ -1,4 +1,4 @@
-import { connectionId, identityHash, plainTitle, watchIdentity, type Episode, type MediaItem, type Movie } from '@sc/api';
+import { bareTitle, connectionId, identityHash, plainTitle, titleKey, watchIdentity, type Episode, type MediaItem, type Movie } from '@sc/api';
 import { describe, expect, it } from 'vitest';
 
 const key = (externalId: string) => ({ connectionId: connectionId('c1'), externalId });
@@ -30,6 +30,20 @@ describe('plainTitle', () => {
     expect(plainTitle('Blade Runner 2049')).toEqual({ title: 'blade runner 2049' });
     expect(plainTitle('IT')).toEqual({ title: 'it' });
     expect(plainTitle('IT (2017) DE')).toEqual({ title: 'it', year: 2017 });
+  });
+});
+
+describe('bareTitle and titleKey', () => {
+  it('leaves the title as it was written, for a catalogue to look up', () => {
+    expect(bareTitle('Matrix (1999) DE 4K HDR')).toEqual({ title: 'Matrix', year: 1999 });
+    expect(bareTitle('  Amélie [2001] FR ')).toEqual({ title: 'Amélie', year: 2001 });
+    expect(bareTitle('Dark Matter – Der Zeitenläufer (2024) DE')).toEqual({ title: 'Dark Matter – Der Zeitenläufer', year: 2024 });
+  });
+
+  it('keys a title by what its spellings share, and a title in another script by nothing', () => {
+    expect(titleKey('Le Fabuleux Destin d’Amélie Poulain')).toBe('le fabuleux destin d amelie poulain');
+    expect(titleKey('Spider-Man: No Way Home')).toBe('spider man no way home');
+    expect(titleKey('Брат')).toBe('');
   });
 });
 

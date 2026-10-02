@@ -99,6 +99,7 @@ export function guarded(db: SyncDatabase): SyncDatabase {
     playlists: wrap(db.playlists),
     watchProgress: wrap(db.watchProgress),
     accountSettings: wrap(db.accountSettings),
+    identities: wrap(db.identities),
     journal: wrap(db.journal),
   };
   return {

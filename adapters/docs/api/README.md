@@ -8,13 +8,13 @@ without learning about the others.
 
 | File | What it defines |
 | --- | --- |
-| `category.ts` | The four categories — `sources`, `iptv`, `players`, `sync` — and whether each is account-wide or device-wide (`CATEGORY_SCOPE`). The platforms (`PlatformId`: `ios`, `android`, `web`) and `runsOn()`. `qualifiedPluginId()` and `categoryOfPluginId()`, for ids like `sources/jellyfin`. |
+| `category.ts` | The five categories — `sources`, `iptv`, `players`, `sync`, `metadata` — and whether each is account-wide or device-wide (`CATEGORY_SCOPE`). The platforms (`PlatformId`: `ios`, `android`, `web`) and `runsOn()`. `qualifiedPluginId()` and `categoryOfPluginId()`, for ids like `sources/jellyfin`. |
 | `bytes.ts` | Bytes as text and back — base64, base64url, UTF-8 — written by hand, since a plugin has no `btoa` or `TextEncoder` and Hermes may lack them. |
 | `ids.ts` | Branded IDs: `PluginId`, `UserId`, `ConnectionId`, `CredentialsRef`. A `UserId` is a string at runtime, but the compiler will not accept one where a `ConnectionId` belongs. |
 | `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files` and `live`. |
 | `capabilities.ts` | The media capability flags, and `CapabilityKey` (`'media.offlineMetadata'`), the form a setting uses to gate one. |
 | `fields.ts` | The field descriptors a plugin uses to ask for input: `text` (optionally a `credential`), `url`, `password`, `boolean`, `select`, and the setting-only `libraries`. |
-| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists. |
+| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists — and the `attribution` a service's terms ask the app to show. |
 | `connection.ts` | `Connection` — one configured instance of a source or IPTV plugin, owned by the account — and `PerProfile`, which says what each profile keeps for itself. |
 | `per-profile.ts` | Which keys a mode keeps per profile, the values one profile runs with (`resolveValues`), and whether a profile is set up (`isSetUpFor`). |
 | `user.ts` | `AppUser` — a profile. |
@@ -22,7 +22,7 @@ without learning about the others.
 | `validate.ts` | `validateManifest()` — the rules every manifest must satisfy. |
 | `media.ts` | `MediaItem` (movie, show, season, episode, and a video site's channel and playlist), `GlobalMediaKey`, `MediaDetail` — with the `Creator` behind a video and a channel's `ChildSection`s — `Person`, `Library`, `WatchStatus`, and opaque `ImageRef` / `HeadersRef`. Also what a file *is* — `MediaVersion` with its video, audio and subtitle streams, plus the `HdrFormat`, `SpatialAudio` and `SubtitleDelivery` vocabularies that `playback.ts` shares. |
 | `live.ts` | `ChannelGroup`, `Channel`, `Programme`, and the queries for channels and the guide. |
-| `identity.ts` | What something is apart from any source — `watchIdentity()`, by catalogue id or, where a provider keeps each language's copy apart, its `plainTitle()` and year — and `identityHash()`, the short name a watch record's key carries. |
+| `identity.ts` | What something is apart from any source — `watchIdentity()`, by catalogue id or, where a provider keeps each language's copy apart, its `plainTitle()` and year — and `identityHash()`, the short name a watch record's key carries. `bareTitle()` is a title without the provider's marks, as written, for a catalogue to look up; `titleKey()` is what two spellings of it share. |
 | `query.ts` | `ItemQuery` with a search's `SearchScope`, `ChildQuery` (a section and a cursor), `ItemPage`, the four sorts, `compareItems()` — the one ordering rule — and `mergeSorted()`. |
 | `playback.ts` | What to play: `PlaybackDescriptor` and its sources, audio and subtitle tracks; `PlayerProfile`, what an engine plays; `PlaybackRequest`; and `PlaybackReport`, what playing reports back to a source. |
 | `player.ts` | The player role: `MediaPlayer`, `PlayerEvent`, `PlayerManifest`, and the pure `canPlay()`, `missingFor()` and `choosePlayer()`. |
@@ -33,6 +33,7 @@ without learning about the others.
 | `media-role.ts` | `MediaRole`, `ConnectedMediaProvider`, and `MEDIA_CAPABILITY_MEMBERS`. |
 | `account.ts` | The account role: `AccountRecord` and its kinds, `AccountSnapshot`, `PushOutcome`, `AccountInfo`, `ConnectedAccount`, `recordKey()`, `recordId()` and `isAccountRecord()`, and `DEFAULT_MAX_PROFILES`. |
 | `backup.ts` | The backup role: `ConnectedBackupTarget` — `stat`, `read`, `write` with `ifMatch`, `list`. |
+| `metadata.ts` | The metadata role: `MetadataManifest` (`identifies`), `IdentifyQuery`, `ConnectedMetadataProvider` — `check`, `identify`, `dispose` — and `METADATA_MEMBERS`. |
 
 `fixtures/account-records.json` holds records every side must accept or
 refuse. The tests here read it, and so do the sync server's.
@@ -73,6 +74,7 @@ export const plugin: Plugin = {
   - sources and IPTV: `media`
   - players: `player`
   - sync: `account` or `backup`
+  - metadata: `metadata`
 - **`platforms`** — where it runs. The app shows and runs a plugin only where
   it runs.
 - **`contentKinds`** — what a source brings. The plugin states it; the app
@@ -183,6 +185,24 @@ const { records } = await account.pull(); // every record of the account
   account's id, the kind and the key. Derived, never chosen, so a resent write
   lands on the same record — and the server derives the same for the profile
   it creates at sign-up.
+
+## The metadata contract
+
+```ts
+const catalogue = await plugin.metadata.connect(target, context); // no network work yet
+await catalogue.check();                                          // the key, tried once
+await catalogue.identify({ type: 'movie', title: 'Der Pate', year: 1972 }); // { tmdb: '238' }
+```
+
+- **`identify`** answers with a catalogue's ids, or with nothing where no
+  match is close enough to be sure of. The app keys watch status by them, so
+  a wrong answer merges two films — none is always better.
+- **The query is the source's title without its marks** (`bareTitle`): no
+  "DE", no "4K", no "(1999)" — with the year that was in it, where the item
+  had none of its own. `originalTitle`, where the source knows it, is asked
+  first.
+- **A refused key is latched** — `UNAUTHORIZED`, `retry: 'never'` — and a
+  catalogue that counts requests answers `backoff`; the app then waits.
 
 ## The backup contract
 

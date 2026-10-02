@@ -2,6 +2,7 @@ import type { CapabilityKey } from './capabilities';
 import { categoryOfPluginId, PLATFORMS, PLUGIN_CATEGORIES, type PluginCategory } from './category';
 import { isLibrarySelection, type Field } from './fields';
 import { isToggle, type PluginManifest } from './manifest';
+import { IDENTIFIABLE_KINDS } from './metadata';
 import { SEARCH_SCOPES } from './query';
 
 /** The one block each category declares. */
@@ -10,9 +11,10 @@ const CATEGORY_BLOCKS: Readonly<Record<PluginCategory, readonly Block[]>> = {
   iptv: ['media'],
   players: ['player'],
   sync: ['account', 'backup'],
+  metadata: ['metadata'],
 };
-type Block = 'media' | 'player' | 'account' | 'backup';
-const BLOCKS: readonly Block[] = ['media', 'player', 'account', 'backup'];
+type Block = 'media' | 'player' | 'account' | 'backup' | 'metadata';
+const BLOCKS: readonly Block[] = ['media', 'player', 'account', 'backup', 'metadata'];
 const KEY = /^[a-z][A-Za-z0-9]*$/;
 const SECRET_LOOKING = /password|passcode|passphrase|token|secret|apikey/i;
 
@@ -43,6 +45,7 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
   for (const platform of duplicates(platforms)) problems.push(`platform "${platform}" is listed twice`);
   if (manifest.displayName.trim() === '') problems.push('displayName is empty');
   if (manifest.description.trim() === '') problems.push('description is empty');
+  if (manifest.attribution?.trim() === '') problems.push('attribution is empty');
   if (blocks.length === 0) problems.push('declares no block');
 
   if (media) {
@@ -80,6 +83,14 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     }
   }
   if (manifest.backup && manifest.backup.location.trim() === '') problems.push('backup location is empty');
+  if (manifest.metadata) {
+    const { identifies } = manifest.metadata;
+    if (identifies.length === 0) problems.push('metadata role identifies nothing');
+    for (const kind of identifies) {
+      if (!(IDENTIFIABLE_KINDS as readonly string[]).includes(kind)) problems.push(`metadata kind "${kind}" is not one of ${IDENTIFIABLE_KINDS.join(', ')}`);
+    }
+    for (const kind of duplicates(identifies)) problems.push(`metadata kind "${kind}" is listed twice`);
+  }
 
   for (const field of [...connectionFields, ...settings, ...(manifest.account?.signUp?.fields ?? [])]) {
     if (field.type !== 'select') continue;

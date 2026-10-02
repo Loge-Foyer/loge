@@ -783,6 +783,52 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
     });
   });
 
+  describe('what a metadata adapter said items are', () => {
+    const key = (id: string) => ({ connectionId: connectionId('c-home'), externalId: id });
+
+    it('keeps an answer per profile and item — a miss as no ids — and journals none of it', async () => {
+      const { db } = open();
+      await household(db);
+      const head = await db.journal.head();
+      await db.identities.put(alex.id, { key: key('vod:1'), externalIds: { tmdb: '603' }, resolvedAt: 5 });
+      await db.identities.put(alex.id, { key: key('vod:2'), resolvedAt: 6 });
+      await db.identities.put(alex.id, { key: key('vod:1'), externalIds: { tmdb: '604' }, resolvedAt: 7 });
+      const known = await db.identities.getMany(alex.id, [key('vod:1'), key('vod:2'), key('vod:3')]);
+      expect([...known].sort((a, b) => a.key.externalId.localeCompare(b.key.externalId))).toEqual([
+        { key: key('vod:1'), externalIds: { tmdb: '604' }, resolvedAt: 7 },
+        { key: key('vod:2'), resolvedAt: 6 },
+      ]);
+      expect(await db.identities.getMany(kids.id, [key('vod:1')])).toEqual([]);
+      expect(await db.journal.count(head)).toBe(0);
+    });
+
+    it('is not kept for a profile or a source that is gone, and goes with either', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.identities.put(userId('u-gone'), { key: key('vod:1'), resolvedAt: 1 });
+      await db.identities.put(alex.id, { key: { connectionId: connectionId('c-gone'), externalId: 'vod:1' }, resolvedAt: 1 });
+      expect(await db.identities.getMany(userId('u-gone'), [key('vod:1')])).toEqual([]);
+      await db.identities.put(alex.id, { key: key('vod:1'), resolvedAt: 1 });
+      await db.identities.put(kids.id, { key: key('vod:1'), resolvedAt: 1 });
+      await db.users.delete(kids.id);
+      expect(await db.identities.getMany(kids.id, [key('vod:1')])).toEqual([]);
+      await db.connections.delete(home.id);
+      expect(await db.identities.getMany(alex.id, [key('vod:1')])).toEqual([]);
+    });
+
+    it('is purged for a connection, or for one profile’s use of it', async () => {
+      const { db } = open();
+      const home = await household(db);
+      await db.identities.put(alex.id, { key: key('vod:1'), resolvedAt: 1 });
+      await db.identities.put(kids.id, { key: key('vod:1'), resolvedAt: 1 });
+      await db.identities.purge(home.id, alex.id);
+      expect(await db.identities.getMany(alex.id, [key('vod:1')])).toEqual([]);
+      expect(await db.identities.getMany(kids.id, [key('vod:1')])).toHaveLength(1);
+      await db.identities.purge(home.id);
+      expect(await db.identities.getMany(kids.id, [key('vod:1')])).toEqual([]);
+    });
+  });
+
   describe('the account’s own settings', () => {
     it('keeps a setting for the whole account, journaled with no profile, and writes nothing that changes nothing', async () => {
       const { db } = open();

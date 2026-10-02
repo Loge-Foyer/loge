@@ -1,5 +1,4 @@
 import {
-  identityHash,
   showIdentityOf,
   watchIdentity,
   type ConnectionId,
@@ -13,10 +12,12 @@ import {
 } from '@sc/api';
 
 import { stableJson } from '../hash';
+import type { IdentityService } from '../identity';
 import type { Clock, LocalDatabase, Repositories, WatchEntry, WatchProgress } from '../ports';
 import type { Source, SourceService } from '../sources';
 import { kindsForTab } from '../tab-content';
 import { itemKeyOf } from './item-key';
+import { keptRowId } from './kept';
 import { toSnapshot } from './snapshot';
 
 // A stop this near the end counts as watched here, as most servers count it;
@@ -85,6 +86,8 @@ export function createWatchService(deps: {
   readonly db: LocalDatabase;
   readonly sources: SourceService;
   readonly clock: Clock;
+  /** The catalogue ids this device found items to have: laid on before an item is keyed, so every copy of a film is one. */
+  readonly identities: Pick<IdentityService, 'withKnownIds'>;
   /** Something was queued: deliver soon. */
   readonly onQueued: () => void;
 }): WatchService {
@@ -103,12 +106,12 @@ export function createWatchService(deps: {
 
   /** What the app keeps it under: the catalogue first, the title where a provider keeps copies apart by language. */
   const identityOf = (source: Source, item: MediaItem) => watchIdentity(item, { byTitle: source.manifest.category === 'iptv' });
-  const rowIdOf = (userId: UserId, identity: string) => `${userId}/${identityHash(identity)}`;
 
-  /** The app's own: one journaled write, and nothing waits on any source. */
-  const keep = async (userId: UserId, source: Source, item: MediaItem, report: PlaybackReport) => {
+  /** The app's own: one journaled write, and nothing waits on any source — what a catalogue said of it was found before. */
+  const keep = async (userId: UserId, source: Source, played: MediaItem, report: PlaybackReport) => {
+    const [item = played] = await deps.identities.withKnownIds(userId, [played]);
     const identity = identityOf(source, item);
-    const id = rowIdOf(userId, identity);
+    const id = keptRowId(userId, identity);
     const at = now();
     let changed = false;
     await db.transaction(async (tx) => {
@@ -122,7 +125,7 @@ export function createWatchService(deps: {
       if (report.kind === 'played' && !report.played && item.type === 'show') await restartEpisodes(tx, userId, identity, at);
       changed = true;
     });
-    if (changed) tell(userId, report, item.key);
+    if (changed) tell(userId, report, played.key);
   };
 
   const record = async (userId: UserId, item: MediaItem, report: PlaybackReport, next: (current: WatchStatus) => WatchStatus) => {
@@ -224,14 +227,14 @@ export function createWatchService(deps: {
       if (byConnection.size === 0) return kept;
       // Each item's row — and, for an episode, its show's: a series marked done marks every episode of it.
       const wanted = new Map<string, { readonly item: MediaItem; readonly own: string; readonly show?: string }>();
-      for (const item of items) {
+      for (const item of await deps.identities.withKnownIds(userId, items)) {
         const source = byConnection.get(item.key.connectionId);
         if (!source) continue;
         const show = item.type === 'episode' ? showIdentityOf(item, { byTitle: source.manifest.category === 'iptv' }) : undefined;
         wanted.set(itemKeyOf(item.key), {
           item,
-          own: rowIdOf(userId, identityOf(source, item)),
-          ...(show === undefined ? {} : { show: rowIdOf(userId, show) }),
+          own: keptRowId(userId, identityOf(source, item)),
+          ...(show === undefined ? {} : { show: keptRowId(userId, show) }),
         });
       }
       const ids = new Set<string>();

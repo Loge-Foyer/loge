@@ -96,9 +96,8 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
         footer="Every profile of your account sees these connections. Each one decides what a profile keeps for itself — nothing, its own sign-in, or everything."
       >
         {connections.map(({ connection, setUp, off }) => {
-          const what = connection.enabled && manifest.media
-            ? manifest.media.contentKinds.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ')
-            : 'Switched off';
+          const brings = manifest.media?.contentKinds ?? manifest.metadata?.identifies ?? [];
+          const what = connection.enabled ? brings.map((kind) => CONTENT_KIND_LABELS[kind]).join(', ') : 'Switched off';
           const who =
             connection.perProfile === 'none'
               ? PER_PROFILE_SUMMARY.none

@@ -1,4 +1,4 @@
-import type { AppErrorCode, Connection, ConnectionId, CredentialsRef, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
+import type { AppErrorCode, Connection, ConnectionId, CredentialsRef, ExternalIds, MediaDetail, MediaItem, PlaybackReport, UserId, WatchStatus } from '@sc/api';
 
 import type {
   AccountRepository,
@@ -17,6 +17,8 @@ import type {
   SubscriptionRepository,
   FavoriteChannel,
   FavoriteChannelRepository,
+  IdentityRepository,
+  KnownIdentity,
   AccountSetting,
   AccountSettingsRepository,
   WatchProgress,
@@ -86,6 +88,14 @@ interface MediaDetailRecord {
   readonly fingerprint: string;
   readonly detail: MediaDetail;
   readonly savedAt: number;
+}
+
+interface IdentityRecord {
+  readonly userId: UserId;
+  readonly connectionId: ConnectionId;
+  readonly externalId: string;
+  readonly externalIds?: ExternalIds;
+  readonly resolvedAt: number;
 }
 
 interface WatchRecord {
@@ -229,6 +239,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
         'favoriteChannels',
         'playlists',
         'watchProgress',
+        'identities',
       ] as const) {
         await deleteWhere(name, 'byUser', id);
       }
@@ -264,7 +275,17 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
       const row = await get<ConnectionRecord>('connections', id);
       if (!row) return;
       await request(store('connections').delete(id));
-      for (const name of ['connectionProfileValues', 'mediaLists', 'mediaDetails', 'watchStatus', 'outbox', 'downloads', 'subscriptions', 'favoriteChannels'] as const) {
+      for (const name of [
+        'connectionProfileValues',
+        'mediaLists',
+        'mediaDetails',
+        'watchStatus',
+        'outbox',
+        'downloads',
+        'subscriptions',
+        'favoriteChannels',
+        'identities',
+      ] as const) {
         await deleteWhere(name, 'byConnection', id);
       }
       await request(store('backupState').delete(id));
@@ -700,6 +721,37 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     },
   };
 
+  // Device state beside the media cache: never journaled, cascaded by hand from the profile and the connection.
+  const identities: IdentityRepository = {
+    getMany: async (user, keys) => {
+      const found: KnownIdentity[] = [];
+      for (const key of keys) {
+        const row = await get<IdentityRecord>('identities', [user, key.connectionId, key.externalId]);
+        if (!row) continue;
+        found.push({ key, ...(row.externalIds ? { externalIds: row.externalIds } : {}), resolvedAt: row.resolvedAt });
+      }
+      return found;
+    },
+    put: async (user, known) => {
+      if (!(await parentsExist(user, known.key.connectionId))) return;
+      await request(
+        store('identities').put({
+          userId: user,
+          connectionId: known.key.connectionId,
+          externalId: known.key.externalId,
+          ...(known.externalIds ? { externalIds: known.externalIds } : {}),
+          resolvedAt: known.resolvedAt,
+        } satisfies IdentityRecord),
+      );
+    },
+    purge: async (connection, user) => {
+      for (const key of await request(store('identities').index('byConnection').getAllKeys(connection))) {
+        // The primary key starts with the profile it was asked for.
+        if (user === undefined || (Array.isArray(key) && key[0] === user)) await request(store('identities').delete(key));
+      }
+    },
+  };
+
   // The account's own, no profile's: journaled with no user.
   const accountSettings: AccountSettingsRepository = {
     get: (name) => get<AccountSetting>('accountSettings', name),
@@ -738,6 +790,7 @@ export function indexedDbRepositories(tx: IDBTransaction, deps: WriteOptions & {
     playlists,
     watchProgress,
     accountSettings,
+    identities,
     journal,
   };
 }

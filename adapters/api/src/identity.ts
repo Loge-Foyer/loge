@@ -70,12 +70,14 @@ const TAGS = new Set([
 ]);
 
 /**
- * A title as a key, and the year a provider wrote into it: "Matrix (1999) DE 4K
- * HDR" is `matrix` from 1999, "INCEPTION - 2010" is `inception` from 2010.
- * Accents, case and punctuation go; a year in brackets, or after a dash at the
- * end, ends the title, and whatever follows it is the provider's marking.
+ * A title without what a provider writes around it, and the year it wrote
+ * into it: "Matrix (1999) DE 4K HDR" is "Matrix" from 1999, "INCEPTION -
+ * 2010" is "INCEPTION" from 2010. A year in brackets, or after a dash at the
+ * end, ends the title, and whatever follows it is the provider's marking; a
+ * language or a quality is only ever taken off the end, in capitals, and
+ * never all of a title. What a catalogue is asked to look up.
  */
-export function plainTitle(name: string): { readonly title: string; readonly year?: number } {
+export function bareTitle(name: string): { readonly title: string; readonly year?: number } {
   const trimmed = name.trim();
   // "(1999)", "[1999]" or " - 2010" — never a bare number, which "Blade Runner 2049" is part of its name.
   const mark = /\((1[89]\d\d|20\d\d)\)|\[(1[89]\d\d|20\d\d)\]|\s[-–]\s(1[89]\d\d|20\d\d)(?=\s|$)/.exec(trimmed);
@@ -83,14 +85,27 @@ export function plainTitle(name: string): { readonly title: string; readonly yea
   const year = marked ? Number(mark[1] ?? mark[2] ?? mark[3]) : undefined;
   const words = (marked ? trimmed.slice(0, mark.index) : trimmed).trim().split(/\s+/);
   while (words.length > 1 && TAGS.has(words[words.length - 1] ?? '')) words.pop();
-  const title = words
-    .join(' ')
+  return { title: words.join(' '), ...(year === undefined ? {} : { year }) };
+}
+
+/** A title as a key — `bareTitle`, then `titleKey`: "Matrix (1999) DE 4K HDR" is `matrix` from 1999. */
+export function plainTitle(name: string): { readonly title: string; readonly year?: number } {
+  const bare = bareTitle(name);
+  return { ...bare, title: titleKey(bare.title) };
+}
+
+/**
+ * What two spellings of one title share: no accents, no case, no
+ * punctuation. Empty for a title in a script other than Latin — which then
+ * matches nothing, rather than every other such title.
+ */
+export function titleKey(title: string): string {
+  return title
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-  return { title, ...(year === undefined ? {} : { year }) };
 }
 
 /**

@@ -38,6 +38,7 @@ describe('SQLite migrations', () => {
       'device_settings',
       'downloads',
       'favorite_channels',
+      'identities',
       'media_details',
       'media_lists',
       'outbox',

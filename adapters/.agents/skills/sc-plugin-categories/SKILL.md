@@ -1,6 +1,6 @@
 ---
 name: sc-plugin-categories
-description: Decide which category a Streaming Center plugin belongs in — sources, iptv, players or sync — and split a service that does two jobs into two plugins. Use before adding a plugin for a service that already has one, when a plugin should start doing a second job, or when unsure where something goes.
+description: Decide which category a Streaming Center plugin belongs in — sources, iptv, players, sync or metadata — and split a service that does two jobs into two plugins. Use before adding a plugin for a service that already has one, when a plugin should start doing a second job, or when unsure where something goes.
 ---
 
 # Which category, and when to split
@@ -13,6 +13,7 @@ Every plugin does one job, in one folder:
 | `iptv` | brings live TV, and a provider's films and series | `media` with `live` | account | Stalker, Xtream, M3U |
 | `players` | plays | `player` | device | the built-in player, and mpv |
 | `sync` | keeps the account, or its backup | `account` or `backup` | device | your own server, iCloud or Drive backups |
+| `metadata` | says what a film or series is, by its name | `metadata` | account | TMDB |
 
 ## The service already has a plugin, and should do a second job
 
@@ -56,6 +57,14 @@ not a media server's watch status. Nothing is mastered twice.
 - **It is IPTV** when it is a provider's service built around channels: a
   portal, an Xtream account, an M3U playlist. Everything it brings, films and
   series included, shows on the TV tab only.
+
+## Between sources and metadata
+
+- **It is a source** when it brings something to watch.
+- **It is metadata** when it only knows *about* films and series — a
+  catalogue such as TMDB. It brings nothing to any tab: the app asks it what
+  a provider's title is, so watch status covers every copy of a film. A
+  service that does both — a catalogue that also streams — is two plugins.
 
 ## Between players and everything else
 

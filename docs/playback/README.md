@@ -279,6 +279,15 @@ and TV on). `Source.watch` says who keeps it — the source, the app, or nobody
 - **One row per thing watched, not per copy.** A provider that keeps a film's
   German and English copies apart — and its HQ and 4K ones — matches them to
   one TMDB id, and watching one marks them all (`watchIdentity`).
+- **Where the provider says nothing, a metadata adapter does.** With a TMDB
+  connection on, the items drawn with their kept status are looked up in the
+  background (`IdentityService.resolve`, from `useKeptWatch`): an IPTV film or
+  series known only by its title — an episode by its series' — four at a
+  time, each answer remembered on the device (v10), a miss for thirty days.
+  What was kept under the title moves to the TMDB id, journaled, so every
+  device follows. A refused key stops the lookups until it changes; a
+  refusal for load, or no network, pauses them for a minute. Writing never
+  waits on TMDB: a mark uses whatever this device already knows.
 - **Laid over lists where they are drawn** (`useKeptWatch`): local state, so a
   mark shows at once and no source is asked again. The TV tab lists what was
   begun first (`keptInProgress`).

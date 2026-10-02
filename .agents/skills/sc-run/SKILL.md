@@ -302,8 +302,9 @@ The target, once Phase 6 has landed:
   development mock portal is offered.
 - **Settings** — the account first (local, or "Synced just now · 1 change
   waiting"), then the current profile, profiles (up to ten: "Add a profile"
-  goes at the limit), PIN lock, and Adapters as four rows — Sources, IPTV,
-  Players, Sync — each opening this platform's list. iCloud shows on iOS only.
+  goes at the limit), PIN lock, and Adapters as five rows — Sources, IPTV,
+  Players, Sync, Metadata — each opening this platform's list. iCloud shows on
+  iOS only.
 - **Playing** — a film or an episode's page has Play (or Resume, and From the
   beginning) and Mark watched; the player is full screen and turns with the
   device.
@@ -315,8 +316,8 @@ The target, once Phase 6 has landed:
   profiles lands on "Who's watching?".
 - Four tabs — Media, Videos, TV, Settings; TV shows IPTV once a provider is
   added.
-- Settings → Adapters is four lists — Sources, IPTV, Players, Sync — of what
-  runs on this platform. Add a connection through a form built from its
+- Settings → Adapters is five lists — Sources, IPTV, Players, Sync, Metadata
+  — of what runs on this platform. Add a connection through a form built from its
   manifest, and choose what each profile keeps for itself.
 - Settings → Account shows a local account, or your server's with Sync now,
   what it keeps in step, Sign in again, Switch account and Sign out. Profiles

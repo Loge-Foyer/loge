@@ -4,6 +4,7 @@ import {
   type AccountRole,
   type BackupRole,
   type MediaRole,
+  type MetadataRole,
   type PlatformId,
   type Plugin,
   type PluginCategory,
@@ -35,6 +36,8 @@ export interface PluginCatalog {
   accountRole(id: PluginId): AccountRole | undefined;
   /** The backup role's implementation: where the account's backup file can go. */
   backupRole(id: PluginId): BackupRole | undefined;
+  /** The metadata role's implementation: what a title is. */
+  metadataRole(id: PluginId): MetadataRole | undefined;
 }
 
 export interface CatalogOptions {
@@ -52,7 +55,8 @@ export function createPluginCatalog(
   const roles = new Map<PluginId, MediaRole>();
   const accountRoles = new Map<PluginId, AccountRole>();
   const backupRoles = new Map<PluginId, BackupRole>();
-  for (const { manifest, media, account, backup } of plugins) {
+  const metadataRoles = new Map<PluginId, MetadataRole>();
+  for (const { manifest, media, account, backup, metadata } of plugins) {
     const problems = [
       ...validateManifest(manifest),
       ...(byId.has(manifest.id) ? ['its id is already registered'] : []),
@@ -72,6 +76,7 @@ export function createPluginCatalog(
     if (media) roles.set(manifest.id, media);
     if (account) accountRoles.set(manifest.id, account);
     if (backup) backupRoles.set(manifest.id, backup);
+    if (metadata) metadataRoles.set(manifest.id, metadata);
   }
 
   const manifests = [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -84,5 +89,6 @@ export function createPluginCatalog(
     mediaRole: (id) => roles.get(id),
     accountRole: (id) => accountRoles.get(id),
     backupRole: (id) => backupRoles.get(id),
+    metadataRole: (id) => metadataRoles.get(id),
   };
 }

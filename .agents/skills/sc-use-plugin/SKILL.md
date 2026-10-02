@@ -93,7 +93,7 @@ import { plugin as jellyfin } from '@sc/source-jellyfin';
 The catalogue validates every manifest at startup (`validateManifest`): it
 throws in development and leaves the plugin out in production. It lists and
 runs only plugins whose `platforms` include the one the app is on, and sorts
-them into Settings → Adapters' four lists. Nothing else in the app changes —
+them into Settings → Adapters' five lists. Nothing else in the app changes —
 Settings renders the new plugin's page, and its form, from its manifest.
 
 ## 5. Branch on category and effective capabilities — never a name

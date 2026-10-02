@@ -4,6 +4,7 @@ import { plugin as m3u } from '@sc/iptv-m3u';
 import { plugin as mockIptv } from '@sc/iptv-mock';
 import { plugin as stalker } from '@sc/iptv-stalker';
 import { plugin as xtream } from '@sc/iptv-xtream';
+import { plugin as tmdb } from '@sc/metadata-tmdb';
 import { plugin as mpv } from '@sc/player-mpv';
 import { plugin as systemPlayer } from '@sc/player-system';
 import { plugin as vlc } from '@sc/player-vlc';
@@ -52,6 +53,7 @@ export const plugins: readonly Plugin[] = [
   icloudBackup,
   googleDriveBackup,
   onedriveBackup,
+  tmdb,
   // Test doubles — offline, deliberately partial. Development builds only.
   ...(__DEV__ ? [mockSource, mockIptv, mockAccount, mockBackups] : []),
 ];

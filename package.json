@@ -11,6 +11,7 @@
     "@sc/iptv-mock": "*",
     "@sc/iptv-stalker": "*",
     "@sc/iptv-xtream": "*",
+    "@sc/metadata-tmdb": "*",
     "@sc/player-kit": "*",
     "@sc/player-ksplayer": "*",
     "@sc/player-mpv": "*",
@@ -121,7 +122,8 @@
     "adapters/sources/*",
     "adapters/iptv/*",
     "adapters/players/*",
-    "adapters/sync/*"
+    "adapters/sync/*",
+    "adapters/metadata/*"
   ],
   "overrides": {
     "react-native": "$react-native"

@@ -211,7 +211,7 @@ TV's sections.
   (`settings/downloads/options`); then Downloads, what this device keeps and
   what is still coming down. Options is hidden where nothing can be kept — a
   TV, a browser.
-- **Adapters** — four rows: Sources, IPTV, Players, Sync. Each opens that
+- **Adapters** — five rows: Sources, IPTV, Players, Sync, Metadata. Each opens that
   category's list for this platform (`settings/adapters/[category]`), and each
   plugin has its page (`settings/adapters/[category]/[name]`). There is no
   global list.
@@ -224,7 +224,13 @@ TV's sections.
     Import, and Show the backup key, behind the owner check. When a save finds
     the file changed on another device, it asks: open theirs, keep this
     device's, or keep both.
-- **About.**
+  - **Metadata** lists its connections like a source's — TMDB, with your own
+    key, its `enabled` switch and Test connection. Its row says which is set
+    up. It brings nothing to a tab: watch status the app keeps on TV is keyed
+    by what it answers, so a provider's German and English copies of a film
+    are one.
+- **About** — the version, and every attribution a manifest carries (TMDB's
+  notice), by the adapter's name: no screen names a service itself.
 
 ## The connection form
 

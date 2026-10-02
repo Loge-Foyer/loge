@@ -7,6 +7,7 @@ import type { SearchScope } from './query';
 import type { BooleanField, Field, LibrariesField, SelectField, TextField, UrlField } from './fields';
 import type { PluginId } from './ids';
 import type { MediaRole } from './media-role';
+import type { MetadataManifest, MetadataRole } from './metadata';
 import type { PlayerManifest, PlayerRole } from './player';
 
 export interface MediaRoleManifest {
@@ -43,6 +44,12 @@ export interface PluginManifest {
   readonly displayName: string;
   /** One sentence for the plugin list. */
   readonly description: string;
+  /**
+   * What the service's terms ask an app using it to say — "This product uses
+   * the TMDB API but is not endorsed or certified by TMDB." — shown in
+   * Settings → About, so no screen has to name the service itself.
+   */
+  readonly attribution?: string;
   /** Sources and IPTV. */
   readonly media?: MediaRoleManifest;
   /** Players. */
@@ -51,6 +58,8 @@ export interface PluginManifest {
   readonly account?: AccountManifest;
   /** Sync: where the account's backup file is kept. */
   readonly backup?: BackupManifest;
+  /** Metadata: what it can name. */
+  readonly metadata?: MetadataManifest;
   /** What a connection needs: endpoint, account, secrets. */
   readonly connectionFields: readonly Field[];
   readonly settings: readonly PluginSettingDescriptor[];
@@ -68,6 +77,7 @@ export interface Plugin {
   readonly player?: PlayerRole;
   readonly account?: AccountRole;
   readonly backup?: BackupRole;
+  readonly metadata?: MetadataRole;
 }
 
 export function isToggle(setting: PluginSettingDescriptor): setting is ToggleSetting {

@@ -109,8 +109,8 @@ These are specific to Streaming Center and matter more than anything above.
    `services/tab-content.ts` and nowhere else.
 
 3. **Only the composition root imports a concrete plugin** — a source, IPTV,
-   player or sync package, and so a player's view. Screens resolve what they
-   need from injected services. `@sc/player-kit` holds only types — the React
+   player, sync or metadata package, and so a player's view. Screens resolve
+   what they need from injected services. `@sc/player-kit` holds only types — the React
    half of the player contract — and may be named anywhere as `import type`;
    lint refuses anything more. This is what keeps the boundary real rather
    than aspirational.
@@ -145,9 +145,9 @@ These are specific to Streaming Center and matter more than anything above.
    `src/services/query-keys.ts`). The database alone is not enough. What a
    source answered is keyed with `remoteKey()`, so a local change never
    refetches every server. What lives where:
-   - **Account-wide** — profiles, their PINs and preferences, and source and
-     IPTV connections with each profile's values on them. Journaled, carried to
-     your server, written into backups. What a profile keeps for itself on a
+   - **Account-wide** — profiles, their PINs and preferences, and source,
+     IPTV and metadata connections with each profile's values on them.
+     Journaled, carried to your server, written into backups. What a profile keeps for itself on a
      connection — its values under the connection's `perProfile` mode — is
      user-owned and goes with the profile.
    - **Device-wide** — players (on or off, the default, their settings), sync
@@ -188,9 +188,9 @@ These are specific to Streaming Center and matter more than anything above.
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
   newer database is refused. A table rebuild is a `foreignKeysOff` step. The
-  latest three: v7 the lists a profile makes, v8 its favourite channels, v9
-  watch status the app keeps and the account's own settings. `docs/data` has
-  what each does.
+  latest three: v8 a profile's favourite channels, v9 watch status the app
+  keeps and the account's own settings, v10 what a metadata adapter said an
+  IPTV title is. `docs/data` has what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
   changes nothing writes nothing. Only account-wide state is journaled: device
   settings, sync-category connections, the account's own rows (`account`,
@@ -518,7 +518,8 @@ repository, as npm workspaces:
   "adapters/sources/*",
   "adapters/iptv/*",
   "adapters/players/*",
-  "adapters/sync/*"
+  "adapters/sync/*",
+  "adapters/metadata/*"
 ]
 ```
 
@@ -601,11 +602,11 @@ typecheck.
   the scroll view it finds over the whole sheet unless it is the second of
   exactly two children, so anything put beside it — a title, Done — is drawn
   under the content.
-- **Four tabs:** Media, Videos, TV, Settings. Settings → Adapters is four rows —
-  Sources, IPTV, Players, Sync — each opening that category's list for this
-  platform (`settings/adapters/[category]`, then `[category]/[name]`: the id's
-  two parts are the two segments, so no id is ever URL-encoded). There is no
-  global list.
+- **Four tabs:** Media, Videos, TV, Settings. Settings → Adapters is five
+  rows — Sources, IPTV, Players, Sync, Metadata — each opening that category's
+  list for this platform (`settings/adapters/[category]`, then
+  `[category]/[name]`: the id's two parts are the two segments, so no id is
+  ever URL-encoded). There is no global list.
 - Forms render from manifests (`src/components/manifest-form/`), switching on
   `field.type` only. Never write a form for a specific plugin.
 - **A button comes from `@/components/button`, never from Tamagui** — lint
@@ -664,7 +665,7 @@ Everything above describes the target; what runs today:
 - **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
   a time: Live with group chips, channels with now and next, a day guide per
   channel, channels played live with channel up and down; its films and
-  series as posters. Settings → Adapters is four lists, by category, of the
+  series as posters. Settings → Adapters is five lists, by category, of the
   plugins that run on this platform. Stored plugin ids are qualified by
   category (database v3).
 - **One account per device,** local or on your own server (database v4).
@@ -728,6 +729,14 @@ Everything above describes the target; what runs today:
   by `watchIdentity` (the TMDB id a portal matched it to, else its title),
   merged field by field on sync; the TV tab lists what was begun first, and
   every card has its check.
+- **Metadata (database v10):** a fifth adapter category, and TMDB in it, with
+  the household's own key — account-wide, like a source. Items an IPTV
+  provider names only by their title are looked up as they are drawn
+  (`IdentityService`, four at a time); the answer is kept on the device, laid
+  on before an item is keyed, and what was kept under the title moves to the
+  TMDB id. Never by name above the composition root: the lookups branch on the
+  `iptv` category and `Source.watch`, and About shows what a manifest's
+  `attribution` says.
 - **Downloads:** Settings → Downloads holds Options — what to ask a source
   for, which does not drive a download yet — then what is kept. Media's home
   has a Downloaded row after Continue watching (home layout version 2), and a

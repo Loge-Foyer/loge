@@ -17,6 +17,7 @@ plugins/
   iptv/<name>/           m3u stalker xtream mock
   players/<name>/        system ksplayer mpv vlc
   sync/<name>/           custom-server icloud google-drive onedrive mock mock-backup
+  metadata/<name>/       tmdb
 test/                    vitest — api rules, plugins against fake HTTP, conformance
 docs/
 ```
@@ -38,6 +39,7 @@ that folder path: `sources/jellyfin`, `iptv/stalker`, `players/system`,
 | `iptv` | `media`, with `live` | the media role, with live members | account |
 | `players` | `player` (a profile per platform) | the player role and `player-kit`'s view | device |
 | `sync` | `account` or `backup` | the account role or the backup role | device |
+| `metadata` | `metadata` (`identifies`: movies, shows) | the metadata role: `identify` a title | account |
 
 **A service with two jobs is two plugins.** Google Drive's files are
 `sources/google-drive`; Google Drive as a backup place is `sync/google-drive`.
@@ -55,7 +57,7 @@ create `adapters/sync/jellyfin`.
 | --- | --- | --- |
 | `api` | nothing | react, react-native, expo\*, any plugin, the app |
 | `player-kit` | `@sc/api`, `react`, `react-native` (peers) | any plugin, the app |
-| a sources, IPTV or sync plugin | `@sc/api` | any framework, the app, another plugin |
+| a sources, IPTV, sync or metadata plugin | `@sc/api` | any framework, the app, another plugin |
 | a player plugin | `@sc/api`, `@sc/player-kit`, react, react-native, its engine (expo-video, or an Expo module in its own folder, reached through `expo`) | the app, another plugin |
 
 A player's React, React Native and published engine are **peers**, which the
@@ -104,6 +106,8 @@ interface PluginManifest {
   readonly player?: PlayerManifest;
   readonly account?: AccountManifest;
   readonly backup?: BackupManifest;
+  readonly metadata?: MetadataManifest;         // { identifies: ['movies', 'shows'] }
+  readonly attribution?: string;                 // what the service's terms ask the app to show, in About
   readonly connectionFields: readonly Field[];
   readonly settings: readonly PluginSettingDescriptor[];     // never a password
 }
@@ -198,6 +202,22 @@ values:
 `stat`, `read`, `list`, and `write(name, bytes, ifMatch)`, which refuses with
 `SYNC_CONFLICT` when the file changed since that etag. It stores bytes and
 nothing else. The file's format and encryption are the app's.
+
+### The metadata role
+
+`plugin.metadata.connect(target, context)` returns a
+`ConnectedMetadataProvider`: `check`, `identify`, `dispose`.
+
+- **`identify({ type, title, originalTitle?, year? })`** answers with a
+  catalogue's ids — `{ tmdb: '238' }` — or nothing. The app keys watch status
+  by them (`watchIdentity`), so **a wrong answer merges two films**: answer
+  only when sure. TMDB takes a name in any language only once that name is
+  among the film's own translations or alternative titles, and refuses a name
+  several films share when no year tells them apart.
+- **A refused key is latched**, and a catalogue counting requests answers
+  `backoff`. The app asks four at a time, and remembers every answer.
+- The query's title has no provider marks — `bareTitle` took them off —
+  and carries the year that was in it.
 
 ---
 
@@ -332,6 +352,8 @@ Phase 9 dropped VLC, which is back now on Android, iPhone and Apple TV.
   promise), and watch state written back (`reportPlayback`, `setPlayed`)
 - the account role, record by record (`AccountRecord`, `isAccountRecord`), and
   the backup role
+- the metadata role (`identify`), and what a thing is apart from any source
+  (`watchIdentity`, `bareTitle`, `titleKey`, `identityHash`)
 - the host's crypto port (`PluginCrypto`: random bytes, SHA-256, HKDF,
   AES-GCM), and bytes as text (`bytes.ts`)
 
@@ -371,6 +393,11 @@ TypeScript program of its own with React Native's types.
   with an invite, the password typed again as the owner check.
 - **`sync/mock`** plays at being your own server in memory, and
   **`sync/mock-backup`** at being a backup target.
+- **`metadata/tmdb`** implements the metadata role: which film or series a
+  title is, with the household's own key — a Read Access Token as a bearer
+  header, an API key in the query. Tested against recorded answers, and run
+  against TMDB with a real key: "Der Pate" and "The Godfather" are both 238,
+  "Haus des Geldes" and "Money Heist" both 71446.
 - **Every other plugin** is a manifest that declares no capability: the other
   IPTV plugins, KSPlayer with no profile, backup targets with no role.
 

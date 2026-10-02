@@ -7,6 +7,7 @@ import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Info } from '@tamagui/lucide-icons-2/icons/Info';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
+import { ScanSearch } from '@tamagui/lucide-icons-2/icons/ScanSearch';
 import { SlidersHorizontal } from '@tamagui/lucide-icons-2/icons/SlidersHorizontal';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Users } from '@tamagui/lucide-icons-2/icons/Users';
@@ -23,6 +24,7 @@ import type { DownloadBudget } from '@/services/downloads';
 import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
+import { useConnectedPlugins } from '@/hooks/use-connections';
 import { useAccountSettingActions, useWatchStatusSetting } from '@/hooks/use-account-settings';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
 import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
@@ -53,6 +55,7 @@ const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
   iptv: Tv,
   players: CirclePlay,
   sync: RefreshCw,
+  metadata: ScanSearch,
 };
 
 /** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
@@ -66,6 +69,7 @@ export function SettingsScreen() {
   const status = useSyncStatus();
   const { data: profiles = [] } = useProfiles();
   const { data: sources = [] } = useSources();
+  const { data: connectedPlugins } = useConnectedPlugins();
   const user = profiles.find((profile) => profile.id === userId);
   const appSettings = useAppSettings();
   const { set } = useAppSettingActions();
@@ -83,6 +87,10 @@ export function SettingsScreen() {
   const summaryOf = (category: PluginCategory) => {
     if (category === 'sync') return account?.kind === 'server' ? `Your account: ${account.name}` : CATEGORY_DESCRIPTIONS.sync;
     if (catalog.inCategory(category).length === 0) return 'None on this device';
+    if (category === 'metadata') {
+      const used = catalog.inCategory(category).filter((manifest) => connectedPlugins?.has(manifest.id));
+      return used.length === 0 ? CATEGORY_DESCRIPTIONS.metadata : used.map((manifest) => manifest.displayName).join(', ');
+    }
     const connected = sources.filter((source) => source.manifest.category === category).length;
     if (connected === 0) return CATEGORY_DESCRIPTIONS[category];
     return `${connected} ${connected === 1 ? 'connection' : 'connections'}`;
@@ -212,7 +220,7 @@ export function SettingsScreen() {
 
       <SettingsSection
         title="Adapters"
-        footer="Sources and IPTV go with your account. Players, and where your account and its backups live, are set up on each device."
+        footer="Sources, IPTV and metadata go with your account. Players, and where your account and its backups live, are set up on each device."
       >
         {PLUGIN_CATEGORIES.map((category) => {
           const Icon = CATEGORY_ICONS[category];
@@ -234,6 +242,10 @@ export function SettingsScreen() {
           icon={<Info size={20} color="$color11" />}
           trailing={<SizableText color="$color10">{Constants.expoConfig?.version ?? '—'}</SizableText>}
         />
+        {/* What the services the app uses ask it to say: their manifests carry it, so nothing here names one. */}
+        {catalog.list().flatMap((manifest) =>
+          manifest.attribution ? [<SettingsRow key={manifest.id} title={manifest.displayName} subtitle={manifest.attribution} />] : [],
+        )}
       </SettingsSection>
     </Screen>
   );

@@ -11,7 +11,7 @@ that is not built yet, it says so.
 | [Getting started](getting-started/README.md) | Installing and running, the three ways into a first launch, your own server on your computer, backups, starting from scratch |
 | [Architecture](architecture/README.md) | Layers, the composition root, the session gate, the plugin catalogue, sources, the account and its sync, the owner check, backups, state ownership |
 | [Data](data/README.md) | The local database: account-wide and device-wide data, transactions, the change journal, syncing with your server, the backup file, migrations, secrets, the media cache |
-| [Adapters](adapters/README.md) | Where the adapters live and how the boundary is kept, the four categories and their lists, scopes, the platform filter, registration, what an adapter is given and where its content appears |
+| [Adapters](adapters/README.md) | Where the adapters live and how the boundary is kept, the five categories and their lists, scopes, the platform filter, registration, what an adapter is given and where its content appears |
 | [Playback](playback/README.md) | Descriptors and players, choosing a player, device-wide selection, watch status and its outbox |
 | [UI](ui/README.md) | Tamagui, the four tabs, Settings, Welcome and the account screens, artwork, the web |
 | [Network](network/README.md) | Reaching a server: cleartext on both phones, and the client-certificate design that is not built yet |

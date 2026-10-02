@@ -8,6 +8,7 @@ import {
   type Connection,
   type ConnectionId,
   type ConnectionValues,
+  type ExternalIds,
   type GlobalMediaKey,
   type MediaDetail,
   type MediaItem,
@@ -46,6 +47,8 @@ import type {
   SubscriptionRepository,
   FavoriteChannel,
   FavoriteChannelRepository,
+  IdentityRepository,
+  KnownIdentity,
   AccountSetting,
   AccountSettingsRepository,
   WatchProgress,
@@ -872,6 +875,44 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     },
   };
 
+  // Device state beside the media cache: never journaled, cascading from the profile and the connection.
+  const identities: IdentityRepository = {
+    getMany: async (user, keys) => {
+      const found: KnownIdentity[] = [];
+      const byConnection = new Map<ConnectionId, string[]>();
+      for (const key of keys) byConnection.set(key.connectionId, [...(byConnection.get(key.connectionId) ?? []), key.externalId]);
+      for (const [connection, externalIds] of byConnection) {
+        for (let at = 0; at < externalIds.length; at += 400) {
+          const some = externalIds.slice(at, at + 400);
+          const rows = await sql.all<{ external_id: string; external_ids: string | null; resolved_at: number }>(
+            `SELECT external_id, external_ids, resolved_at FROM identities WHERE user_id = ? AND connection_id = ? AND external_id IN (${some.map(() => '?').join(', ')})`,
+            [user, connection, ...some],
+          );
+          for (const row of rows) {
+            found.push({
+              key: { connectionId: connection, externalId: row.external_id },
+              ...(row.external_ids === null ? {} : { externalIds: parse<ExternalIds>(row.external_ids) }),
+              resolvedAt: row.resolved_at,
+            });
+          }
+        }
+      }
+      return found;
+    },
+    put: async (user, known) => {
+      if (!(await parentsExist(user, known.key.connectionId))) return;
+      await sql.run(
+        `INSERT INTO identities (user_id, connection_id, external_id, external_ids, resolved_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, connection_id, external_id) DO UPDATE SET external_ids = excluded.external_ids, resolved_at = excluded.resolved_at`,
+        [user, known.key.connectionId, known.key.externalId, known.externalIds === undefined ? null : JSON.stringify(known.externalIds), known.resolvedAt],
+      );
+    },
+    purge: async (connection, user) => {
+      if (user === undefined) await sql.run('DELETE FROM identities WHERE connection_id = ?', [connection]);
+      else await sql.run('DELETE FROM identities WHERE connection_id = ? AND user_id = ?', [connection, user]);
+    },
+  };
+
   const journal: JournalRepository = {
     entries: async (after = 0, limit) =>
       (await sql.all<JournalRow>('SELECT * FROM change_journal WHERE seq > ? ORDER BY seq LIMIT ?', [after, limit ?? -1])).map(
@@ -904,6 +945,7 @@ export function sqliteRepositories(sql: SqlExecutor, options: WriteOptions): Rep
     playlists,
     watchProgress,
     accountSettings,
+    identities,
     journal,
   };
 }

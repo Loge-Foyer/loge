@@ -35,8 +35,9 @@ web for one thing only — sql.js, loaded to write or open a backup file.
 - **Profiles**, at most ten: a name, the ref of a PIN, and their preferences
   (today the home layout). Everything a profile owns cascades from `users`, so
   deleting the profile is one statement.
-- **Source and IPTV connections**, with their shared values, their category,
-  `enabled` and their `perProfile` mode. Every device on the account has them.
+- **Source, IPTV and metadata connections**, with their shared values, their
+  category, `enabled` and their `perProfile` mode. Every device on the account
+  has them.
 - **A profile's own values** on a connection that keeps values per profile:
   fields, settings, a credentials ref, or `off` when the profile does not use
   that connection.
@@ -58,6 +59,7 @@ web for one thing only — sql.js, loaded to write or open a backup file.
   - `account_sync` — the checkpoint, and when it last synced
   - `backup_state` — per target, the `{ lineage, generation, etag }` last seen
 - **What sources answered**, per profile: the media cache (below).
+- **What a metadata adapter said items are** (v10), per profile: `identities`.
 - **The change journal.**
 
 **The credential store** holds passwords, PINs, session tokens and the backup
@@ -366,6 +368,25 @@ The steps, the same on both engines:
   channel offline made two records of it, and the second broke every later
   reconcile on the unique index. The smaller id now wins on every device, and
   the other is deleted on the account.
+- **v10** — `identities`: what a metadata adapter — TMDB — said an item of an
+  IPTV provider is, keyed by profile, connection and item: its catalogue ids,
+  or `NULL` for "asked, nothing close enough".
+  - **Why.** A portal keeps a copy of a film for each language, each its own
+    item under its own name, and often says nothing more. Until its copies
+    carry one id, watching the German copy leaves the English one unwatched.
+  - **Device state, like the media cache:** never journaled, never synced,
+    never in a backup — a device without it asks again. It cascades from the
+    profile and from the source whose item it names, and is purged with the
+    media cache when that connection's values change: another portal at the
+    same connection may mean another film by the same id.
+  - **Laid on before an item is keyed:** the watch service reads it
+    (`withKnownIds`) before `watchIdentity`, so a film found to be
+    `tmdb:movie:238` is kept there; an episode takes its series' entry.
+  - **A miss is asked again after thirty days**; a hit is kept.
+  - **What was kept under the title moves** — in one journaled transaction,
+    the row under the catalogue's id written, merged with any already there,
+    and the title's removed — so every device of the account follows. Watched
+    holds if either was; where it got to is the one touched last.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the

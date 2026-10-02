@@ -354,8 +354,9 @@ export function createConnectionService(deps: {
       if (row) await tx.connections.putProfileValues(connection.id, userId, row);
       else await tx.connections.deleteProfileValues(connection.id, userId);
     }
-    // What the source answered under the old values may not hold under the new ones.
+    // What the source answered under the old values may not hold under the new ones — nor what its items were found to be.
     await tx.mediaCache.purge(connection.id);
+    await tx.identities.purge(connection.id);
     await tx.staleSecrets.add([...stale, ...signedOut.map((scope) => sessionRef(connection.id, scope))]);
   };
 

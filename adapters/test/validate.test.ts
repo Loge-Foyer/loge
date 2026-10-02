@@ -207,7 +207,7 @@ describe('validateManifest — categories and platforms', () => {
   it('needs the id to be the category and a name', () => {
     expect(with_(source, { id: pluginId('fixture') })).toContain('id "fixture" must be "sources/<kebab-case name>"');
     expect(with_(source, { id: pluginId('iptv/fixture') })).toContain('id "iptv/fixture" must be "sources/<kebab-case name>"');
-    expect(with_(source, { category: 'widgets' as never })).toContain('category "widgets" is not one of sources, iptv, players, sync');
+    expect(with_(source, { category: 'widgets' as never })).toContain('category "widgets" is not one of sources, iptv, players, sync, metadata');
   });
 
   it('allows only the block the category declares, and only one', () => {
@@ -256,5 +256,43 @@ describe('validateManifest — categories and platforms', () => {
     expect(validateManifest({ ...blockless, id: pluginId('sync/drive'), category: 'sync', backup: { location: ' ' } })).toContain(
       'backup location is empty',
     );
+  });
+});
+
+describe('validateManifest — metadata', () => {
+  const { media: _media, ...blockless } = sound;
+  const metadata = (overrides: Partial<PluginManifest> = {}) =>
+    validateManifest({
+      ...blockless,
+      id: pluginId('metadata/fixture'),
+      category: 'metadata',
+      connectionFields: [{ key: 'apiKey', label: 'Key', type: 'password', required: true }],
+      settings: [],
+      metadata: { identifies: ['movies', 'shows'] },
+      ...overrides,
+    });
+
+  it('accepts a metadata block that names films and series', () => {
+    expect(metadata()).toEqual([]);
+  });
+
+  it('takes an attribution only with words in it', () => {
+    expect(metadata({ attribution: 'Uses a catalogue.' })).toEqual([]);
+    expect(metadata({ attribution: ' ' })).toContain('attribution is empty');
+  });
+
+  it('rejects one that names nothing, something it cannot, or one kind twice', () => {
+    expect(metadata({ metadata: { identifies: [] } })).toContain('metadata role identifies nothing');
+    expect(metadata({ metadata: { identifies: ['movies', 'movies', 'live' as never] } })).toEqual([
+      'metadata kind "live" is not one of movies, shows',
+      'metadata kind "movies" is listed twice',
+    ]);
+  });
+
+  it('keeps the block in its category, and every other block out of it', () => {
+    expect(validateManifest({ ...sound, metadata: { identifies: ['movies'] } })).toEqual(
+      expect.arrayContaining(['a sources plugin cannot declare the metadata block', 'declares media and metadata; a plugin declares one block']),
+    );
+    expect(metadata({ media: { contentKinds: ['movies'], capabilities: [] } })).toContain('a metadata plugin cannot declare the media block');
   });
 });

@@ -6,8 +6,8 @@ const expoConfig = require('eslint-config-expo/flat');
 // (spec §15). These make that a lint error rather than a convention.
 const implementations = [
   {
-    // A source, IPTV, player or sync package. @sc/player-kit is the player contract: its types go anywhere (below).
-    group: ['@sc/source-*', '@sc/iptv-*', '@sc/player-*', '!@sc/player-kit', '@sc/sync-*'],
+    // A source, IPTV, player, sync or metadata package. @sc/player-kit is the player contract: its types go anywhere (below).
+    group: ['@sc/source-*', '@sc/iptv-*', '@sc/player-*', '!@sc/player-kit', '@sc/sync-*', '@sc/metadata-*'],
     message: 'Only src/composition/ imports a concrete plugin. Use the catalogue from useServices().',
   },
   {

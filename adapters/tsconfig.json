@@ -12,6 +12,7 @@
     "api/src/**/*.ts",
     "sources/*/src/**/*.ts",
     "iptv/*/src/**/*.ts",
-    "sync/*/src/**/*.ts"
+    "sync/*/src/**/*.ts",
+    "metadata/*/src/**/*.ts"
   ]
 }

@@ -1,11 +1,12 @@
 import { pluginId, type PluginId } from './ids';
 
 /**
- * The four kinds of plugin. Each has its folder under `plugins/`, its list in
- * Settings → Plugins, and one contract: sources and IPTV the media role,
- * players the player role, sync the account or the backup role.
+ * The five kinds of plugin. Each has its folder under `adapters/`, its list in
+ * Settings → Adapters, and one contract: sources and IPTV the media role,
+ * players the player role, sync the account or the backup role, metadata the
+ * metadata role — what a title is, for a source that does not say.
  */
-export const PLUGIN_CATEGORIES = ['sources', 'iptv', 'players', 'sync'] as const;
+export const PLUGIN_CATEGORIES = ['sources', 'iptv', 'players', 'sync', 'metadata'] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
 
@@ -25,11 +26,13 @@ export const CATEGORY_SCOPE: Readonly<Record<PluginCategory, PluginScope>> = {
   iptv: 'account',
   players: 'device',
   sync: 'device',
+  // A key is the household's, like a source's password: set up once, on every device.
+  metadata: 'account',
 };
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 
-/** `sources/jellyfin`: a plugin's category and name, which is also its folder under `plugins/`. */
+/** `sources/jellyfin`: a plugin's category and name, which is also its folder under `adapters/`. */
 export function qualifiedPluginId(category: PluginCategory, name: string): PluginId {
   if (!NAME.test(name)) throw new Error(`plugin name "${name}" must be kebab-case`);
   return pluginId(`${category}/${name}`);
