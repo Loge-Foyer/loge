@@ -102,3 +102,26 @@ finger) is a refusal.
 - Deep links work cold or warm, with no prompt:
   `adb shell am start -a android.intent.action.VIEW -d "loge://browse/movies"`.
 - JavaScript logs go to logcat under `ReactNativeJS`.
+
+## The app icon
+
+An adaptive icon, as Android's guide describes one: 108 dp layers with the
+art inside the 66 dp safe zone, and a monochrome layer for themed icons
+(Android 13 and later). The layers are the finished design's
+(`.claude/Finished Design/Android/Loge/` at the workspace root).
+
+- **`android.adaptiveIcon` in `app.json`:**
+  - the foreground (`assets/images/android-icon-foreground.png`) and
+    monochrome (`android-icon-monochrome.png`) layers, at 432², which is
+    xxxhdpi. Expo resizes them for every density.
+  - the background is a colour, `#4a0b14`, not an image. Expo takes a colour
+    or an image there, nothing in between. `#4a0b14` is the design's
+    gradient at the icon's centre, and its average.
+- **PNGs, not vectors.** Converting the design's SVGs to VectorDrawables
+  drops their stroke gradients.
+- **The root `icon`** (`assets/images/icon.png`, the flat render) makes the
+  legacy `ic_launcher` and `ic_launcher_round` webps. With `minSdkVersion` 26
+  nothing shows them.
+- **A suggested app in the dock** sits on a plate tinted from the wallpaper.
+  That plate is the Pixel launcher's, not the icon's; the app drawer shows the
+  icon as it is.

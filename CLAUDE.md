@@ -131,6 +131,16 @@ What runs today:
   `npm run tvos:device` — with no development client, no Metro and nothing
   attached: a development build on a phone kept it busy for the computer, and
   warm (`docs/platforms/ios`).
+- Loge's own icon, from the finished design kept at the workspace root
+  (`../.claude/Finished Design/`):
+  - iOS: an Icon Composer document, `assets/loge.icon`, whose fill is the
+    background, with Mono art for Clear and Tinted;
+  - Android: an adaptive icon on one colour, with a monochrome layer;
+  - Apple TV: a layered icon and the top shelf;
+  - the web: the flat icon as the favicon;
+  - the splash: the mark.
+- The theme is drawn from the icon: velvet-black surfaces and a brass
+  accent (`docs/ui`, and each `docs/platforms/*` page's "App icon").
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

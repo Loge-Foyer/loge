@@ -107,3 +107,36 @@ click that only React Native's own `Pressable` hears. So:
   page, the default profile in the picker.
 
 `docs/ui` has the TV layouts.
+
+## The icon and the top shelf
+
+tvOS reads no Icon Composer document. Its icon is a layered image stack, and
+config-tv builds it from `appleTVImages` in `app.json` into
+`TVAppIcon.brandassets`. On a TV build only, config-tv also names the app
+icon `TVAppIcon` after Expo has named it `loge`, so the stack wins. An iPhone
+build never sees any of it.
+
+- **`assets/tv/`**, made once from the finished design's 1024² iOS layers
+  (`.claude/Finished Design/iOS/Loge/` at the workspace root):
+  - **the app icon**, at 400×240, 800×480 and 1280×768, in three layers:
+    - back: the design's gradient, #7a1422 to #2a050b along (0, 0) → (0.3, 1)
+      of the image;
+    - middle: the box;
+    - front: the front.
+
+    The art is 60 % of the icon's height, centred, so the parallax has room.
+  - **the top shelf**, at 1920×720 and 3840×1440, and wide at 2320×720 and
+    4640×1440: the front composited over the box, at half the height,
+    centred on the gradient.
+- **The back layer has to be an image.** A tvOS stack has no fill, so the
+  background is the one picture of a gradient in the app.
+- **The iPhone's `loge.icon` rides along.** Expo adds it to every target,
+  and with `INCLUDE_ALL_APPICON_ASSETS` actool compiles its four layers into
+  the TV build as well, unused. actool raises nothing about it.
+- **File names carry their size.** Names inside one image set must differ.
+  config-tv reads the paths from the working directory, which is the project
+  root when `scripts/ios-target.js` prebuilds.
+- **To make them again:** scale each layer so the art (its bounds in the
+  1024² layers are 112, 102 – 912, 922) is the share of the height above.
+  Place it centred on a transparent canvas of the size, and paint the back
+  layer's gradient by its formula.

@@ -184,3 +184,40 @@ passcode. Only `src/platform/owner-authentication.ts` imports it; the web gets
 - `npm run ios` builds, installs and opens the development build. Opened again
   by hand, it shows its launcher: pick the running Metro server.
 - Deep links use the app's own scheme, `loge://<path>`.
+
+## The app icon
+
+The icon is an Icon Composer document, `assets/loge.icon` (`ios.icon` in
+`app.json`), made from the finished design kept at the workspace root
+(`.claude/Finished Design/`). Open it in Icon Composer to change it.
+
+- **The background is the document's fill**, a gradient from #7a1422 to
+  #2a050b, not a layer. Icon Composer draws a document fill top to bottom and
+  ignores an `orientation` on it, so there is none.
+- **Two groups, front first**: the front (the play button, the cushion, the
+  rail) over the box. Each holds the colour art, hidden in Mono, and the
+  white Mono art, shown only there. Mono covers Clear and Tinted.
+  - `image-name-specializations` would read as the way to swap art per
+    appearance. Icon Composer 27 ignores it, and actool compiles only the
+    base images.
+  - A layer's default visibility goes inside `hidden-specializations` as
+    `{"value": …}`. A plain `hidden` next to it wins over every appearance.
+- **PNG layers, not the design's SVGs.** CoreSVG maps the play button's
+  stroke gradient apart from its fill and draws a second triangle inside
+  it. The 1024² PNGs render as designed.
+- **Preview it without Xcode's window**, in any appearance (Default, Dark,
+  ClearLight, ClearDark, TintedLight, TintedDark):
+
+  ```bash
+  "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" \
+    assets/loge.icon --export-image --output-file /tmp/icon.png --platform iOS \
+    --rendition Default --width 1024 --height 1024 --scale 1
+  ```
+
+  `xcrun actool assets/loge.icon --compile /tmp/icon --platform iphoneos --minimum-deployment-target 16.4 --app-icon loge --output-partial-info-plist /tmp/icon/p.plist`
+  compiles it as a build would. `xcrun assetutil --info /tmp/icon/Assets.car`
+  lists what came out.
+- **Renaming the document needs a clean prebuild.** Expo copies it to
+  `ios/Loge/<name>.icon` and names the app icon after it. A prebuild that is
+  not clean keeps the old copy too, and actool compiles both.
+- Apple TV never reads a `.icon`: `docs/platforms/tvos`.

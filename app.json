@@ -6,8 +6,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "loge",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#1b0e0e",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/loge.icon",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -22,9 +23,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0e1214",
+        "backgroundColor": "#4a0b14",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -43,9 +43,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0e1214",
+          "backgroundColor": "#1b0e0e",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
       "expo-sqlite",
@@ -85,7 +85,32 @@
       "./config-plugins/with-newest-libcxx",
       "./config-plugins/with-picture-in-picture",
       "./config-plugins/with-scene-lifecycle",
-      "@react-native-tvos/config-tv"
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "appleTVImages": {
+            "iconSmallLayers": {
+              "front": "./assets/tv/icon-front-400x240.png",
+              "middle": "./assets/tv/icon-middle-400x240.png",
+              "back": "./assets/tv/icon-back-400x240.png"
+            },
+            "iconSmall2xLayers": {
+              "front": "./assets/tv/icon-front-800x480.png",
+              "middle": "./assets/tv/icon-middle-800x480.png",
+              "back": "./assets/tv/icon-back-800x480.png"
+            },
+            "iconLayers": {
+              "front": "./assets/tv/icon-front-1280x768.png",
+              "middle": "./assets/tv/icon-middle-1280x768.png",
+              "back": "./assets/tv/icon-back-1280x768.png"
+            },
+            "topShelf": "./assets/tv/top-shelf-1920x720.png",
+            "topShelf2x": "./assets/tv/top-shelf-3840x1440.png",
+            "topShelfWide": "./assets/tv/top-shelf-wide-2320x720.png",
+            "topShelfWide2x": "./assets/tv/top-shelf-wide-4640x1440.png"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
