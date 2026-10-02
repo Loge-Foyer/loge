@@ -112,6 +112,31 @@ Tests run on Node, which has built-ins Hermes does not. What passes here can
 still throw on a phone — which is why lint rejects the known gaps in `src/` —
 and screens are only proven by driving the app: see the `loge-run` skill.
 
+## Versions
+
+Loge and Foyer share one version, `YEAR.MONTH.BUILD` — `2026.10.1`, then
+`2027.3.456` — so whoever runs them sees at once that they belong together.
+
+- **`BUILD` counts every release and never starts again**, not at a new month
+  and not at a new year. That makes it the build number too: iOS's
+  `CFBundleVersion` and Android's `versionCode` are `BUILD`, and both stores
+  want one that only goes up.
+- **`YEAR.MONTH` is when that release was made.** The month has no leading
+  zero: semver refuses `2027.03.4`, and the stores read `03` and `3` as one.
+- **`package.json` is the only place it is written.** `app.json` has no
+  `version`, so Expo takes it from `package.json`, and `app.config.js`
+  derives the build number from it and refuses anything else.
+- **`npm run release` starts the next one**: this month, `BUILD` + 1, written
+  here and in `../foyer/internal/version/version.go` — refused if the two
+  disagree — and it says what to commit in each. Foyer's harness fails when
+  the server answers another version than the app's.
+- **The version is baked into the native projects**, and `npm run ios` and
+  `npm run android` never prebuild again: after a release,
+  `npx expo prebuild --clean` before the next native build.
+- **It says nothing about compatibility.** App and server ship together, and
+  nothing compares versions; a "can this server do X" belongs in a field of
+  `info`, never in a comparison.
+
 ## Debugging on a device
 
 - **Android** prints JavaScript logs to logcat:

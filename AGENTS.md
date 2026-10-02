@@ -80,6 +80,9 @@ Docs: https://docs.expo.dev/eas/index.md
 
   A native change means building again — a stale build looks like code that
   did not change. The web needs no build.
+- **The version is `package.json`'s alone.** Never write one in `app.json`
+  or by hand: `npm run release` moves the app and Foyer together, and
+  `app.config.js` derives the build number from it (`docs/development`).
 - Prefer recommended Expo modules over third-party libraries, and check your
   available skills before adding dependencies.
   Docs: https://docs.expo.dev/versions/latest/index.md

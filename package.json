@@ -1,7 +1,7 @@
 {
   "name": "loge",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "2026.10.1",
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "@expo/ui": "~57.0.21",
@@ -102,6 +102,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test && npm run typecheck:adapters",
     "test": "vitest run",
+    "release": "node scripts/release.mjs",
     "typecheck:adapters": "tsc --noEmit -p adapters && tsc --noEmit -p adapters/tsconfig.players.json && tsc --noEmit -p adapters/test"
   },
   "private": true,
