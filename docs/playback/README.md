@@ -37,6 +37,12 @@ space, will any engine on this device still open in a month".
   will make one (Jellyfin transcoding) or because several already exist (a
   site's own renditions). A source with the first alone hands over what it
   has, and no sheet of choices is shown.
+- **What to ask for** is Settings → Downloads → Options: a smaller copy or
+  the file as it is, a resolution, a bitrate, HDR. This device's, for every
+  source at once. **It does not drive a download yet**: the detail page lists
+  the versions a source offers, and the queue asks for the one chosen, never
+  passing `DownloadRequest.quality`. Wiring it — the version that fits taken
+  in one tap — is for later.
 - **A `DownloadDescriptor` is as secret as a `PlaybackDescriptor`**: its
   address can hold an `api_key`, an HMAC signature or a session token. Memory
   only, never a row, never a log.

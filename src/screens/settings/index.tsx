@@ -7,6 +7,7 @@ import { Film } from '@tamagui/lucide-icons-2/icons/Film';
 import { Info } from '@tamagui/lucide-icons-2/icons/Info';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
+import { SlidersHorizontal } from '@tamagui/lucide-icons-2/icons/SlidersHorizontal';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
@@ -17,7 +18,7 @@ import { ProfileAvatar } from '@/components/profile-avatar';
 import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
-import { useDownloadBudget } from '@/hooks/use-downloads';
+import { useDownloadBudget, useDownloadSettings } from '@/hooks/use-downloads';
 import type { DownloadBudget } from '@/services/downloads';
 import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
@@ -29,6 +30,7 @@ import { useSources } from '@/hooks/use-sources';
 import { APP_DEFAULTS } from '@/services/app-settings';
 import { CONTENT_TABS } from '@/services/tab-content';
 
+import { downloadOptionsSummary } from './download-options';
 import { categoryHref } from './plugin-route';
 
 const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
@@ -41,6 +43,7 @@ const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
 /** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
 export function SettingsScreen() {
   const budget = useDownloadBudget();
+  const downloadSettings = useDownloadSettings();
   const userId = useActiveUserId();
   const { catalog } = useServices();
   const { data: account } = useAccount();
@@ -142,6 +145,15 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="Downloads" footer="What this device keeps to watch with no network at all.">
+        {/* Where nothing can be kept — a TV, a browser — there is nothing to ask for. */}
+        {budget.data?.limitBytes === 0 ? null : (
+          <SettingsRow
+            title="Options"
+            subtitle={downloadOptionsSummary(downloadSettings.data)}
+            icon={<SlidersHorizontal size={20} color="$color11" />}
+            href="/settings/downloads/options"
+          />
+        )}
         <SettingsRow
           title="Downloads"
           subtitle={downloadsSummary(budget.data)}

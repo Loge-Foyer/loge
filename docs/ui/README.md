@@ -163,6 +163,10 @@ TV's sections.
   (on by default on a TV, where whoever picks up the remote is someone else;
   the default profile is kept for when it is off), and force landscape on
   playback.
+- **Downloads** — Options, what to ask a source for when keeping a copy
+  (`settings/downloads/options`); then Downloads, what this device keeps and
+  what is still coming down. Options is hidden where nothing can be kept — a
+  TV, a browser.
 - **Adapters** — four rows: Sources, IPTV, Players, Sync. Each opens that
   category's list for this platform (`settings/adapters/[category]`), and each
   plugin has its page (`settings/adapters/[category]/[name]`). There is no
