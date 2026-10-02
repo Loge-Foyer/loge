@@ -20,18 +20,22 @@ export const plugin: Plugin = {
     media: { contentKinds: ['live', 'movies', 'shows'], capabilities: ['browse', 'search', 'channels', 'epg', 'playback', 'remoteImages', 'offlineMetadata'] },
     connectionFields: [
       { key: 'portalUrl', label: 'Portal address', type: 'url', required: true, placeholder: 'http://portal.example.com/c/' },
-      // The MAC address is what signs in: anyone with it and the portal's address can use the subscription.
+      // The MAC address is what signs in: anyone with it and the portal's address
+      // can use the subscription, so it is stored as a password. It is no secret
+      // to whoever holds it, though, and typing one unseen is how it goes wrong —
+      // so it is shown, as are the box's other ids.
       {
         key: 'mac',
         label: 'MAC address',
         type: 'password',
+        visible: true,
         required: true,
         placeholder: '00:1A:79:00:00:00',
-        description: 'The one your provider registered for you. Kept like a password.',
+        description: 'The one your provider registered for you.',
       },
-      { key: 'serialNumber', label: 'Serial number', type: 'password', description: 'Only if your provider asks for one.' },
-      { key: 'deviceId', label: 'Device id', type: 'password', description: 'Only if your provider asks for one.' },
-      { key: 'signature', label: 'Signature', type: 'password', description: 'Only if your provider asks for one.' },
+      { key: 'serialNumber', label: 'Serial number', type: 'password', visible: true, description: 'Only if your provider asks for one.' },
+      { key: 'deviceId', label: 'Device id', type: 'password', visible: true, description: 'Only if your provider asks for one.' },
+      { key: 'signature', label: 'Signature', type: 'password', visible: true, description: 'Only if your provider asks for one.' },
     ],
     settings: [
       {

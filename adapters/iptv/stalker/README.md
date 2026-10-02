@@ -18,11 +18,13 @@ series.
 
 - **Portal address** — required, as the provider gives it (`…/c/`, or
   `…/stalker_portal/c/`, or the script itself, `…/portal.php`).
-- **MAC address** — required. Kept like a password: anyone with it and the
-  portal's address can use the subscription. It must look like
-  `00:1A:79:12:34:56`; dashes and lower case are read too.
+- **MAC address** — required. Stored like a password — anyone with it and the
+  portal's address can use the subscription — but shown as it is typed and
+  when the connection is edited (`visible`): it is no secret to whoever holds
+  it, and typed unseen it goes wrong. It must look like `00:1A:79:12:34:56`;
+  dashes and lower case are read too.
 - **Serial number**, **device id** and **signature** — only if the provider
-  asks for them; kept like passwords too.
+  asks for them; stored and shown the same way.
 
 ## How it talks to a portal
 

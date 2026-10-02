@@ -35,6 +35,22 @@ describe.each(ENGINES)('on %s', (engine: Engine) => {
       expect(stored?.values.credentialsRef).toBeDefined();
     });
 
+    it('shows what a visible password holds, for its scope, and no other password', async () => {
+      const source = fakeMediaPlugin('portal', { withVisible: true });
+      const { services } = buildServices({ plugins: [source.plugin], engine });
+      const kids = await services.profiles.create('Kids');
+      const created = await services.connections.create(source.manifest.id, setSecret(sharedDraft(source.manifest, kids.id), kids.id, 'mac', '00:1A:79:12:34:56'));
+      expect(await services.connections.visibleSecrets(created.id, 'shared')).toEqual({ mac: '00:1A:79:12:34:56' });
+      // Shown again and saved as it was, it changes nothing: the ref stays.
+      const shownBack = setSecret(sharedDraft(source.manifest, kids.id), kids.id, 'mac', '00:1A:79:12:34:56');
+      expect((await services.connections.update(created.id, shownBack)).values.credentialsRef).toBe(created.values.credentialsRef);
+      // Nothing is saved for a profile's own scope here, and a manifest without one shows nothing.
+      expect(await services.connections.visibleSecrets(created.id, kids.id)).toEqual({});
+      const plain = await setUp();
+      const other = await plain.services.connections.create(plain.source.manifest.id, sharedDraft(plain.source.manifest, plain.kids.id));
+      expect(await plain.services.connections.visibleSecrets(other.id, 'shared')).toEqual({});
+    });
+
     it('refuses a draft whose shared values are incomplete', async () => {
       const { services, source } = await setUp();
       await expect(services.connections.create(source.manifest.id, initialDraft(source.manifest, 0))).rejects.toBeInstanceOf(

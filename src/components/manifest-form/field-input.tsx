@@ -15,7 +15,7 @@ export type FormField = Field | PluginSettingDescriptor;
 
 export interface FieldInputProps {
   field: FormField;
-  /** For a password field: what was typed in this edit, never a saved value. */
+  /** For a password field: what was typed in this edit — never a saved value, unless the field is `visible`. */
   value: FieldValue | undefined;
   onChange: (value: FieldValue) => void;
   error?: string | undefined;
@@ -77,6 +77,8 @@ export function FieldInput(props: FieldInputProps) {
 
 function TextInputField({ field, value, onChange, disabled, saved, onRemoveSaved, error, id }: FieldInputProps & { id: string }) {
   const isPassword = field.type === 'password';
+  // A visible password is typed and read in the clear: stored as a secret, shown as text.
+  const masked = isPassword && field.visible !== true;
   const placeholder = isPassword && saved ? 'Saved — type to replace' : 'placeholder' in field ? field.placeholder : undefined;
   return (
     <XStack gap="$2" items="center">
@@ -93,7 +95,7 @@ function TextInputField({ field, value, onChange, disabled, saved, onRemoveSaved
         autoCorrect={false}
         // `type` alone: on native it picks the keyboard or masks the text, as
         // long as no inputMode/keyboardType overrides it.
-        type={isPassword ? 'password' : field.type === 'url' ? 'url' : 'text'}
+        type={masked ? 'password' : field.type === 'url' ? 'url' : 'text'}
         {...(placeholder ? { placeholder } : {})}
       />
       {isPassword && saved && onRemoveSaved ? (

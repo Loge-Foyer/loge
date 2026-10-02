@@ -5,6 +5,7 @@ import {
   type AppUser,
   type BooleanField,
   type ConnectionId,
+  type Credentials,
   type FieldValue,
   type PerProfile,
   type PluginId,
@@ -16,7 +17,7 @@ import {
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { Button } from '@/components/button';
@@ -45,6 +46,7 @@ import {
   probeValues,
   profilesLosingValues,
   secretFor,
+  secretScope,
   setProfileOff,
   setSecret,
   setValue,
@@ -58,12 +60,41 @@ import {
   type ConnectionDraft,
   type ConnectionEditState,
   type SavedSecrets,
+  type SecretScope,
 } from '@/services/connections';
 import { hasErrors, hasFieldErrors, validateDraft, type DraftErrors } from '@/services/field-values';
 import type { ProbeTarget } from '@/services/media';
 import { showsOn } from '@/services/tab-content';
 
 const NO_ERRORS: DraftErrors = { shared: {}, profiles: {} };
+const NONE_SHOWN: Credentials = {};
+
+/**
+ * What the visible password fields hold for the scope a tab edits, read from
+ * the credential store into this form's state — never into a query, whose
+ * cache other screens can read.
+ */
+function useShownSecrets(manifest: PluginManifest, connectionId: ConnectionId | undefined, scope: SecretScope): Credentials {
+  const { connections } = useServices();
+  const wanted = manifest.connectionFields.some((field) => field.type === 'password' && field.visible === true);
+  const at = `${connectionId ?? ''}|${scope}`;
+  const [shown, setShown] = useState<{ readonly at: string; readonly values: Credentials }>();
+  useEffect(() => {
+    if (!connectionId || !wanted) return;
+    let current = true;
+    connections.visibleSecrets(connectionId, scope).then(
+      (values) => {
+        if (current) setShown({ at, values });
+      },
+      // Not on this device — a restore — and the field says it is saved, as any password does.
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [connections, connectionId, scope, at, wanted]);
+  return shown?.at === at ? shown.values : NONE_SHOWN;
+}
 const NOTHING_SAVED: SavedSecrets = { shared: new Set(), profiles: new Map() };
 
 export function NewConnectionScreen({ pluginId }: { pluginId: PluginId }) {
@@ -215,6 +246,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
   const locked = separate && tab !== userId && tabProfile?.pinProtected === true && !unlocked.has(tab);
   const tabOff = isOffInDraft(draft, tab);
   const canProbe = catalog.mediaRole(manifest.id) !== undefined && draft.enabled;
+  const shown = useShownSecrets(manifest, connectionId, secretScope(draft, tab));
 
   const target = (): ProbeTarget => {
     const values = probeValues(manifest, draft, tab);
@@ -270,19 +302,24 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
       const change = secretFor(draft, tab, field.key);
       const savedHere = (separate ? saved.profiles.get(tab) : saved.shared)?.has(field.key) ?? false;
       const isSaved = change !== null && (savedHere || typeof change === 'object');
+      // A visible one shows what is saved until it is typed over, and emptying
+      // it removes it: there is no "Saved — type to replace" to keep it by.
+      const visible = field.visible === true;
+      const value = typeof change === 'string' ? change : visible && change === undefined ? shown[field.key] : undefined;
       return (
         <FieldInput
           key={`${list}.${field.key}`}
           field={field}
-          value={typeof change === 'string' ? change : undefined}
-          onChange={(value) => {
-            if (typeof value === 'string') edit((current) => setSecret(current, tab, field.key, value));
+          value={value}
+          onChange={(next) => {
+            if (typeof next !== 'string') return;
+            edit((current) => setSecret(current, tab, field.key, visible && next === '' && isSaved ? null : next));
           }}
           error={error}
           disabled={inert}
-          saved={isSaved}
+          saved={isSaved && value === undefined}
           marker={marker(perProfile)}
-          {...(isSaved && !field.required && !inert
+          {...(isSaved && !visible && !field.required && !inert
             ? { onRemoveSaved: () => edit((current) => setSecret(current, tab, field.key, null)) }
             : {})}
         />

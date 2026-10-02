@@ -114,6 +114,8 @@ export interface FakeSourceOptions {
   readonly signsIn?: boolean;
   /** A field that says nothing of where or as whom it signs in — as Jellyfin's "local only". */
   readonly withNote?: boolean;
+  /** A password shown as it is typed and when edited — as a portal's MAC address. */
+  readonly withVisible?: boolean;
   /** Takes progress and watched state back (`watchStateWrite`), recording each report. */
   readonly writesWatchState?: boolean;
   /** Thrown by the watch-state writes alone while set: the source answers, but takes nothing back. */
@@ -162,6 +164,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
       { key: 'username', label: 'Username', type: 'text', required: true, credential: true },
       { key: 'password', label: 'Password', type: 'password' },
       ...(options.withNote ? [{ key: 'note', label: 'Note', type: 'text' as const }] : []),
+      ...(options.withVisible ? [{ key: 'mac', label: 'MAC address', type: 'password' as const, visible: true as const }] : []),
     ],
     settings: options.withImages
       ? [{ key: 'cacheMetadata', label: 'Cache', type: 'boolean', default: true, gates: ['media.offlineMetadata'] }]

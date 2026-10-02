@@ -12,7 +12,7 @@ credentials.
 | --- | --- | --- |
 | `text` | text input | `required`, `placeholder`, `default`, `credential` |
 | `url` | URL input | same as `text`, without `credential` |
-| `password` | masked input | the only secret type; no `default`; never shown again once saved |
+| `password` | masked input | the only secret type; no `default`; never shown again once saved — unless `visible` |
 | `boolean` | switch | `default` required |
 | `select` | picker | `options` and a `default` that is one of them |
 
@@ -21,6 +21,13 @@ store and keeps an opaque `credentialsRef` on the connection, plus the names of
 the saved secrets. Everything else is stored in plain text — so
 `validateManifest` rejects a non-password field whose key looks like a secret
 (`apiToken` declared as `text`).
+
+**`visible: true`** on a password field shows it as it is typed and reads the
+saved value back when the connection is edited — for a credential that signs in
+on its own but is no secret to the person holding it, such as a portal's MAC
+address, which goes wrong when typed unseen. It changes nothing about storage:
+the credential store, never a row, and in `secrets` on the way to your server.
+Emptying a saved one removes it.
 
 **`credential: true`** marks a text field that is part of the account on the
 other side — a username. It decides what "separate credentials per profile"

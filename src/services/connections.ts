@@ -98,6 +98,11 @@ export interface ConnectionService {
   /** The account's connection is refused: signing out comes first. */
   remove(id: ConnectionId): Promise<void>;
   /**
+   * What the password fields a manifest marks `visible` hold for `scope` — a
+   * portal's MAC address — for the form to show. Never any other password.
+   */
+  visibleSecrets(id: ConnectionId, scope: SecretScope): Promise<Credentials>;
+  /**
    * The secret values a probe signs in with: what `scope` has saved, with this
    * edit's changes applied. They go to the plugin, never to a screen.
    */
@@ -418,6 +423,14 @@ export function createConnectionService(deps: {
       if (!removed) return;
       await janitor.drain();
       onChanged?.(id);
+    },
+    visibleSecrets: async (id, scope) => {
+      const existing = await db.connections.get(id);
+      const manifest = existing ? catalog.get(existing.pluginId) : undefined;
+      const shown = (manifest?.connectionFields ?? []).filter((field) => field.type === 'password' && field.visible === true).map((field) => field.key);
+      if (!existing || shown.length === 0) return {};
+      const saved = await savedIn({ connection: existing, profiles: await db.connections.profileValues(id) }, scope);
+      return Object.fromEntries(shown.flatMap((key) => (saved[key] === undefined ? [] : [[key, saved[key]]])));
     },
     probeSecrets: async (pluginId, id, scope, changes) => {
       const manifest = manifestOf(pluginId);

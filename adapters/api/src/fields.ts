@@ -28,13 +28,20 @@ export interface UrlField extends FieldBase {
 
 /**
  * The only field whose value is secret. It goes to the credential store, never
- * to the database, and is never read back into a form — which is also why it
- * cannot declare a default.
+ * to the database, and is never read back into a form unless it is `visible` —
+ * which is also why it cannot declare a default.
  */
 export interface PasswordField extends FieldBase {
   readonly type: 'password';
   readonly required?: boolean;
   readonly placeholder?: string;
+  /**
+   * Shown as it is typed, and read back to be edited: a credential that signs
+   * in on its own but is no secret to the person holding it — a portal's MAC
+   * address, which is tedious to type unseen and worth checking later. Still a
+   * password to storage: the credential store, never a row.
+   */
+  readonly visible?: true;
 }
 
 export interface BooleanField extends FieldBase {
