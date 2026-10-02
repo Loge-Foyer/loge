@@ -52,7 +52,7 @@ function fakePortal(options: { keeps?: boolean } = {}) {
           listChannels: async (query) => {
             calls.push(`channels ${query.groupId ?? '*'} ${query.cursor ?? '-'}`);
             fail();
-            const list = all.filter((each) => !query.groupId || each.groupIds.includes(query.groupId));
+            const list = all.filter((each) => (!query.groupId || each.groupIds.includes(query.groupId)) && (!query.term || each.name.includes(query.term)));
             const offset = query.cursor ? Number(query.cursor) : 0;
             const page = list.slice(offset, offset + 2);
             return { channels: page, total: list.length, ...(offset + 2 < list.length ? { nextCursor: String(offset + 2) } : {}) };
@@ -72,7 +72,7 @@ function fakePortal(options: { keeps?: boolean } = {}) {
             fail();
             // The portal's own order: not sorted for the app.
             const films = ['Zulu', 'Alpha', 'Mike'].map((title, index) => movie(target.connectionId, `f${index}`, 2020, { title }));
-            return query.kind === 'movies' ? { items: films } : { items: [] };
+            return query.kind === 'movies' ? { items: films.filter((film) => !query.term || film.title.includes(query.term)) } : { items: [] };
           },
           getItem: async (externalId) => ({ item: movie(target.connectionId, externalId, 2020), people: [], studios: [], externalIds: {} }),
           getChildren: async () => ({ items: [] }),
@@ -132,6 +132,28 @@ describe.each(ENGINES)('live TV on %s', (engine: Engine) => {
     await t.services.media.channels(t.kids, t.connectionId, { limit: 2 });
     t.portal.fail(down());
     await expect(t.services.media.channels(t.kids, t.connectionId, { limit: 2 })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+  });
+
+  it('never keeps a search’s channels, nor stands the group in for a search', async () => {
+    const t = await setUp({ keeps: true });
+    await t.services.media.channels(t.kids, t.connectionId, { limit: 2 });
+    expect((await t.services.media.channels(t.kids, t.connectionId, { limit: 2, term: '3' })).value.channels.map((channel) => channel.name)).toEqual(['Channel 3']);
+    t.portal.fail(down());
+    const saved = await t.services.media.channels(t.kids, t.connectionId, { limit: 2 });
+    expect(saved.value.channels.map((channel) => channel.name)).toEqual(['Channel 1', 'Channel 2']);
+    await expect(t.services.media.channels(t.kids, t.connectionId, { limit: 2, term: '3' })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+  });
+
+  it('never keeps a search’s films, nor stands the catalogue in for a search', async () => {
+    const t = await setUp({ keeps: true });
+    const newest = { kind: 'movies', sort: { by: 'addedAt', order: 'desc' }, limit: 20 } as const;
+    await t.services.media.sourcePage(t.kids, t.connectionId, newest);
+    expect((await t.services.media.sourcePage(t.kids, t.connectionId, { ...newest, term: 'Zulu' })).items.map((item) => item.title)).toEqual(['Zulu']);
+    t.portal.fail(down());
+    const saved = await t.services.media.sourcePage(t.kids, t.connectionId, newest);
+    expect(saved.items.map((item) => item.title)).toEqual(['Zulu', 'Alpha', 'Mike']);
+    expect(saved.sourceError?.savedAt).toBeDefined();
+    await expect(t.services.media.sourcePage(t.kids, t.connectionId, { ...newest, term: 'Zulu' })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
   });
 
   it('lists one source’s films in its own order, never merged or re-sorted', async () => {

@@ -1,10 +1,10 @@
-import type { Channel, ChannelGroup, ConnectionId, ContentKind, Programme } from '@sc/api';
-import { FlashList } from '@shopify/flash-list';
+import type { Channel, ChannelGroup, ConnectionId, ContentKind, MediaItem, Programme } from '@sc/api';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { CalendarDays } from '@tamagui/lucide-icons-2/icons/CalendarDays';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { TvMinimalPlay } from '@tamagui/lucide-icons-2/icons/TvMinimalPlay';
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
@@ -58,7 +58,11 @@ export function TvScreen() {
         <SourceTabs
           tabs={sources.map((source) => ({ id: source.connection.id, label: source.connection.label }))}
           selected={selected.connection.id}
-          onSelect={(id) => router.setParams({ source: id, kind: '', group: '' })}
+          onSelect={(id) => {
+            // Another provider is another list: a search does not follow.
+            setTerm('');
+            router.setParams({ source: id, kind: '', group: '' });
+          }}
         />
       ) : null}
       {selected.kinds.length > 1 ? (
@@ -75,11 +79,14 @@ export function TvScreen() {
     </YStack>
   );
 
-  // A new term is a new list: the key resets the section's paging with it.
+  // Keyed by what a section lists, never by the term. The search box sits in
+  // the list's header, so remounting the list for each term took the keyboard
+  // away while someone was typing; a new term is a new query, which pages from
+  // its start on its own.
   if (kind === 'live') {
-    return <Live key={`${selected.connection.id}:${term}`} source={selected} group={params.group ? fromRouteId(params.group) : undefined} term={term} header={header} />;
+    return <Live key={selected.connection.id} source={selected} group={params.group ? fromRouteId(params.group) : undefined} term={term} header={header} />;
   }
-  return <SourceGrid key={`${selected.connection.id}:${kind}:${term}`} source={selected} kind={kind} term={term} header={header} />;
+  return <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} term={term} header={header} />;
 }
 
 function TvEmptyState() {
@@ -138,10 +145,15 @@ function Live({ source, group, term, header }: { source: TabSource; group: strin
   const now = useNow();
   const { onRefresh, control } = useRefresh();
   const errors = [groups.data?.sourceError, channels.data?.pages[0]?.sourceError, guide.data?.sourceError].filter((error): error is SourceError => error !== undefined);
+  const scroller = useRef<FlatList<Channel>>(null);
+  useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
 
   return (
     <FlatList
+      ref={scroller}
       data={list}
+      // The first tap after typing reaches a chip or ✕, rather than only putting the keyboard away.
+      keyboardShouldPersistTaps="handled"
       keyExtractor={(channel) => channel.key.externalId}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}
@@ -173,6 +185,16 @@ function Live({ source, group, term, header }: { source: TabSource; group: strin
       refreshControl={control}
     />
   );
+}
+
+/** A new search starts at the top of its list. */
+function useTopOnNewTerm(term: string, toTop: () => void) {
+  const previous = useRef(term);
+  useEffect(() => {
+    if (previous.current === term) return;
+    previous.current = term;
+    toTop();
+  });
 }
 
 function dedupe(errors: readonly SourceError[]): readonly SourceError[] {
@@ -287,9 +309,13 @@ function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: C
   const cardWidth = Math.floor((width - 32 - (columns - 1) * 12) / columns);
   const items = page.data?.pages.flatMap((each) => each.items) ?? [];
   const errors = page.data?.pages[0]?.sourceError ? [page.data.pages[0].sourceError] : [];
+  const scroller = useRef<FlashListRef<MediaItem>>(null);
+  useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
   return (
     <FlashList
+      ref={scroller}
       key={columns}
+      keyboardShouldPersistTaps="handled"
       data={items}
       numColumns={columns}
       keyExtractor={(item) => item.key.externalId}

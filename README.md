@@ -161,8 +161,10 @@ the design, and most of it runs today, built with
 - **Live TV** on the TV tab, from a Stalker portal: channels in their groups
   with what is on now and next, a day's guide, channel up and down, and the
   provider's films and series.
-- **Search**, on Media and on TV — each box searching what is in front of
-  you, never everything at once.
+- **Search**, on Media, Videos and TV — each box searching what is in front
+  of you, never everything at once. It starts once typing stops for two
+  seconds, or at once on the search key; on Videos, where each search is a
+  request to the source, on the search key alone.
 - **Not yet:** M3U and Xtream, Plex and Emby, the drives, and downloads.
   KSPlayer is a manifest with no engine behind it.
 

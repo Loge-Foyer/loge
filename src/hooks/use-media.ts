@@ -76,20 +76,23 @@ export function useGrid(spec: RowSpec | undefined) {
   // Nothing was ever saved for a search, so nothing stands in for one.
   const searching = (spec?.term ?? '').trim().length > 0;
   const saved = useQuery({
-    queryKey: remoteKey(userId, 'saved', 'grid', spec?.kind, spec?.sort.by, spec?.sort.order),
+    // Scoped to one source where the grid is: two sources' films are not one list.
+    queryKey: remoteKey(userId, 'saved', 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.connectionId),
     queryFn: () => (spec && !searching ? media.saved.gridFirstPage(userId, spec, GRID_PAGE) : null),
     enabled: spec !== undefined && !searching,
   });
   // A saved first page has no `next`, and a placeholder never counts for
   // `hasNextPage` — so the grid cannot page on from last week's positions.
+  // A disabled query still holds what it had: while searching, the saved
+  // catalogue must not stand in for the answer.
   const placeholder = useMemo(
     (): InfiniteData<GridPage, MergeState | null> | undefined =>
-      saved.data ? { pages: [saved.data], pageParams: [null] } : undefined,
-    [saved.data],
+      saved.data && !searching ? { pages: [saved.data], pageParams: [null] } : undefined,
+    [saved.data, searching],
   );
   return useInfiniteQuery({
     // The term is part of the key: one query's answers never show under another's.
-    queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.term?.trim() || undefined),
+    queryKey: remoteKey(userId, 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.connectionId, spec?.term?.trim() || undefined),
     queryFn: ({ pageParam, signal }) => {
       if (!spec) throw new Error('No row to show.');
       return media.gridPage(userId, spec, pageParam, GRID_PAGE, signal);

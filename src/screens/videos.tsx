@@ -102,6 +102,8 @@ function SourceVideos({
     <FlashList
       // A new column count is a new layout, not an update of the old one.
       key={columns}
+      // The first tap after typing reaches a tab or ✕, rather than only putting the keyboard away.
+      keyboardShouldPersistTaps="handled"
       data={items}
       numColumns={columns}
       keyExtractor={(item: MediaItem) => `${item.key.connectionId}:${item.key.externalId}`}
@@ -129,7 +131,8 @@ function SourceVideos({
             />
           ) : null}
           {canSearch ? (
-            <SearchField placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`} term={term} onTerm={onTerm} />
+            // Each search is a request to the source, so only the search key sends one.
+            <SearchField placeholder={`Search ${CONTENT_KIND_LABELS[kind].toLowerCase()}`} term={term} onTerm={onTerm} searchOn="submit" />
           ) : null}
           <XStack>
             <Link href="/lists" asChild>

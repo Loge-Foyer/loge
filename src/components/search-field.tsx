@@ -6,13 +6,15 @@ import { XStack } from 'tamagui';
 import { Button } from '@/components/button';
 import { TextInput } from '@/components/text-input';
 
-/** Long enough that a key does not start a search, short enough not to feel slow. */
-const SETTLE_MS = 300;
+/** Long enough to finish a word with a TV remote, short enough not to feel slow. */
+const PAUSE_MS = 2_000;
 
 /**
  * A search box over whatever list it is put above — never across lists. It
- * reports a term only once typing settles, so a source is asked once for a
- * word rather than once for each letter of it.
+ * searches once typing pauses, or at once on the keyboard's search key; with
+ * `searchOn="submit"`, on that key alone, for a source where every search is a
+ * request someone waits on. Emptying the box brings the list back at once: an
+ * empty box is no search to wait for.
  *
  * What is typed is its own, so that typing stays immediate while the list
  * behind it lags a moment. To clear it from outside — moving to another
@@ -23,18 +25,25 @@ export function SearchField({
   placeholder,
   term,
   onTerm,
+  searchOn = 'pause',
 }: {
   placeholder: string;
   term: string;
   onTerm: (term: string) => void;
+  searchOn?: 'pause' | 'submit';
 }) {
   const [typed, setTyped] = useState(term);
 
   useEffect(() => {
     if (typed === term) return;
-    const timer = setTimeout(() => onTerm(typed), SETTLE_MS);
+    if (typed.trim() === '') {
+      onTerm('');
+      return;
+    }
+    if (searchOn === 'submit') return;
+    const timer = setTimeout(() => onTerm(typed), PAUSE_MS);
     return () => clearTimeout(timer);
-  }, [typed, term, onTerm]);
+  }, [typed, term, onTerm, searchOn]);
 
   return (
     <XStack items="center" gap="$2">
@@ -52,7 +61,7 @@ export function SearchField({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          // Answer the moment it is asked for, rather than waiting out the settle.
+          // Answer the moment it is asked for, rather than waiting out the pause.
           onSubmitEditing={() => onTerm(typed)}
           clearButtonMode="never"
         />

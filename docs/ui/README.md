@@ -133,6 +133,22 @@ browser, that providers can't be reached there). Otherwise:
 IPTV is hidden on the web until a proxy exists — except the development mock
 portal, which has no portal to be refused by.
 
+## Search
+
+A search box searches the list beneath it and nothing else
+(`components/search-field.tsx`): Media's grid, a Videos source, and each of
+TV's sections.
+
+- **When it asks.** Once typing stops for two seconds, or at once on the
+  keyboard's search key. Videos asks on the key alone: there every search is a
+  request to the source. Emptying the box brings the list back at once.
+- **The box stays put.** A list is keyed by what it lists — the source, the
+  kind — never by the term. The box lives in the list's header, and a list
+  remounted for each term took the keyboard away mid-word.
+- **Nothing of a search is kept.** Its pages are never saved, and nothing
+  saved stands in for a search that fails: the catalogue is not what a search
+  for something in it found.
+
 ## Settings
 
 - **Account** — local, or on your own server, and how it stands.

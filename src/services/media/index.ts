@@ -192,6 +192,8 @@ const daysBetween = (from: string, to: string): readonly string[] => {
   return days;
 };
 
+const searches = (term: string | undefined) => (term ?? '').trim() !== '';
+
 // Gone or no longer possible: what was saved for it is wrong now, not merely old.
 const invalidates = (error: AppError) => error.code === 'NOT_FOUND' || error.code === 'INVALID_STATE';
 
@@ -602,8 +604,9 @@ export function createMediaService(deps: {
       }),
 
     channels: (userId, connectionId, query, signal) =>
-      // Only a group's first page is kept: a saved page is shown, never paged from.
-      liveCall(userId, connectionId, 'channels', query.cursor ? undefined : listKey.channels(query.groupId), (provider) => {
+      // Only a group's first page is kept: a saved page is shown, never paged
+      // from. Never a search's, which would come back as the group's list.
+      liveCall(userId, connectionId, 'channels', query.cursor || searches(query.term) ? undefined : listKey.channels(query.groupId), (provider) => {
         if (!provider.listChannels) throw missing('listChannels');
         return provider.listChannels(query, signal);
       }),
@@ -631,12 +634,15 @@ export function createMediaService(deps: {
     sourcePage: async (userId, connectionId, query, signal) => {
       const source = await sourceFor(userId, connectionId);
       const key = listKey.source(query);
+      // A search is never saved, and nothing saved stands in for one: the
+      // catalogue is not what a search for something in it found.
+      const searching = searches(query.term);
       try {
         const page = await call(source, (provider) => listItems(provider, query, signal));
-        if (!query.cursor) await saveList(userId, source, key, page.items);
+        if (!query.cursor && !searching) await saveList(userId, source, key, page.items);
         return { ...page, items: await watch.overlay(userId, page.items) };
       } catch (error) {
-        if (isAborted(error) || query.cursor) throw error;
+        if (isAborted(error) || query.cursor || searching) throw error;
         const failure = toAppError(error, log);
         const stand = await savedFor(userId, source, key, failure);
         if (!stand) throw failure;

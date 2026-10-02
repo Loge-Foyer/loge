@@ -83,6 +83,8 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
       <FlashList
         // A new column count is a new layout, not an update of the old one.
         key={columns}
+        // The first tap after typing reaches ✕ or a card, rather than only putting the keyboard away.
+        keyboardShouldPersistTaps="handled"
         data={items}
         numColumns={columns}
         keyExtractor={(item) => `${item.key.connectionId}:${item.key.externalId}`}
