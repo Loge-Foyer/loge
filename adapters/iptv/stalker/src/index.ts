@@ -56,6 +56,14 @@ export const plugin: Plugin = {
         description:
           'If what is on now is off by an hour or more, choose the time zone the portal keeps its guide in — often its own. Summer time follows each programme’s date.',
       },
+      {
+        key: 'guideByCountry',
+        label: 'Put other countries’ guides right',
+        type: 'boolean',
+        default: true,
+        description:
+          'A channel from another country than the portal’s own — its guide id ends in .tr, or its group starts with TR — can have a guide written in UTC that the portal takes for its own clock, hours early. Such a guide is read as UTC.',
+      },
     ],
   },
   media: {

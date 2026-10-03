@@ -55,6 +55,23 @@ const episodes = { js: { total_items: 2, max_page_items: 14, data: [{ id: '611',
 const now = 1_000_000; // the fake clock's, in ms
 const epg = (channel: string, start: number) => ({ ch_id: channel, name: `Show at ${start}`, descr: 'About it.', start_timestamp: start, stop_timestamp: start + 1800 });
 
+// A German portal with Turkish channels, as a real one answered: its `time` is
+// its own Berlin wall clock, and its stamps are that clock's instants. Show
+// TV's weekend news airs at 18:25 in Istanbul — 15:25Z — but its guide was
+// written in UTC and taken for Berlin's clock: stamped 13:25Z, `time` 15:25.
+const stamp = (iso: string) => Date.parse(iso) / 1000;
+const countryGenres = { js: [{ id: '*', title: 'All' }, { id: '1', title: 'TR ✨ ULUSAL' }, { id: '22', title: 'DE ✨ DEUTSCHLAND' }] };
+const countryChannels = [
+  { id: '12', name: '↺SHOW TV FHD', number: '2836', cmd: 'ffmpeg http://localhost/ch/12_', tv_genre_id: '1', xmltv_id: 'showtv.tr' },
+  { id: '534', name: '↺DAS ERSTE FHD', number: '1', cmd: 'ffmpeg http://localhost/ch/534_', tv_genre_id: '22', xmltv_id: 'ard.de' },
+  { id: '24', name: '↺KANAL 7 FHD', number: '2841', cmd: 'ffmpeg http://localhost/ch/24_', tv_genre_id: '1' },
+];
+const countryGuide = {
+  '12': [{ ch_id: '12', name: 'Show Ana Haber', start_timestamp: stamp('2026-10-04T13:25:00Z'), stop_timestamp: stamp('2026-10-04T14:45:00Z'), time: '2026-10-04 15:25:00', time_to: '2026-10-04 16:45:00' }],
+  '534': [{ ch_id: '534', name: 'Tagesschau', start_timestamp: stamp('2026-10-04T18:00:00Z'), stop_timestamp: stamp('2026-10-04T18:15:00Z'), time: '2026-10-04 20:00:00', time_to: '2026-10-04 20:15:00' }],
+  '24': [{ ch_id: '24', name: 'Hafta Sonu Haberleri', start_timestamp: stamp('2026-10-04T13:00:00Z'), stop_timestamp: stamp('2026-10-04T14:00:00Z'), time: '2026-10-04 15:00:00', time_to: '2026-10-04 16:00:00' }],
+};
+
 interface PortalOptions {
   readonly profile?: Readonly<Record<string, unknown>>;
   readonly expireOnce?: boolean;
@@ -68,6 +85,10 @@ interface PortalOptions {
   readonly stolen?: number;
   /** Its films' pages, where a test needs pages of its own. */
   readonly vod?: (page: number) => unknown;
+  /** Turkish and German channels, with guide ids and a guide on a German portal's clock. */
+  readonly countries?: boolean;
+  /** Its every-channel list fails, as a busy portal's whole answers can. */
+  readonly everyChannelFails?: boolean;
 }
 
 /** A Ministra portal at /stalker_portal/, answering by `type` and `action`. */
@@ -94,14 +115,22 @@ function fakePortal(options: PortalOptions = {}) {
         return { status: 200, text: 'Authorization failed.' };
       }
       if (type === 'stb' && action === 'get_profile') return { status: 200, json: { js: { id: '9', name: 'box', status: 0, ...options.profile } } };
-      if (type === 'itv' && action === 'get_genres') return { status: 200, json: genres };
-      if (type === 'itv' && action === 'get_ordered_list') return { status: 200, json: channelPage(Number(request.query.p)) };
-      if (type === 'itv' && action === 'get_all_channels') return { status: 200, json: { js: { total_items: 3, data: [...channelPage(1).js.data, ...channelPage(2).js.data] } } };
+      if (type === 'itv' && action === 'get_genres') return { status: 200, json: options.countries ? countryGenres : genres };
+      if (type === 'itv' && action === 'get_ordered_list') {
+        if (options.countries) return { status: 200, json: { js: { total_items: 3, max_page_items: 14, cur_page: 1, data: countryChannels } } };
+        return { status: 200, json: channelPage(Number(request.query.p)) };
+      }
+      if (type === 'itv' && action === 'get_all_channels') {
+        if (options.everyChannelFails) return { status: 503 };
+        if (options.countries) return { status: 200, json: { js: { total_items: 3, data: countryChannels } } };
+        return { status: 200, json: { js: { total_items: 3, data: [...channelPage(1).js.data, ...channelPage(2).js.data] } } };
+      }
       if (type === 'itv' && action === 'get_short_epg') {
         const start = now / 1000 - 600;
         return { status: 200, json: { js: [epg(request.query.ch_id ?? '', start), epg(request.query.ch_id ?? '', start + 1800)] } };
       }
       if (type === 'itv' && action === 'get_epg_info') {
+        if (options.countries) return { status: 200, json: { js: { data: countryGuide } } };
         const start = now / 1000;
         return { status: 200, json: { js: { data: { '101': [epg('101', start), epg('101', start + 7200)], '102': [epg('102', start)] } } } };
       }
@@ -353,7 +382,7 @@ describe('Stalker — live TV', () => {
     // 20:15 in Berlin, in summer, stamped as 20:15Z: it airs at 18:15Z.
     const stamped = Date.parse('2026-07-01T20:15:00Z') / 1000;
     const entry = { name: 'Tagesschau', start_timestamp: stamped, stop_timestamp: stamped + 900 };
-    expect(toProgramme(entry, key('ch:101'), 'Europe/Berlin')).toMatchObject({ startsAt: '2026-07-01T18:15:00.000Z', endsAt: '2026-07-01T18:30:00.000Z' });
+    expect(toProgramme(entry, key('ch:101'), { zone: 'Europe/Berlin' })).toMatchObject({ startsAt: '2026-07-01T18:15:00.000Z', endsAt: '2026-07-01T18:30:00.000Z' });
     // As the portal says: its times as sent.
     expect(toProgramme(entry, key('ch:101'))).toMatchObject({ startsAt: '2026-07-01T20:15:00.000Z' });
   });
@@ -367,6 +396,65 @@ describe('Stalker — live TV', () => {
     expect(day.map((programme) => [programme.channel.externalId, programme.startsAt])).toEqual([['ch:101', at(now + 3_600_000)]]);
     // Still told the box is on UTC, so the shift is the whole of the difference.
     expect(http.to(LOAD).at(-1)?.headers.Cookie).toContain('timezone=UTC');
+  });
+
+  it('reads another country’s guide, written in UTC and taken for the portal’s own clock, as UTC', () => {
+    const [news] = countryGuide['12'];
+    const [tagesschau] = countryGuide['534'];
+    // Istanbul keeps another offset than the portal's clock (`time` against the stamp): 18:25 there is 15:25Z.
+    expect(toProgramme(news, key('ch:12'), { countryZone: 'Europe/Istanbul' })).toMatchObject({ startsAt: '2026-10-04T15:25:00.000Z', endsAt: '2026-10-04T16:45:00.000Z' });
+    // Berlin keeps the portal's own: as sent, 20:00 there.
+    expect(toProgramme(tagesschau, key('ch:534'), { countryZone: 'Europe/Berlin' })).toMatchObject({ startsAt: '2026-10-04T18:00:00.000Z' });
+    // No country known, or no `time` to read: as sent.
+    expect(toProgramme(news, key('ch:12'))).toMatchObject({ startsAt: '2026-10-04T13:25:00.000Z' });
+    const { time: _time, time_to: _timeTo, ...stampsOnly } = news ?? {};
+    expect(toProgramme(stampsOnly, key('ch:12'), { countryZone: 'Europe/Istanbul' })).toMatchObject({ startsAt: '2026-10-04T13:25:00.000Z' });
+  });
+
+  it('keeps the chosen zone for the portal’s own country, and reads another country’s stamps as they are', () => {
+    // A portal that stamps its own Berlin wall clock as UTC: its home news, sent as 20:00Z, airs at 18:00Z.
+    const home = { name: 'Tagesschau', start_timestamp: stamp('2026-10-04T20:00:00Z'), stop_timestamp: stamp('2026-10-04T20:15:00Z'), time: '2026-10-04 20:00:00' };
+    expect(toProgramme(home, key('ch:534'), { zone: 'Europe/Berlin', countryZone: 'Europe/Berlin' })).toMatchObject({ startsAt: '2026-10-04T18:00:00.000Z' });
+    // A guide written in UTC there was stamped as written: 15:25Z is 18:25 in Istanbul.
+    const abroad = { name: 'Show Ana Haber', start_timestamp: stamp('2026-10-04T15:25:00Z'), stop_timestamp: stamp('2026-10-04T16:45:00Z'), time: '2026-10-04 15:25:00' };
+    expect(toProgramme(abroad, key('ch:12'), { zone: 'Europe/Berlin', countryZone: 'Europe/Istanbul' })).toMatchObject({ startsAt: '2026-10-04T15:25:00.000Z' });
+  });
+
+  it('knows each channel’s country by its guide id or its group, and puts its guide right', async () => {
+    const { provider } = await connect({ countries: true });
+    await need(provider, 'listChannelGroups')();
+    await need(provider, 'listChannels')({ limit: 50 });
+    const guide = await need(provider, 'getGuide')({ channels: [key('ch:12'), key('ch:534'), key('ch:24')], from: '2026-10-04T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' });
+    expect(guide.map((programme) => [programme.title, programme.startsAt])).toEqual([
+      ['Show Ana Haber', '2026-10-04T15:25:00.000Z'],
+      ['Tagesschau', '2026-10-04T18:00:00.000Z'],
+      // No guide id, but a Turkish group: 18:00 in Istanbul.
+      ['Hafta Sonu Haberleri', '2026-10-04T15:00:00.000Z'],
+    ]);
+  });
+
+  it('takes every guide as the portal says once the switch is off', async () => {
+    const { provider } = await connect({ countries: true, settings: { guideByCountry: false } });
+    await need(provider, 'listChannels')({ limit: 50 });
+    const guide = await need(provider, 'getGuide')({ channels: [key('ch:12')], from: '2026-10-04T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' });
+    expect(guide.map((programme) => programme.startsAt)).toEqual(['2026-10-04T13:25:00.000Z']);
+  });
+
+  it('reads the portal’s channels and groups once for a favourite nothing has listed', async () => {
+    const { provider, http } = await connect({ countries: true });
+    const getGuide = need(provider, 'getGuide');
+    const window = { from: '2026-10-04T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' };
+    const guide = await getGuide({ channels: [key('ch:24')], ...window });
+    expect(guide.map((programme) => programme.startsAt)).toEqual(['2026-10-04T15:00:00.000Z']);
+    await getGuide({ channels: [key('ch:24'), key('ch:12')], ...window });
+    expect(http.to(LOAD).filter((request) => request.query.action === 'get_all_channels')).toHaveLength(1);
+    expect(http.to(LOAD).filter((request) => request.query.action === 'get_genres')).toHaveLength(1);
+  });
+
+  it('answers the guide as the portal says when its channels cannot be read', async () => {
+    const { provider } = await connect({ countries: true, everyChannelFails: true });
+    const guide = await need(provider, 'getGuide')({ channels: [key('ch:12')], from: '2026-10-04T00:00:00.000Z', to: '2026-10-05T00:00:00.000Z' });
+    expect(guide.map((programme) => programme.startsAt)).toEqual(['2026-10-04T13:25:00.000Z']);
   });
 
   it('offers every time zone, and leaves the guide alone until one is chosen', () => {

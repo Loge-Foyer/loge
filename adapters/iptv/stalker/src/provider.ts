@@ -1,5 +1,7 @@
 import {
   AppError,
+  COUNTRY_ZONES,
+  countryOf,
   matchesTerm,
   type CancelSignal,
   type ConnectedMediaProvider,
@@ -33,6 +35,7 @@ import {
   toSeasons,
   toVod,
   type ChannelRow,
+  type GuideReading,
   type EpisodeRow,
   type SeasonRow,
   type VodRow,
@@ -61,9 +64,15 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   const portalUrl = typeof fields.portalUrl === 'string' ? fields.portalUrl : '';
   // The zone the portal keeps its guide in, where the connection says; its times as sent otherwise.
   const zone = typeof settings.timeZone === 'string' && settings.timeZone !== '' ? settings.timeZone : undefined;
+  // On unless switched off: a setting added after a connection was made is absent from it.
+  const byCountry = settings.guideByCountry !== false;
   const portal = createPortal({ portalUrl, context });
   // What `create_link` takes for each id — in memory only: on some portals it is the stream's address, sign-in and all.
   const channelCmds = new Map<string, string>();
+  // What says which country each channel is from — by the portal's own channel id — and its groups' titles.
+  const hints = new Map<string, { readonly name: string; readonly genre?: string; readonly guideId?: string }>();
+  const genreTitles = new Map<string, string>();
+  let genresRead: Promise<unknown> | undefined;
   const vod = new Map<string, VodRow>();
   const seasonRows = new Map<string, SeasonRow>();
   const episodeRows = new Map<string, EpisodeRow>();
@@ -83,7 +92,55 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   let wholeGuide: { readonly slot: number; readonly period: number; readonly answer: Promise<unknown> } | undefined;
 
   const remember = (rows: readonly ChannelRow[]) => {
-    for (const row of rows) if (row.cmd) channelCmds.set(row.channel.key.externalId, row.cmd);
+    for (const row of rows) {
+      if (row.cmd) channelCmds.set(row.channel.key.externalId, row.cmd);
+      const id = parseId(row.channel.key.externalId);
+      if (id?.kind !== 'channel') continue;
+      const genre = row.channel.groupIds[0];
+      hints.set(id.id, { name: row.channel.name, ...(genre ? { genre } : {}), ...(row.guideId ? { guideId: row.guideId } : {}) });
+    }
+  };
+
+  const groups = async (signal?: CancelSignal) => {
+    const found = toGroups(await portal.call('itv', 'get_genres', {}, signal));
+    for (const group of found) genreTitles.set(group.id, group.name);
+    return found;
+  };
+
+  /**
+   * How one channel's guide is read: the connection's zone, and the zone of
+   * the channel's own country where its guide id, its group or its name says
+   * which. A channel nothing has listed yet — a favourite, after a restart —
+   * has none until the portal's channels are read.
+   */
+  const readingOf = (channelId: string): GuideReading => {
+    const hint = byCountry ? hints.get(channelId) : undefined;
+    const country = hint
+      ? countryOf({ ...(hint.guideId ? { guideId: hint.guideId } : {}), names: [hint.genre ? genreTitles.get(hint.genre) : undefined, hint.name] })
+      : undefined;
+    const countryZone = country ? COUNTRY_ZONES[country] : undefined;
+    return { ...(zone ? { zone } : {}), ...(countryZone ? { countryZone } : {}) };
+  };
+
+  /**
+   * What the guide needs to know of the channels asked about: every channel,
+   * once, when one has not been listed, and the groups' titles, once. Neither
+   * is waited on by more than the caller that asked, and neither failing
+   * fails the guide — a channel then keeps the connection's reading.
+   */
+  const knowChannels = async (channelIds: readonly string[], signal?: CancelSignal) => {
+    if (!byCountry) return;
+    if (channelIds.some((id) => !hints.has(id))) await abandonable(loadEveryChannel(), signal).catch(() => undefined);
+    const untitled = channelIds.some((id) => {
+      const genre = hints.get(id)?.genre;
+      return genre !== undefined && !genreTitles.has(genre);
+    });
+    if (untitled) {
+      genresRead ??= groups().catch(() => {
+        genresRead = undefined;
+      });
+      await abandonable(genresRead, signal).catch(() => undefined);
+    }
   };
 
   // A channel played before its list was read, since a restart: the whole list, once.
@@ -211,7 +268,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       return { serverName: portal.root()?.replace(/^[a-z]+:\/\//i, '') ?? portalUrl };
     },
 
-    listChannelGroups: async (signal) => toGroups(await portal.call('itv', 'get_genres', {}, signal)),
+    listChannelGroups: (signal) => groups(signal),
 
     listChannels: async (query, signal) => {
       const page = query.cursor ? Number(query.cursor) : 1;
@@ -242,11 +299,15 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
         return parsed?.kind === 'channel' ? [{ key, id: parsed.id }] : [];
       });
       if (wanted.length === 0) return [];
+      await knowChannels(
+        wanted.map(({ id }) => id),
+        signal,
+      );
       const inWindow = (programme: Programme) => Date.parse(programme.endsAt) > from && Date.parse(programme.startsAt) < to;
       const now = context.clock.now();
       if (wanted.length <= SHORT_EPG_CHANNELS && to - now <= SHORT_EPG_WINDOW_MS) {
         const lists = await Promise.all(
-          wanted.map(async ({ key, id }) => epgList(await portal.call('itv', 'get_short_epg', { ch_id: id, size: 10 }, signal)).flatMap((entry) => toProgramme(entry, key, zone) ?? [])),
+          wanted.map(async ({ key, id }) => epgList(await portal.call('itv', 'get_short_epg', { ch_id: id, size: 10 }, signal)).flatMap((entry) => toProgramme(entry, key, readingOf(id)) ?? [])),
         );
         return lists.flat().filter(inWindow);
       }
@@ -255,7 +316,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       const shift = zone ? Math.ceil(Math.abs(zoneOffsetMs(zone, now) ?? 0) / 3_600_000) : 0;
       const period = Math.min(LONGEST_GUIDE_HOURS, Math.max(1, Math.ceil((to - now) / 3_600_000) + shift));
       const js = await guideOfEveryChannel(period, signal);
-      return wanted.flatMap(({ key, id }) => epgInfoFor(js, id).flatMap((entry) => toProgramme(entry, key, zone) ?? [])).filter(inWindow);
+      return wanted.flatMap(({ key, id }) => epgInfoFor(js, id).flatMap((entry) => toProgramme(entry, key, readingOf(id)) ?? [])).filter(inWindow);
     },
 
     listItems: (query, signal) => listing(listVod(query, signal)),
@@ -351,6 +412,8 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     dispose: async () => {
       channelCmds.clear();
+      hints.clear();
+      genreTitles.clear();
       vod.clear();
       seasonRows.clear();
       episodeRows.clear();

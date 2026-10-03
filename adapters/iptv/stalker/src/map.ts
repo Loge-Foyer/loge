@@ -1,6 +1,7 @@
 import {
   fromZoneWallClock,
   imageRef,
+  zoneOffsetMs,
   plainTitle,
   type ExternalIds,
   type Channel,
@@ -125,6 +126,8 @@ export interface ChannelRow {
   readonly channel: Channel;
   /** What `create_link` takes. Kept in memory only. */
   readonly cmd?: string;
+  /** The id its guide has in the portal's XMLTV source — `trt1.tr` — whose ending names its country. */
+  readonly guideId?: string;
 }
 
 export interface Page<T> {
@@ -159,6 +162,7 @@ export function toChannelRow(row: Readonly<Record<string, unknown>>, connectionI
   const logo = image(row.logo, root);
   const archiveHours = number(row.tv_archive_duration);
   const cmd = text(row.cmd);
+  const guideId = text(row.xmltv_id);
   return {
     channel: {
       key: { connectionId, externalId: ids.channel(id) },
@@ -169,29 +173,63 @@ export function toChannelRow(row: Readonly<Record<string, unknown>>, connectionI
       ...(yes(row.archive) && archiveHours ? { catchupDays: Math.max(1, Math.round(archiveHours / 24)) } : {}),
     },
     ...(cmd ? { cmd } : {}),
+    ...(guideId ? { guideId } : {}),
   };
 }
 
 /**
- * One programme. `zone` is the time zone the connection says the portal keeps
- * its guide in: a portal that stamps its own wall-clock time as UTC — told the
- * box is on UTC, as this plugin always says — puts 20:15 in Berlin at 20:15Z,
- * two hours late in summer. Without one, the portal's times are taken as sent.
+ * How one channel's guide is read. `zone` is the time zone the connection
+ * says the portal keeps its guide in: a portal that stamps its own wall-clock
+ * time as UTC — told the box is on UTC, as this plugin always says — puts
+ * 20:15 in Berlin at 20:15Z, two hours late in summer. `countryZone` is the
+ * zone of the channel's own country, where something about it says which, and
+ * the connection reads other countries' guides as UTC.
  */
-export function toProgramme(entry: unknown, channel: GlobalMediaKey, zone?: string): Programme | undefined {
+export interface GuideReading {
+  readonly zone?: string;
+  readonly countryZone?: string;
+}
+
+/** The portal's own wall-clock time — `time`, `2026-10-04 15:25:00` — read as if it were UTC. */
+function wallClock(value: unknown): number | undefined {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(text(value) ?? '');
+  if (!parts) return undefined;
+  const [, year, month, day, hour, minute, second] = parts.map(Number);
+  return Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0, second ?? 0);
+}
+
+/**
+ * One programme. Without a zone, its times as sent.
+ *
+ * Another country's guide can be written in UTC and taken by the portal for
+ * its own clock: on a German portal, Show TV's weekend news at 18:25 in
+ * Istanbul (15:25Z) came stamped 13:25Z, its `time` 15:25 — two hours early in
+ * summer. A channel whose country's zone keeps another offset than the
+ * portal's clock — `time` against the stamp, at that programme — is that
+ * case: its `time` is read as UTC. One of the portal's own country, or of none
+ * known, stays as sent.
+ */
+export function toProgramme(entry: unknown, channel: GlobalMediaKey, reading: GuideReading = {}): Programme | undefined {
   const row = record(entry);
   const start = number(row?.start_timestamp);
   const stop = number(row?.stop_timestamp);
   const title = text(row?.name);
   if (!row || start === undefined || stop === undefined || !title || stop <= start) return undefined;
   const description = text(row.descr);
-  const at = (seconds: number) => new Date(zone ? fromZoneWallClock(seconds * 1000, zone) : seconds * 1000).toISOString();
+  const { zone, countryZone } = reading;
+  const sent = (seconds: number) => (zone ? fromZoneWallClock(seconds * 1000, zone) : seconds * 1000);
+  // The portal's wall clock for it: its `time`, else the stamp, where the connection says stamps are one.
+  const wall = wallClock(row.time) ?? (zone ? start * 1000 : undefined);
+  const own = countryZone !== undefined && wall !== undefined ? zoneOffsetMs(countryZone, sent(start)) : undefined;
+  const utc = own !== undefined && wall !== undefined && own !== wall - sent(start);
+  const startsAt = utc && wall !== undefined ? wall : sent(start);
+  const endsAt = utc && wall !== undefined ? (wallClock(row.time_to) ?? wall + (stop - start) * 1000) : sent(stop);
   return {
     channel,
     title,
     ...(description ? { description } : {}),
-    startsAt: at(start),
-    endsAt: at(stop),
+    startsAt: new Date(startsAt).toISOString(),
+    endsAt: new Date(endsAt).toISOString(),
   };
 }
 

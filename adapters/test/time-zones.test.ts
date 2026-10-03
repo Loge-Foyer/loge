@@ -1,4 +1,4 @@
-import { fromZoneWallClock, TIME_ZONES, zoneOffsetMs } from '@loge/api';
+import { COUNTRY_ZONES, countryOf, fromZoneWallClock, TIME_ZONES, zoneOffsetMs } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const HOUR = 3_600_000;
@@ -38,5 +38,53 @@ describe('time zones', () => {
     expect(new Date(fromZoneWallClock(at('2026-03-29T03:30:00Z'), 'Europe/Berlin')).toISOString()).toBe('2026-03-29T01:30:00.000Z');
     expect(new Date(fromZoneWallClock(at('2026-10-25T04:30:00Z'), 'Europe/Berlin')).toISOString()).toBe('2026-10-25T03:30:00.000Z');
     expect(new Date(fromZoneWallClock(at('2026-10-24T22:00:00Z'), 'Europe/Berlin')).toISOString()).toBe('2026-10-24T20:00:00.000Z');
+  });
+});
+
+describe('countries', () => {
+  it('gives every country one zone the platform knows, by the spelling the list uses', () => {
+    expect(Object.keys(COUNTRY_ZONES).length).toBeGreaterThan(240);
+    for (const [country, zone] of Object.entries(COUNTRY_ZONES)) {
+      expect(country).toMatch(/^[A-Z]{2}$/);
+      expect(TIME_ZONES).toContain(zone);
+      expect(zoneOffsetMs(zone, at('2026-07-01T12:00:00Z'))).toBeTypeOf('number');
+    }
+    expect(COUNTRY_ZONES.DE).toBe('Europe/Berlin');
+    expect(COUNTRY_ZONES.TR).toBe('Europe/Istanbul');
+    expect(COUNTRY_ZONES.US).toBe('America/New_York');
+    expect(COUNTRY_ZONES.RU).toBe('Europe/Moscow');
+    expect(COUNTRY_ZONES.UA).toBe('Europe/Kiev');
+  });
+
+  it('reads a country off a guide id first, the way XMLTV sources end them', () => {
+    expect(countryOf({ guideId: 'trt1.tr', names: ['DE ✨ DEUTSCHLAND'] })).toBe('TR');
+    expect(countryOf({ guideId: 'ard.de', names: [] })).toBe('DE');
+    expect(countryOf({ guideId: 'DasErste.de@HD', names: [] })).toBe('DE');
+    expect(countryOf({ guideId: 'BBCOne.uk', names: [] })).toBe('GB');
+    expect(countryOf({ guideId: 'TRT 1 HD', names: [] })).toBeUndefined();
+  });
+
+  it('reads one off a name that starts with a code, a flag or a country', () => {
+    expect(countryOf({ names: ['TR ✨ ULUSAL'] })).toBe('TR');
+    expect(countryOf({ names: ['|DE| SPORT'] })).toBe('DE');
+    expect(countryOf({ names: ['[TR] SPOR'] })).toBe('TR');
+    expect(countryOf({ names: ['DE: KIDS'] })).toBe('DE');
+    expect(countryOf({ names: ['KKTC ✨ KIBRIS'] })).toBe('CY');
+    expect(countryOf({ names: ['🇹🇷 ULUSAL'] })).toBe('TR');
+    expect(countryOf({ names: ['TÜRKİYE'] })).toBe('TR');
+    expect(countryOf({ names: ['Deutschland HD'] })).toBe('DE');
+    expect(countryOf({ names: ['AR ✨ SAUDI ARABIA'] })).toBe('SA');
+    // The group comes before the channel's own name.
+    expect(countryOf({ names: [undefined, 'UK: BBC One'] })).toBe('GB');
+  });
+
+  it('takes nothing for a country that is a language, a channel, or a word', () => {
+    expect(countryOf({ names: ['AR ✨ MBC'] })).toBeUndefined();
+    expect(countryOf({ names: ['TV 8 FHD'] })).toBeUndefined();
+    expect(countryOf({ names: ['FHD ✨ SPORT'] })).toBeUndefined();
+    expect(countryOf({ names: ['De Wereld'] })).toBeUndefined();
+    expect(countryOf({ names: ['↺DAS ERSTE FHD'] })).toBeUndefined();
+    expect(countryOf({ names: ['EX-YU ✨ FILM'] })).toBeUndefined();
+    expect(countryOf({ names: [] })).toBeUndefined();
   });
 });

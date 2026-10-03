@@ -124,6 +124,29 @@ follows them by what the portal matched them to:
   `@loge/api`, on the platform's own time-zone database). `get_epg_info` is
   asked for the hours of the shift as well, so the end of the window is still
   covered.
+- **Put other countries' guides right** — on by default, and read as on for a
+  connection made before it existed. One zone cannot fix a portal whose
+  guides come from sources on different clocks. The real portal this was
+  built against keeps its guide on Berlin's wall clock — its `time` strings
+  say so, and its stamps are their instants — and its German guide is right.
+  Its Turkish guide was written in **UTC** and taken for that clock: Show
+  TV's weekend news at 18:25 in Istanbul (15:25Z) arrives stamped 13:25Z with
+  `time` 15:25, and Kanal 7's at 18:00 as 13:00Z, `time` 15:00 — two hours
+  early in summer, one in winter.
+  - Each channel's country comes from its guide id's ending (`showtv.tr`,
+    `ard.de`), else its group's or its own name (`TR ✨ ULUSAL`, a flag, a
+    country's name) — `countryOf` and `COUNTRY_ZONES` in `@loge/api`. `AR`
+    starts this portal's Arabic groups and is no country.
+  - A channel whose country's zone keeps another offset than the portal's
+    clock — `time` against the stamp, per programme — has its `time` read as
+    UTC. One of the portal's own country, or of no country known, is left as
+    sent; so is everything with the switch off.
+  - Where a zone is chosen above, the portal's own country keeps that
+    reading, and another country's stamps are taken as they are.
+  - The provider learns countries from the channel lists it reads. A
+    favourite nothing has listed since a restart has the portal's whole list
+    read once (`get_all_channels`) and its groups once; if that fails, the
+    guide answers as sent.
 
 ## Platforms
 
