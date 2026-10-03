@@ -113,6 +113,10 @@ click that only React Native's own `Pressable` hears. So:
     twice quickly, one flashes and jumps as a double tap does, and the
     controls stay away, so the next double press jumps again; pressed once,
     the controls come up.
+  - On a channel, which is live and has nothing to jump through, left opens
+    its group, sliding in from the left with the focus on the channel
+    playing; up and down move through it, select zaps, and right closes it.
+    The live bar's Channels button opens it too while the controls are up.
   - Play/pause plays and pauses; the scrubber is a progress bar.
   - While the controls are away, the focus rests on an invisible view over
     the picture, which select presses. The full-screen tap-catcher a phone

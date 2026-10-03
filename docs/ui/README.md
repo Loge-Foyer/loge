@@ -164,6 +164,10 @@ browser, that providers can't be reached there). Otherwise:
   minutes. A tap plays the channel; the calendar opens its day
   (`tv/channel/[connectionId]/[channelId]`): today from midnight, what is on
   now marked, and Watch live.
+- **In the player**, a channel's group — or the ★ list it was played from —
+  slides in from the left, over the picture, from the Channels button or a
+  TV remote's left (`docs/playback`). A row there is the TV tab's own, drawn
+  compact (`components/media/channel-row.tsx`).
 - **Movies** and **Shows** — posters in the provider's own order, one provider,
   never merged with the library; a poster opens the ordinary detail page, with
   Play where the provider can play. Where the app keeps watch status for the

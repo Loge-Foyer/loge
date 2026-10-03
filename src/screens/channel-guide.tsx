@@ -5,13 +5,12 @@ import { useState } from 'react';
 import { FlatList } from 'react-native';
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
+import { clockOf } from '@/components/labels';
 import { liveHref } from '@/components/media/item-link';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
 import { useGuide, useNow } from '@/hooks/use-live';
 import { useRefreshMedia } from '@/hooks/use-media';
-
-import { clockOf } from './tv';
 
 /** Today on one channel, from midnight to midnight, what is on now marked — and a way to watch it. */
 export function ChannelGuideScreen({ channel, name, group }: { channel: GlobalMediaKey; name: string; group?: string }) {

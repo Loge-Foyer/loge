@@ -32,15 +32,14 @@ import { FocusGroup } from '@/components/focus-group';
 import { FOCUSED, isHandheld, isTV, useRemoteFocus } from '@/components/remote';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
-import { useFavoriteChannels } from '@/hooks/use-lists';
-import { nowAndNext, useChannels, useGuide, useNow } from '@/hooks/use-live';
+import { nowAndNext, useGuide, useLineup, useNow } from '@/hooks/use-live';
 import { useItem } from '@/hooks/use-media';
 import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import { asChannel } from '@/services/lists';
 import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
 import { useRemoteKeys } from '@/hooks/use-remote-keys';
+import { ChannelPanel } from '@/screens/player-channels';
 import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
@@ -120,7 +119,7 @@ export function PlayerScreen({
             {...(plan?.kind === 'play' && plan.descriptor.segments ? { segments: plan.descriptor.segments } : {})}
             {...(next.data ? { next: next.data } : {})}
             {...(player ? { player } : {})}
-            {...(live ? { live: <LiveBar channel={key} title={live.title} {...(live.group ? { group: live.group } : {})} /> } : {})}
+            {...(live ? { live: { channel: key, title: live.title, ...(live.group ? { group: live.group } : {}) } } : {})}
           />
         )}
       </YStack>
@@ -160,12 +159,14 @@ function Controls({
   next?: Episode;
   /** The player the user picked, which the next episode keeps. */
   player?: PluginId;
-  /** For a channel: its name, now and next, and the channels either side. */
-  live?: ReactNode;
+  /** A channel: its name, and the group it was opened from — for now and next, and the channels around it. */
+  live?: { readonly channel: GlobalMediaKey; readonly title: string; readonly group?: string };
 }) {
   const [visible, setVisible] = useState(true);
   const [touchedAt, setTouchedAt] = useState(0);
   const [panel, setPanel] = useState<'audio' | 'subtitles' | 'speed' | 'chapters'>();
+  // A channel's group, slid in from the left; the controls stay away while it is.
+  const [channels, setChannels] = useState(false);
   const [rate, setRate] = useState(1);
   const { data: settings } = useAppSettings();
   const app = settings ?? APP_DEFAULTS;
@@ -176,7 +177,7 @@ function Controls({
   const playing = state === 'playing';
   const waiting = starting || state === 'loading' || state === 'buffering';
   // Out of the way while it plays; back at a touch, and whenever it stops.
-  const shown = visible || !playing;
+  const shown = (visible || !playing) && !channels;
 
   useEffect(() => {
     if (!shown || !playing || panel || scrub !== undefined) return;
@@ -192,6 +193,15 @@ function Controls({
     touch();
     if (playing) controller?.pause();
     else controller?.play();
+  };
+  const openChannels = () => {
+    setPanel(undefined);
+    setVisible(false);
+    setChannels(true);
+  };
+  const closeChannels = () => {
+    setChannels(false);
+    setVisible(false);
   };
   // Where the last jump went, and when: a quick run of them builds on that,
   // not on a position the engine has not caught up with yet.
@@ -267,10 +277,10 @@ function Controls({
 
   // Only a deliberate vertical drag down an outer third takes over; a tap
   // falls through to the controls underneath, which is what makes both
-  // possible on the same piece of picture. Not while a panel is open over the
-  // right of the picture: a drag there is that panel's.
+  // possible on the same piece of picture. Not while a panel or a channel's
+  // group is open over the picture: a drag there is theirs.
   const edgeScreen: EdgeScreen = {
-    claims: (x) => panel === undefined && size.width > 0 && (x < size.width / 3 || x > (size.width * 2) / 3),
+    claims: (x) => panel === undefined && !channels && size.width > 0 && (x < size.width / 3 || x > (size.width * 2) / 3),
     // The sliders show with the controls only, so a drag brings them up. It
     // starts from where the last one left the level, however recently.
     begin: (x) => {
@@ -362,15 +372,18 @@ function Controls({
   // A TV remote. Play/pause plays and pauses. With the controls up, the
   // arrows move the focus among them, and keep them up while they do; select
   // is the focused control's own. With them away, select, up and down bring
-  // them back — focus on play — and left and right are the picture's sides,
-  // which a channel, being live, has no use for.
+  // them back — focus on play — and left and right are the picture's sides.
+  // A channel, being live, has no use for those: left opens its group. While
+  // that is open, the arrows are its own.
   useRemoteKeys((key) => {
     if (key === 'playPause') return toggle();
+    if (channels) return;
     if (shown) {
       if (key !== 'select') touch();
       return;
     }
-    if (key === 'select' || key === 'up' || key === 'down' || live) return touch();
+    if (key === 'select' || key === 'up' || key === 'down') return touch();
+    if (live) return key === 'left' ? openChannels() : touch();
     arrow(key);
   });
 
@@ -471,7 +484,9 @@ function Controls({
                 <X size={26} color="white" />
               </IconButton>
               <YStack flex={1}>
-                {live}
+                {live ? (
+                  <LiveBar channel={live.channel} title={live.title} {...(live.group ? { group: live.group } : {})} onChannels={openChannels} />
+                ) : null}
                 {item?.type === 'episode' ? (
                   <SizableText size="$2" color="rgba(255,255,255,0.75)" numberOfLines={1}>
                     {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
@@ -628,7 +643,7 @@ function Controls({
       ) : null}
       </Pressable>
       {/* On a TV, where the focus rests while the controls are away: when the focused control goes with them, this is all that is left to take it. Select presses it, and they come back. */}
-      {isTV && !shown ? <Pressable style={StyleSheet.absoluteFill} onPress={touch} accessibilityLabel="Show the controls" /> : null}
+      {isTV && !shown && !channels ? <Pressable style={StyleSheet.absoluteFill} onPress={touch} accessibilityLabel="Show the controls" /> : null}
       {(['left', 'right'] as const).map((side) => (
         <Animated.View
           key={`flash-${side}`}
@@ -667,6 +682,7 @@ function Controls({
           </SizableText>
         </YStack>
       ) : null}
+      {channels && live ? <ChannelPanel channel={live.channel} group={live.group} onClose={closeChannels} /> : null}
     </View>
   );
 }
@@ -764,14 +780,10 @@ function EdgeSlider({ side, inset, kind, value, active }: { side: 'left' | 'righ
 /**
  * A channel's name marked live, what is on now and next, and the channels
  * either side in its group — or among the favourites, when it was opened
- * from the ★ list.
+ * from the ★ list — with the whole group a press away.
  */
-function LiveBar({ channel, title, group }: { channel: GlobalMediaKey; title: string; group?: string }) {
-  const favorites = isFavorites(group);
-  const channels = useChannels(channel.connectionId, group, undefined, { enabled: !favorites });
-  const kept = useFavoriteChannels(favorites ? channel.connectionId : undefined);
-  const list = favorites ? (kept.data ?? []).map(asChannel) : (channels.data?.pages.flatMap((page) => page.value.channels) ?? []);
-  const at = list.findIndex((each) => each.key.externalId === channel.externalId);
+function LiveBar({ channel, title, group, onChannels }: { channel: GlobalMediaKey; title: string; group?: string; onChannels: () => void }) {
+  const { list, at, more } = useLineup(channel, group, isFavorites(group));
   const guide = useGuide(channel.connectionId, [channel]);
   const now = useNow();
   const { now: airing, next } = nowAndNext(guide.data?.value, channel, now);
@@ -802,16 +814,23 @@ function LiveBar({ channel, title, group }: { channel: GlobalMediaKey; title: st
           </SizableText>
         ) : null}
       </YStack>
-      {list.length > 1 && at >= 0 ? (
-        <XStack gap="$2">
-          <IconButton label="Previous channel" onPress={() => zap(-1)}>
-            <ChevronUp size={28} color="white" />
+      <XStack gap="$2">
+        {list.length > 1 && at >= 0 ? (
+          <>
+            <IconButton label="Previous channel" onPress={() => zap(-1)}>
+              <ChevronUp size={28} color="white" />
+            </IconButton>
+            <IconButton label="Next channel" onPress={() => zap(1)}>
+              <ChevronDown size={28} color="white" />
+            </IconButton>
+          </>
+        ) : null}
+        {list.length > 1 || more ? (
+          <IconButton label="Channels" onPress={onChannels}>
+            <List size={26} color="white" />
           </IconButton>
-          <IconButton label="Next channel" onPress={() => zap(1)}>
-            <ChevronDown size={28} color="white" />
-          </IconButton>
-        </XStack>
-      ) : null}
+        ) : null}
+      </XStack>
     </XStack>
   );
 }

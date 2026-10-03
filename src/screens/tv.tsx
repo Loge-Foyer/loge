@@ -10,10 +10,10 @@ import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
 import { ActionMenu } from '@/components/action-menu';
-import { Artwork } from '@/components/artwork';
 import { px } from '@/components/density';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, episodeCode, listNames } from '@/components/labels';
+import { ChannelSummary } from '@/components/media/channel-row';
 import { FAVORITES_GROUP, fromRouteId, isFavorites, liveHref, routeId } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
@@ -287,8 +287,7 @@ function ChannelRow({
   /** A long press — or a held select — offers to add it to the favourites, or take it out. */
   onHold: (channel: Channel) => void;
 }) {
-  const { now, next } = nowAndNext(programmes, channel.key, at);
-  const progress = now ? (at - Date.parse(now.startsAt)) / (Date.parse(now.endsAt) - Date.parse(now.startsAt)) : undefined;
+  const { now } = nowAndNext(programmes, channel.key, at);
   const row = useRemoteFocus();
   const guide = useRemoteFocus();
   return (
@@ -304,38 +303,7 @@ function ChannelRow({
       >
         {({ pressed }) => (
           <XStack gap="$3" items="center" opacity={pressed ? 0.75 : 1} bg={row.focused ? '$accent4' : '$color2'} rounded="$4" p="$2.5">
-            <YStack width={px(72)} height={px(42)} rounded="$2" overflow="hidden" bg="$color3" items="center" justify="center">
-              {channel.logo ? (
-                <Artwork connectionId={connectionId} image={channel.logo} width={px(72)} aspect={72 / 42} label={channel.name} rounded="$3" fit="contain" />
-              ) : (
-                <SizableText size="$4" fontWeight="700" color="$color10">
-                  {channel.number ?? channel.name.slice(0, 2)}
-                </SizableText>
-              )}
-            </YStack>
-            <YStack flex={1} gap="$1">
-              <XStack items="center" gap="$1.5">
-                <SizableText size="$4" fontWeight="600" color="$color12" numberOfLines={1} shrink={1}>
-                  {channel.number === undefined ? channel.name : `${channel.number}  ${channel.name}`}
-                </SizableText>
-                {favorite ? <Star size={px(13)} color="$accent10" /> : null}
-              </XStack>
-              {now ? (
-                <YStack gap="$1">
-                  <SizableText size="$2" color="$color11" numberOfLines={1}>
-                    {`${clockOf(now.startsAt)}  ${now.title}`}
-                  </SizableText>
-                  <YStack height={3} rounded={2} bg="$color4" overflow="hidden">
-                    <YStack height="100%" width={`${Math.round(Math.min(1, Math.max(0, progress ?? 0)) * 100)}%`} bg="$accent9" />
-                  </YStack>
-                </YStack>
-              ) : null}
-              {next ? (
-                <SizableText size="$1" color="$color10" numberOfLines={1}>
-                  {`Next ${clockOf(next.startsAt)}  ${next.title}`}
-                </SizableText>
-              ) : null}
-            </YStack>
+            <ChannelSummary channel={channel} connectionId={connectionId} programmes={programmes} now={at} favorite={favorite} />
           </XStack>
         )}
       </Pressable>
@@ -361,12 +329,6 @@ const captionOf = (captions: ReadonlyMap<string, string>, item: MediaItem) => {
   const caption = captions.get(itemKeyOf(item.key));
   return caption ? { caption } : {};
 };
-
-/** "20:15", in the device's own time. */
-export function clockOf(iso: string): string {
-  const at = new Date(iso);
-  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-}
 
 function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: ContentKind | undefined; term: string; header: React.ReactElement }) {
   const page = useSourcePage(source.connection.id, kind, NEWEST, term);

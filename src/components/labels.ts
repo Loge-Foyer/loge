@@ -139,6 +139,12 @@ export function clockTime(ms: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 }
 
+/** "20:15": a moment of the day, in the device's own time. */
+export function clockOf(iso: string): string {
+  const at = new Date(iso);
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+}
+
 const FORMAT_NAMES: Readonly<Record<string, string>> = {
   mpegts: 'MPEG-TS',
   hls: 'HLS',

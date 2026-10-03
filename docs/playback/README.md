@@ -378,6 +378,15 @@ over the tabs, with `start` in milliseconds for a resume:
   what is on now and next, and channel up and down through the group it was
   opened from. A channel whose only stream is raw MPEG-TS says, in a browser or
   on an iPhone, which player would play it.
+- **A channel's group slides in from the left** (`screens/player-channels.tsx`)
+  — the Channels button beside up and down, or on a TV left with the controls
+  away — while the channel plays on. It is the group's own pages, the very
+  ones the TV tab holds, or the ★ list's (`useLineup`): it opens on the
+  channel playing, marked, with the remote's focus on it, paging on to find it
+  for ten pages at most before it opens at the top instead. Select zaps — the
+  player starts again on the new channel, and the list goes with it. Right,
+  Back (Menu on a TV, best effort), or a tap beside it closes it; while it is
+  open the controls and the edges keep out of its way.
 
 Detail pages get Play — or Resume where the source says it stopped, with
 From the beginning beside it — for a film or an episode whose source has

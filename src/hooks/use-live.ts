@@ -2,10 +2,12 @@ import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } f
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+import { asChannel } from '@/services/lists';
 import type { SourceError } from '@/services/media';
 import { remoteKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
+import { useFavoriteChannels } from './use-lists';
 import { useActiveUserId } from './use-session';
 
 const MINUTE = 60_000;
@@ -62,6 +64,31 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
     staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
     refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
   });
+}
+
+/**
+ * The channels around one, as the player zaps and lists them: its group's,
+ * page by page — the very pages the TV tab holds — or the profile's
+ * favourites, when it was opened from the ★ list. `at` is where the channel
+ * stands among those loaded, -1 until a page holds it.
+ */
+export function useLineup(channel: GlobalMediaKey, group: string | undefined, favorites: boolean) {
+  const channels = useChannels(channel.connectionId, group, undefined, { enabled: !favorites });
+  const kept = useFavoriteChannels(favorites ? channel.connectionId : undefined);
+  const list = favorites ? (kept.data ?? []).map(asChannel) : (channels.data?.pages.flatMap((page) => page.value.channels) ?? []);
+  const more = !favorites && channels.hasNextPage;
+  const fetchingMore = channels.isFetchingNextPage;
+  return {
+    list,
+    at: list.findIndex((each) => each.key.externalId === channel.externalId),
+    settled: favorites ? !kept.isPending : !channels.isPending,
+    pages: channels.data?.pages.length ?? 0,
+    more,
+    fetchingMore,
+    loadMore: () => {
+      if (more && !fetchingMore) void channels.fetchNextPage();
+    },
+  };
 }
 
 /** The time, held in state and moved on every `stepMs`: render stays pure, and what shows the time follows it. */
