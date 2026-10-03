@@ -95,6 +95,17 @@ playback at whatever the site muxes — usually 720p. The server's own muxing
 proxy (`/proxy/fast/{id}?format=…`) is the full-quality route, and is what
 downloads will use.
 
+**What `formatStreams` holds may be YouTube's HLS.** On the server this was
+run against, a video's one muxed stream is an HLS master straight from the
+site's CDN, in Relay and Off alike — so no sign-in goes with it.
+- It names 17 variants, the top one 4K VP9, and up to 40 dubbed audio
+  renditions. Each playlist is about 2.3 MB for a two-hour video.
+- AVPlayer opens one in about a second.
+- mpv reads every playlist before it starts: seven to more than ten seconds
+  on the Apple TV simulator. Its stall alarm counts from the file loading
+  for that reason.
+- VLC took as long to show a picture.
+
 **A stream address is a secret.** `/proxy/relay` URLs carry an HMAC signature
 and an expiry, and `/proxy/fast/` a token. A descriptor is in memory only,
 never logged, never cached — the rule this adapter inherits rather than
@@ -110,6 +121,9 @@ reach `/api/v1/thumbnails/` or `/api/v1/captions/` — the server's
 signed into the addresses the server hands out. Pictures use those addresses
 now (above); that is tested against the fake, and not yet seen on the real
 server. Captions already took the server's addresses as given.
+
+Played on the Apple TV simulator against the real server with all three
+players, from the start and resumed. On a real Apple TV it has not yet played.
 
 
 See `adapters/docs/writing-a-plugin/`.
