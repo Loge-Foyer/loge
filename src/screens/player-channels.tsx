@@ -58,8 +58,14 @@ export function ChannelPanel({ channel, group, onClose }: { channel: GlobalMedia
 
   const [progress] = useState(() => new Animated.Value(0));
   const [leaving, setLeaving] = useState(false);
+  // The channel playing asks for the focus once the list has slid in: asked
+  // while it is still off the screen, tvOS gives it to whichever row is
+  // nearest the middle instead.
+  const [arrived, setArrived] = useState(false);
   useEffect(() => {
-    Animated.timing(progress, { toValue: 1, duration: SLIDE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(progress, { toValue: 1, duration: SLIDE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
+      if (finished) setArrived(true);
+    });
   }, [progress]);
   const close = () => {
     if (leaving) return;
@@ -114,7 +120,7 @@ export function ChannelPanel({ channel, group, onClose }: { channel: GlobalMedia
                 <PanelChannel
                   channel={item}
                   current={item.key.externalId === channel.externalId}
-                  preferred={index === start}
+                  preferred={arrived && index === start}
                   favorite={keptIds.has(item.key.externalId)}
                   programmes={guide.data?.value}
                   now={now}
