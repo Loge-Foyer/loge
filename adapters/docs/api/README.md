@@ -14,7 +14,7 @@ without learning about the others.
 | `content.ts` | `ContentKind` — what a source brings: `movies`, `shows`, `anime`, `videos`, `files` and `live`. |
 | `capabilities.ts` | The media capability flags, and `CapabilityKey` (`'media.offlineMetadata'`), the form a setting uses to gate one. |
 | `fields.ts` | The field descriptors a plugin uses to ask for input: `text` (optionally a `credential`), `url`, `password`, `boolean`, `select`, and the setting-only `libraries`. |
-| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists — and the `attribution` a service's terms ask the app to show. |
+| `manifest.ts` | `PluginManifest` and `Plugin` — what a plugin package exports: the manifest, its category and platforms, the one block its category declares, and that block's implementation once it exists — the `attribution` a service's terms ask the app to show, and the `credits` for what it is built on, with `creditsOn` to pick a platform's. |
 | `connection.ts` | `Connection` — one configured instance of a source or IPTV plugin, owned by the account — and `PerProfile`, which says what each profile keeps for itself. |
 | `per-profile.ts` | Which keys a mode keeps per profile, the values one profile runs with (`resolveValues`), and whether a profile is set up (`isSetUpFor`). |
 | `user.ts` | `AppUser` — a profile. |

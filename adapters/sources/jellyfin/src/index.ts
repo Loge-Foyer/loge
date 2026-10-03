@@ -15,6 +15,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Jellyfin',
     description: 'Self-hosted film and TV server.',
+    credits: [{ name: 'Jellyfin', url: 'https://github.com/jellyfin/jellyfin', note: 'The media server it connects to.' }],
     media: {
       contentKinds: ['movies', 'shows'],
       capabilities: [

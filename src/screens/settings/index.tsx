@@ -21,7 +21,7 @@ import { Screen } from '@/components/screen';
 import { AppSwitch } from '@/components/app-switch';
 import { useDownloadBudget, useDownloadSettings } from '@/hooks/use-downloads';
 import type { DownloadBudget } from '@/services/downloads';
-import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
+import { ChoiceRow, LinkRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
@@ -260,12 +260,8 @@ export function SettingsScreen() {
           icon={<Info size={20} color="$color11" />}
           trailing={<SizableText color="$color10">{Constants.expoConfig?.version ?? '—'}</SizableText>}
         />
-        {/* The AGPL owes whoever uses a copy its source, and NOTICE asks every copy to keep this attribution. */}
-        <SettingsRow title="Loge" subtitle="Free software, under the GNU AGPL 3.0 or later. Source: github.com/Loge-Foyer/loge" />
-        {/* What the services the app uses ask it to say: their manifests carry it, so nothing here names one. */}
-        {catalog.list().flatMap((manifest) =>
-          manifest.attribution ? [<SettingsRow key={manifest.id} title={manifest.displayName} subtitle={manifest.attribution} />] : [],
-        )}
+        {/* The AGPL owes whoever uses a copy its source, and NOTICE asks every copy to keep this attribution. What each adapter is built on — and what a service asks the app to say — is on that adapter's own page, under Credits. */}
+        <LinkRow title="Loge" note="Free software, under the GNU AGPL 3.0 or later." url="https://github.com/Loge-Foyer/loge" />
       </SettingsSection>
     </Screen>
   );

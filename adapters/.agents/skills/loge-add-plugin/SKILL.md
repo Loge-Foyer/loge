@@ -80,7 +80,11 @@ through the media role.
      `backup: { connect }`.
    - **A metadata catalogue** declares `metadata: { identifies }` and exports
      `metadata: { connect }`; where its terms ask the app to credit it, the
-     manifest's `attribution` says how, and Settings → About shows it.
+     manifest's `attribution` says how, and its page shows it under Credits.
+   - **Any adapter** credits what it is built on or talks to, where that has
+     a source to point at: `credits: [{ name, url, note, platforms? }]`, an
+     https address, and `platforms` only for a build that carries it (an
+     Android library, an iPhone one).
 
    The provider reaches the host only through `context`: `http` for requests,
    `session` for a token, `credentials` for passwords, and `network`,

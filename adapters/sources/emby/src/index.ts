@@ -14,6 +14,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Emby',
     description: 'Media server for films and TV, a close relative of Jellyfin.',
+    credits: [{ name: 'Emby', url: 'https://github.com/MediaBrowser/Emby', note: 'The server’s source, from the years it was open.' }],
     media: { contentKinds: ['movies', 'shows'], capabilities: [] },
     connectionFields: [
       {

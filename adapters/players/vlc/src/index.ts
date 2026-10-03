@@ -17,6 +17,11 @@ export const plugin: PlayerPlugin = {
     platforms: ['ios', 'android'],
     displayName: 'VLC',
     description: 'VLC’s engine: plays nearly anything, streams included.',
+    credits: [
+      { name: 'VLC', url: 'https://github.com/videolan/vlc', note: 'The engine: libVLC.' },
+      { name: 'VLC for Android', url: 'https://github.com/videolan/vlc-android', note: 'libVLC, built for Android.', platforms: ['android'] },
+      { name: 'VLCKit', url: 'https://github.com/videolan/vlckit', note: 'libVLC for iPhone and Apple TV.', platforms: ['ios'] },
+    ],
     player: { profiles: PROFILES },
     connectionFields: [],
     settings: [],

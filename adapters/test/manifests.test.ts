@@ -3,6 +3,7 @@ import {
   ACCOUNT_MEMBERS,
   BACKUP_MEMBERS,
   categoryOfPluginId,
+  creditsOn,
   MEDIA_CAPABILITY_MEMBERS,
   METADATA_MEMBERS,
   validateManifest,
@@ -142,4 +143,22 @@ it('keeps media servers sources: they are the master of their watch state', () =
 
 it('keeps IPTV off the web, where portals send no CORS headers', () => {
   for (const provider of [m3u, stalker, xtream]) expect(provider.manifest.platforms).not.toContain('web');
+});
+
+it('credits what each is built on or talks to, where it has a source to point at', () => {
+  const names = (plugin: Plugin) => (plugin.manifest.credits ?? []).map((credit) => credit.name);
+  expect(names(jellyfin)).toEqual(['Jellyfin']);
+  expect(names(emby)).toEqual(['Emby']);
+  expect(names(yattee)).toEqual(['Yattee Server']);
+  expect(names(invidious)).toEqual(['Invidious']);
+  expect(names(mpv)).toEqual(['mpv', 'libmpv-android', 'MPVKit']);
+  expect(names(vlc)).toEqual(['VLC', 'VLC for Android', 'VLCKit']);
+  expect(names(ksplayer)).toEqual(['KSPlayer']);
+  expect(names(customServer)).toEqual(['Foyer', 'PocketBase']);
+  expect(names(tmdb)).toEqual(['TMDB']);
+  // A browser's built-in player is hls.js and mpegts.js; a phone's is expo-video.
+  expect(creditsOn(systemPlayer.manifest, 'web').map((credit) => credit.name)).toEqual(['hls.js', 'mpegts.js']);
+  expect(creditsOn(systemPlayer.manifest, 'android').map((credit) => credit.name)).toEqual(['expo-video', 'Media3']);
+  // A closed service, a protocol or a format has nothing to point at.
+  for (const none of [plex, webdav, stalker, xtream, m3u, icloudDrive, googleDrive, onedrive, icloudBackup]) expect(names(none)).toEqual([]);
 });

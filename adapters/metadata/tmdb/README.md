@@ -66,8 +66,9 @@ remembers each answer, and a miss for thirty days.
 
 > This product uses the TMDB API but is not endorsed or certified by TMDB.
 
-TMDB's terms ask an app using its API to say so where it lists its sources;
-the app's Settings → About does.
+TMDB's terms ask an app using its API to say so in its "About or Credits"
+section; the app shows it under Credits on TMDB's own page in Settings →
+Adapters → Metadata, beneath a link to themoviedb.org.
 
 ## Status
 

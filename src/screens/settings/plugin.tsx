@@ -1,4 +1,4 @@
-import type { ConnectionId, PluginId, PluginManifest } from '@loge/api';
+import { creditsOn, type ConnectionId, type PluginId, type PluginManifest } from '@loge/api';
 import { Cloud } from '@tamagui/lucide-icons-2/icons/Cloud';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { RefreshCw } from '@tamagui/lucide-icons-2/icons/RefreshCw';
@@ -11,7 +11,7 @@ import { Chip } from '@/components/chip';
 import { ConfirmButton } from '@/components/confirm-button';
 import { CONTENT_KIND_LABELS, describeBackupProblem, describeTargetStatus, PER_PROFILE_SUMMARY, TAB_LABELS } from '@/components/labels';
 import { Screen } from '@/components/screen';
-import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { CreditRow, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useBackupTargetActions, useBackupTargets } from '@/hooks/use-backup';
@@ -83,6 +83,7 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
             <SettingsRow title="Not in this version of the app yet" />
           )}
         </SettingsSection>
+        <PluginCredits manifest={manifest} />
       </Screen>
     );
   }
@@ -121,7 +122,33 @@ export function PluginScreen({ pluginId }: { pluginId: PluginId }) {
         })}
         <SettingsRow title="Add connection" icon={<Plus size={18} color="$accent10" />} href={newConnectionHref(pluginId)} />
       </SettingsSection>
+      <PluginCredits manifest={manifest} />
     </Screen>
+  );
+}
+
+/**
+ * What an adapter is built on or talks to, for this platform, and what a
+ * service's terms ask the app to say — its notice as the footer. Last on its
+ * page: TMDB asks for its notice in an "About or Credits" section, and this
+ * is one.
+ */
+function PluginCredits({ manifest }: { manifest: PluginManifest }) {
+  const { catalog } = useServices();
+  const credits = creditsOn(manifest, catalog.platform);
+  if (credits.length === 0) {
+    return manifest.attribution ? (
+      <SettingsSection title="Credits">
+        <SettingsRow title={manifest.displayName} subtitle={manifest.attribution} subtitleLines={4} />
+      </SettingsSection>
+    ) : null;
+  }
+  return (
+    <SettingsSection title="Credits" {...(manifest.attribution ? { footer: manifest.attribution } : {})}>
+      {credits.map((credit) => (
+        <CreditRow key={credit.url} credit={credit} />
+      ))}
+    </SettingsSection>
   );
 }
 
@@ -202,6 +229,7 @@ function BackupTargetScreen({ manifest }: { manifest: PluginManifest }) {
           </SettingsSection>
         ))}
       {resolveError ? <SizableText color="$red11">{resolveError}</SizableText> : null}
+      <PluginCredits manifest={manifest} />
     </Screen>
   );
 }
@@ -276,6 +304,7 @@ function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
           It has no engine on this device yet, so it never plays here.
         </Paragraph>
       ) : null}
+      <PluginCredits manifest={manifest} />
     </Screen>
   );
 }

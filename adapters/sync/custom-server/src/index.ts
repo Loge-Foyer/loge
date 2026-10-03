@@ -18,6 +18,10 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Your own server',
     description: 'Keeps your account on Foyer, the server you run yourself.',
+    credits: [
+      { name: 'Foyer', url: 'https://github.com/Loge-Foyer/foyer', note: 'The server you run for your account.' },
+      { name: 'PocketBase', url: 'https://github.com/pocketbase/pocketbase', note: 'What Foyer is built on.' },
+    ],
     account: {
       ownerProof: { fields: ['password'] },
       signUp: {

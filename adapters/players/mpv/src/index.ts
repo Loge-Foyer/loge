@@ -18,6 +18,11 @@ export const plugin: PlayerPlugin = {
     platforms: ['ios', 'android'],
     displayName: 'mpv',
     description: 'The mpv engine: plays nearly any file, with subtitles drawn as the file styles them.',
+    credits: [
+      { name: 'mpv', url: 'https://github.com/mpv-player/mpv', note: 'The engine.' },
+      { name: 'libmpv-android', url: 'https://github.com/jarnedemeulemeester/libmpv-android', note: 'mpv, built for Android.', platforms: ['android'] },
+      { name: 'MPVKit', url: 'https://github.com/mpvkit/MPVKit', note: 'mpv for iPhone and Apple TV, built from Streamyfin’s fork.', platforms: ['ios'] },
+    ],
     player: { profiles: PROFILES },
     connectionFields: [],
     settings: [],

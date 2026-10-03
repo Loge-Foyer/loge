@@ -75,6 +75,7 @@ stand-in:
 | Face ID, the passcode | unavailable: Forgot PIN uses the account password, as in a browser |
 | Export, import, Restore a backup | not offered: no files and no share sheet (`FileExchange.available`) |
 | Downloads | none: tvOS gives an app no storage the system will not clear |
+| A browser | none: a credit, or Loge's own source, shows its address instead of opening it |
 
 **The device database is a known limit.** SQLite lives in the documents
 folder, which the simulator keeps and a real Apple TV does not promise to: an

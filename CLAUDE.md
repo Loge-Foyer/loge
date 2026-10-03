@@ -115,6 +115,9 @@ What runs today:
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.
+- Credits: each adapter's page ends with what it is built on — Jellyfin,
+  Yattee Server, mpv, VLC, Foyer and PocketBase… — from its manifest, and
+  TMDB's notice moved there from About, which now opens Loge's own source.
 - A profile's PIN on All devices or on This device alone — its own, or none
   (`DeviceSettings.pins`): a personal phone without one, the family's TV
   with one.

@@ -15,8 +15,9 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'TMDB',
     description: 'Finds which film or series a title is, so its watch status covers every copy of it.',
-    // TMDB's terms ask for this wherever an app lists what it uses.
+    // TMDB's terms ask for this in an app's About or Credits: its page's Credits.
     attribution: 'This product uses the TMDB API but is not endorsed or certified by TMDB.',
+    credits: [{ name: 'TMDB', url: 'https://www.themoviedb.org', note: 'The Movie Database: the catalogue it asks.' }],
     metadata: { identifies: ['movies', 'shows'] },
     connectionFields: [
       {

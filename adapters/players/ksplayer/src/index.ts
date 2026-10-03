@@ -8,6 +8,7 @@ export const plugin: Plugin = {
     platforms: ['ios'],
     displayName: 'KSPlayer',
     description: 'An FFmpeg-based player for iPhone and iPad: MKV, HEVC, HDR and Dolby Vision, ASS and PGS subtitles.',
+    credits: [{ name: 'KSPlayer', url: 'https://github.com/kingslay/KSPlayer', note: 'The engine.' }],
     player: { profiles: {} },
     connectionFields: [],
     settings: [],

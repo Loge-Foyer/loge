@@ -763,8 +763,13 @@ Everything above describes the target; what runs today:
   (`IdentityService`, four at a time); the answer is kept on the device, laid
   on before an item is keyed, and what was kept under the title moves to the
   TMDB id. Never by name above the composition root: the lookups branch on the
-  `iptv` category and `Source.watch`, and About shows what a manifest's
-  `attribution` says.
+  `iptv` category and `Source.watch`, and the adapter's own page shows what a
+  manifest's `attribution` says, under Credits.
+- **Credits:** each adapter's page ends with what it is built on or talks to,
+  from its manifest's `credits` for this platform (`creditsOn` in
+  `@loge/api`), as rows that open the address (`LinkRow`) — and About opens
+  Loge's own source. The GitHub mark is chosen by the address, never by the
+  plugin; a TV shows the address, having no browser.
 - **Downloads:** Settings → Downloads holds Options — what to ask a source
   for, which does not drive a download yet — then what is kept. Media's home
   has a Downloaded row after Continue watching (home layout version 2), and a

@@ -1,11 +1,16 @@
+import type { Credit } from '@loge/api';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
+import { ExternalLink } from '@tamagui/lucide-icons-2/icons/ExternalLink';
+import { Github } from '@tamagui/lucide-icons-2/icons/Github';
+import { Globe } from '@tamagui/lucide-icons-2/icons/Globe';
 import { Link, type Href } from 'expo-router';
 import { Children, Fragment, type ReactNode } from 'react';
+import { Linking } from 'react-native';
 import { ListItem, Separator, SizableText, XStack, YGroup, YStack } from 'tamagui';
 
 import { px } from '@/components/density';
 import { Button } from '@/components/button';
-import { remotely } from '@/components/remote';
+import { isTV, remotely } from '@/components/remote';
 
 /** A group's name above it, as every section of Settings has one. */
 export function SectionTitle({ children }: { children: string }) {
@@ -54,6 +59,10 @@ interface RowProps {
   trailing?: ReactNode;
   href?: Href;
   onPress?: () => void;
+  /** What a press does, to assistive tech: a button unless it opens an address. */
+  role?: 'button' | 'link';
+  /** How many lines the subtitle may take. */
+  subtitleLines?: number;
   destructive?: boolean;
   disabled?: boolean;
 }
@@ -61,7 +70,7 @@ interface RowProps {
 // A row a TV remote can press too; focused, it lights up in the accent.
 const Row = remotely(ListItem, { bg: '$accent4' });
 
-export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, destructive, disabled }: RowProps) {
+export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, role = 'button', subtitleLines = 2, destructive, disabled }: RowProps) {
   const navigates = href !== undefined;
   const item = (
     <Row
@@ -71,8 +80,8 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
       disabled={disabled}
       opacity={disabled ? 0.5 : 1}
       gap="$3"
-      // A pressable row is a button to assistive tech and the keyboard as well.
-      {...(onPress ? { onPress, role: 'button' as const, tabIndex: 0 } : {})}
+      // A pressable row is a button — or a link — to assistive tech and the keyboard as well.
+      {...(onPress ? { onPress, role, tabIndex: 0 } : {})}
     >
       {icon}
       <YStack flex={1} gap="$0.5">
@@ -80,7 +89,7 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
           {title}
         </SizableText>
         {subtitle ? (
-          <SizableText size="$2" color="$color10" numberOfLines={2}>
+          <SizableText size="$2" color="$color10" numberOfLines={subtitleLines}>
             {subtitle}
           </SizableText>
         ) : null}
@@ -96,6 +105,42 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
   ) : (
     item
   );
+}
+
+/** An address as it is read aloud or typed: no scheme, no closing slash. */
+const readable = (url: string) => url.replace(/^https:\/\//, '').replace(/\/$/, '');
+
+// A TV has no browser to open an address in: the row shows it instead, and
+// still takes the remote's focus, which scrolls only as far as something it
+// can land on.
+const stayPut = () => undefined;
+
+/**
+ * A way out to an address — an upstream project, a service's site — drawn
+ * like any row: GitHub's mark for a repository there, a globe for anything
+ * else, chosen by the address and never by a plugin; what it is, the address
+ * beneath, and a link symbol at the far end, so it reads as something to
+ * press. React Native's `Linking` opens it: a new tab in a browser, where
+ * expo-linking would take the app itself away.
+ */
+export function LinkRow({ title, url, note }: { title: string; url: string; note?: string }) {
+  const Mark = url.startsWith('https://github.com/') ? Github : Globe;
+  return (
+    <SettingsRow
+      title={title}
+      subtitle={note ? `${note}\n${readable(url)}` : readable(url)}
+      subtitleLines={4}
+      icon={<Mark size={20} color="$color11" />}
+      role="link"
+      onPress={isTV ? stayPut : () => void Linking.openURL(url).catch(() => undefined)}
+      {...(isTV ? {} : { trailing: <ExternalLink size={18} color="$color9" /> })}
+    />
+  );
+}
+
+/** What a plugin is built on, from its manifest. */
+export function CreditRow({ credit }: { credit: Credit }) {
+  return <LinkRow title={credit.name} url={credit.url} {...(credit.note ? { note: credit.note } : {})} />;
 }
 
 /** A row whose trailing edge is a short list of choices, one of them taken. */

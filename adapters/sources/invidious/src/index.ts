@@ -14,6 +14,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Invidious',
     description: 'A privacy-respecting YouTube front end.',
+    credits: [{ name: 'Invidious', url: 'https://github.com/iv-org/invidious', note: 'The front end it connects to.' }],
     media: { contentKinds: ['videos'], capabilities: [] },
     connectionFields: [
       {

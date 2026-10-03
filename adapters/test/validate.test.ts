@@ -1,4 +1,4 @@
-import { pluginId, validateManifest, type PluginManifest } from '@loge/api';
+import { creditsOn, pluginId, validateManifest, type PluginManifest } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 const sound: PluginManifest = {
@@ -294,5 +294,50 @@ describe('validateManifest — metadata', () => {
       expect.arrayContaining(['a sources plugin cannot declare the metadata block', 'declares media and metadata; a plugin declares one block']),
     );
     expect(metadata({ media: { contentKinds: ['movies'], capabilities: [] } })).toContain('a metadata plugin cannot declare the media block');
+  });
+});
+
+describe('validateManifest — credits', () => {
+  const credit = { name: 'Upstream', url: 'https://github.com/example/upstream', note: 'What it is built on.' };
+
+  it('accepts credits with an https address, a note, and platforms the plugin runs on', () => {
+    expect(problemsWith({ credits: [credit, { name: 'Site', url: 'https://www.example.org', platforms: ['web'] }] })).toEqual([]);
+  });
+
+  it('refuses an address a browser should not be handed as it is', () => {
+    for (const url of [
+      'http://github.com/example/upstream',
+      'https://user:secret@github.com/example',
+      'https://github.com:443/example',
+      'https://github.com/example?tab=readme',
+      'https://github.com/example#readme',
+      'javascript:alert(1)',
+      'https://localhost/example',
+      'https://127.0.0.1/example',
+      'github.com/example/upstream',
+      'https://github.com/example upstream',
+      'https://GitHub.com/example',
+      'https://github.com//example',
+    ]) {
+      expect(problemsWith({ credits: [{ ...credit, url }] }), url).toContain(`credit "Upstream" needs an https address, not "${url}"`);
+    }
+  });
+
+  it('refuses an empty name or note, a platform it does not run on, and one listed twice', () => {
+    expect(problemsWith({ credits: [{ ...credit, name: ' ' }] })).toContain('a credit has no name');
+    expect(problemsWith({ credits: [{ ...credit, note: '' }] })).toContain('credit "Upstream" has an empty note');
+    expect(problemsWith({ platforms: ['ios'], credits: [{ ...credit, platforms: ['web'] }] })).toContain(
+      'credit "Upstream" names platform "web", which the plugin does not run on',
+    );
+    expect(problemsWith({ credits: [{ ...credit, platforms: [] }] })).toContain('credit "Upstream" names no platform');
+    expect(problemsWith({ credits: [{ ...credit, platforms: ['ios', 'ios'] }] })).toContain('credit "Upstream" lists platform "ios" twice');
+    expect(problemsWith({ credits: [credit, { ...credit, name: 'Again' }] })).toContain(`credit address "${credit.url}" is listed twice`);
+  });
+
+  it('gives each platform its own', () => {
+    const credits = [credit, { name: 'Android build', url: 'https://github.com/example/android', platforms: ['android' as const] }];
+    expect(creditsOn({ credits }, 'android').map((each) => each.name)).toEqual(['Upstream', 'Android build']);
+    expect(creditsOn({ credits }, 'web').map((each) => each.name)).toEqual(['Upstream']);
+    expect(creditsOn({}, 'ios')).toEqual([]);
   });
 });

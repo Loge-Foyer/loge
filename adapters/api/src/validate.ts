@@ -1,7 +1,7 @@
 import type { CapabilityKey } from './capabilities';
 import { categoryOfPluginId, PLATFORMS, PLUGIN_CATEGORIES, type PluginCategory } from './category';
 import { isLibrarySelection, type Field } from './fields';
-import { isToggle, type PluginManifest } from './manifest';
+import { isToggle, type Credit, type PluginManifest } from './manifest';
 import { IDENTIFIABLE_KINDS } from './metadata';
 import { SEARCH_SCOPES } from './query';
 
@@ -16,6 +16,10 @@ const CATEGORY_BLOCKS: Readonly<Record<PluginCategory, readonly Block[]>> = {
 type Block = 'media' | 'player' | 'account' | 'backup' | 'metadata';
 const BLOCKS: readonly Block[] = ['media', 'player', 'account', 'backup', 'metadata'];
 const KEY = /^[a-z][A-Za-z0-9]*$/;
+// An address handed to a browser as it is: https, a host name, a plain path —
+// no credentials, port, query or fragment. A regular expression, because the
+// api has no URL to parse one with.
+const CREDIT_URL = /^https:\/\/(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?:\/[A-Za-z0-9._~%-]+)*\/?$/;
 const SECRET_LOOKING = /password|passcode|passphrase|token|secret|apikey/i;
 
 /**
@@ -46,6 +50,7 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
   if (manifest.displayName.trim() === '') problems.push('displayName is empty');
   if (manifest.description.trim() === '') problems.push('description is empty');
   if (manifest.attribution?.trim() === '') problems.push('attribution is empty');
+  problems.push(...creditProblems(manifest.credits ?? [], platforms));
   if (blocks.length === 0) problems.push('declares no block');
 
   if (media) {
@@ -138,6 +143,25 @@ export function validateManifest(manifest: PluginManifest): readonly string[] {
     }
   }
 
+  return problems;
+}
+
+/** What a plugin credits: each with a name, an https address, and only platforms the plugin runs on. */
+function creditProblems(credits: readonly Credit[], platforms: readonly string[]): readonly string[] {
+  const problems: string[] = [];
+  for (const credit of credits) {
+    if (credit.name.trim() === '') problems.push('a credit has no name');
+    if (!CREDIT_URL.test(credit.url)) problems.push(`credit "${credit.name}" needs an https address, not "${credit.url}"`);
+    if (credit.note?.trim() === '') problems.push(`credit "${credit.name}" has an empty note`);
+    if (credit.platforms !== undefined) {
+      if (credit.platforms.length === 0) problems.push(`credit "${credit.name}" names no platform`);
+      for (const platform of credit.platforms) {
+        if (!platforms.includes(platform)) problems.push(`credit "${credit.name}" names platform "${platform}", which the plugin does not run on`);
+      }
+      for (const platform of duplicates(credit.platforms)) problems.push(`credit "${credit.name}" lists platform "${platform}" twice`);
+    }
+  }
+  for (const url of duplicates(credits.map((credit) => credit.url))) problems.push(`credit address "${url}" is listed twice`);
   return problems;
 }
 

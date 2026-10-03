@@ -38,7 +38,15 @@ the two route segments, so no id is ever URL-encoded. There is no global list.
 - **Sync** has your own server, the backup targets, and the backup file.
 - **Metadata** lists its connections like a source's: the key, an `enabled`
   switch, and Test connection. A manifest's `attribution` — what TMDB's terms
-  ask an app to say — is shown in Settings → About, so no screen names it.
+  ask an app to say — is shown under Credits on its own page, so no screen
+  names it.
+
+**Credits.** A manifest may name what its adapter is built on or talks to —
+`credits: [{ name, url, note?, platforms? }]` — and the app lists them, for the
+platform it runs on (`creditsOn`), at the end of the adapter's page. The
+address is https, with no credentials, port, query or fragment, and a credit
+may name only platforms the adapter runs on (`validateManifest`). A closed
+service, a protocol or a format has nothing to point at, and credits nothing.
 
 ## Account-wide or device-wide
 

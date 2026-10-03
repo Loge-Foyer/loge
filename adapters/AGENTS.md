@@ -107,7 +107,8 @@ interface PluginManifest {
   readonly account?: AccountManifest;
   readonly backup?: BackupManifest;
   readonly metadata?: MetadataManifest;         // { identifies: ['movies', 'shows'] }
-  readonly attribution?: string;                 // what the service's terms ask the app to show, in About
+  readonly attribution?: string;                 // what the service's terms ask the app to show, under Credits on its page
+  readonly credits?: readonly Credit[];          // what it is built on or talks to: { name, url (https), note?, platforms? }
   readonly connectionFields: readonly Field[];
   readonly settings: readonly PluginSettingDescriptor[];     // never a password
 }

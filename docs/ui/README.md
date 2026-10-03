@@ -282,8 +282,18 @@ TV's sections.
     up. It brings nothing to a tab: watch status the app keeps on TV is keyed
     by what it answers, so a provider's German and English copies of a film
     are one.
-- **About** — the version, and every attribution a manifest carries (TMDB's
-  notice), by the adapter's name: no screen names a service itself.
+- **Credits** end every adapter's page (`settings/adapters/[category]/[name]`):
+  what it is built on or talks to, from its manifest (`credits`), for this
+  platform — Jellyfin, Yattee Server, mpv and its builds, VLC and VLCKit,
+  Foyer and PocketBase — and a service's notice beneath, TMDB's among them.
+  Each is a row that opens the address (`LinkRow`): GitHub's mark for a
+  repository there and a globe for a site, chosen by the address; what it is
+  and the address beneath; a link symbol at the far end. On a TV, which has no
+  browser, the row shows the address and keeps the remote's focus, with no
+  link symbol.
+- **About** — the version, and Loge itself: free software under the GNU AGPL,
+  a row of the same kind opening its source on GitHub. No screen names a
+  service itself.
 
 ## The connection form
 

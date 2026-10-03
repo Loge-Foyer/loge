@@ -23,6 +23,26 @@ export interface MediaRoleManifest {
   readonly searchScopes?: readonly SearchScope[];
 }
 
+/**
+ * Work a plugin is built on or talks to, credited on its own page: an
+ * upstream project's repository, or a service's site. The app draws them; no
+ * screen names the work itself.
+ */
+export interface Credit {
+  readonly name: string;
+  /** An https address, handed to a browser as it is: "https://github.com/jellyfin/jellyfin". */
+  readonly url: string;
+  /** A few words: what it is to this plugin. */
+  readonly note?: string;
+  /** Only the builds that carry it — libmpv-android on Android. Absent: everywhere the plugin runs. */
+  readonly platforms?: readonly PlatformId[];
+}
+
+/** The credits that apply where the app runs. */
+export function creditsOn(manifest: Pick<PluginManifest, 'credits'>, platform: PlatformId): readonly Credit[] {
+  return (manifest.credits ?? []).filter((credit) => credit.platforms === undefined || credit.platforms.includes(platform));
+}
+
 /** A boolean setting that can switch capabilities off for one connection. */
 export interface ToggleSetting extends BooleanField {
   readonly gates?: readonly CapabilityKey[];
@@ -46,10 +66,13 @@ export interface PluginManifest {
   readonly description: string;
   /**
    * What the service's terms ask an app using it to say — "This product uses
-   * the TMDB API but is not endorsed or certified by TMDB." — shown in
-   * Settings → About, so no screen has to name the service itself.
+   * the TMDB API but is not endorsed or certified by TMDB." — shown under
+   * Credits on the plugin's own page, so no screen has to name the service
+   * itself.
    */
   readonly attribution?: string;
+  /** What the plugin is built on or talks to, credited on its page. */
+  readonly credits?: readonly Credit[];
   /** Sources and IPTV. */
   readonly media?: MediaRoleManifest;
   /** Players. */

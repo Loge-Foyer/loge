@@ -17,6 +17,7 @@ export const plugin: Plugin = {
     platforms: ['ios', 'android', 'web'],
     displayName: 'Yattee Server',
     description: 'Backend for YouTube and other web video.',
+    credits: [{ name: 'Yattee Server', url: 'https://github.com/yattee/yattee-server', note: 'The server it connects to.' }],
     media: {
       contentKinds: ['videos'],
       capabilities: ['browse', 'search', 'feed', 'playback', 'remoteImages', 'offlineMetadata', 'downloads', 'downloadOptions'],
