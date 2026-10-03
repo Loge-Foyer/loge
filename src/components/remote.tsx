@@ -5,6 +5,13 @@ import { Platform, Pressable, type GestureResponderEvent, type StyleProp, type V
 export const isTV = Platform.isTV === true;
 
 /**
+ * A phone or a tablet: a finger on the picture. The player's edges live here
+ * alone — a television's volume is the television's, and a browser has a
+ * pointer, not a thumb at the side of the screen.
+ */
+export const isHandheld = !isTV && process.env.EXPO_OS !== 'web';
+
+/**
  * Something a TV remote can press. Tamagui's controls hear touches alone, and
  * a remote's select arrives as a click that only React Native's own Pressable
  * hears — so on a TV a control is drawn inside one, which takes the focus and

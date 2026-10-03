@@ -104,15 +104,27 @@ device's. A button with nothing behind it is not drawn: no second audio track,
 no subtitles, no chapters, or an engine with no rate to set. `setRate` is
 optional on `MediaPlayer` for exactly that reason.
 
-**The edges.** With the controls up, each edge of the picture shows its
-level: brightness on one, volume on the other, as Settings → Adapters →
-Players arranges them.
-- A drag along an edge moves the level, and brings the controls up with it.
+**The edges** are a phone's and a tablet's alone: a television's volume is
+the television's, and a browser has a pointer, not a thumb at the side of the
+screen. With the controls up, each edge of the picture shows its level —
+brightness on one, volume on the other, as Settings → Adapters → Players
+arranges them — on every tab, live or not, whichever engine plays.
+- A drag up or down the outer third of the picture moves the level, and brings
+  the controls up with it. A drag in the middle third, or a tap, is the
+  controls'; so is a drag while a panel is open over the picture.
+- **One responder for the player's whole life.** The screen hands it its
+  latest state after each render. Made afresh on every render, it lost every
+  drag: the grant itself renders, so each move reached a responder that had
+  never granted it — always the left edge, and only the last step.
+- **They keep to the safe area**, clear of a notch, a rounded corner or the
+  home indicator, on whichever side the phone was turned; so do the controls.
+  The player has a `SafeAreaProvider` of its own: a full-screen modal is
+  measured apart from the screen beneath it, whose insets stay those of a
+  phone held upright.
 - **Volume is the device's own**, the one its buttons move: `modules/loge-volume`.
   - On iPhone it goes through MPVolumeView, which also keeps the system's own
     banner away while the player is open.
   - On Android it is the music stream.
-  - A browser has no device volume, so there the edge moves the engine's.
 - A double tap on a side flashes that side, faintly, as it jumps.
 
 **Picture in picture is armed only while something plays.** The system
