@@ -235,6 +235,7 @@ public final class LogeMpvPlayer: SharedObject {
       loading = false
       loaded = true
       tracks()
+      watch()
     // The first frame is up, here or after a seek: what mpv is doing now is
     // whatever `pause` says.
     case MPV_EVENT_PLAYBACK_RESTART:
@@ -332,7 +333,8 @@ public final class LogeMpvPlayer: SharedObject {
 
   func load(uri: String, headers: [String: String]?, startMs: Double?) {
     state("loading")
-    watch()
+    // A new file is counted afresh, once it has loaded.
+    cancelStall()
     // Everything this player knows about a file is kept on the one thread that
     // talks to mpv, and so is set there.
     onMpv { [weak self] in
@@ -468,8 +470,14 @@ public final class LogeMpvPlayer: SharedObject {
   /**
    A decoder that takes a stream and then hands back no frame leaves mpv
    loading for ever — and the screen with a spinner and nothing to read. Ten
-   seconds without a position is that, said out loud. The first position calls
-   it off.
+   seconds from the file loading without a position is that, said out loud.
+   The first position calls it off.
+
+   Opening is not counted. YouTube's HLS names every rendition and every
+   dubbed language, and mpv reads each playlist before it starts — over a
+   hundred megabytes for a two-hour video, which took seven to more than ten
+   seconds on the Apple TV simulator, the picture still on its way. A file that
+   never loads ends, and says so then.
    */
   private func watch() {
     cancelStall()

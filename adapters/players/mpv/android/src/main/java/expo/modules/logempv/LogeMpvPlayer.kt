@@ -116,7 +116,8 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
 
   fun load(uri: String, headers: Map<String, String>?, startMs: Double?) {
     state("loading")
-    watch()
+    // A new file is counted afresh, once it has loaded.
+    main.post { stalled?.let { main.removeCallbacks(it) } }
     // Everything this player knows about a file is kept on the one thread
     // that talks to mpv, and so is set there.
     onMpv {
@@ -219,6 +220,7 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
         loading = false
         loaded = true
         tracks()
+        main.post { watch() }
       }
       // The first frame is up, here or after a seek: what mpv is doing now is
       // whatever `pause` says.
@@ -307,8 +309,11 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
   /**
    * A decoder that takes a stream and then hands back no frame leaves mpv
    * loading for ever — and the screen with a spinner and nothing to read. Ten
-   * seconds without a position is that, said out loud. The first position
-   * calls it off.
+   * seconds from the file loading without a position is that, said out loud.
+   * The first position calls it off. Opening is not counted: YouTube's HLS
+   * names every rendition and every dubbed language, and mpv reads each
+   * playlist before it starts (`ios/LogeMpvPlayer.swift`). A file that never
+   * loads ends, and says so then.
    */
   private fun watch() {
     stalled?.let { main.removeCallbacks(it) }
