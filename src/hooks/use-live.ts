@@ -1,10 +1,10 @@
 import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } from '@loge/api';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { asChannel } from '@/services/lists';
 import type { SourceError } from '@/services/media';
-import { remoteKey } from '@/services/query-keys';
+import { remoteKey, userKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
 import { useFavoriteChannels } from './use-lists';
@@ -89,6 +89,24 @@ export function useLineup(channel: GlobalMediaKey, group: string | undefined, fa
       if (more && !fetchingMore) void channels.fetchNextPage();
     },
   };
+}
+
+/** The Live group this profile chose last on a provider, on this device: `null` for none. */
+export function useLastLiveGroup(connectionId: ConnectionId) {
+  const userId = useActiveUserId();
+  const { liveGroups } = useServices();
+  return useQuery({ queryKey: userKey(userId, 'live-group', connectionId), queryFn: () => liveGroups.last(userId, connectionId) });
+}
+
+/** Remembers a group chosen on a provider — never ★, which comes first by itself while it holds anything. */
+export function useRememberLiveGroup(connectionId: ConnectionId) {
+  const userId = useActiveUserId();
+  const { liveGroups } = useServices();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (group: string) => liveGroups.remember(userId, connectionId, group),
+    onSuccess: () => client.invalidateQueries({ queryKey: userKey(userId, 'live-group', connectionId) }),
+  });
 }
 
 /** The time, held in state and moved on every `stepMs`: render stays pure, and what shows the time follows it. */

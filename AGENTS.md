@@ -154,8 +154,10 @@ These are specific to Loge and matter more than anything above.
      user-owned and goes with the profile.
    - **Device-wide** — players (on or off, the default, their settings), sync
      plugins (your server's sign-in, a backup target and its key), the default
-     profile, sessions, the device key, caches, the journal and sync state.
-     Never journaled, never pushed, never in a backup.
+     profile, the Live group each profile chose last, sessions, the device
+     key, caches, the journal and sync state. Never journaled, never pushed,
+     never in a backup. A device setting that names a profile or a connection
+     has no cascade: `services/removal.ts` drops it in the same transaction.
 
 7. **Components take domain types.** `<PosterCard item={item} />`, never
    `<JellyfinPoster raw={payload} />`. Artwork goes through

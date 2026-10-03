@@ -20,6 +20,7 @@ import type { Applied } from './sync/parts';
 import type { SyncStatus } from './sync/engine';
 import type { DownloadService } from './downloads';
 import type { ListsService } from './lists';
+import type { LiveGroupService } from './live-groups';
 import type { DownloadSettingsService } from './downloads/settings';
 import type { WatchService } from './watch';
 
@@ -70,6 +71,8 @@ export interface Services {
   readonly downloadSettings: DownloadSettingsService;
   /** The channels a profile follows and the lists it made — account-wide. */
   readonly lists: ListsService;
+  /** The Live group each profile chose last on each provider — this device's. */
+  readonly liveGroups: LiveGroupService;
   /** Pressing Play: which player plays what, its controller and its view. */
   readonly playback: PlaybackService;
   readonly orientation: ScreenOrientationControl;

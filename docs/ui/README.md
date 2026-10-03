@@ -153,6 +153,15 @@ browser, that providers can't be reached there). Otherwise:
 - **Live** — group chips (★, then "All", then the provider's), and the
   channels in the provider's own order: logo or number, name, what is on now
   with how far along, and what is next.
+- **Where Live opens** on a provider, until a chip is chosen this time: ★ while
+  the profile keeps favourites there; else the group it chose there last, on
+  this device, while the provider still has it; else All. Nothing is asked of
+  the provider until that is known (`openingGroup`, `services/live-groups.ts`).
+  The choice is a device setting — never journaled, and gone with its profile
+  or its provider; ★ is never kept, since it comes first by itself. On a TV the
+  list is at least a screen tall: react-native-tvos sits a list's scroller in a
+  focus guide only as tall as what it holds, so a short ★ list stopped part way
+  down.
 - **★ Favourites** — the profile's own channels on this provider, kept on the
   account so every device has them: numbered ones in their order, the rest by
   name. Pressing and holding a channel — holding select, with a remote — opens

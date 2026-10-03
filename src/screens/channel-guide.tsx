@@ -2,11 +2,12 @@ import type { GlobalMediaKey } from '@loge/api';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { FlatList } from 'react-native';
+import { FlatList, useWindowDimensions } from 'react-native';
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { clockOf } from '@/components/labels';
 import { liveHref } from '@/components/media/item-link';
+import { isTV } from '@/components/remote';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
 import { useGuide, useNow } from '@/hooks/use-live';
@@ -25,6 +26,7 @@ export function ChannelGuideScreen({ channel, name, group }: { channel: GlobalMe
   const now = useNow();
   const programmes = [...(guide.data?.value ?? [])].sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1));
   const watch = () => router.push(liveHref(channel, name, group));
+  const { height } = useWindowDimensions();
 
   return (
     <>
@@ -33,7 +35,8 @@ export function ChannelGuideScreen({ channel, name, group }: { channel: GlobalMe
         data={programmes}
         keyExtractor={(programme) => programme.startsAt}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+        // A TV list's scroller sits in a focus guide only as tall as what it holds: a short day stopped part way down.
+        contentContainerStyle={{ padding: 16, paddingBottom: 48, ...(isTV ? { minHeight: height } : {}) }}
         ListHeaderComponent={
           <YStack gap="$3" pb="$4">
             <PrimaryButton size="$4" self="flex-start" icon={<Play size={18} fill="currentColor" />} onPress={watch}>

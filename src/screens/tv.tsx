@@ -25,12 +25,13 @@ import { usePosterWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useFavoriteChannels, useListActions } from '@/hooks/use-lists';
-import { nowAndNext, useChannelGroups, useChannels, useGuide, useNow, useSourcePage } from '@/hooks/use-live';
+import { nowAndNext, useChannelGroups, useChannels, useGuide, useLastLiveGroup, useNow, useRememberLiveGroup, useSourcePage } from '@/hooks/use-live';
 import { useInProgress, useKeptWatch } from '@/hooks/use-kept-watch';
 import { useRefreshMedia } from '@/hooks/use-media';
 import { useTabSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
 import { asChannel } from '@/services/lists';
+import { openingGroup, type OpeningGroup } from '@/services/live-groups';
 import type { SourceError } from '@/services/media';
 import type { TabSource } from '@/services/sources';
 import { itemKeyOf } from '@/services/watch/item-key';
@@ -66,9 +67,10 @@ export function TvScreen() {
           tabs={sources.map((source) => ({ id: source.connection.id, label: source.connection.label }))}
           selected={selected.connection.id}
           onSelect={(id) => {
-            // Another provider is another list: a search does not follow.
+            // Another provider is another list: a search does not follow, and
+            // where its Live opens is decided afresh.
             setTerm('');
-            router.setParams({ source: id, kind: '', group: '' });
+            router.setParams({ source: id, kind: '', group: undefined });
           }}
         />
       ) : null}
@@ -91,7 +93,16 @@ export function TvScreen() {
   // away while someone was typing; a new term is a new query, which pages from
   // its start on its own.
   if (kind === 'live') {
-    return <Live key={selected.connection.id} source={selected} group={params.group ? fromRouteId(params.group) : undefined} term={term} header={header} />;
+    // No group yet this time is not All (`''`): where Live opens is decided then.
+    return (
+      <Live
+        key={selected.connection.id}
+        source={selected}
+        group={params.group === undefined ? undefined : fromRouteId(params.group)}
+        term={term}
+        header={header}
+      />
+    );
   }
   return <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} term={term} header={header} />;
 }
@@ -145,11 +156,26 @@ function useRefresh() {
 
 function Live({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
   const connectionId = source.connection.id;
-  const favorites = isFavorites(group);
   const groups = useChannelGroups(connectionId);
-  // The ★ list is the profile's own: the provider is asked for its guide, and nothing else.
-  const channels = useChannels(connectionId, group, term, { enabled: !favorites });
   const kept = useFavoriteChannels(connectionId);
+  const last = useLastLiveGroup(connectionId);
+  const remember = useRememberLiveGroup(connectionId);
+  // Nothing chosen yet this time: ★ while the profile keeps favourites here,
+  // else the group it chose last, else All — and nothing asked of the
+  // provider until that is known.
+  const shown =
+    group ??
+    groupIdOf(
+      openingGroup({
+        favorites: kept.isSuccess ? kept.data.length : kept.isError ? 0 : undefined,
+        last: last.isSuccess ? last.data : last.isError ? null : undefined,
+        groups: groups.isSuccess ? groups.data.value : groups.isError ? [] : undefined,
+      }),
+    );
+  const favorites = isFavorites(shown);
+  // The ★ list is the profile's own: the provider is asked for its guide, and nothing else.
+  const channels = useChannels(connectionId, shown || undefined, term, { enabled: shown !== undefined && !favorites });
+  const { height } = useWindowDimensions();
   const keptIds = new Map((kept.data ?? []).map((entry) => [entry.externalId, entry.id] as const));
   const searching = term.trim();
   const list = favorites
@@ -182,11 +208,22 @@ function Live({ source, group, term, header }: { source: TabSource; group: strin
         keyboardShouldPersistTaps="handled"
         keyExtractor={(channel) => channel.key.externalId}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}
+        // On a TV the list's scroller sits in a focus guide as tall as what it
+        // holds, so a short list — ★ above all — stopped part way down the
+        // screen. Content a screen tall makes the guide a screen tall; flex on
+        // the list would make it nothing at all.
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, ...(isTV ? { minHeight: height } : {}) }}
         ListHeaderComponent={
           <YStack gap="$3" pb="$3">
             {header}
-            <GroupChips groups={groups.data?.value ?? []} selected={group} />
+            <GroupChips
+              groups={groups.data?.value ?? []}
+              selected={shown}
+              onChoose={(id) => {
+                router.setParams({ group: routeId(id) });
+                if (!isFavorites(id)) remember.mutate(id);
+              }}
+            />
             <SourceNotices errors={dedupe(errors)} onRetry={() => void onRefresh()} />
           </YStack>
         }
@@ -194,7 +231,7 @@ function Live({ source, group, term, header }: { source: TabSource; group: strin
           <ChannelRow
             channel={item}
             connectionId={connectionId}
-            group={group}
+            group={shown}
             programmes={guide.data?.value}
             now={now}
             favorite={keptIds.has(item.key.externalId)}
@@ -249,7 +286,7 @@ function dedupe(errors: readonly SourceError[]): readonly SourceError[] {
   return errors.slice(0, 1);
 }
 
-function GroupChips({ groups, selected }: { groups: readonly ChannelGroup[]; selected: string | undefined }) {
+function GroupChips({ groups, selected, onChoose }: { groups: readonly ChannelGroup[]; selected: string | undefined; onChoose: (id: string) => void }) {
   return (
     <SourceTabs
       tabs={[
@@ -258,10 +295,17 @@ function GroupChips({ groups, selected }: { groups: readonly ChannelGroup[]; sel
         { id: '', label: 'All' },
         ...groups.map((group) => ({ id: group.id, label: group.name })),
       ]}
-      selected={selected ?? ''}
-      onSelect={(id) => router.setParams({ group: routeId(id) })}
+      selected={selected}
+      onSelect={onChoose}
     />
   );
+}
+
+/** The group an opening names, as the chips and the route spell it. */
+function groupIdOf(opening: OpeningGroup | undefined): string | undefined {
+  if (!opening) return undefined;
+  if (opening.kind === 'favorites') return FAVORITES_GROUP;
+  return opening.kind === 'group' ? opening.id : '';
 }
 
 export function playChannel(channel: Channel, group: string | undefined) {

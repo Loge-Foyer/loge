@@ -24,7 +24,8 @@ export function SourceTabs({
   onSelect,
 }: {
   tabs: readonly SourceTab[];
-  selected: string;
+  /** None while the choice is still being made. */
+  selected?: string | undefined;
   onSelect: (id: string) => void;
 }) {
   return (

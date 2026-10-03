@@ -47,6 +47,7 @@ import { createSyncScheduler } from '@/services/sync/scheduler';
 import { createWatchService } from '@/services/watch';
 import { createDownloadService } from '@/services/downloads';
 import { createListsService } from '@/services/lists';
+import { createLiveGroupService } from '@/services/live-groups';
 import { createDownloadQueue } from '@/services/downloads/queue';
 import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createOutboxDrainer } from '@/services/watch/drainer';
@@ -120,6 +121,7 @@ export function createServices(): AppServices {
   });
   const watch = createWatchService({ db, sources, clock, identities, onQueued: () => drainer.kick() });
   const lists = createListsService({ db, ids, clock });
+  const liveGroups = createLiveGroupService({ db });
   const downloadSettings = createDownloadSettingsService({ deviceSettings: db.deviceSettings });
   const files = createFileStore();
   const downloadQueue = createDownloadQueue({
@@ -262,6 +264,7 @@ export function createServices(): AppServices {
       downloads,
       downloadSettings,
       lists,
+      liveGroups,
       playback,
       orientation: screenOrientation,
       brightness: screenBrightness,

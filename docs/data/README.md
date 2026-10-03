@@ -50,7 +50,10 @@ web for one thing only — sql.js, loaded to write or open a backup file.
 **Device-wide** — never leave the device:
 
 - **Device settings:** the default profile, players (on or off, the default,
-  their settings) and sync settings.
+  their settings), sync settings, and the Live group each profile chose last
+  on each provider. A setting that names a profile or a connection — the
+  default profile, a Live group — goes in the same transaction as the profile
+  or the connection (`services/removal.ts`): no cascade reaches it.
 - **Sync-category connections:** your server's sign-in, a backup target.
 - **The account's own rows**, never journaled, and all three cleared when the
   device changes account:

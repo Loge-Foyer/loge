@@ -1,5 +1,6 @@
 import type { ConnectionId, CredentialsRef, UserId } from '@loge/api';
 
+import { forgetConnectionGroups, forgetProfileGroups } from './live-groups';
 import type { Repositories } from './ports';
 import { accountWide } from './scope';
 import { sessionRef } from './sessions';
@@ -20,9 +21,11 @@ export async function removeProfileIn(tx: Repositories, id: UserId, options: { r
   const own = await tx.connections.valuesOfProfile(id);
   const connections = await tx.connections.list();
   await tx.users.delete(id);
+  // What this device kept for it: no cascade reaches a device setting.
   await tx.deviceSettings.update((current) => {
-    if (current.defaultUserId !== id) return current;
-    const { defaultUserId: _deleted, ...rest } = current;
+    const left = forgetProfileGroups(current, id);
+    if (left.defaultUserId !== id) return left;
+    const { defaultUserId: _deleted, ...rest } = left;
     return rest;
   });
   await tx.staleSecrets.add([
@@ -45,6 +48,7 @@ export async function removeConnectionIn(tx: Repositories, id: ConnectionId): Pr
   const profiles = await tx.connections.profileValues(id);
   const users = await tx.users.list();
   await tx.connections.delete(id);
+  await tx.deviceSettings.update((current) => forgetConnectionGroups(current, id));
   await tx.staleSecrets.add([
     ...[connection.values.credentialsRef, ...[...profiles.values()].map((values) => values.credentialsRef)].filter(isRef),
     sessionRef(id, 'shared'),

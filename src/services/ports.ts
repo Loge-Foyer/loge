@@ -96,6 +96,12 @@ export interface DeviceSettings {
    * backed up.
    */
   readonly downloads?: Partial<DownloadSettings>;
+  /**
+   * The Live group each profile chose last on each provider, here — profile
+   * id, then connection id, then the group; `''` is All. It goes with its
+   * profile and its provider (`services/live-groups.ts`).
+   */
+  readonly liveGroups?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 export interface DownloadSettings {

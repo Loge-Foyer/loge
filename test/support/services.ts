@@ -56,6 +56,7 @@ import { createAccountProviders } from '@/services/sync/provider';
 import { createSyncScheduler } from '@/services/sync/scheduler';
 import { createDownloadService } from '@/services/downloads';
 import { createListsService } from '@/services/lists';
+import { createLiveGroupService } from '@/services/live-groups';
 import { createDownloadSettingsService } from '@/services/downloads/settings';
 import { createPlaybackService } from '@/services/playback';
 import { createWatchService } from '@/services/watch';
@@ -451,6 +452,7 @@ export function buildServices(options: {
     onQueued: () => undefined,
   });
   const lists = createListsService({ db, ids, clock });
+  const liveGroups = createLiveGroupService({ db });
   const playback = createPlaybackService({
     players: options.players ?? [],
     choosing: players.choosing,
@@ -504,6 +506,7 @@ export function buildServices(options: {
       downloads,
       downloadSettings,
       lists,
+      liveGroups,
       playback,
       orientation,
     },
