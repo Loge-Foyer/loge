@@ -240,7 +240,11 @@ TV's sections.
   - **Sources** and **IPTV** list their connections and add new ones.
   - **Players** list this device's engines, with "Plays first" or "Off": each
     one's page has its switch and "Play with it first" (`services/players.ts`,
-    device settings). The built-in player plays; the others arrive in Phase 8.
+    device settings). Beneath the list, Controls is three tabs: **Controls** —
+    how far a seek moves, either side of play, a double tap (on a TV, a double
+    press of left or right), press and hold, the time at the right; **Edges**,
+    a phone's and a tablet's alone; and **Buttons**, as **Beneath** and
+    **Floating**. Decoding and Leaving the player follow.
   - **Sync** has your own server, the backup targets — iCloud on iOS only,
     Google Drive and OneDrive, as they arrive — and the backup file: Export,
     Import, and Show the backup key, behind the owner check. When a save finds

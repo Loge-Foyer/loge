@@ -7,6 +7,15 @@ import { px } from '@/components/density';
 import { Button } from '@/components/button';
 import { remotely } from '@/components/remote';
 
+/** A group's name above it, as every section of Settings has one. */
+export function SectionTitle({ children }: { children: string }) {
+  return (
+    <SizableText size="$2" fontWeight="600" color="$color10" px="$3" textTransform="uppercase">
+      {children}
+    </SizableText>
+  );
+}
+
 export function SettingsSection({
   title,
   footer,
@@ -19,11 +28,7 @@ export function SettingsSection({
   const rows = Children.toArray(children);
   return (
     <YStack gap="$2">
-      {title ? (
-        <SizableText size="$2" fontWeight="600" color="$color10" px="$3" textTransform="uppercase">
-          {title}
-        </SizableText>
-      ) : null}
+      {title ? <SectionTitle>{title}</SectionTitle> : null}
       <YGroup rounded="$6" overflow="hidden" borderWidth={1} borderColor="$borderColor">
         {rows.map((row, index) => (
           <Fragment key={index}>

@@ -2,14 +2,17 @@ import type { PluginCategory, PluginId, PluginManifest } from '@loge/api';
 import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons-2/icons/ChevronUp';
 import { Stack } from 'expo-router';
-import { Paragraph, SizableText, XStack } from 'tamagui';
+import { useState } from 'react';
+import { Paragraph, SizableText, XStack, YStack } from 'tamagui';
 
 import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
 import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
+import { isHandheld, isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
-import { ChoiceRow, SettingsRow, SettingsSection } from '@/components/settings-list';
+import { ChoiceRow, SectionTitle, SettingsRow, SettingsSection } from '@/components/settings-list';
+import { SourceTabs } from '@/components/source-tabs';
 import { useServices } from '@/hooks/services-context';
 import { useAccount } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
@@ -175,6 +178,12 @@ const BUTTON_NOTES: Readonly<Partial<Record<PlayerButton, string>>> = {
 };
 
 const JUMP_LABELS: Readonly<Record<PlayerJump, string>> = { off: 'Off', seek: 'Seconds', chapter: 'Chapter' };
+
+/** The tabs under Controls. */
+const CONTROL_TABS = ['controls', 'edges', 'buttons'] as const;
+type ControlTab = (typeof CONTROL_TABS)[number];
+const CONTROL_TAB_LABELS: Readonly<Record<ControlTab, string>> = { controls: 'Controls', edges: 'Edges', buttons: 'Buttons' };
+const isControlTab = (id: string): id is ControlTab => (CONTROL_TABS as readonly string[]).includes(id);
 const SLIDER_LABELS: Readonly<Record<PlayerSlider, string>> = { off: 'Off', brightness: 'Brightness', volume: 'Volume' };
 
 function ButtonRows({ row, title, footer }: { row: ButtonRow; title: string; footer: string }) {
@@ -210,79 +219,105 @@ function PlayerControlsSection() {
   const { data } = useAppSettings();
   const { set } = useAppSettingActions();
   const { data: players = [] } = usePlayers();
+  const [tab, setTab] = useState<ControlTab>('controls');
   const settings = data ?? APP_DEFAULTS;
   const busy = set.isPending;
   // Named from their manifests, so no player is named in this file.
   const cannotShrink = players.filter((player) => player.playsHere && !player.canShrink).map((player) => player.manifest.displayName);
+  // The edges are a phone's and a tablet's: a TV and a browser have none to arrange.
+  const tabs = CONTROL_TABS.filter((each) => each !== 'edges' || isHandheld);
   return (
     <>
-      <SettingsSection title="Controls" footer="The same on every player: a player is the engine, and the controls are the app’s. Play itself is always in the middle.">
-        <ChoiceRow
-          title="Skip by"
-          subtitle="How far a seek moves, by button or by tap."
-          options={SEEK_CHOICES}
-          label={(seconds) => `${seconds}s`}
-          value={(SEEK_CHOICES.find((seconds) => seconds * 1000 === settings.seekMs) ?? 10) as (typeof SEEK_CHOICES)[number]}
-          disabled={busy}
-          onChoose={(seconds) => set.mutate({ seekMs: seconds * 1000 })}
+      <YStack gap="$2">
+        <SectionTitle>Controls</SectionTitle>
+        <SourceTabs
+          tabs={tabs.map((id) => ({ id, label: CONTROL_TAB_LABELS[id] }))}
+          selected={tab}
+          onSelect={(id) => {
+            if (isControlTab(id)) setTab(id);
+          }}
         />
-        <ChoiceRow
-          title="Either side of play"
-          options={PLAYER_JUMPS}
-          label={(jump) => JUMP_LABELS[jump]}
-          value={settings.centreJump}
-          disabled={busy}
-          onChoose={(centreJump) => set.mutate({ centreJump })}
-        />
-        <ChoiceRow
-          title="Double tap a side"
-          subtitle="Left goes back, right goes forward."
-          options={PLAYER_JUMPS}
-          label={(jump) => JUMP_LABELS[jump]}
-          value={settings.doubleTap}
-          disabled={busy}
-          onChoose={(doubleTap) => set.mutate({ doubleTap })}
-        />
-        <ChoiceRow
-          title="Press and hold"
-          subtitle="How fast it plays while a finger is down."
-          options={HOLD_RATES}
-          label={(rate) => (rate === 1 ? 'Off' : `${rate}×`)}
-          value={(HOLD_RATES.find((rate) => rate === settings.holdRate) ?? 1) as (typeof HOLD_RATES)[number]}
-          disabled={busy}
-          onChoose={(holdRate) => set.mutate({ holdRate })}
-        />
-        <ChoiceRow
-          title="Time at the right"
-          options={['left', 'total'] as const}
-          label={(which) => (which === 'left' ? 'Left' : 'Total')}
-          value={settings.showRemaining ? 'left' : 'total'}
-          disabled={busy}
-          onChoose={(which) => set.mutate({ showRemaining: which === 'left' })}
-        />
-      </SettingsSection>
+      </YStack>
 
-      <SettingsSection title="Edges" footer="Drag up or down an edge of the picture; with the controls up, each edge shows where it stands. Volume is the device’s own, the one its buttons move. Brightness is this app’s window only, and goes back to the system’s when the player closes.">
-        <ChoiceRow
-          title="Left edge"
-          options={PLAYER_SLIDERS}
-          label={(slider) => SLIDER_LABELS[slider]}
-          value={settings.leftSlider}
-          disabled={busy}
-          onChoose={(leftSlider) => set.mutate({ leftSlider })}
-        />
-        <ChoiceRow
-          title="Right edge"
-          options={PLAYER_SLIDERS}
-          label={(slider) => SLIDER_LABELS[slider]}
-          value={settings.rightSlider}
-          disabled={busy}
-          onChoose={(rightSlider) => set.mutate({ rightSlider })}
-        />
-      </SettingsSection>
+      {tab === 'controls' ? (
+        <SettingsSection footer="The same on every player: a player is the engine, and the controls are the app’s. Play itself is always in the middle.">
+          <ChoiceRow
+            title="Skip by"
+            subtitle="How far a seek moves, by button or by tap."
+            options={SEEK_CHOICES}
+            label={(seconds) => `${seconds}s`}
+            value={(SEEK_CHOICES.find((seconds) => seconds * 1000 === settings.seekMs) ?? 10) as (typeof SEEK_CHOICES)[number]}
+            disabled={busy}
+            onChoose={(seconds) => set.mutate({ seekMs: seconds * 1000 })}
+          />
+          <ChoiceRow
+            title="Either side of play"
+            options={PLAYER_JUMPS}
+            label={(jump) => JUMP_LABELS[jump]}
+            value={settings.centreJump}
+            disabled={busy}
+            onChoose={(centreJump) => set.mutate({ centreJump })}
+          />
+          <ChoiceRow
+            // A remote's left or right, pressed twice, is a tap on that side.
+            title={isTV ? 'Double press left or right' : 'Double tap a side'}
+            subtitle="Left goes back, right goes forward."
+            options={PLAYER_JUMPS}
+            label={(jump) => JUMP_LABELS[jump]}
+            value={settings.doubleTap}
+            disabled={busy}
+            onChoose={(doubleTap) => set.mutate({ doubleTap })}
+          />
+          {/* A remote holds nothing down on the picture. */}
+          {isTV ? null : (
+            <ChoiceRow
+              title="Press and hold"
+              subtitle="How fast it plays while a finger is down."
+              options={HOLD_RATES}
+              label={(rate) => (rate === 1 ? 'Off' : `${rate}×`)}
+              value={(HOLD_RATES.find((rate) => rate === settings.holdRate) ?? 1) as (typeof HOLD_RATES)[number]}
+              disabled={busy}
+              onChoose={(holdRate) => set.mutate({ holdRate })}
+            />
+          )}
+          <ChoiceRow
+            title="Time at the right"
+            options={['left', 'total'] as const}
+            label={(which) => (which === 'left' ? 'Left' : 'Total')}
+            value={settings.showRemaining ? 'left' : 'total'}
+            disabled={busy}
+            onChoose={(which) => set.mutate({ showRemaining: which === 'left' })}
+          />
+        </SettingsSection>
+      ) : null}
 
-      <ButtonRows row="buttons" title="Buttons, beneath" footer="What sits in the row under the picture, in this order." />
-      <ButtonRows row="topButtons" title="Buttons, floating" footer="What floats at the top right. The top left is always the title." />
+      {tab === 'edges' && isHandheld ? (
+        <SettingsSection footer="Drag up or down an edge of the picture; with the controls up, each edge shows where it stands. Volume is the device’s own, the one its buttons move. Brightness is this app’s window only, and goes back to the system’s when the player closes.">
+          <ChoiceRow
+            title="Left edge"
+            options={PLAYER_SLIDERS}
+            label={(slider) => SLIDER_LABELS[slider]}
+            value={settings.leftSlider}
+            disabled={busy}
+            onChoose={(leftSlider) => set.mutate({ leftSlider })}
+          />
+          <ChoiceRow
+            title="Right edge"
+            options={PLAYER_SLIDERS}
+            label={(slider) => SLIDER_LABELS[slider]}
+            value={settings.rightSlider}
+            disabled={busy}
+            onChoose={(rightSlider) => set.mutate({ rightSlider })}
+          />
+        </SettingsSection>
+      ) : null}
+
+      {tab === 'buttons' ? (
+        <>
+          <ButtonRows row="buttons" title="Beneath" footer="What sits in the row under the picture, in this order." />
+          <ButtonRows row="topButtons" title="Floating" footer="What floats at the top right. The top left is always the title." />
+        </>
+      ) : null}
 
       <SettingsSection title="Decoding" footer="Only an engine that can tell the difference honours this — mpv can; the built-in player leaves it to the system.">
         <SettingsRow
