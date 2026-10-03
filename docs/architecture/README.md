@@ -121,6 +121,14 @@ and it redirects to the tab this device opens on (`app.openOn`, Media unless
 Settings → App says otherwise). A link that opened the app never passes
 through it.
 
+The screens the guards move between appear at once (`animation: 'none'`): a
+flip replaces a root screen, and a native stack animates a replace as a push,
+so each step from the splash to the tab slid in from the right. The switcher's
+own modals, opened from inside the app, keep their slide. The splash stays up
+until the gate has settled and this device's settings are read
+(`useStartedAppSettings`), so the first frame has the scheme it keeps and
+`index` redirects with no spinner between.
+
 Everything a signed-in profile can reach lives in the `(app)` group: the tabs,
 and the pages pushed over them — the full-screen grid, detail pages and the
 customize sheet. Its layout is keyed by the active profile, so switching
