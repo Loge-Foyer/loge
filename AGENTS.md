@@ -476,6 +476,11 @@ Not an afterthought. Things to know:
 - **A TV keeps nothing durable:** no downloads, no files to move, and a
   database the system may clear on a real Apple TV. Do not build on local
   storage surviving there.
+- **No focus request reaches a native modal on tvOS.** react-native-screens
+  presents one outside React Native's root view, where `hasTVPreferredFocus`,
+  `nextFocus*` and a focus guide's destinations do nothing; `autoFocus` and
+  the traps still work. A screen that must place the focus is pushed on a TV
+  — the player is (`playerOptions`).
 
 ## iOS and Android run Hermes
 

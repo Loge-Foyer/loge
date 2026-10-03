@@ -355,7 +355,9 @@ over the tabs, with `start` in milliseconds for a resume:
   top, the same for every engine: play and pause, ten seconds back and
   forward, a scrubber, the audio and subtitle tracks the stream carries, Next
   episode, and close. They step aside three and a half seconds after a touch
-  while it plays, and come back at a tap or whenever it stops.
+  while it plays, and come back at a tap, a press of the remote, or whenever
+  it stops. A quick run of jumps builds on the last one sent, not on a
+  position the engine has not caught up with yet.
 - **The controller is made in the screen's effect, never kept across one**
   (`hooks/use-playback.ts`): Fast Refresh and React's strict mode run effects
   twice, and a controller disposed in one run and reused in the next hands

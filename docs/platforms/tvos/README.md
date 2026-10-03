@@ -101,10 +101,29 @@ click that only React Native's own `Pressable` hears. So:
   pill: UIKit has no switch on tvOS) and the primary button do the same.
 - **Cards are `Pressable` already**, and only show the focus
   (`useRemoteFocus`).
-- **The player** maps play/pause, and with its controls hidden, left and
-  right seek (`hooks/use-remote-keys.ts`); its scrubber is a progress bar.
+- **The player** answers the remote (`hooks/use-remote-keys.ts`):
+  - Select, up or down bring the controls up, and the focus starts on
+    play/pause every time they do. Left and right reach back and forward;
+    down goes into the row beneath — audio, subtitles, speed, as Settings
+    arranges it — and up into the row at the top. Each row is a focus group
+    (`components/focus-group.tsx`), so up and down always land in it, on the
+    control last used there. A panel those buttons open takes the focus,
+    scrolls, and keeps it until it leaves downwards.
+  - With the controls away, left and right are the picture's sides. Pressed
+    twice quickly, one flashes and jumps as a double tap does, and the
+    controls stay away, so the next double press jumps again; pressed once,
+    the controls come up.
+  - Play/pause plays and pauses; the scrubber is a progress bar.
+  - While the controls are away, the focus rests on an invisible view over
+    the picture, which select presses. The full-screen tap-catcher a phone
+    uses is never focusable here: it wraps every control, and holding the
+    focus it would never hand it on.
+- **The player is pushed, not presented.** tvOS puts a native modal outside
+  React Native's root view, where `hasTVPreferredFocus`, `nextFocus*` and a
+  focus guide's destinations do nothing (`autoFocus` and the traps still
+  work). The sheets, still full-screen modals here, have the same limit.
 - **Where the focus starts:** the first card of the home, Play on a detail
-  page, the default profile in the picker.
+  page, the default profile in the picker, play/pause in the player.
 
 `docs/ui` has the TV layouts.
 

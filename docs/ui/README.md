@@ -358,8 +358,10 @@ browser are untouched.
 - **The home's spotlight**: above the rows, whatever card the remote is on,
   large — its picture, title, a line of facts and two of overview — following
   the focus. The focus starts on the first card.
-- **The player** answers the remote: play/pause, and with its controls hidden,
-  left and right seek; its scrubber is a progress bar.
+- **The player** answers the remote: select brings the controls up with the
+  focus on play/pause, the arrows move among them, and a panel takes the
+  focus. With them away, a double press of left or right jumps as a double
+  tap does; its scrubber is a progress bar (`docs/platforms/tvos`).
 
 ## On the web
 

@@ -20,7 +20,7 @@ import { X } from '@tamagui/lucide-icons-2/icons/X';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, PanResponder, Pressable, StyleSheet, View, type PanResponderInstance } from 'react-native';
+import { Animated, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type PanResponderInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
 
@@ -28,7 +28,8 @@ import { px } from '@/components/density';
 import { Button } from '@/components/button';
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
 import { isFavorites, liveHref, playHref } from '@/components/media/item-link';
-import { isHandheld, isTV } from '@/components/remote';
+import { FocusGroup } from '@/components/focus-group';
+import { FOCUSED, isHandheld, isTV, useRemoteFocus } from '@/components/remote';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useFavoriteChannels } from '@/hooks/use-lists';
@@ -43,6 +44,8 @@ import { useRemoteKeys } from '@/hooks/use-remote-keys';
 import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
+/** How long a remote's left or right waits for a second press: a click comes slower than a finger's tap. */
+const DOUBLE_PRESS_MS = 400;
 /** How bright a double tap's side flashes at its peak: barely, a white veil over the picture. */
 const FLASH_ALPHA = 0.04;
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -190,36 +193,31 @@ function Controls({
     if (playing) controller?.pause();
     else controller?.play();
   };
-  const skip = (by: number) => {
-    touch();
-    controller?.seek(Math.max(0, Math.min(durationMs ?? Number.MAX_SAFE_INTEGER, positionMs + by)));
-  };
-  /** Back or forward, by whatever the setting says that means. */
-  const jump = (how: PlayerJump, direction: -1 | 1) => {
+  // Where the last jump went, and when: a quick run of them builds on that,
+  // not on a position the engine has not caught up with yet.
+  const lastJump = useRef<{ readonly to: number; readonly at: number }>(undefined);
+  /**
+   * Back or forward, by whatever the setting says that means. `quiet` leaves
+   * the controls where they were — away, for a remote's double press, so the
+   * next one jumps again rather than moving the focus.
+   */
+  const jump = (how: PlayerJump, direction: -1 | 1, quiet = false) => {
     if (how === 'off') return;
-    if (how === 'seek') return skip(direction * seekMs);
-    const to = chapterBeside(chapters, positionMs, direction);
+    const now = Date.now();
+    const from = lastJump.current && now - lastJump.current.at < 1_500 ? lastJump.current.to : positionMs;
+    const to =
+      how === 'seek'
+        ? Math.max(0, Math.min(durationMs ?? Number.MAX_SAFE_INTEGER, from + direction * seekMs))
+        : chapterBeside(chapters, from, direction);
     if (to === undefined) return;
-    touch();
+    lastJump.current = { to, at: now };
+    if (!quiet) touch();
     controller?.seek(to);
   };
   const playNext = () => {
     if (!next) return;
     router.replace(playHref(next.key, player ? { player } : {}));
   };
-
-  // A TV remote. Play/pause plays and pauses. With the controls out of the
-  // way, left and right seek as the buttons would — not on a channel, which
-  // is live — and up or down brings them back; with them up, the arrows move
-  // between them, and keep them up while they do. Select is the picture's own
-  // press, which shows and hides them as a tap does.
-  useRemoteKeys((key) => {
-    if (key === 'playPause') return toggle();
-    if (key === 'select') return;
-    if (shown) return touch();
-    if (key === 'up' || key === 'down') return touch();
-    if (!live) skip(key === 'left' ? -seekMs : seekMs);
-  });
 
   // What a drag down an edge is showing, while it is showing it.
   const [adjust, setAdjust] = useState<{ readonly kind: Level; readonly value: number }>();
@@ -333,6 +331,49 @@ function Controls({
     else touch();
   };
 
+  // A remote's left or right waiting to learn whether a second press follows.
+  const pending = useRef<{ readonly key: 'left' | 'right'; readonly timer: ReturnType<typeof setTimeout> }>(undefined);
+  useEffect(() => () => clearTimeout(pending.current?.timer), []);
+
+  /**
+   * Left or right with the controls away, as a tap on that side would be: a
+   * second press inside the window jumps, flashing the side, and leaves them
+   * away; a lone one brings them up once the window has passed.
+   */
+  const arrow = (key: 'left' | 'right') => {
+    const first = pending.current;
+    clearTimeout(first?.timer);
+    pending.current = undefined;
+    if (first?.key === key) {
+      flashSide(key);
+      jump(app.doubleTap, key === 'left' ? -1 : 1, true);
+      return;
+    }
+    if (app.doubleTap === 'off') return touch();
+    pending.current = {
+      key,
+      timer: setTimeout(() => {
+        pending.current = undefined;
+        touch();
+      }, DOUBLE_PRESS_MS),
+    };
+  };
+
+  // A TV remote. Play/pause plays and pauses. With the controls up, the
+  // arrows move the focus among them, and keep them up while they do; select
+  // is the focused control's own. With them away, select, up and down bring
+  // them back — focus on play — and left and right are the picture's sides,
+  // which a channel, being live, has no use for.
+  useRemoteKeys((key) => {
+    if (key === 'playPause') return toggle();
+    if (shown) {
+      if (key !== 'select') touch();
+      return;
+    }
+    if (key === 'select' || key === 'up' || key === 'down' || live) return touch();
+    arrow(key);
+  });
+
   const hold = (on: boolean) => {
     if (holdRate <= 1 || live || !controller?.setRate) return;
     setBoosted(on);
@@ -409,6 +450,8 @@ function Controls({
         onPressOut={() => hold(false)}
         delayLongPress={400}
         accessibilityLabel={shown ? 'Hide the controls' : 'Show the controls'}
+        // On a TV it wraps every control: holding the focus, it would never hand it on to them.
+        {...(isTV ? { focusable: false } : {})}
       >
       {shown ? (
         <YStack
@@ -421,52 +464,60 @@ function Controls({
           pt={insets.top + px(24)}
           pb={insets.bottom + px(24)}
         >
-          <XStack items="center" gap="$3">
-            <IconButton label="Close the player" onPress={close}>
-              <X size={26} color="white" />
-            </IconButton>
-            <YStack flex={1}>
-              {live}
-              {item?.type === 'episode' ? (
-                <SizableText size="$2" color="rgba(255,255,255,0.75)" numberOfLines={1}>
-                  {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
+          {/* Each row is one group to a remote: up and down land in it from anywhere above or below, on the control last used there. */}
+          <FocusGroup>
+            <XStack items="center" gap="$3">
+              <IconButton label="Close the player" onPress={close}>
+                <X size={26} color="white" />
+              </IconButton>
+              <YStack flex={1}>
+                {live}
+                {item?.type === 'episode' ? (
+                  <SizableText size="$2" color="rgba(255,255,255,0.75)" numberOfLines={1}>
+                    {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
+                  </SizableText>
+                ) : null}
+                <SizableText size="$5" fontWeight="600" color="white" numberOfLines={1}>
+                  {item?.title ?? ''}
                 </SizableText>
-              ) : null}
-              <SizableText size="$5" fontWeight="600" color="white" numberOfLines={1}>
-                {item?.title ?? ''}
-              </SizableText>
-            </YStack>
-            {/* The top left is always what is playing; what floats at the right is arranged. */}
-            <XStack items="center" gap="$2">{row(topButtons)}</XStack>
-          </XStack>
+              </YStack>
+              {/* The top left is always what is playing; what floats at the right is arranged. */}
+              <XStack items="center" gap="$2">{row(topButtons)}</XStack>
+            </XStack>
+          </FocusGroup>
 
-          <XStack items="center" justify="center" gap="$8">
-            {live || centreJump === 'off' ? null : (
-              <IconButton
-                label={centreJump === 'chapter' ? 'Chapter back' : `Back ${seekSeconds} seconds`}
-                onPress={() => jump(centreJump, -1)}
-                disabled={!controller}
-              >
-                {centreJump === 'chapter' ? <ChevronsLeft size={30} color="white" /> : <RotateCcw size={30} color="white" />}
+          <FocusGroup>
+            <XStack items="center" justify="center" gap="$8">
+              {live || centreJump === 'off' ? null : (
+                <IconButton
+                  label={centreJump === 'chapter' ? 'Chapter back' : `Back ${seekSeconds} seconds`}
+                  onPress={() => jump(centreJump, -1)}
+                  disabled={!controller}
+                >
+                  {centreJump === 'chapter' ? <ChevronsLeft size={30} color="white" /> : <RotateCcw size={30} color="white" />}
+                </IconButton>
+              )}
+              {/* Always there while the controls are, spinning while it loads: the focus starts here each time they come up, and a remote's focus must have somewhere to land. */}
+              <IconButton label={waiting ? 'Loading' : playing ? 'Pause' : 'Play'} onPress={toggle} big preferred>
+                {waiting ? (
+                  <Spinner size="large" color="white" />
+                ) : playing ? (
+                  <Pause size={44} color="white" fill="white" />
+                ) : (
+                  <Play size={44} color="white" fill="white" />
+                )}
               </IconButton>
-            )}
-            {waiting ? (
-              <Spinner size="large" color="white" />
-            ) : (
-              <IconButton label={playing ? 'Pause' : 'Play'} onPress={toggle} big>
-                {playing ? <Pause size={44} color="white" fill="white" /> : <Play size={44} color="white" fill="white" />}
-              </IconButton>
-            )}
-            {live || centreJump === 'off' ? null : (
-              <IconButton
-                label={centreJump === 'chapter' ? 'Chapter forward' : `Forward ${seekSeconds} seconds`}
-                onPress={() => jump(centreJump, 1)}
-                disabled={!controller}
-              >
-                {centreJump === 'chapter' ? <ChevronsRight size={30} color="white" /> : <RotateCw size={30} color="white" />}
-              </IconButton>
-            )}
-          </XStack>
+              {live || centreJump === 'off' ? null : (
+                <IconButton
+                  label={centreJump === 'chapter' ? 'Chapter forward' : `Forward ${seekSeconds} seconds`}
+                  onPress={() => jump(centreJump, 1)}
+                  disabled={!controller}
+                >
+                  {centreJump === 'chapter' ? <ChevronsRight size={30} color="white" /> : <RotateCw size={30} color="white" />}
+                </IconButton>
+              )}
+            </XStack>
+          </FocusGroup>
 
           <YStack gap="$3">
             {panel === 'audio' || panel === 'subtitles' ? (
@@ -521,7 +572,7 @@ function Controls({
                   {clockTime(scrub ?? positionMs)}
                 </SizableText>
                 {isTV ? (
-                  // A remote cannot drag a thumb: left and right seek, and this only says where it is.
+                  // A remote cannot drag a thumb: a double press of left or right jumps, and this only says where it is.
                   <YStack flex={1} height={6} rounded={3} bg="rgba(255,255,255,0.3)" overflow="hidden">
                     <YStack height="100%" width={`${Math.min(100, ((scrub ?? positionMs) / durationMs) * 100)}%`} bg="$accent9" />
                   </YStack>
@@ -566,14 +617,18 @@ function Controls({
                 </SizableText>
               </XStack>
             ) : null}
-            <XStack items="center" gap="$2">
-              <XStack flex={1}>{skipAction ? <SkipButton label={skipAction.label} onPress={skipAction.run} /> : null}</XStack>
-              {row(buttons)}
-            </XStack>
+            <FocusGroup>
+              <XStack items="center" gap="$2">
+                <XStack flex={1}>{skipAction ? <SkipButton label={skipAction.label} onPress={skipAction.run} /> : null}</XStack>
+                {row(buttons)}
+              </XStack>
+            </FocusGroup>
           </YStack>
         </YStack>
       ) : null}
       </Pressable>
+      {/* On a TV, where the focus rests while the controls are away: when the focused control goes with them, this is all that is left to take it. Select presses it, and they come back. */}
+      {isTV && !shown ? <Pressable style={StyleSheet.absoluteFill} onPress={touch} accessibilityLabel="Show the controls" /> : null}
       {(['left', 'right'] as const).map((side) => (
         <Animated.View
           key={`flash-${side}`}
@@ -770,23 +825,14 @@ function TrackPanel({
   tracks: readonly (AudioTrack | SubtitleTrack)[];
   onChoose: (id: string | null) => void;
 }) {
+  // Which track plays is the engine's to know, and it does not say: the focus starts on the first.
   return (
-    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={px(220)} maxW={px(360)}>
-      {kind === 'subtitles' ? <TrackRow label="Off" onPress={() => onChoose(null)} /> : null}
-      {tracks.map((track) => (
-        <TrackRow key={track.id} label={track.label} onPress={() => onChoose(track.id)} />
+    <Panel>
+      {kind === 'subtitles' ? <PanelRow label="Off" chosen={false} preferred onPress={() => onChoose(null)} /> : null}
+      {tracks.map((track, index) => (
+        <PanelRow key={track.id} label={track.label} chosen={false} preferred={kind === 'audio' && index === 0} onPress={() => onChoose(track.id)} />
       ))}
-    </YStack>
-  );
-}
-
-function TrackRow({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      <SizableText size="$4" color="white" px="$3" py="$2" numberOfLines={1}>
-        {label}
-      </SizableText>
-    </Pressable>
+    </Panel>
   );
 }
 
@@ -795,14 +841,18 @@ function IconButton({
   onPress,
   disabled,
   big,
+  preferred = false,
   children,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   big?: boolean;
+  /** Where a remote's focus goes as it appears. */
+  preferred?: boolean;
   children: ReactNode;
 }) {
+  const { focused, handlers } = useRemoteFocus();
   return (
     <Pressable
       onPress={onPress}
@@ -810,9 +860,12 @@ function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       hitSlop={12}
-      style={{ opacity: disabled ? 0.4 : 1, padding: big ? 12 : 6 }}
+      style={{ opacity: disabled ? 0.4 : 1 }}
+      {...(isTV ? { hasTVPreferredFocus: preferred, ...handlers } : {})}
     >
-      {children}
+      <YStack p={px(big ? 12 : 6)} rounded={999} bg={focused ? 'rgba(255, 255, 255, 0.16)' : 'transparent'} {...(focused ? FOCUSED : {})}>
+        {children}
+      </YStack>
     </Pressable>
   );
 }
@@ -867,21 +920,36 @@ function segmentOfChapter(chapters: readonly Chapter[] | undefined, positionMs: 
   return at;
 }
 
-/** The sheet a button opens over the controls: speed, chapters, tracks. */
+/**
+ * The sheet a button opens over the controls: speed, chapters, tracks. It
+ * scrolls, and on a TV keeps the focus in until it leaves downwards, back to
+ * the row of buttons that opened it.
+ */
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={px(220)} maxW={px(360)} maxH={px(260)} overflow="scroll">
-      {children}
+    <YStack self="flex-end" bg="rgba(20, 20, 20, 0.92)" rounded="$4" p="$2" minW={px(220)} maxW={px(360)} maxH={px(260)} overflow="hidden">
+      <FocusGroup trap>
+        <ScrollView>{children}</ScrollView>
+      </FocusGroup>
     </YStack>
   );
 }
 
-function PanelRow({ label, chosen, onPress }: { label: string; chosen: boolean; onPress: () => void }) {
+function PanelRow({ label, chosen, preferred = chosen, onPress }: { label: string; chosen: boolean; preferred?: boolean; onPress: () => void }) {
+  const { focused, handlers } = useRemoteFocus();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      <SizableText size="$4" color={chosen ? '$accent9' : 'white'} fontWeight={chosen ? '700' : '400'} px="$3" py="$2" numberOfLines={1}>
-        {label}
-      </SizableText>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: chosen }}
+      {...(isTV ? { hasTVPreferredFocus: preferred, ...handlers } : {})}
+    >
+      <YStack px="$3" py="$2" rounded="$3" bg={focused ? '$accent4' : 'transparent'}>
+        <SizableText size="$4" color={focused ? '$accent11' : chosen ? '$accent9' : 'white'} fontWeight={chosen ? '700' : '400'} numberOfLines={1}>
+          {label}
+        </SizableText>
+      </YStack>
     </Pressable>
   );
 }

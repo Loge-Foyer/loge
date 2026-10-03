@@ -54,10 +54,15 @@ export const detailOptions: StackOptions = {
   title: '',
 };
 
-/** The player: the whole screen, no header, faded in over the tabs. */
+/**
+ * The player: the whole screen, no header, faded in over the tabs. On a TV it
+ * is pushed rather than presented: tvOS puts a native modal outside React
+ * Native's root view, where no control can ask for the focus — and the remote
+ * needs play/pause to have it when the controls come up.
+ */
 export const playerOptions: StackOptions = {
   headerShown: false,
-  presentation: 'fullScreenModal',
+  presentation: isTV ? 'card' : 'fullScreenModal',
   animation: 'fade',
   gestureEnabled: false,
 };
