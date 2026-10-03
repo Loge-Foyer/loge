@@ -53,7 +53,8 @@ export function SourceTabs({
                 ? { iconAfter: <Circle size={7} bg={active ? '$accentColor' : '$orange9'} aria-label="needs attention" /> }
                 : {})}
             >
-              {tab.label}
+              {/* An icon alone has no words: an empty string is a bare text node, which Tamagui reports on the web with props LogBox cannot print, and the tab throws. */}
+              {tab.label || null}
             </Button>
           );
         })}
