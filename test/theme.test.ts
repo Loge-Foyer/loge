@@ -61,6 +61,8 @@ describe.each(['dark', 'light'] as const)('the %s theme', (scheme) => {
     ['a placeholder in its field', value(scheme, 'color8'), value(`${scheme}_Input`, 'background'), 4.5],
     ['a border', value(scheme, 'borderColor'), page, 1.3],
     ['a primary button’s label', value(scheme, 'accentColor'), value(scheme, 'accentBackground'), 4.5],
+    // A chosen option is drawn with the fill beside unchosen buttons: told apart as a control is, 3:1.
+    ['a chosen option beside an unchosen one', value(scheme, 'accentBackground'), value(`${scheme}_Button`, 'background'), 3],
     ['the accent on the page — a tab’s tint, a focus ring', value(scheme, 'accent10'), page, 4.5],
     ['a link', value(scheme, 'accent11'), page, 4.5],
     ['a spinner', value(scheme, 'accent9'), page, 3],

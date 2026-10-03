@@ -143,6 +143,14 @@ export function CreditRow({ credit }: { credit: Credit }) {
   return <LinkRow title={credit.name} url={credit.url} {...(credit.note ? { note: credit.note } : {})} />;
 }
 
+/**
+ * The option taken, among the ones beside it: the accent's fill, as a chosen
+ * tab has. Not Tamagui's `accent` theme, whose page colour it would take — a
+ * cream paler than an unchosen button in light, a brown darker than one in
+ * the dark.
+ */
+export const CHOSEN = { bg: '$accentBackground', color: '$accentColor' } as const;
+
 /** A row whose trailing edge is a short list of choices, one of them taken. */
 export function ChoiceRow<T extends string | number>({
   title,
@@ -173,7 +181,7 @@ export function ChoiceRow<T extends string | number>({
               size="$2"
               aria-label={`${title}: ${label(option)}`}
               disabled={disabled}
-              {...(option === value ? ({ theme: 'accent' } as const) : {})}
+              {...(option === value ? CHOSEN : {})}
               onPress={() => onChoose(option)}
             >
               <Button.Text>{label(option)}</Button.Text>

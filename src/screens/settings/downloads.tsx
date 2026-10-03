@@ -11,7 +11,7 @@ import { AppSwitch } from '@/components/app-switch';
 import { ConfirmButton } from '@/components/confirm-button';
 import { fileSize } from '@/components/labels';
 import { Screen } from '@/components/screen';
-import { SettingsRow, SettingsSection } from '@/components/settings-list';
+import { CHOSEN, SettingsRow, SettingsSection } from '@/components/settings-list';
 import { useDownloadActions, useDownloadBudget, useDownloads, useDownloadSettings } from '@/hooks/use-downloads';
 import { useServices } from '@/hooks/services-context';
 import { SIZE_CHOICES } from '@/services/downloads/settings';
@@ -162,7 +162,7 @@ function ChoiceRow<T extends number>({
               key={String(option)}
               size="$2"
               aria-label={`${title}: ${label(option)}`}
-              {...(option === value ? ({ theme: 'accent' } as const) : {})}
+              {...(option === value ? CHOSEN : {})}
               onPress={() => onChoose(option)}
             >
               <Button.Text>{label(option)}</Button.Text>

@@ -608,7 +608,9 @@ typecheck.
   picture — the player, a poster's badges — is `<Theme name="dark">`, dark in
   both. The fill is `$accentBackground` with `$accentColor` on it; never pair
   accent steps by hand for one, since the light theme turns Tamagui's pair
-  round (`tamagui.themes.ts`).
+  round (`tamagui.themes.ts`). A chosen option wears that fill too
+  (`CHOSEN`, `components/settings-list.tsx`) — never `theme: 'accent'`, whose
+  page is paler than an unchosen button in light.
 - v5 is **shorthands-only** (`bg`, `p`, `rounded`, `items`…); media keys are
   min-width (`$sm`, `$md`, `$lg`, `$xl`).
 - Native-drawn chrome (NativeTabs, stack headers, native switches) takes

@@ -35,6 +35,11 @@ but the config and its test reads.
     are given accent10 with accent1 written on it. The light brass ramp is
     deeper than the dark one: accent10 holds 5.4:1 on white as a tab's tint
     or a focus ring.
+  - **What is chosen wears the fill**: a chosen tab, and the option taken in
+    a row of choices (`CHOSEN`, `components/settings-list.tsx`). Never
+    Tamagui's `accent` theme for it: that theme's page is the ramp's step 2, a
+    cream paler than an unchosen button in light and a brown darker than one
+    in the dark.
   - **Status words are step 11** — `$red11`, `$green11`, `$orange11`. Step 10
     is under 4.5:1 on white. An icon, a border or a badge keeps step 10.
   - **What sits on a picture is drawn dark** in either scheme: the player
