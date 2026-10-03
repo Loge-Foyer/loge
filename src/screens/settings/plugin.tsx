@@ -201,7 +201,7 @@ function BackupTargetScreen({ manifest }: { manifest: PluginManifest }) {
             </YStack>
           </SettingsSection>
         ))}
-      {resolveError ? <SizableText color="$red10">{resolveError}</SizableText> : null}
+      {resolveError ? <SizableText color="$red11">{resolveError}</SizableText> : null}
     </Screen>
   );
 }

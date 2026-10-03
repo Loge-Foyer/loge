@@ -139,8 +139,10 @@ What runs today:
   - Apple TV: a layered icon and the top shelf;
   - the web: the flat icon as the favicon;
   - the splash: the mark.
-- The theme is drawn from the icon: velvet-black surfaces and a brass
-  accent (`docs/ui`, and each `docs/platforms/*` page's "App icon").
+- The theme: black, grey and white — pure black in dark, white in light —
+  with the icon's brass accent; Settings → App → Appearance follows the
+  device or holds either (`docs/ui`). The splash keeps the icon's velvet, and
+  each `docs/platforms/*` page's "App icon" says how the icon is made.
 - vitest covers the database on both engines, every migration, the services,
   and two devices on one fake server on every pair of engines.
 

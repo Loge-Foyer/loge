@@ -82,7 +82,7 @@ export function LibrariesField({
         </XStack>
       ) : probe.status === 'error' ? (
         <XStack gap="$3" items="center">
-          <SizableText size="$2" color="$red10" flex={1}>
+          <SizableText size="$2" color="$red11" flex={1}>
             {probe.error}
           </SizableText>
           <Button size="$3" icon={RefreshCw} onPress={probe.load}>

@@ -72,7 +72,7 @@ export function DownloadsScreen() {
       </SettingsSection>
 
       {budget?.nearlyFull ? (
-        <Paragraph color="$orange10">
+        <Paragraph color="$orange11">
           {budget.full
             ? 'There is no room left. Delete something below before downloading more.'
             : 'Nearly full — the next download may not fit.'}

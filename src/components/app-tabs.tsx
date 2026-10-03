@@ -7,8 +7,9 @@ export function AppTabs() {
   // The bar is drawn natively, so it gets resolved colours rather than tokens.
   const accent = String(theme.accentBackground.val);
   const muted = String(theme.color10.val);
-  // iOS draws its own dark material; Android's Material bar would otherwise
-  // follow the system's light theme under a dark app.
+  // iOS draws its own material, light or dark as the app is; Android's
+  // Material bar is coloured here, so it follows the app's own choice of
+  // Appearance rather than the system's.
   const android =
     process.env.EXPO_OS === 'android'
       ? {

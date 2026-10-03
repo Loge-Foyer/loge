@@ -151,6 +151,11 @@ export const BUTTON_LABELS = ['symbols', 'symbolsAndText'] as const;
 
 export type ButtonLabels = (typeof BUTTON_LABELS)[number];
 
+/** Light or dark, or as the device itself is set. */
+export const APPEARANCES = ['system', 'light', 'dark'] as const;
+
+export type AppearanceSetting = (typeof APPEARANCES)[number];
+
 export interface AppSettings {
   /** The tab the app opens on when it starts. */
   readonly openOn: ContentTab;
@@ -194,6 +199,8 @@ export interface AppSettings {
   readonly softwareFallback: boolean;
   /** A title page's buttons: their symbols alone, or with their words. Every one keeps its words for a screen reader. */
   readonly buttonLabels: ButtonLabels;
+  /** Light or dark — the native chrome with it — or as the device is set. */
+  readonly appearance: AppearanceSetting;
 }
 
 export interface DeviceSettingsRepository {

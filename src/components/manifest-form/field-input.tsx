@@ -64,7 +64,7 @@ export function FieldInput(props: FieldInputProps) {
         <TextInputField {...props} id={id} />
       )}
       {error ? (
-        <SizableText size="$2" color="$red10">
+        <SizableText size="$2" color="$red11">
           {error}
         </SizableText>
       ) : field.description ? (
@@ -100,7 +100,7 @@ function TextInputField({ field, value, onChange, disabled, saved, onRemoveSaved
         {...(placeholder ? { placeholder } : {})}
       />
       {isPassword && saved && onRemoveSaved ? (
-        <Button size="$3" chromeless color="$red10" onPress={onRemoveSaved}>
+        <Button size="$3" chromeless color="$red11" onPress={onRemoveSaved}>
           Remove
         </Button>
       ) : null}

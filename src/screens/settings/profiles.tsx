@@ -70,7 +70,7 @@ export function ProfilesScreen() {
           </XStack>
         </SettingsSection>
       )}
-      {create.error ? <SizableText color="$red10">{create.error.message}</SizableText> : null}
+      {create.error ? <SizableText color="$red11">{create.error.message}</SizableText> : null}
     </Screen>
   );
 }

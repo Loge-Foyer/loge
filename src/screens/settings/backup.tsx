@@ -134,7 +134,7 @@ export function BackupKeyScreen() {
         />
       ) : (
         <YStack gap="$3" items="flex-start">
-          {error ? <SizableText color="$red10">{error}</SizableText> : null}
+          {error ? <SizableText color="$red11">{error}</SizableText> : null}
           <PrimaryButton size="$4" disabled={busy} onPress={() => void show()}>
             Show the key
           </PrimaryButton>

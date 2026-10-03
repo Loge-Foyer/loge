@@ -16,8 +16,9 @@ module went with its vault.
 `npm run android` builds the client and installs it; after that, Metro serves
 the JavaScript as usual. Change native code, or add a player, and build again.
 
-The Material tab bar is themed from Tamagui explicitly, because it would
-otherwise follow the system's light theme under a dark app.
+The Material tab bar is themed from Tamagui explicitly, so it follows the
+app's own Appearance — light, dark, or the system's — rather than the
+system's alone.
 
 ## Servers over plain HTTP
 

@@ -32,6 +32,8 @@ export const APP_DEFAULTS: AppSettings = {
   softwareFallback: true,
   // Play and the eye say what they do; the words only crowd a phone's row.
   buttonLabels: 'symbols',
+  // As the phone, the TV or the browser is set: it changes with the time of day there.
+  appearance: 'system',
 };
 
 /**

@@ -5,8 +5,8 @@
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "loge",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#1b0e0e",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#000000",
     "ios": {
       "icon": "./assets/loge.icon",
       "infoPlist": {

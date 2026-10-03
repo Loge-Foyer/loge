@@ -134,7 +134,7 @@ export function AccountScreen() {
               onConfirm={() => (asks.length > 0 ? setProving(true) : signOut.mutate(undefined))}
             />
             {signOutError ? (
-              <SizableText size="$2" color="$red10">
+              <SizableText size="$2" color="$red11">
                 {signOutError}
               </SizableText>
             ) : null}

@@ -367,7 +367,7 @@ function DetailsForm({
           {creating ? 'Have an account? Sign in' : 'New here? Create an account'}
         </Button>
       ) : null}
-      {message ? <SizableText color="$red10">{message}</SizableText> : null}
+      {message ? <SizableText color="$red11">{message}</SizableText> : null}
       <XStack gap="$3" items="center">
         <PrimaryButton size="$5" disabled={busy} onPress={() => void submit()}>
           {asCreate ? 'Create account' : 'Sign in'}

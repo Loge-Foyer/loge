@@ -58,7 +58,7 @@ export function OwnerProofForm({
           </SizableText>
         </XStack>
       ) : error ? (
-        <SizableText size="$2" color="$red10">
+        <SizableText size="$2" color="$red11">
           {error}
         </SizableText>
       ) : null}

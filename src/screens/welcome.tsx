@@ -119,7 +119,7 @@ function LocalAccount({ onBack }: { onBack: () => void }) {
       />
       <TextInput size="$5" value={name} onChangeText={setName} placeholder="Your name" autoFocus onSubmitEditing={() => create.mutate()} aria-label="Your name" />
       {create.error ? (
-        <SizableText size="$3" color="$red10">
+        <SizableText size="$3" color="$red11">
           {create.error.message}
         </SizableText>
       ) : null}
@@ -154,7 +154,7 @@ function FirstProfile() {
       />
       <TextInput size="$5" value={name} onChangeText={setName} placeholder="Your name" autoFocus onSubmitEditing={() => create.mutate()} aria-label="Profile name" />
       {create.error ? (
-        <SizableText size="$3" color="$red10">
+        <SizableText size="$3" color="$red11">
           {create.error.message}
         </SizableText>
       ) : null}

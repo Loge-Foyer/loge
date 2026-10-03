@@ -575,7 +575,7 @@ function WatchState({ item }: { item: MediaItem }) {
     return (
       <XStack gap="$2" items="center">
         <Check size={16} color="$green10" />
-        <SizableText size="$3" color="$green10">
+        <SizableText size="$3" color="$green11">
           Watched
         </SizableText>
       </XStack>

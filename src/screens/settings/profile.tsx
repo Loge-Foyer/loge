@@ -73,7 +73,7 @@ export function ProfileScreen({ userId }: { userId: UserId }) {
         <ProfileAvatar user={profile} size={64} />
         <YStack flex={1} gap="$2">
           <TextInput value={draftName} onChangeText={setName} aria-label="Profile name" />
-          {rename.error ? <SizableText color="$red10">{rename.error.message}</SizableText> : null}
+          {rename.error ? <SizableText color="$red11">{rename.error.message}</SizableText> : null}
         </YStack>
         <PrimaryButton
           disabled={draftName.trim() === profile.name || rename.isPending}
@@ -113,7 +113,7 @@ export function ProfileScreen({ userId }: { userId: UserId }) {
             The only profile on a device cannot be deleted.
           </SizableText>
         ) : null}
-        {remove.error ? <SizableText color="$red10">{remove.error.message}</SizableText> : null}
+        {remove.error ? <SizableText color="$red11">{remove.error.message}</SizableText> : null}
       </YStack>
     </Screen>
   );

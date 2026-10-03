@@ -283,7 +283,8 @@ The target, once Phase 6 has landed:
   on its one profile; a server account with profiles lands on "Who's
   watching?".
 - **Four tabs** — Media, Videos, TV, Settings. Native tab bars on iOS and
-  Android; a top navigation bar in the browser. Dark only.
+  Android; a top navigation bar in the browser. Light or dark as the device
+  is set, or as Settings → App → Appearance says.
 - **Media** — an empty state until a source is connected. Then Continue
   Watching (landscape cards with progress), a row per kind (posters with
   ratings, watched checks and progress bars), a title link to each row's

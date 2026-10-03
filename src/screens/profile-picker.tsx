@@ -118,7 +118,7 @@ export function ProfilePicker({ mode }: { mode: 'boot' | 'switch' }) {
           </PrimaryButton>
         </XStack>
       ) : null}
-      {create.error ? <SizableText color="$red10">{create.error.message}</SizableText> : null}
+      {create.error ? <SizableText color="$red11">{create.error.message}</SizableText> : null}
       {mode === 'switch' ? (
         <Button chromeless onPress={() => router.back()} color="$color10">
           Cancel

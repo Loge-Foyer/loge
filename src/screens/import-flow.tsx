@@ -96,7 +96,7 @@ export function ImportFlow({
             title="Restore a backup"
             body="A backup file holds an account — its profiles and PINs, its settings, and its sources with their passwords. Choose one, then type the key it was saved with."
           />
-          {step.error ? <SizableText color="$red10">{step.error}</SizableText> : null}
+          {step.error ? <SizableText color="$red11">{step.error}</SizableText> : null}
           <XStack gap="$3" items="center">
             <PrimaryButton size="$5" disabled={busy} onPress={() => void pick()}>
               Choose a backup file
@@ -123,7 +123,7 @@ export function ImportFlow({
             onSubmitEditing={() => void open(step.file)}
             aria-label="Backup key"
           />
-          {step.error ? <SizableText color="$red10">{step.error}</SizableText> : null}
+          {step.error ? <SizableText color="$red11">{step.error}</SizableText> : null}
           <XStack gap="$3" items="center">
             <PrimaryButton size="$5" disabled={busy || key.trim() === ''} onPress={() => void open(step.file)}>
               Open
@@ -163,7 +163,7 @@ export function ImportFlow({
             />
           ) : (
             <>
-              {step.error ? <SizableText color="$red10">{step.error}</SizableText> : null}
+              {step.error ? <SizableText color="$red11">{step.error}</SizableText> : null}
               <PrimaryButton size="$5" onPress={() => void complete(prepared)}>
                 {current ? 'Replace' : 'Restore'}
               </PrimaryButton>

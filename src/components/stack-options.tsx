@@ -65,6 +65,8 @@ export const playerOptions: StackOptions = {
   presentation: isTV ? 'card' : 'fullScreenModal',
   animation: 'fade',
   gestureEnabled: false,
+  // Black behind the picture in either scheme, so a turn or a fade shows no white edge.
+  contentStyle: { backgroundColor: 'black' },
 };
 
 /**

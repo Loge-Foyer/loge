@@ -596,12 +596,24 @@ typecheck.
 - **Tamagui 2.7.7** (`v5` preset) is the one component system. Pin every
   `@tamagui/*` package to the same exact version.
 - **One theme entry point:** `src/tamagui.config.ts`. Never add a second theme
-  or styling system beside it. `@expo/ui` is installed because expo-router
-  depends on it — do not use it for screens.
+  or styling system beside it. Its colours are `src/tamagui.themes.ts`, apart
+  only so `test/theme.test.ts` can read them without React Native; nothing
+  else imports it. `@expo/ui` is installed because expo-router depends on it
+  — do not use it for screens.
+- **Two schemes, light and dark**, as Settings → App → Appearance says: greys
+  for the page and its words, the brass accent for what is pressed and
+  chosen. Write a token, never a colour that assumes one scheme. Status words
+  are step 11 (`$red11`…: step 10 fails on white). What is drawn over a
+  picture — the player, a poster's badges — is `<Theme name="dark">`, dark in
+  both. The fill is `$accentBackground` with `$accentColor` on it; never pair
+  accent steps by hand for one, since the light theme turns Tamagui's pair
+  round (`tamagui.themes.ts`).
 - v5 is **shorthands-only** (`bg`, `p`, `rounded`, `items`…); media keys are
   min-width (`$sm`, `$md`, `$lg`, `$xl`).
 - Native-drawn chrome (NativeTabs, stack headers, native switches) takes
-  resolved colours: `String(theme.x.val)`.
+  resolved colours: `String(theme.x.val)`. The native side follows the app's
+  Appearance through `Appearance.setColorScheme`, and the root view takes the
+  page's colour (`components/theme-root.tsx`).
 - Scrolling surfaces are React Native `ScrollView`/`FlatList`, not Tamagui's;
   the full-screen grid is `@shopify/flash-list`, keyed by its column count.
 - v5 views default to `position: static` on the web. An overlay's container
@@ -725,7 +737,8 @@ Everything above describes the target; what runs today:
   by its term, because the box lives in its header and the keyboard went with
   each remount.
 - **Settings → App:** what the app does by itself on this device, as against
-  what a plugin does. The tab it opens on (`openOn`, Media by default —
+  what a plugin does. Its Appearance (`appearance`: System by default, Light
+  or Dark — the theme, and the native chrome with it). The tab it opens on (`openOn`, Media by default —
   `src/app/index.tsx` redirects there at a cold start and after a profile is
   picked), whether it asks who is watching at every launch
   (`alwaysChooseProfile`: off on a phone, on on a TV, from `appDefaults`), and

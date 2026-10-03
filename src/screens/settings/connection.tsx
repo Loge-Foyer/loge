@@ -449,7 +449,7 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
           borderColor={errors.label ? '$red8' : '$borderColor'}
         />
         {errors.label ? (
-          <SizableText size="$2" color="$red10">
+          <SizableText size="$2" color="$red11">
             {errors.label}
           </SizableText>
         ) : null}
@@ -516,12 +516,12 @@ function ConnectionForm({ title, manifest, connectionId, stored, initial, saved,
         Passwords are kept in secure storage and never shown again.
       </Paragraph>
       {losing > 0 ? (
-        <SizableText size="$2" color="$orange10">
+        <SizableText size="$2" color="$orange11">
           Saving removes the separate details of {losing} {losing === 1 ? 'profile' : 'profiles'}.
         </SizableText>
       ) : null}
 
-      {errors.form && modes.length <= 1 ? <SizableText color="$red10">{errors.form}</SizableText> : null}
+      {errors.form && modes.length <= 1 ? <SizableText color="$red11">{errors.form}</SizableText> : null}
       <YStack gap="$3" items="flex-start">
         <PrimaryButton size="$4" disabled={saving} onPress={() => void submit()}>
           {submitLabel}
@@ -590,12 +590,12 @@ function TestConnection({
       </Button>
       {test.isPending ? <Spinner size="small" color="$accent9" /> : null}
       {test.data ? (
-        <SizableText size="$2" color="$green10" flex={1}>
+        <SizableText size="$2" color="$green11" flex={1}>
           {`Connected${test.data.serverName ? ` to ${test.data.serverName}` : ''} · ${displayName}${test.data.version ? ` ${test.data.version}` : ''}`}
         </SizableText>
       ) : null}
       {test.error ? (
-        <SizableText size="$2" color="$red10" flex={1}>
+        <SizableText size="$2" color="$red11" flex={1}>
           {describeProbeError(asProbeError(test.error))}
         </SizableText>
       ) : null}

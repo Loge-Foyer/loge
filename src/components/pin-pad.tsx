@@ -66,7 +66,7 @@ export function PinPad({ title, message, tone = 'hint', disabled = false, onComp
           />
         ))}
       </XStack>
-      <SizableText size="$3" color={tone === 'error' ? '$red10' : '$color10'} minH="$2" text="center">
+      <SizableText size="$3" color={tone === 'error' ? '$red11' : '$color10'} minH="$2" text="center">
         {message ?? ' '}
       </SizableText>
       <XStack flexWrap="wrap" width={264} gap="$3" justify="center">

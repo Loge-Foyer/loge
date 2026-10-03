@@ -22,7 +22,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type PanResponderInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SizableText, Slider, Spinner, XStack, YStack } from 'tamagui';
+import { SizableText, Slider, Spinner, Theme, XStack, YStack } from 'tamagui';
 
 import { px } from '@/components/density';
 import { Button } from '@/components/button';
@@ -99,30 +99,33 @@ export function PlayerScreen({
 
   return (
     // Its own provider: a full-screen modal is measured apart from the screen
-    // beneath it, so the root one keeps a turned phone's old insets.
+    // beneath it, so the root one keeps a turned phone's old insets. Dark in
+    // either scheme: it is drawn over a film.
     <SafeAreaProvider>
-      <YStack flex={1} bg="black">
-        <StatusBar hidden />
-        {View && controller ? <Surface view={View} controller={controller} /> : null}
-        {shrunk ? null : problem ? (
-          <Notice
-            message={problem}
-            {...(plan?.kind === 'none' || plan?.kind === 'no-player' ? { players: true } : { onRetry: retry })}
-          />
-        ) : (
-          <Controls
-            item={item}
-            controller={controller}
-            snapshot={snapshot}
-            starting={!plan || !controller}
-            {...(plan?.kind === 'play' && plan.descriptor.chapters ? { chapters: plan.descriptor.chapters } : {})}
-            {...(plan?.kind === 'play' && plan.descriptor.segments ? { segments: plan.descriptor.segments } : {})}
-            {...(next.data ? { next: next.data } : {})}
-            {...(player ? { player } : {})}
-            {...(live ? { live: { channel: key, title: live.title, ...(live.group ? { group: live.group } : {}) } } : {})}
-          />
-        )}
-      </YStack>
+      <Theme name="dark">
+        <YStack flex={1} bg="black">
+          <StatusBar hidden />
+          {View && controller ? <Surface view={View} controller={controller} /> : null}
+          {shrunk ? null : problem ? (
+            <Notice
+              message={problem}
+              {...(plan?.kind === 'none' || plan?.kind === 'no-player' ? { players: true } : { onRetry: retry })}
+            />
+          ) : (
+            <Controls
+              item={item}
+              controller={controller}
+              snapshot={snapshot}
+              starting={!plan || !controller}
+              {...(plan?.kind === 'play' && plan.descriptor.chapters ? { chapters: plan.descriptor.chapters } : {})}
+              {...(plan?.kind === 'play' && plan.descriptor.segments ? { segments: plan.descriptor.segments } : {})}
+              {...(next.data ? { next: next.data } : {})}
+              {...(player ? { player } : {})}
+              {...(live ? { live: { channel: key, title: live.title, ...(live.group ? { group: live.group } : {}) } } : {})}
+            />
+          )}
+        </YStack>
+      </Theme>
     </SafeAreaProvider>
   );
 }

@@ -32,7 +32,7 @@ import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import { WATCH_STATUS_DEFAULTS } from '@/services/account-settings';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import { BUTTON_LABELS, type ButtonLabels } from '@/services/ports';
+import { APPEARANCES, BUTTON_LABELS, type AppearanceSetting, type ButtonLabels } from '@/services/ports';
 import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
 import { downloadOptionsSummary } from './download-options';
@@ -48,6 +48,12 @@ const WATCH_STATUS_ROWS: Readonly<Record<ContentTab, { readonly title: string; r
 const BUTTON_LABEL_NAMES: Readonly<Record<ButtonLabels, string>> = {
   symbols: 'Symbols',
   symbolsAndText: 'Symbols and text',
+};
+
+const APPEARANCE_NAMES: Readonly<Record<AppearanceSetting, string>> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
 };
 
 const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
@@ -81,6 +87,7 @@ export function SettingsScreen() {
   const watchStatus = useWatchStatusSetting();
   const { setWatchStatus } = useAccountSettingActions();
   const buttonLabels = appSettings.data?.buttonLabels ?? APP_DEFAULTS.buttonLabels;
+  const appearance = appSettings.data?.appearance ?? APP_DEFAULTS.appearance;
   const defaultProfile = profiles.find((profile) => profile.id === defaultUserId);
 
   /** A list's line: what is set up in it, or what it is for. */
@@ -150,6 +157,15 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">
+        <ChoiceRow
+          title="Appearance"
+          subtitle="Light or dark, or as this device is set"
+          options={APPEARANCES}
+          label={(option) => APPEARANCE_NAMES[option]}
+          value={appearance}
+          disabled={appSettings.data === undefined || set.isPending}
+          onChoose={(option) => set.mutate({ appearance: option })}
+        />
         <ChoiceRow
           title="Open on"
           subtitle="The tab the app starts on"

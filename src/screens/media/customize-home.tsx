@@ -150,7 +150,7 @@ function RowEditor({
             <SourceTabs tabs={CARDS} selected={row.card} onSelect={(card) => onChange({ card: card as CardStyle })} />
           </YStack>
           {row.extra ? (
-            <Button size="$3" chromeless icon={Trash2} color="$red10" self="flex-start" onPress={onRemove}>
+            <Button size="$3" chromeless icon={Trash2} color="$red11" self="flex-start" onPress={onRemove}>
               Remove this row
             </Button>
           ) : null}

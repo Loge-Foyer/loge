@@ -10,8 +10,9 @@ import { SizableText, XStack, YStack } from 'tamagui';
 import { GUTTER, px } from './density';
 import { FOCUSED, useRemoteFocus } from './remote';
 
-// From iOS 26 a header's buttons sit in the system's own glass; anywhere else
-// the "⋯" over artwork needs a backdrop of its own to be seen.
+// From iOS 26 — and tvOS 26 — a header's buttons sit in the system's own
+// glass, which follows light and dark; anywhere else the "⋯" over artwork
+// needs a backdrop of its own to be seen.
 const SYSTEM_GLASS = Platform.OS === 'ios' && Number.parseInt(String(Platform.Version), 10) >= 26;
 // A browser's header gives its right-hand buttons no margin of their own.
 const EDGE = Platform.OS === 'web' ? 8 : 0;
@@ -28,11 +29,11 @@ export function MoreButton({ label, onPress }: { label: string; onPress: () => v
           rounded={999}
           items="center"
           justify="center"
-          bg={SYSTEM_GLASS ? 'transparent' : 'rgba(15, 6, 6, 0.55)'}
+          bg={SYSTEM_GLASS ? 'transparent' : 'rgba(0, 0, 0, 0.55)'}
           opacity={pressed ? 0.7 : 1}
           {...(focused ? FOCUSED : {})}
         >
-          <Ellipsis size={px(20)} color="white" />
+          <Ellipsis size={px(20)} color={SYSTEM_GLASS ? '$color12' : 'white'} />
         </YStack>
       )}
     </Pressable>

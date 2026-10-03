@@ -76,7 +76,7 @@ export function SettingsRow({ title, subtitle, icon, trailing, href, onPress, de
     >
       {icon}
       <YStack flex={1} gap="$0.5">
-        <SizableText size="$4" color={destructive ? '$red10' : '$color12'} fontWeight="500">
+        <SizableText size="$4" color={destructive ? '$red11' : '$color12'} fontWeight="500">
           {title}
         </SizableText>
         {subtitle ? (

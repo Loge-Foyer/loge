@@ -15,19 +15,40 @@ Every `@tamagui/*` package is pinned to the same exact version — Tamagui is no
 tied to an Expo SDK, so nothing else keeps them in step.
 
 There is exactly **one theme entry point**: `src/tamagui.config.ts`. Colours,
-spacing and type all come from there; nothing sits beside it.
+spacing and type all come from there; nothing sits beside it. Its colours are
+`src/tamagui.themes.ts`, a module with no React Native import that nothing
+but the config and its test reads.
 
-- **Dark only, in the icon's colours.** Surfaces are a velvet-black, red-brown
-  in the dark steps and ivory at the light end. A single brass accent marks
-  primary actions and selection. No borrowed brand colours.
-  - Each surface step keeps the lightness of the cool blue-grey it replaced,
-    so no contrast moved.
-  - The theme fills with accent10 and writes accent3 on it, so the top of the
-    brass ramp is the icon's own (#d9a441, #f4cf6a, #fff1b8).
+- **Black, grey and white, light and dark, and the icon's brass.** Nothing
+  tints what is read: the page and its words are greys alone, and a single
+  brass accent marks primary actions, selection and a remote's focus. No
+  borrowed brand colours.
+  - **Dark** is pure black — an OLED screen's own — with white words; **light**
+    is pure white with black ones. Tamagui draws the page from step 2 and
+    every see-through shade of it from step 1, so both are the page's colour.
+  - A step does one job in both schemes: 3 a field or a chip, 4 a border or a
+    button, 8 a field's placeholder (4.6:1 inside it), 10 muted words (8.3 and
+    7.8:1), 12 the words themselves.
+  - **The fill is accent10 in both.** The dark theme writes accent3 on it; in
+    a light theme Tamagui turns the pair round — a pale fill with the bronze
+    on it, a cream tint on white — so the light theme and each of its colours
+    are given accent10 with accent1 written on it. The light brass ramp is
+    deeper than the dark one: accent10 holds 5.4:1 on white as a tab's tint
+    or a focus ring.
+  - **Status words are step 11** — `$red11`, `$green11`, `$orange11`. Step 10
+    is under 4.5:1 on white. An icon, a border or a badge keeps step 10.
+  - **What sits on a picture is drawn dark** in either scheme: the player
+    (`<Theme name="dark">`, on black), the badges on a poster on their black
+    pill (`PILL`), a profile's initial.
   - Tamagui emits the steps as rounded `hsla()`. Check a contrast on what it
-    emits, not on the hex in the ramp, and write a colour that must match it
-    — the splash's, the native root view's in `app.json` — as the emitted
-    value (`#1b0e0e` for the background, not the ramp's `#1a0d0d`).
+    emits, not on the hex in the ramp — `test/theme.test.ts` checks the pairs
+    that matter in both schemes, and that the greys are greys.
+- **Appearance** is the device's: System, the default, follows the phone, the
+  TV or the browser; Light and Dark hold either (Settings → App). The native
+  chrome — the tab bar, sheets, alerts, the keyboard — follows the app's
+  choice through `Appearance.setColorScheme`, and the root view behind every
+  screen takes the page's colour (`expo-system-ui`). The splash keeps the
+  icon's velvet (`#1b0e0e`) and its mark in both, as the icon keeps its own.
 - **Shorthands.** The v5 preset only accepts the short form of a style prop:
   `bg`, `p`, `px`, `rounded`, `items`, `justify`, `self`, `maxW`…
 - **Media queries are min-width**: `$sm` ≥ 640, `$md` ≥ 768, `$lg` ≥ 1024,
@@ -223,7 +244,8 @@ TV's sections.
   sources there that keep none: Media, Videos, TV's films and series. The
   account's, the same for every profile and device; a source that keeps its
   own — a media server — keeps it there.
-- **App** — how this device behaves, whoever is watching: the tab it opens on
+- **App** — how this device behaves, whoever is watching: its Appearance —
+  System, Light or Dark — the tab it opens on
   (Media, Videos or TV), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;
   the default profile is kept for when it is off), force landscape on
