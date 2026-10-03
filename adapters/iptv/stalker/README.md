@@ -165,7 +165,15 @@ on now and no more, so "now and next" shows one — the day guide, which comes
 from `get_epg_info`, has the rest.
 
 **One MAC address is one device** on a provider's side. Never invent a second
-to try something, never sign in from two places at once, and never loop a
-failed handshake: a refusal is latched on purpose.
+to try something, and never loop a failed handshake: a refusal is latched on
+purpose.
+
+- **Every client is that one device.** The app on several devices, a script
+  or a test may each reach a real portal, but only with the connection's MAC
+  address and box ids and this adapter's own MAG User-Agent — run this code,
+  never an identity of its own.
+- **Each handshake ends the token every other client holds.** Each signs in
+  again on its next call, but a stream playing there can stop, so a probe
+  plays one stream at a time.
 
 See `docs/writing-a-plugin/` at the repository root.

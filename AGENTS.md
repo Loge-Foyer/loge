@@ -170,7 +170,10 @@ These are specific to Loge and matter more than anything above.
    after a few failures — Jellyfin, your own server and an IPTV portal alike. A
    source that answers `UNAUTHORIZED` is parked until the user acts, a plugin
    signs in once per 401 at most, and Test connection / Load libraries are
-   buttons — never a probe while someone is typing.
+   buttons — never a probe while someone is typing. A real portal is reached
+   as one device from anywhere — the app, a script, a test: the connection's
+   MAC address and box ids and the adapter's own MAG User-Agent, never an
+   identity of a client's own; each handshake ends every other place's token.
 
 ---
 

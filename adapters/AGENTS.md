@@ -159,6 +159,9 @@ the connection's values already resolved for one profile.
   sources with it. Channels come in the provider's own order.
 - **Sign-in is single-flight.** Several calls start together.
 - **A refused login is never retried.** Servers lock accounts; portals too.
+- **A portal is one device.** Whatever reaches a real one — the app on any
+  device, a script, a test — sends the connection's MAC address and box ids
+  and the adapter's own MAG User-Agent, never an identity of its own.
 - **Throw only `AppError`**, with a retry hint: `backoff`, `network-change` or
   `never`.
 - **A playback descriptor lives in memory only.** A stream address can carry a
