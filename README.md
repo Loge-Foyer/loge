@@ -91,7 +91,9 @@ password twice. Your server keeps those passwords readable, for now. It is
 yours, so keep it private, and behind TLS anywhere but your home network.
 
 Some things stay with each device, whatever the account: which players it uses,
-and how it syncs or backs up.
+how it syncs or backs up, and — where you choose — a profile's PIN: one for
+every device, or this device's own, so the family's TV can ask for one that
+your phone does not.
 
 Changing account replaces what is on the device; two accounts are never mixed.
 Signing in to another account asks first, and offers to export a backup before

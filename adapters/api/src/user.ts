@@ -4,5 +4,6 @@ import type { UserId } from './ids';
 export interface AppUser {
   readonly id: UserId;
   readonly name: string;
+  /** Whether this device asks for a PIN for it: the account's, or one this device keeps for itself. */
   readonly pinProtected: boolean;
 }

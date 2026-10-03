@@ -115,6 +115,9 @@ What runs today:
 - Watch status (database v5): the cache and the outbox written together,
   a drainer carrying them to the source, and this device's state shown until
   the source has heard.
+- A profile's PIN on All devices or on This device alone — its own, or none
+  (`DeviceSettings.pins`): a personal phone without one, the family's TV
+  with one.
 - Settings → Downloads: Options, then what is kept; a Downloaded row on Media,
   whose copies open and play offline.
 - TV: a ★ of favourite channels before the provider's groups, per profile on

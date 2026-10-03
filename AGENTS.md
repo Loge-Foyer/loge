@@ -154,8 +154,9 @@ These are specific to Loge and matter more than anything above.
      user-owned and goes with the profile.
    - **Device-wide** — players (on or off, the default, their settings), sync
      plugins (your server's sign-in, a backup target and its key), the default
-     profile, the Live group each profile chose last, sessions, the device
-     key, caches, the journal and sync state. Never journaled, never pushed,
+     profile, the Live group each profile chose last, a profile's PIN where
+     this device decides its own (`pins`), sessions, the device key, caches,
+     the journal and sync state. Never journaled, never pushed,
      never in a backup. A device setting that names a profile or a connection
      has no cascade: `services/removal.ts` drops it in the same transaction.
 
@@ -768,6 +769,13 @@ Everything above describes the target; what runs today:
   for, which does not drive a download yet — then what is kept. Media's home
   has a Downloaded row after Continue watching (home layout version 2), and a
   kept copy's page opens and plays with no network, from where it was asked.
+- **PIN lock per device:** a profile's PIN is asked on All devices — the
+  account's, as before — or on This device: its own, or none, whatever the
+  account says (`DeviceSettings.pins`, `services/device-pins.ts`). No
+  migration: a device setting holding a ref, the PIN in the credential store,
+  never journaled, synced or backed up, and dropped with the profile and with
+  a replaced account. `toAppUser(user, pins)` makes `pinProtected` the PIN
+  this device asks for; sync and backups keep the account's ref.
 - **Favourite channels (database v8, backup schema 3):** a ★ before a
   provider's groups on TV, kept per profile on the account; holding a channel
   — holding select, with a remote — adds it or takes it out.

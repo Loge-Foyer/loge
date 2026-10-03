@@ -14,7 +14,7 @@ import { Users } from '@tamagui/lucide-icons-2/icons/Users';
 import Constants from 'expo-constants';
 import { SizableText } from 'tamagui';
 
-import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describeSyncStatus, fileSize, TAB_LABELS } from '@/components/labels';
+import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, describePinStatus, describeSyncStatus, fileSize, TAB_LABELS } from '@/components/labels';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
@@ -27,6 +27,7 @@ import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
 import { useAccountSettingActions, useWatchStatusSetting } from '@/hooks/use-account-settings';
 import { useAppSettingActions, useAppSettings } from '@/hooks/use-app-settings';
+import { usePinStatus } from '@/hooks/use-pin';
 import { useDefaultUserId, useProfiles } from '@/hooks/use-profiles';
 import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
@@ -77,6 +78,7 @@ export function SettingsScreen() {
   const { data: sources = [] } = useSources();
   const { data: connectedPlugins } = useConnectedPlugins();
   const user = profiles.find((profile) => profile.id === userId);
+  const pin = usePinStatus(userId);
   const appSettings = useAppSettings();
   const { set } = useAppSettingActions();
   const { data: defaultUserId } = useDefaultUserId();
@@ -129,7 +131,7 @@ export function SettingsScreen() {
         />
         <SettingsRow
           title="PIN lock"
-          subtitle={user?.pinProtected ? 'On — this profile asks for its PIN' : 'Off'}
+          subtitle={pin.data ? describePinStatus(pin.data) : user?.pinProtected ? 'On' : 'Off'}
           icon={<Lock size={20} color="$color11" />}
           href="/settings/pin"
         />

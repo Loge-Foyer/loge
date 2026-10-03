@@ -1,8 +1,17 @@
 import type { Credentials, UserId } from '@loge/api';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import type { PinScope } from '@/services/pins';
+import { userKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
 import { useRefreshLocalState } from './use-local-state';
+
+/** Where a profile's PIN comes from on this device, and whether it asks for one. */
+export function usePinStatus(userId: UserId) {
+  const { pins } = useServices();
+  return useQuery({ queryKey: userKey(userId, 'pin'), queryFn: () => pins.status(userId) });
+}
 
 export function usePinActions() {
   const { pins } = useServices();
@@ -21,6 +30,11 @@ export function usePinActions() {
     remove: useMutation({
       mutationFn: ({ userId, current }: { userId: UserId; current: string }) =>
         pins.remove(userId, current),
+      onSuccess: () => refresh(),
+    }),
+    /** All devices, or this device's own: with the PIN asked for now, when it asks for one. */
+    setScope: useMutation({
+      mutationFn: ({ userId, scope, current }: { userId: UserId; scope: PinScope; current?: string }) => pins.setScope(userId, scope, current),
       onSuccess: () => refresh(),
     }),
     /** Forgot PIN: the owner is asked — with `proof`, when the account asks for one — and only a yes clears it. */

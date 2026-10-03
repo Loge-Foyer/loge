@@ -27,7 +27,11 @@ import type { ContentTab } from './tab-content';
 export interface StoredUser {
   readonly id: UserId;
   readonly name: string;
-  /** Present when the profile has a PIN; the PIN itself lives in the credential store. */
+  /**
+   * Present when the account keeps a PIN for the profile; the PIN itself
+   * lives in the credential store. A device may decide one for itself
+   * instead (`DeviceSettings.pins`).
+   */
   readonly pinCredentialRef?: CredentialsRef;
 }
 
@@ -68,6 +72,15 @@ export interface ConnectionRepository {
   deleteProfileValues(id: ConnectionId, userId: UserId): Promise<void>;
 }
 
+/**
+ * What this device decided for one profile's PIN, in place of the account's:
+ * with `ref`, a PIN of its own — in the credential store, never a row — and
+ * without, none, whatever the account says.
+ */
+export interface DevicePin {
+  readonly ref?: CredentialsRef;
+}
+
 export interface DeviceSettings {
   readonly defaultUserId?: UserId;
   /** A fingerprint of the device key, never the key: it spots a phone restored from another's backup. */
@@ -102,6 +115,13 @@ export interface DeviceSettings {
    * profile and its provider (`services/live-groups.ts`).
    */
   readonly liveGroups?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /**
+   * The profiles whose PIN this device decides for itself, by profile id
+   * (`services/device-pins.ts`); one not named asks for the account's. Never
+   * journaled, never on your server, never in a backup, and gone with its
+   * profile.
+   */
+  readonly pins?: Readonly<Record<string, DevicePin>>;
 }
 
 export interface DownloadSettings {

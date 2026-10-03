@@ -1,5 +1,6 @@
 import type { ConnectionId, CredentialsRef, UserId } from '@loge/api';
 
+import { devicePinOf, withoutDevicePin } from './device-pins';
 import { forgetConnectionGroups, forgetProfileGroups } from './live-groups';
 import type { Repositories } from './ports';
 import { accountWide } from './scope';
@@ -10,7 +11,8 @@ const isRef = (ref: CredentialsRef | undefined): ref is CredentialsRef => ref !=
 /**
  * Removes a profile inside a transaction. The cascade takes everything it
  * owns; its secrets are not in the database, so they are queued: its own
- * sign-ins, its PIN, its sessions. `false` when there was no such profile.
+ * sign-ins, its PIN — the account's, and one this device kept for it — its
+ * sessions. `false` when there was no such profile.
  */
 export async function removeProfileIn(tx: Repositories, id: UserId, options: { readonly allowLast: boolean }): Promise<boolean> {
   const all = await tx.users.list();
@@ -20,10 +22,11 @@ export async function removeProfileIn(tx: Repositories, id: UserId, options: { r
   if (!options.allowLast && all.length === 1) throw new Error('The last profile cannot be deleted.');
   const own = await tx.connections.valuesOfProfile(id);
   const connections = await tx.connections.list();
+  const devicePin = devicePinOf((await tx.deviceSettings.get()).pins, id)?.ref;
   await tx.users.delete(id);
   // What this device kept for it: no cascade reaches a device setting.
   await tx.deviceSettings.update((current) => {
-    const left = forgetProfileGroups(current, id);
+    const left = withoutDevicePin(forgetProfileGroups(current, id), id);
     if (left.defaultUserId !== id) return left;
     const { defaultUserId: _deleted, ...rest } = left;
     return rest;
@@ -31,6 +34,7 @@ export async function removeProfileIn(tx: Repositories, id: UserId, options: { r
   await tx.staleSecrets.add([
     ...[...own.values()].map((values) => values.credentialsRef).filter(isRef),
     ...(user.pinCredentialRef ? [user.pinCredentialRef] : []),
+    ...(devicePin ? [devicePin] : []),
     ...connections.map((connection) => sessionRef(connection.id, id)),
   ]);
   return true;

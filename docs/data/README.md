@@ -50,10 +50,18 @@ web for one thing only — sql.js, loaded to write or open a backup file.
 **Device-wide** — never leave the device:
 
 - **Device settings:** the default profile, players (on or off, the default,
-  their settings), sync settings, and the Live group each profile chose last
-  on each provider. A setting that names a profile or a connection — the
-  default profile, a Live group — goes in the same transaction as the profile
+  their settings), sync settings, the Live group each profile chose last on
+  each provider, and the profiles whose PIN this device decides for itself
+  (`pins`). A setting that names a profile or a connection — the default
+  profile, a Live group, a PIN — goes in the same transaction as the profile
   or the connection (`services/removal.ts`): no cascade reaches it.
+- **A PIN this device decides** is its own, or none, in place of the
+  account's: the setting holds a ref, the PIN lives in the credential store
+  beside the account's PINs, and neither is journaled, pushed or backed up.
+  Changing account — a sign-in that replaces, an import — takes this device's
+  choices with the profiles; signing out keeps them. Every place that shows or
+  checks a PIN asks for the one this device asks for (`effectivePinRef`); sync
+  and backups only ever know the account's.
 - **Sync-category connections:** your server's sign-in, a backup target.
 - **The account's own rows**, never journaled, and all three cleared when the
   device changes account:
@@ -412,7 +420,7 @@ launch if a crash came in between.
 
 At worst a crash leaves an orphaned secret, never a row pointing at nothing.
 Removing a connection or a profile queues every ref it held, including the
-sessions derived from it.
+sessions derived from it and a PIN this device kept for the profile.
 
 ## Session tokens are bound to what signed in
 
@@ -444,7 +452,9 @@ A phone's own backup can carry the database to another phone. That is not the
   - A source whose saved password is gone is not signed in without it, because
     servers lock accounts after failed logins. It says it needs its password
     again, and the connection form asks for it.
-  - A PIN that is gone lets its profile's owner in, as a child lock should.
+  - A PIN that is gone lets its profile's owner in, as a child lock should —
+    the account's, or one this device kept: its choice comes back with the
+    database, and on iOS its PIN with the passwords.
   - The backup key is gone too.
 - **Either way,** a device-key fingerprint in the database spots the restore
   at boot: the pending journal and the session are dropped, and the next

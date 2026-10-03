@@ -157,7 +157,9 @@ watching?" when profiles arrive, to the picker when the profile in use is gone,
 and back to `needs-account` when the account is gone. Nothing happens while
 starting or failed, and a PIN set elsewhere never locks the profile in use. The
 first profile chosen on a device without a default becomes its default, as the
-first one created does.
+first one created does. The PIN the gate asks for is the one this device asks
+for: the account's, unless this device decides one of its own, or none
+(Settings → PIN lock, `DeviceSettings.pins`).
 
 ## The plugin catalogue
 
@@ -417,7 +419,7 @@ Every key is prefixed with the active profile (`userKey`) or with `device`
 | State | Lives in |
 | --- | --- |
 | The account-wide state — profiles, preferences, source and IPTV connections, per-profile values — and the change journal | repositories — SQLite on native, IndexedDB on web |
-| Device settings — the default profile, players, sync settings — and sync-category connections | repositories, never journaled |
+| Device settings — the default profile, players, sync settings, the PINs this device decides — and sync-category connections | repositories, never journaled |
 | The account: `account`, `account_sync` (the checkpoint, last synced), `backup_state` | repositories, never journaled, cleared when the device changes account |
 | Passwords, PINs, your server's account password | the credential store — the keychain on native, encrypted IndexedDB on web |
 | Session tokens, the device key, the backup key | the device-bound credential store — the keychain, never restored onto another phone |

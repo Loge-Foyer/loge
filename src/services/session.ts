@@ -4,6 +4,7 @@ import { decideInitialGate, type Gate } from './boot';
 import type { AppSettingsService } from './app-settings';
 import type { PinCheck, PinService } from './pins';
 import type { AccountRepository, DeviceSettingsRepository, UserRepository } from './ports';
+import { effectivePinRef } from './device-pins';
 import { toAppUser } from './users';
 
 export interface SessionService {
@@ -63,7 +64,7 @@ export function createSessionService(deps: {
         const [stored, settings, held, app] = await Promise.all([users.list(), deviceSettings.get(), account.get(), appSettings.get()]);
         const decision = decideInitialGate({
           hasAccount: held !== undefined,
-          users: stored.map(toAppUser),
+          users: stored.map((user) => toAppUser(user, settings.pins)),
           defaultUserId: settings.defaultUserId,
           alwaysChooseProfile: app.alwaysChooseProfile,
         });
@@ -76,9 +77,10 @@ export function createSessionService(deps: {
       }
     },
     select: async (userId) => {
-      const user = await users.get(userId);
+      const [user, settings] = await Promise.all([users.get(userId), deviceSettings.get()]);
       if (!user) throw new Error(`Unknown profile ${userId}`);
-      if (user.pinCredentialRef === undefined) {
+      // The PIN this device asks for: its own decision, else the account's.
+      if (effectivePinRef(user, settings.pins) === undefined) {
         await enter(userId);
         return 'ready';
       }
@@ -107,7 +109,7 @@ export function createSessionService(deps: {
         // Decided as at launch, so a sync while the picker is up never walks past it into the default profile.
         next = decideInitialGate({
           hasAccount: true,
-          users: stored.map(toAppUser),
+          users: stored.map((user) => toAppUser(user, settings.pins)),
           defaultUserId: settings.defaultUserId,
           alwaysChooseProfile: app.alwaysChooseProfile,
         }).gate;

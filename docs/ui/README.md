@@ -239,7 +239,12 @@ TV's sections.
   why. A profile the server refused for the limit stays on this device only,
   and says so. A local copy kept after signing out that holds more than ten
   keeps them all, but adds none until there are fewer.
-- **PIN lock**, per profile.
+- **PIN lock**, per profile, asked on **All devices** — one PIN, kept with the
+  account — or on **This device** alone: its own PIN, or none, whatever the
+  account says. A personal phone without one, the family's TV with one.
+  Changing where it applies asks for the PIN asked for now, and the actions
+  beneath take the scope's words ("Set a PIN for this device"). The Profile
+  row says which: "On — the same PIN on every device", "Off on this device".
 - **Watch status** — which tabs the account keeps watch status on, for the
   sources there that keep none: Media, Videos, TV's films and series. The
   account's, the same for every profile and device; a source that keeps its
@@ -347,8 +352,8 @@ lock's current-PIN step — wherever the owner can be asked: on your server, wit
 the account's password; otherwise with Face ID, a fingerprint or the passcode.
 Where nobody can be asked — a browser on a local account — a hint takes the
 link's place, and a server account that no longer lets this device in points
-to signing in to it again. A yes clears the PIN and opens the profile; PIN lock
-then offers "Set a PIN".
+to signing in to it again. A yes clears the PIN this device asks for — on This
+device, only its own — and opens the profile; PIN lock then offers to set one.
 
 **Screens scroll with taps passing through** (`components/screen.tsx`,
 `keyboardShouldPersistTaps="handled"`): otherwise the first tap on a button

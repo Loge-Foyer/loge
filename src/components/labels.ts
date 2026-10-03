@@ -18,6 +18,7 @@ import type { TargetStatus } from '@/services/backup/targets';
 import type { HomeRow } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import type { OwnerVerdict } from '@/services/owner-check';
+import type { PinScope, PinStatus } from '@/services/pins';
 import type { SyncStatus } from '@/services/sync/engine';
 import type { ContentTab } from '@/services/tab-content';
 
@@ -128,6 +129,18 @@ export function timeLeft(item: MediaItem): string | undefined {
   if (!runtimeMs || position === undefined) return undefined;
   const minutes = Math.max(1, Math.round((runtimeMs - position) / 60_000));
   return `${minutes} min left`;
+}
+
+/** Where a profile's PIN comes from, as the choice between them says it. */
+export const PIN_SCOPE_LABELS: Readonly<Record<PinScope, string>> = {
+  account: 'All devices',
+  device: 'This device',
+};
+
+/** How a profile's PIN stands on this device, in one line. */
+export function describePinStatus(status: PinStatus): string {
+  if (status.scope === 'account') return status.asks ? 'On — the same PIN on every device' : 'Off';
+  return status.asks ? 'On — this device’s own PIN' : 'Off on this device';
 }
 
 /** "4:07", "1:05:09": a position or a length, as a player shows it. */

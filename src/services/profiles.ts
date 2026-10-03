@@ -49,10 +49,14 @@ export function createProfileService(deps: {
   };
 
   return {
-    list: async () => (await db.users.list()).map(toAppUser),
+    // Whether a profile asks for its PIN is this device's to say as well as the account's.
+    list: async () => {
+      const [users, settings] = await Promise.all([db.users.list(), db.deviceSettings.get()]);
+      return users.map((user) => toAppUser(user, settings.pins));
+    },
     get: async (id) => {
-      const user = await db.users.get(id);
-      return user && toAppUser(user);
+      const [user, settings] = await Promise.all([db.users.get(id), db.deviceSettings.get()]);
+      return user && toAppUser(user, settings.pins);
     },
     create: async (name) => {
       const user = { id: toUserId(ids.next()), name: cleanName(name) };
@@ -66,7 +70,8 @@ export function createProfileService(deps: {
         await tx.users.insert(user);
         if (isFirst) await tx.deviceSettings.update((current) => ({ ...current, defaultUserId: user.id }));
       });
-      return toAppUser(user);
+      // New: nothing is decided for it on any device yet.
+      return toAppUser(user, undefined);
     },
     rename: async (id, name) => {
       const user = await db.users.get(id);

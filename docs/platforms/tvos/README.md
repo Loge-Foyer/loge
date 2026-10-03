@@ -80,7 +80,10 @@ stand-in:
 folder, which the simulator keeps and a real Apple TV does not promise to: an
 app there may only keep purgeable caches. A television wants its account on
 your own server, which brings it all back; that, and moving the database to
-caches, is later work.
+caches, is later work. A PIN the TV keeps for itself goes with a cleared
+database, and the TV then asks for the account's: the arrangement that keeps
+the TV locked is a PIN on All devices, with the phones that should not ask
+choosing This device.
 
 ## Players
 
