@@ -17,8 +17,8 @@ public final class LogeVlcModule: Module {
         LogeVlcPlayer()
       }
 
-      AsyncFunction("load") { (player: LogeVlcPlayer, uri: String, userAgent: String?, referrer: String?, startMs: Double?) in
-        player.load(uri: uri, userAgent: userAgent, referrer: referrer, startMs: startMs)
+      AsyncFunction("load") { (player: LogeVlcPlayer, uri: String, userAgent: String?, referrer: String?, startMs: Double?, cachingMs: Double?) in
+        player.load(uri: uri, userAgent: userAgent, referrer: referrer, startMs: startMs, cachingMs: cachingMs)
       }.runOnQueue(.main)
 
       Function("play") { (player: LogeVlcPlayer) in

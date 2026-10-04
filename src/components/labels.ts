@@ -486,3 +486,9 @@ export function rowTitle(row: HomeRow): string {
   const base = CONTENT_KIND_LABELS[row.kind];
   return row.extra ? `${base} · ${SORT_LABELS[row.sort.by]}` : base;
 }
+
+/** "mpv", or "mpv and the built-in player". */
+export function listed(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}

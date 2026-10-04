@@ -1,16 +1,18 @@
 import {
   AppError,
+  bufferingFor,
   clampRate,
   createPlayerEvents,
   playbackFailed,
   playerReleased,
   type AudioTrack,
   type MediaPlayer,
+  type PlaybackSource,
   type PlayerContext,
   type SubtitleTrack,
 } from '@loge/api';
 
-import { nativeModule, type NativePlayer, type NativeTrack } from './native';
+import { nativeModule, type NativeCache, type NativePlayer, type NativeTrack } from './native';
 
 /** The mpv core behind each controller. This package's view draws it; nothing else touches it. */
 const engines = new WeakMap<MediaPlayer, NativePlayer>();
@@ -33,6 +35,12 @@ const SUBTITLE_FORMATS: Readonly<Record<string, string>> = {
   dvb_subtitle: 'dvbsub',
   mov_text: 'mov_text',
 };
+
+/** The device's Buffering, as mpv takes it for one stream: a disk cache only where it is worth one (`bufferingFor`). */
+function cacheFor(context: PlayerContext, source: PlaybackSource): NativeCache {
+  const buffering = bufferingFor(context.preferences?.buffering, source);
+  return buffering.mode === 'disk' ? { mode: 'disk', limitBytes: buffering.diskBytes } : { mode: buffering.mode };
+}
 
 /**
  * mpv on Android, through the Expo module in `android/`. Tracks keep mpv's own
@@ -170,7 +178,7 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       toldTracks = '';
       events.setState('loading');
       try {
-        await mpv.load(source.uri, headers ?? null, startMs !== undefined && startMs > 0 ? startMs : null);
+        await mpv.load(source.uri, headers ?? null, startMs !== undefined && startMs > 0 ? startMs : null, cacheFor(context, source));
       } catch (error) {
         const failure = playbackFailed(undefined, error);
         events.fail(failure);

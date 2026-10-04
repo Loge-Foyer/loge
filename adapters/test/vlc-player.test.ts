@@ -43,6 +43,14 @@ async function playing(player: MediaPlayer, engine: FakeVlcPlayer) {
 }
 
 describe('VLC on Android (libVLC)', () => {
+  it('holds a second and a half of a stream, or a third of one with buffering off — in memory, having no disk cache', async () => {
+    for (const mode of ['off', 'memory', 'disk'] as const) {
+      await createEngine({ ...context, preferences: { softwareFallback: true, buffering: { mode, diskBytes: 1024 ** 3 } } }).load({ source: source() });
+    }
+    await createEngine(context).load({ source: source() });
+    expect(created.slice(-4).map((engine) => engine.cachings)).toEqual([[300], [1_500], [1_500], [1_500]]);
+  });
+
   it('hands libVLC the address, where to start, and the only headers it can send', async () => {
     const { player, engine, states } = vlc();
     await player.load({ source: source({ uri: 'http://portal/live.ts', protocol: 'mpegts', headersRef: headersRef('portal') }), startMs: 90_000 });

@@ -21,6 +21,9 @@ export interface NativeTrack {
 
 export type NativeState = 'loading' | 'buffering' | 'playing' | 'paused' | 'ended';
 
+/** How far ahead mpv reads for one file, and where: its own cache, none, or a file it stops writing at `limitBytes`. */
+export type NativeCache = { readonly mode: 'off' | 'memory' } | { readonly mode: 'disk'; readonly limitBytes: number };
+
 export type NativeEvents = {
   state(event: { readonly state: NativeState }): void;
   position(event: { readonly positionMs: number; readonly durationMs?: number }): void;
@@ -30,7 +33,7 @@ export type NativeEvents = {
 
 export declare class NativePlayer extends SharedObject<NativeEvents> {
   /** mpv sends any header a stream needs, unlike most engines. */
-  load(uri: string, headers: Readonly<Record<string, string>> | null, startMs: number | null): Promise<void>;
+  load(uri: string, headers: Readonly<Record<string, string>> | null, startMs: number | null, cache: NativeCache): Promise<void>;
   play(): void;
   pause(): void;
   /** Plays again from here: after the end mpv holds the last frame, so this is a seek. */

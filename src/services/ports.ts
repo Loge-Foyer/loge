@@ -1,5 +1,6 @@
 import type {
   AppErrorCode,
+  BufferingMode,
   CancelSignal,
   Connection,
   ConnectionId,
@@ -174,6 +175,9 @@ export type ButtonLabels = (typeof BUTTON_LABELS)[number];
 /** Light or dark, or as the device itself is set. */
 export const APPEARANCES = ['system', 'light', 'dark'] as const;
 
+/** How far ahead the player reads: as little as it needs, ahead in memory, or ahead on this device's storage. */
+export const BUFFERINGS: readonly BufferingMode[] = ['off', 'memory', 'disk'];
+
 export type AppearanceSetting = (typeof APPEARANCES)[number];
 
 export interface AppSettings {
@@ -221,6 +225,15 @@ export interface AppSettings {
   readonly buttonLabels: ButtonLabels;
   /** Light or dark — the native chrome with it — or as the device is set. */
   readonly appearance: AppearanceSetting;
+  /**
+   * How far ahead the player reads, and where it keeps it: as little as it
+   * needs, in memory — each engine's own read-ahead — or on this device's
+   * storage, up to `bufferDiskBytes`, where an engine can (`buffersOnDisk`)
+   * and a stream is worth it. Anything else reads ahead in memory.
+   */
+  readonly buffering: BufferingMode;
+  /** The most a disk cache may hold, for one stream at a time. */
+  readonly bufferDiskBytes: number;
 }
 
 export interface DeviceSettingsRepository {

@@ -153,11 +153,27 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     expect((await services.players.list())[0]?.firstOn).toEqual([]);
   });
 
+  it('say which keep what they read ahead on disk here, as their profile for this platform claims', async () => {
+    const disk = { ...builtIn, manifest: { ...builtIn.manifest, player: { profiles: { ios: { ...HLS, buffersOnDisk: true }, android: HLS } } } };
+    const memory = { ...phoneOnly, manifest: { ...phoneOnly.manifest, player: { profiles: { ios: HLS } } } };
+    const phone = buildServices({ plugins: [disk, memory], engine, platform: 'ios' });
+    expect((await phone.services.players.list()).map((each) => [each.manifest.id, each.buffersOnDisk])).toEqual([
+      ['players/built-in', true],
+      ['players/phone-only', false],
+    ]);
+    const other = buildServices({ plugins: [disk], engine, platform: 'android' });
+    expect((await other.services.players.list())[0]?.buffersOnDisk).toBe(false);
+  });
+
   it('are this device’s alone: nothing about them is journaled', async () => {
     const { services, db } = buildServices({ plugins: [builtIn, phoneOnly], engine, platform: 'android' });
     await services.account.createLocal('Lee');
     const before = (await db.journal.entries()).length;
+    // Reading ahead in memory, each engine's own, until the device chooses.
+    expect(await services.appSettings.get()).toMatchObject({ buffering: 'memory', bufferDiskBytes: 1024 ** 3 });
     await services.players.setEnabled(phoneOnly.manifest.id, false);
+    await services.appSettings.set({ buffering: 'disk', bufferDiskBytes: 2 * 1024 ** 3 });
+    expect(await services.appSettings.get()).toMatchObject({ buffering: 'disk', bufferDiskBytes: 2 * 1024 ** 3 });
     await services.players.setPreferred(phoneOnly.manifest.id);
     await services.players.setFirstOn(builtIn.manifest.id, 'tv', true);
     expect(await db.journal.entries()).toHaveLength(before);

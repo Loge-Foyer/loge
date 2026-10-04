@@ -26,6 +26,7 @@ class LogeVlcPlayer(context: Context, appContext: AppContext) : SharedObject(app
   private var uri: String? = null
   private var userAgent: String? = null
   private var referrer: String? = null
+  private var cachingMs: Double? = null
   private var length = 0L
   private var lastSecond = -1L
   // How full libVLC's buffer is since the stream opened; null until it says.
@@ -84,10 +85,11 @@ class LogeVlcPlayer(context: Context, appContext: AppContext) : SharedObject(app
     emit("tracks", mapOf("audio" to listed(mediaPlayer.audioTracks), "subtitles" to listed(mediaPlayer.spuTracks)))
   }
 
-  fun load(uri: String, userAgent: String?, referrer: String?, startMs: Double?) {
+  fun load(uri: String, userAgent: String?, referrer: String?, startMs: Double?, cachingMs: Double?) {
     this.uri = uri
     this.userAgent = userAgent
     this.referrer = referrer
+    this.cachingMs = cachingMs
     open(startMs ?: 0.0)
   }
 
@@ -105,6 +107,8 @@ class LogeVlcPlayer(context: Context, appContext: AppContext) : SharedObject(app
     userAgent?.let { media.addOption(":http-user-agent=$it") }
     referrer?.let { media.addOption(":http-referrer=$it") }
     if (startMs > 0) media.addOption(":start-time=${startMs / 1000.0}")
+    // How much it holds before it plays, and keeps ahead after: the device's Buffering, in memory — libVLC has no disk cache.
+    cachingMs?.let { media.addOption(":network-caching=${it.toLong()}") }
     length = 0
     lastSecond = -1
     mediaPlayer.media = media

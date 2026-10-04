@@ -1,5 +1,7 @@
 import { PLAYER_BUTTONS, type AppSettings, type DeviceSettingsRepository, type PlayerButton } from './ports';
 
+const GB = 1024 * 1024 * 1024;
+
 /**
  * What the app does by itself, as against what a plugin does: for now, whether
  * the player turns the phone on its side. Device-wide, like players — never
@@ -34,6 +36,9 @@ export const APP_DEFAULTS: AppSettings = {
   buttonLabels: 'symbols',
   // As the phone, the TV or the browser is set: it changes with the time of day there.
   appearance: 'system',
+  // Each engine's own read-ahead, as before there was a choice.
+  buffering: 'memory',
+  bufferDiskBytes: GB,
 };
 
 /**
@@ -47,6 +52,10 @@ export function appDefaults(device: { readonly tv: boolean }): AppSettings {
 
 /** What a press and hold may be set to. 1 is off. */
 export const HOLD_RATES = [1, 1.5, 2, 2.5, 3, 4] as const;
+
+/** A disk cache's limit moves in half gigabytes, from one half to eight. */
+export const BUFFER_DISK_STEP = GB / 2;
+export const BUFFER_DISK_MAX = 8 * GB;
 
 /** What the seek buttons may be set to, in seconds. */
 export const SEEK_CHOICES = [5, 10, 15, 30, 60] as const;

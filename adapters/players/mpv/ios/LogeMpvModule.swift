@@ -22,8 +22,8 @@ public final class LogeMpvModule: Module {
         return player
       }
 
-      AsyncFunction("load") { (player: LogeMpvPlayer, uri: String, headers: [String: String]?, startMs: Double?) in
-        player.load(uri: uri, headers: headers, startMs: startMs)
+      AsyncFunction("load") { (player: LogeMpvPlayer, uri: String, headers: [String: String]?, startMs: Double?, cache: [String: Any]?) in
+        player.load(uri: uri, headers: headers, startMs: startMs, cache: cache)
       }
 
       // Each of these returns at once: the player queues the work on its own

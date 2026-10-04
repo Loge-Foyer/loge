@@ -128,6 +128,8 @@ What runs today:
   or remove one. Stalker shows its MAC address, takes a Guide time zone, and
   shares one sign-in properly; another country's guide, written in UTC and
   taken for the portal's own clock, is put right by each channel's country.
+- Settings → App → Buffering: Off, Memory or Disk with a limit — a disk cache
+  in mpv, memory in the other engines (`docs/playback`).
 - Yattee's pictures from the addresses the server signs; artwork drawn again
   once its source is ready.
 - Apple TV, from the same code: `npm run tvos` turns `ios/` into the TV

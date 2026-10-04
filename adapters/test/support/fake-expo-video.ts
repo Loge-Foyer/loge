@@ -17,6 +17,7 @@ export class FakeVideoPlayer {
   status: 'idle' | 'loading' | 'readyToPlay' | 'error' = 'idle';
   isLive = false;
   timeUpdateEventInterval = 0;
+  bufferOptions: unknown = undefined;
   audioTrack: FakeTrack | null = null;
   subtitleTrack: FakeTrack | null = null;
   released = false;

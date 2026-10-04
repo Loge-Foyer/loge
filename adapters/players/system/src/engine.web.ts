@@ -1,5 +1,6 @@
 import {
   AppError,
+  bufferingFor,
   clampRate,
   createPlayerEvents,
   playbackFailed,
@@ -217,6 +218,8 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
         if (!HlsClass.isSupported()) throw fail(new AppError('INVALID_STATE', 'This browser cannot play HLS.'));
         const instance = new HlsClass({
           enableWorker: false,
+          // Off: ten seconds ahead rather than hls.js's thirty. Memory and Disk are its own; a page keeps nothing on disk.
+          ...(bufferingFor(context.preferences?.buffering, source).mode === 'off' ? { maxBufferLength: 10 } : {}),
           ...(startMs !== undefined && startMs > 0 ? { startPosition: startMs / 1000 } : {}),
           ...(headers
             ? {
@@ -247,7 +250,12 @@ export function createEngine(context: PlayerContext, host: WebEngineHost = page)
         if (!MpegtsClass.getFeatureList().mseLivePlayback) throw fail(new AppError('INVALID_STATE', 'This browser cannot play MPEG-TS.'));
         const instance = MpegtsClass.createPlayer(
           { type: 'mpegts', isLive: source.live, url: source.uri },
-          { enableWorker: false, ...(headers ? { headers: { ...headers } } : {}) },
+          {
+            enableWorker: false,
+            ...(headers ? { headers: { ...headers } } : {}),
+            // Off: each piece played as it arrives, with no stash to start from.
+            ...(bufferingFor(context.preferences?.buffering, source).mode === 'off' ? { enableStashBuffer: false } : {}),
+          },
         );
         transport = instance;
         instance.on(MpegtsClass.Events.ERROR, (type: string, detail: string, info?: { code?: number }) => onTransportError(MpegtsClass, type, detail, info));

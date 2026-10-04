@@ -175,6 +175,8 @@ it runs today, built with [Tamagui](https://tamagui.dev):
     wait for a real device there.
   - Each device chooses which player goes first, on each tab if you like.
     "Play with…" on a film or an episode picks one for it.
+  - How far ahead they read is the device's too: off, in memory, or on disk
+    up to a limit you set — mpv keeps it on disk, the others in memory.
 - **Watch status for sources that keep none** — IPTV films and series, and
   web video — is kept by the app, on the account, for every device. With a
   TMDB key, the German and the English copy of a film share one record.

@@ -96,6 +96,9 @@ internal object LogeMpvNative {
 
   external fun observeProperty(handle: Long, name: String, format: Int)
 
+  /** What the disk cache holds, in bytes, data mpv has pruned included; -1 where there is none. */
+  external fun cacheFileBytes(handle: Long): Double
+
   external fun attachSurface(handle: Long, surface: Surface)
 
   external fun detachSurface(handle: Long)

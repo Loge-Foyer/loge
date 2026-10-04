@@ -26,7 +26,8 @@ export type NativeEvents = {
 
 export declare class NativePlayer extends SharedObject<NativeEvents> {
   /** libVLC takes a user agent and a referrer, and no other header. */
-  load(uri: string, userAgent: string | null, referrer: string | null, startMs: number | null): Promise<void>;
+  /** `cachingMs`: how much it holds before it plays and keeps ahead after — libVLC's `network-caching`, in memory. */
+  load(uri: string, userAgent: string | null, referrer: string | null, startMs: number | null, cachingMs: number): Promise<void>;
   play(): void;
   pause(): void;
   /** Opens the stream anew and plays it from here: after its end, libVLC plays a stream again no other way. */

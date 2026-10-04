@@ -13,6 +13,8 @@ export const PROFILES: Readonly<Partial<Record<PlatformId, PlayerProfile>>> = {
   ios: {
     // It draws into an AVSampleBufferDisplayLayer, which the system can take.
     pictureInPicture: true,
+    // Its demuxer cache can live in a file in the app's caches (`cache-on-disk`).
+    buffersOnDisk: true,
     protocols: ['progressive', 'hls', 'dash', 'mpegts'],
     containers: ['mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi', 'ts', 'm2ts', 'mpegts', 'flv', 'ogg', 'wmv', 'asf', 'mpeg', 'mpg', 'vob', '3gp'],
     videoCodecs: ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg2video', 'mpeg4', 'msmpeg4v3', 'vc1', 'wmv3'],
@@ -26,6 +28,7 @@ export const PROFILES: Readonly<Partial<Record<PlatformId, PlayerProfile>>> = {
     maxHeight: 2160,
   },
   android: {
+    buffersOnDisk: true,
     protocols: ['progressive', 'hls', 'dash', 'mpegts'],
     containers: ['mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi', 'ts', 'm2ts', 'mpegts', 'flv', 'ogg', 'wmv', 'asf', 'mpeg', 'mpg', 'vob', '3gp'],
     videoCodecs: ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg2video', 'mpeg4', 'msmpeg4v3', 'vc1', 'wmv3'],

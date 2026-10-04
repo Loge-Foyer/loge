@@ -259,8 +259,13 @@ TV's sections.
   (Media, Videos or TV), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;
   the default profile is kept for when it is off), force landscape on
-  playback, and whether a title's buttons show their words beside their
-  symbols.
+  playback, whether a title's buttons show their words beside their
+  symbols, and **Buffering**: Off, Memory — the default — or Disk, where a
+  player here can keep what it reads ahead on storage. Disk adds its limit:
+  a slider on a phone, a step down and a step up on a TV, half a gigabyte to
+  eight and no more than half of what is free; its row says what it is
+  used for and names the players that keep it in memory instead
+  (`screens/settings/buffering.tsx`, `docs/playback`).
 - **Downloads** — Options, what to ask a source for when keeping a copy
   (`settings/downloads/options`); then Downloads, what this device keeps and
   what is still coming down. Options is hidden where nothing can be kept — a

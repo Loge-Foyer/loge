@@ -43,6 +43,15 @@ describe('the built-in player on a phone (expo-video)', () => {
   }
   const ready = (engine: FakeVideoPlayer) => engine.emit('statusChange', { status: 'readyToPlay' });
 
+  it('reads only a few seconds ahead with buffering off, and as AVPlayer and Media3 choose otherwise', async () => {
+    const off = createNativeEngine({ ...context, preferences: { softwareFallback: true, buffering: { mode: 'off', diskBytes: 0 } } });
+    await off.load({ source: source() });
+    expect(created.at(-1)?.bufferOptions).toEqual({ preferredForwardBufferDuration: 3, waitsToMinimizeStalling: false, minBufferForPlayback: 1 });
+    const { player, engine } = native();
+    await player.load({ source: source() });
+    expect(engine.bufferOptions).toBeUndefined();
+  });
+
   it('loads off the UI thread with the stream’s type and headers, and starts where asked once ready', async () => {
     const { player, engine, log } = native();
     await player.load({ source: source({ headersRef: headersRef('token') }), startMs: 90_000 });
@@ -193,7 +202,7 @@ describe('the built-in player on a phone (expo-video)', () => {
 });
 
 describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => {
-  function web(options: { nativeHls?: boolean; supported?: boolean; hlsFails?: boolean; mse?: boolean; mpegtsFails?: boolean } = {}) {
+  function web(options: { nativeHls?: boolean; supported?: boolean; hlsFails?: boolean; mse?: boolean; mpegtsFails?: boolean; bufferingOff?: boolean } = {}) {
     const video = new FakeVideoElement();
     video.nativeHls = options.nativeHls ?? false;
     const hls = fakeHls({ supported: options.supported ?? true });
@@ -209,7 +218,7 @@ describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => 
     // The page's own visibility, which is when a browser is asked for picture in picture.
     const watchers = new Set<() => void>();
     let hidden = false;
-    const player = createWebEngine(context, {
+    const player = createWebEngine(options.bufferingOff ? { ...context, preferences: { softwareFallback: true, buffering: { mode: 'off', diskBytes: 0 } } } : context, {
       createVideo: () => video as unknown as HTMLVideoElement,
       loadHls,
       loadMpegts,
@@ -224,6 +233,15 @@ describe('the built-in player in a browser (<video>, hls.js, mpegts.js)', () => 
     return { player, video, hls, transport, loadHls, loadMpegts, hide, watchers, log: record(player) };
   }
   const liveTs = (overrides: Partial<PlaybackSource> = {}) => source({ uri: 'https://portal/live.ts', protocol: 'mpegts', container: 'ts', live: true, ...overrides });
+
+  it('reads ten seconds ahead and keeps no stash with buffering off — a page keeps nothing on disk', async () => {
+    const hlsPage = web({ bufferingOff: true });
+    await hlsPage.player.load({ source: source() });
+    expect(hlsPage.hls.instances[0]?.config).toEqual({ enableWorker: false, maxBufferLength: 10 });
+    const tsPage = web({ bufferingOff: true });
+    await tsPage.player.load({ source: liveTs() });
+    expect(tsPage.transport.instances[0]?.config).toEqual({ enableWorker: false, enableStashBuffer: false });
+  });
 
   it('plays HLS through hls.js, without a worker, from where it is asked to start', async () => {
     const { player, video, hls, loadHls, log } = web();

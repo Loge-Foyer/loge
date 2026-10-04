@@ -19,6 +19,7 @@
 #include <atomic>
 #include <clocale>
 #include <cstdint>
+#include <cstring>
 
 extern "C" {
 
@@ -31,6 +32,32 @@ enum {
   LOGE_MPV_FORMAT_FLAG = 3,
   LOGE_MPV_FORMAT_INT64 = 4,
   LOGE_MPV_FORMAT_DOUBLE = 5,
+};
+
+// mpv_node, for the one property read whole: how much a disk cache holds.
+enum {
+  LOGE_MPV_FORMAT_NODE = 6,
+  LOGE_MPV_FORMAT_NODE_MAP = 8,
+};
+
+struct mpv_node_list;
+
+struct mpv_node {
+  union {
+    char *string;
+    int flag;
+    int64_t int64;
+    double double_;
+    struct mpv_node_list *list;
+    void *ba;
+  } u;
+  int format;
+};
+
+struct mpv_node_list {
+  int num;
+  struct mpv_node *values;
+  char **keys;
 };
 
 // mpv_event_id, of which this file acts on two.
@@ -65,6 +92,7 @@ int mpv_observe_property(mpv_handle *ctx, uint64_t reply_userdata, const char *n
 struct mpv_event *mpv_wait_event(mpv_handle *ctx, double timeout);
 void mpv_wakeup(mpv_handle *ctx);
 void mpv_free(void *data);
+void mpv_free_node_contents(struct mpv_node *node);
 
 // FFmpeg needs both to decode through MediaCodec. Weak: an engine built
 // without them decodes in software instead of failing to load.
@@ -335,5 +363,22 @@ JNIEXPORT void JNICALL Java_expo_modules_logempv_LogeMpvNative_detachSurface(JNI
     env->DeleteGlobalRef(self->surface);
     self->surface = nullptr;
   }
+}
+
+/** What a disk cache holds, in bytes, pruned data included: the one field of `demuxer-cache-state` read here. -1 where there is none. */
+JNIEXPORT jdouble JNICALL Java_expo_modules_logempv_LogeMpvNative_cacheFileBytes(JNIEnv *, jobject, jlong handle) {
+  Instance *self = of(handle);
+  if (self == nullptr || self->mpv == nullptr) return -1;
+  mpv_node state{};
+  if (mpv_get_property(self->mpv, "demuxer-cache-state", LOGE_MPV_FORMAT_NODE, &state) < 0) return -1;
+  double bytes = -1;
+  if (state.format == LOGE_MPV_FORMAT_NODE_MAP && state.u.list != nullptr) {
+    for (int index = 0; index < state.u.list->num; index++) {
+      const mpv_node &value = state.u.list->values[index];
+      if (std::strcmp(state.u.list->keys[index], "file-cache-bytes") == 0 && value.format == LOGE_MPV_FORMAT_INT64) bytes = static_cast<double>(value.u.int64);
+    }
+  }
+  mpv_free_node_contents(&state);
+  return bytes;
 }
 }

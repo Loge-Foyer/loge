@@ -73,6 +73,28 @@ describe('mpv on Android (libmpv)', () => {
     expect(engine.loads.at(-1)).toEqual({ uri: 'https://server/film.mkv', headers: null, startMs: null });
   });
 
+  it('reads ahead as the device asks: not at all, in memory, or on disk to a limit — never on disk for a channel or a file kept here', async () => {
+    const GB = 1024 ** 3;
+    const made = (mode: 'off' | 'memory' | 'disk') => {
+      const player = createEngine({ ...context, preferences: { softwareFallback: true, buffering: { mode, diskBytes: GB } } });
+      const engine = createdMpv.at(-1);
+      if (!engine) throw new Error('no engine');
+      return { player, engine };
+    };
+    const off = made('off');
+    await off.player.load({ source: source() });
+    expect(off.engine.caches).toEqual([{ mode: 'off' }]);
+    const disk = made('disk');
+    await disk.player.load({ source: source() });
+    await disk.player.load({ source: source({ uri: 'http://portal/live/101.ts', protocol: 'mpegts', container: 'ts', live: true }) });
+    await disk.player.load({ source: source({ uri: 'file:///kept/film.mkv' }) });
+    expect(disk.engine.caches).toEqual([{ mode: 'disk', limitBytes: GB }, { mode: 'memory' }, { mode: 'memory' }]);
+    // Nothing chosen: mpv's own cache, as before there was a choice.
+    const plain = mpv();
+    await plain.player.load({ source: source() });
+    expect(plain.engine.caches).toEqual([{ mode: 'memory' }]);
+  });
+
   it('follows mpv’s states, telling each once', async () => {
     const { player, engine, states } = mpv();
     await player.load({ source: source() });
@@ -182,6 +204,11 @@ describe('mpv on Android (libmpv)', () => {
     expect(engineOf(player)).toBeUndefined();
     expect(() => player.play()).toThrow(expect.objectContaining({ code: 'INVALID_STATE' }));
     await expect(player.load({ source: source() })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  });
+
+  it('says it can keep what it reads ahead on disk, on both phones', () => {
+    expect(PROFILES.ios?.buffersOnDisk).toBe(true);
+    expect(PROFILES.android?.buffersOnDisk).toBe(true);
   });
 
   it('plays what the built-in player cannot: Matroska with DTS or TrueHD, AV1, raw MPEG-TS', () => {

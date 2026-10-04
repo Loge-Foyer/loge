@@ -414,6 +414,11 @@ design; these are the rules:
   anywhere else, and never master it a second time.
 - **The null engine fails loudly.** A silent no-op turns "playback not
   implemented" into a mystery bug.
+- **Reading ahead is the device's, and decided once** — Settings → App →
+  Buffering, `PlayerPreferences.buffering`, and `bufferingFor` in `@loge/api`
+  per stream: never on disk for a live stream, which would only grow, nor for
+  a file on the device. An engine claims disk with `buffersOnDisk` in its
+  profile and nothing else; Settings offers Disk only where one here does.
 - **A controller is made inside an effect, never kept across one**, and a
   descriptor lives in that screen's state, never in the query cache
   (`hooks/use-playback.ts`). Fast Refresh and strict mode run effects twice:
@@ -798,6 +803,8 @@ Everything above describes the target; what runs today:
   Another country's guide, written in UTC and taken for the portal's own
   clock, is put right by each channel's country — its guide id, group or
   name (`countryOf`) — with no setting to touch.
+- **Buffering** in Settings → App: Off, Memory or Disk with its limit, which
+  mpv honours with a disk cache and the other engines in memory.
 - **Yattee** pictures come from the addresses the server signs for them.
 - **Apple TV:** the app builds, installs and runs on the tvOS 27 simulator
   (`npm run tvos`), driven by the remote: every control focusable and

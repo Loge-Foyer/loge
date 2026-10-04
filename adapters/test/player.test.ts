@@ -1,5 +1,6 @@
 import {
   AppError,
+  bufferingFor,
   canPlay,
   choosePlayer,
   createPlayerEvents,
@@ -133,5 +134,23 @@ describe('createPlayerEvents', () => {
     events.clear();
     events.setState('idle');
     expect(heard).toHaveLength(3);
+  });
+});
+
+describe('reading ahead', () => {
+  const GB = 1024 ** 3;
+  const film = { uri: 'https://server/film.mkv', live: false };
+
+  it('keeps it on disk only where it is worth it: never for a live stream, which would only grow, nor for a file already here', () => {
+    expect(bufferingFor({ mode: 'disk', diskBytes: GB }, film)).toEqual({ mode: 'disk', diskBytes: GB });
+    expect(bufferingFor({ mode: 'disk', diskBytes: GB }, { uri: 'http://portal/live.ts', live: true })).toEqual({ mode: 'memory' });
+    expect(bufferingFor({ mode: 'disk', diskBytes: GB }, { uri: 'file:///kept/film.mkv', live: false })).toEqual({ mode: 'memory' });
+    expect(bufferingFor({ mode: 'disk', diskBytes: 0 }, film)).toEqual({ mode: 'memory' });
+  });
+
+  it('reads in memory where nothing was chosen, and as little as playing needs with it off', () => {
+    expect(bufferingFor(undefined, film)).toEqual({ mode: 'memory' });
+    expect(bufferingFor({ mode: 'memory', diskBytes: GB }, film)).toEqual({ mode: 'memory' });
+    expect(bufferingFor({ mode: 'off', diskBytes: GB }, { ...film, live: true })).toEqual({ mode: 'off' });
   });
 });

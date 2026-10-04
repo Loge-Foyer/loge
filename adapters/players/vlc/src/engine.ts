@@ -1,16 +1,29 @@
 import {
   AppError,
+  bufferingFor,
   clampRate,
   createPlayerEvents,
   playbackFailed,
   playerReleased,
   type AudioTrack,
   type MediaPlayer,
+  type PlaybackSource,
   type PlayerContext,
   type SubtitleTrack,
 } from '@loge/api';
 
 import { nativeModule, type NativePlayer, type NativeTrack } from './native';
+
+/**
+ * How much libVLC holds before it plays, and keeps ahead after: 1.5 s, its
+ * figure until now, rides out a modest network; off starts quicker and stalls
+ * first. It keeps it in memory — libVLC has no disk cache — so Disk is this.
+ */
+const CACHING_MS = { off: 300, memory: 1_500 } as const;
+
+function cachingFor(context: PlayerContext, source: PlaybackSource): number {
+  return bufferingFor(context.preferences?.buffering, source).mode === 'off' ? CACHING_MS.off : CACHING_MS.memory;
+}
 
 /** The libVLC player behind each controller. This package's view draws it; nothing else touches it. */
 const engines = new WeakMap<MediaPlayer, NativePlayer>();
@@ -152,7 +165,7 @@ export function createEngine(context: PlayerContext): MediaPlayer {
         throw failure;
       }
       try {
-        await vlc.load(source.uri, userAgent ?? null, referrer ?? null, startMs !== undefined && startMs > 0 ? startMs : null);
+        await vlc.load(source.uri, userAgent ?? null, referrer ?? null, startMs !== undefined && startMs > 0 ? startMs : null, cachingFor(context, source));
       } catch (error) {
         const failure = playbackFailed(undefined, error);
         events.fail(failure);

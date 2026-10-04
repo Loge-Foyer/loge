@@ -75,6 +75,33 @@ export interface PlayerPreferences {
    * none; off says so loudly instead of quietly flattening the battery.
    */
   readonly softwareFallback: boolean;
+  /** How far ahead to read, and where to keep it. Absent: memory, each engine's own read-ahead. */
+  readonly buffering?: PlayerBuffering;
+}
+
+/**
+ * How far ahead an engine reads, and where it keeps what it read — the
+ * device's Buffering. `off` reads no further than playing needs; `memory`
+ * is the engine's own read-ahead; `disk` keeps it on the device's storage,
+ * up to `diskBytes`, where an engine can (`PlayerProfile.buffersOnDisk`) and
+ * where it is worth it: never for a live stream, which would only grow, nor
+ * for a file already on the device. Anything else reads ahead in memory.
+ */
+export interface PlayerBuffering {
+  readonly mode: BufferingMode;
+  readonly diskBytes: number;
+}
+
+export type BufferingMode = 'off' | 'memory' | 'disk';
+
+/** What an engine does for one stream, the device's Buffering decided for it: disk only where it is worth it. */
+export function bufferingFor(
+  buffering: PlayerBuffering | undefined,
+  source: { readonly uri: string; readonly live: boolean },
+): { readonly mode: 'off' | 'memory' } | { readonly mode: 'disk'; readonly diskBytes: number } {
+  if (buffering?.mode === 'off') return { mode: 'off' };
+  if (buffering?.mode !== 'disk' || buffering.diskBytes <= 0 || source.live || /^file:/i.test(source.uri)) return { mode: 'memory' };
+  return { mode: 'disk', diskBytes: buffering.diskBytes };
 }
 
 export interface PlayerContext {

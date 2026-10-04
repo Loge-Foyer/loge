@@ -18,8 +18,8 @@ class LogeVlcModule : Module() {
         runBlocking(appContext.mainQueue.coroutineContext) { LogeVlcPlayer(context, appContext) }
       }
 
-      AsyncFunction("load") { player: LogeVlcPlayer, uri: String, userAgent: String?, referrer: String?, startMs: Double? ->
-        player.load(uri, userAgent, referrer, startMs)
+      AsyncFunction("load") { player: LogeVlcPlayer, uri: String, userAgent: String?, referrer: String?, startMs: Double?, cachingMs: Double? ->
+        player.load(uri, userAgent, referrer, startMs, cachingMs)
       }.runOnQueue(Queues.MAIN)
 
       Function("play") { player: LogeVlcPlayer ->

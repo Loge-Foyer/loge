@@ -131,6 +131,12 @@ export interface PlayerProfile {
    * arranges it for all of them at once.
    */
   readonly pictureInPicture?: boolean;
+  /**
+   * Whether this engine can keep what it reads ahead on the device's storage
+   * rather than in memory, where the device's Buffering asks it to. One that
+   * cannot reads ahead in memory instead.
+   */
+  readonly buffersOnDisk?: boolean;
 }
 
 /** `getPlaybackDescriptor`'s question: this item, for this engine. */

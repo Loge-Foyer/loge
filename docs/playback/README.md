@@ -211,6 +211,35 @@ here, when there is more than one. The one picked is asked for by the source
 with its own profile, and plays or nothing does — never another in its place.
 The next episode keeps it.
 
+## Reading ahead
+
+How far ahead the player reads, and where it keeps it, is the device's:
+Settings → App → Buffering, beside the rest of how the app behaves. It
+travels to every engine as `PlayerPreferences.buffering` (`@loge/api`), and
+`bufferingFor` decides it per stream, the same way for all of them.
+
+- **Off** reads no further than playing needs: the quickest start, and the
+  first to stall on a weak network.
+- **Memory**, the default, is each engine's own read-ahead, as before there
+  was a choice.
+- **Disk** keeps it on this device's storage, up to a limit — half a gigabyte
+  to eight, one by default, never more than half of what is free — for a
+  network that comes and goes. Only where it is worth it: never for a live
+  stream, which would only grow, nor for a file already on the device. An
+  engine says it can (`PlayerProfile.buffersOnDisk`), and Settings offers Disk
+  only where one here does, naming those that keep it in memory instead.
+
+| Engine | Off | Memory | Disk |
+| --- | --- | --- | --- |
+| mpv | `cache=no` | `cache=auto` — its own | `cache-on-disk` in the app's caches, its file closed to new data at the limit (`demuxer-cache-state`'s `file-cache-bytes`, read once a second); memory when storage is short |
+| VLC | `:network-caching=300` | 1500 ms, its figure until now | as Memory: libVLC has no disk cache |
+| Built-in, phones | `bufferOptions`: 3 s ahead, played as soon as it is in | AVPlayer's and Media3's own | as Memory: expo-video's cache keeps a file for replaying, keyed by its whole address, which a per-play token never repeats |
+| Built-in, browser | hls.js 10 s ahead, mpegts.js without its stash | their own | as Memory: a page keeps nothing on disk |
+
+mpv's disk cache only grows: it frees nothing in its file until the file is
+closed, and the file goes with the player. That is why its limit closes the
+file to new data rather than trimming it, and mpv carries on in memory.
+
 ## Choosing a player
 
 `choosePlayer(sources, candidates, preferred?)` in `@loge/api` decides, and it is

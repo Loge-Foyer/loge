@@ -99,7 +99,10 @@ export function usePlayer(plan: PlaybackPlan | undefined, connectionId: Connecti
   const { data: settings } = useAppSettings();
   // Read as the engine is made, so a change takes effect the next time
   // something plays rather than halfway through a film.
-  const preferences = useEffectEvent(() => ({ softwareFallback: (settings ?? APP_DEFAULTS).softwareFallback }));
+  const preferences = useEffectEvent(() => {
+    const { softwareFallback, buffering, bufferDiskBytes } = settings ?? APP_DEFAULTS;
+    return { softwareFallback, buffering: { mode: buffering, diskBytes: bufferDiskBytes } };
+  });
 
   useEffect(() => {
     if (plan?.kind !== 'play') return;

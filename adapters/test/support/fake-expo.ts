@@ -37,6 +37,8 @@ export interface FakeLoad {
 
 export class FakeVlcPlayer extends SharedObject {
   readonly loads: FakeLoad[] = [];
+  /** What each load asked libVLC to hold, in milliseconds. */
+  readonly cachings: number[] = [];
   readonly calls: string[] = [];
   audioTrack: number | undefined;
   subtitleTrack: number | undefined;
@@ -46,8 +48,9 @@ export class FakeVlcPlayer extends SharedObject {
     created.push(this);
   }
 
-  async load(uri: string, userAgent: string | null, referrer: string | null, startMs: number | null) {
+  async load(uri: string, userAgent: string | null, referrer: string | null, startMs: number | null, cachingMs: number) {
     this.loads.push({ uri, userAgent, referrer, startMs });
+    this.cachings.push(cachingMs);
   }
 
   play() {
@@ -108,6 +111,8 @@ export interface FakeMpvLoad {
 /** mpv's module: one core per controller, taking whatever headers a stream needs. */
 export class FakeMpvPlayer extends SharedObject {
   readonly loads: FakeMpvLoad[] = [];
+  /** How far ahead each load asked mpv to read, and where. */
+  readonly caches: unknown[] = [];
   readonly calls: string[] = [];
   audioTrack: number | undefined;
   subtitleTrack: number | undefined;
@@ -117,8 +122,9 @@ export class FakeMpvPlayer extends SharedObject {
     createdMpv.push(this);
   }
 
-  async load(uri: string, headers: Readonly<Record<string, string>> | null, startMs: number | null) {
+  async load(uri: string, headers: Readonly<Record<string, string>> | null, startMs: number | null, cache: unknown) {
     this.loads.push({ uri, headers, startMs });
+    this.caches.push(cache);
   }
 
   play() {

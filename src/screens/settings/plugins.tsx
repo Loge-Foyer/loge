@@ -8,7 +8,7 @@ import { Paragraph, SizableText, XStack, YStack } from 'tamagui';
 import { Button } from '@/components/button';
 import { AppSwitch } from '@/components/app-switch';
 import { Chip, ChipRow } from '@/components/chip';
-import { CATEGORY_LABELS, CONTENT_KIND_LABELS, TAB_LABELS } from '@/components/labels';
+import { CATEGORY_LABELS, CONTENT_KIND_LABELS, listed, TAB_LABELS } from '@/components/labels';
 import { isHandheld, isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { ChoiceRow, SectionTitle, SettingsRow, SettingsSection } from '@/components/settings-list';
@@ -372,8 +372,3 @@ function PlayerControlsSection() {
   );
 }
 
-/** "mpv", or "mpv and the built-in player". */
-function listed(names: readonly string[]): string {
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}

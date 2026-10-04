@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import expo.modules.kotlin.AppContext
+import java.io.File
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.sharedobjects.SharedObject
 import java.util.concurrent.Executors
@@ -50,6 +51,10 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
   private var pausedForSurface = false
   // Says so when a file opened but never played a frame.
   private var stalled: Runnable? = null
+  // Where a disk cache is written, and how much it may hold; 0 while none is.
+  private val cacheDir = File(context.cacheDir, "mpv")
+  @Volatile private var diskLimit = 0L
+  private var cacheWatch: Runnable? = null
 
   init {
     LogeMpvNative.register(mpv, this)
@@ -114,10 +119,13 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
 
   // ---- what JavaScript asks for ----
 
-  fun load(uri: String, headers: Map<String, String>?, startMs: Double?) {
+  fun load(uri: String, headers: Map<String, String>?, startMs: Double?, cache: Map<String, Any>?) {
     state("loading")
     // A new file is counted afresh, once it has loaded.
-    main.post { stalled?.let { main.removeCallbacks(it) } }
+    main.post {
+      stalled?.let { main.removeCallbacks(it) }
+      cacheWatch?.let { main.removeCallbacks(it) }
+    }
     // Everything this player knows about a file is kept on the one thread
     // that talks to mpv, and so is set there.
     onMpv {
@@ -128,6 +136,7 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
       durationMs = 0
       lastSecond = -1
       applyHeaders(headers)
+      applyCache(cache)
       // `start` applies to the next file, and is set on every load so the one
       // before cannot linger.
       LogeMpvNative.setPropertyString(mpv, "start", if (startMs != null && startMs > 0) "+${startMs / 1000.0}" else "none")
@@ -325,6 +334,48 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
     main.postDelayed(alarm, 10_000)
   }
 
+  /**
+   * How far ahead mpv reads for this file, and where it keeps it — the
+   * device's Buffering, decided per file in TypeScript (`src/engine.ts`).
+   * `off` reads no further than playing needs; `memory` is mpv's own cache;
+   * `disk` writes it to a file in the app's caches, where it may outgrow
+   * memory. That file only grows — mpv frees nothing in it until the file is
+   * closed — so at its limit it is closed to new data, and mpv carries on in
+   * memory. With too little room for the limit, memory from the start.
+   */
+  private fun applyCache(cache: Map<String, Any>?) {
+    val mode = cache?.get("mode") as? String
+    val limit = (cache?.get("limitBytes") as? Number)?.toLong() ?: 0L
+    diskLimit = 0
+    val disk = mode == "disk" && limit > 0 && (cacheDir.isDirectory || cacheDir.mkdirs()) && cacheDir.usableSpace > limit + KEEP_FREE_BYTES
+    LogeMpvNative.setPropertyString(mpv, "cache", if (mode == "off") "no" else if (disk) "yes" else "auto")
+    LogeMpvNative.setPropertyString(mpv, "cache-on-disk", if (disk) "yes" else "no")
+    if (!disk) return
+    LogeMpvNative.setPropertyString(mpv, "demuxer-cache-dir", cacheDir.path)
+    diskLimit = limit
+    main.post { watchCache() }
+  }
+
+  /** Once a second while a disk cache fills: at its limit, no more is written to it. */
+  private fun watchCache() {
+    cacheWatch?.let { main.removeCallbacks(it) }
+    val check = object : Runnable {
+      override fun run() {
+        if (released || diskLimit <= 0) return
+        onMpv {
+          val limit = diskLimit
+          if (limit > 0 && LogeMpvNative.cacheFileBytes(mpv) >= limit) {
+            diskLimit = 0
+            LogeMpvNative.setPropertyString(mpv, "cache-on-disk", "no")
+          }
+        }
+        main.postDelayed(this, 1_000)
+      }
+    }
+    cacheWatch = check
+    main.postDelayed(check, 1_000)
+  }
+
   private fun emitOnMain(name: String, payload: Map<String, Any>) {
     main.post { if (!released) emit(name, payload) }
   }
@@ -363,6 +414,7 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
     released = true
     surface = null
     stalled?.let { main.removeCallbacks(it) }
+    cacheWatch?.let { main.removeCallbacks(it) }
     LogeMpvNative.forget(mpv)
     // Behind whatever was already asked of mpv, so nothing is in the core when it goes.
     work.execute { LogeMpvNative.destroy(mpv) }
@@ -374,5 +426,10 @@ class LogeMpvPlayer(context: Context, appContext: AppContext) : SharedObject(app
   override fun sharedObjectDidRelease() {
     super.sharedObjectDidRelease()
     GlobalScope.launch(Dispatchers.Main) { releasePlayer() }
+  }
+
+  private companion object {
+    // Room the device keeps for itself beside a disk cache: past this, memory instead.
+    const val KEEP_FREE_BYTES = 1L shl 30
   }
 }

@@ -18,8 +18,8 @@ class LogeMpvModule : Module() {
         runBlocking(appContext.mainQueue.coroutineContext) { LogeMpvPlayer(context, appContext) }
       }
 
-      AsyncFunction("load") { player: LogeMpvPlayer, uri: String, headers: Map<String, String>?, startMs: Double? ->
-        player.load(uri, headers, startMs)
+      AsyncFunction("load") { player: LogeMpvPlayer, uri: String, headers: Map<String, String>?, startMs: Double?, cache: Map<String, Any>? ->
+        player.load(uri, headers, startMs, cache)
       }.runOnQueue(Queues.MAIN)
 
       Function("play") { player: LogeMpvPlayer ->

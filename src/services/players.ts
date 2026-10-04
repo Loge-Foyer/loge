@@ -19,6 +19,8 @@ export interface PlayerSummary {
    * the engine's own, as its profile states.
    */
   readonly canShrink: boolean;
+  /** It keeps what it reads ahead on this device's storage, where Buffering asks for Disk; one that cannot keeps it in memory. */
+  readonly buffersOnDisk: boolean;
 }
 
 /**
@@ -119,6 +121,7 @@ export function createPlayerService(deps: {
         firstOn: off.has(manifest.id) ? [] : CONTENT_TABS.filter((tab) => tabs[tab] === manifest.id),
         playsHere: manifest.player?.profiles[platform] !== undefined,
         canShrink: (deps.shrinksAnything?.() ?? false) || manifest.player?.profiles[platform]?.pictureInPicture === true,
+        buffersOnDisk: manifest.player?.profiles[platform]?.buffersOnDisk === true,
       }));
     },
     choosing: async (tab) => {

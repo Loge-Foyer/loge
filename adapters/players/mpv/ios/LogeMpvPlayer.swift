@@ -53,6 +53,9 @@ public final class LogeMpvPlayer: SharedObject {
   private var lastSecond: Int64 = -1
   private var released = false
   private var stalled: DispatchWorkItem?
+  // How much a disk cache may hold, while one is written; and the check that stops it there. On `work`.
+  private var diskLimit: Int64 = 0
+  private var cacheWatch: DispatchSourceTimer?
 
   public override init() {
     super.init()
@@ -331,7 +334,7 @@ public final class LogeMpvPlayer: SharedObject {
 
   // MARK: - What JavaScript asks for
 
-  func load(uri: String, headers: [String: String]?, startMs: Double?) {
+  func load(uri: String, headers: [String: String]?, startMs: Double?, cache: [String: Any]?) {
     state("loading")
     // A new file is counted afresh, once it has loaded.
     cancelStall()
@@ -346,6 +349,7 @@ public final class LogeMpvPlayer: SharedObject {
       self.durationMs = 0
       self.lastSecond = -1
       self.applyHeaders(headers)
+      self.applyCache(cache)
       // `start` applies to the next file, and is set on every load so the one
       // before cannot linger.
       self.setString("start", startMs != nil && startMs! > 0 ? "+\(startMs! / 1000.0)" : "none")
@@ -465,6 +469,76 @@ public final class LogeMpvPlayer: SharedObject {
     setString("http-header-fields", fields.joined(separator: ","))
   }
 
+  // MARK: - Reading ahead
+
+  /// Room the device keeps for itself beside a disk cache: past this, memory instead.
+  private static let keepFreeBytes: Int64 = 1 << 30
+
+  /**
+   How far ahead mpv reads for this file, and where it keeps it — the device's
+   Buffering, decided per file in TypeScript (`src/engine.ts`). `off` reads no
+   further than playing needs; `memory` is mpv's own cache; `disk` writes it
+   to a file in the app's caches, where it may outgrow memory. That file only
+   grows — mpv frees nothing in it until the file is closed — so at its limit
+   it is closed to new data, and mpv carries on in memory. With too little
+   room for the limit, memory from the start. As `LogeMpvPlayer.kt` does.
+   */
+  private func applyCache(_ cache: [String: Any]?) {
+    let mode = cache?["mode"] as? String
+    let limit = (cache?["limitBytes"] as? NSNumber)?.int64Value ?? 0
+    stopCacheWatch()
+    diskLimit = 0
+    var directory: URL?
+    if mode == "disk", limit > 0, let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+      let folder = caches.appendingPathComponent("mpv", isDirectory: true)
+      try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      let free = Int64((try? folder.resourceValues(forKeys: [.volumeAvailableCapacityKey]).volumeAvailableCapacity) ?? 0)
+      if free > limit + Self.keepFreeBytes { directory = folder }
+    }
+    setString("cache", mode == "off" ? "no" : directory != nil ? "yes" : "auto")
+    setString("cache-on-disk", directory != nil ? "yes" : "no")
+    guard let directory else { return }
+    setString("demuxer-cache-dir", directory.path)
+    diskLimit = limit
+    startCacheWatch()
+  }
+
+  /// Once a second while a disk cache fills: at its limit, no more is written to it.
+  private func startCacheWatch() {
+    let timer = DispatchSource.makeTimerSource(queue: work)
+    timer.schedule(deadline: .now() + 1, repeating: 1)
+    timer.setEventHandler { [weak self] in
+      guard let self, !self.released, self.diskLimit > 0 else { return }
+      if self.cacheFileBytes() >= self.diskLimit {
+        self.diskLimit = 0
+        self.setString("cache-on-disk", "no")
+        self.stopCacheWatch()
+      }
+    }
+    cacheWatch = timer
+    timer.resume()
+  }
+
+  private func stopCacheWatch() {
+    cacheWatch?.cancel()
+    cacheWatch = nil
+  }
+
+  /// What the disk cache holds, data mpv has pruned included: the one field of `demuxer-cache-state` read here. -1 where there is none.
+  private func cacheFileBytes() -> Int64 {
+    guard let mpv else { return -1 }
+    var state = mpv_node()
+    guard mpv_get_property(mpv, "demuxer-cache-state", MPV_FORMAT_NODE, &state) >= 0 else { return -1 }
+    defer { mpv_free_node_contents(&state) }
+    guard state.format == MPV_FORMAT_NODE_MAP, let list = state.u.list?.pointee, let keys = list.keys, let values = list.values else { return -1 }
+    for index in 0..<Int(list.num) {
+      guard let key = keys[index], String(cString: key) == "file-cache-bytes" else { continue }
+      let value = values[index]
+      if value.format == MPV_FORMAT_INT64 { return value.u.int64 }
+    }
+    return -1
+  }
+
   // MARK: - Stalling, and the end
 
   /**
@@ -499,6 +573,7 @@ public final class LogeMpvPlayer: SharedObject {
     if released { return }
     released = true
     cancelStall()
+    work.async { [weak self] in self?.stopCacheWatch() }
     // A released player's picture is never the system's to take: armed and
     // left in place, the controller shrank an empty layer the next time
     // anyone left the app.

@@ -65,6 +65,15 @@ What it tells, as `PlayerEvent`s:
   advise. A browser that will not start without a tap leaves it paused, not
   failed. A released player refuses everything.
 
+## Reading ahead
+
+With the device's Buffering off, expo-video's `bufferOptions` asks for three
+seconds ahead, played as soon as they are in; Memory and Disk leave AVPlayer
+and Media3 their own. expo-video's `useCaching` is not a disk read-ahead: it
+keeps a file for replaying, keyed by its whole address, which a stream's
+per-play token never repeats. In a browser, Off reads ten seconds ahead in
+hls.js and keeps no stash in mpegts.js.
+
 ## Dependencies
 
 `@loge/api`, `@loge/player-kit`, React, React Native, expo-video, hls.js and

@@ -36,6 +36,7 @@ import { APP_DEFAULTS } from '@/services/app-settings';
 import { APPEARANCES, BUTTON_LABELS, type AppearanceSetting, type ButtonLabels } from '@/services/ports';
 import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
+import { BufferingRows } from './buffering';
 import { downloadOptionsSummary } from './download-options';
 import { categoryHref } from './plugin-route';
 
@@ -216,6 +217,7 @@ export function SettingsScreen() {
           disabled={appSettings.data === undefined || set.isPending}
           onChoose={(option) => set.mutate({ buttonLabels: option })}
         />
+        <BufferingRows />
       </SettingsSection>
 
       <SettingsSection title="Downloads" footer="What this device keeps to watch with no network at all.">

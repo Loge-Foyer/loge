@@ -80,6 +80,14 @@ What it tells, as `PlayerEvent`s, through `@loge/api`'s `createPlayerEvents`:
   stream that needs a header other than a user agent or a referrer is refused
   loudly: libVLC cannot send one.
 
+## Reading ahead
+
+The device's Buffering reaches each media as `:network-caching` — how much
+libVLC holds before it plays and keeps ahead after: 300 ms with Buffering
+off, and its own 1500 ms otherwise. libVLC has no disk cache, so Disk is
+Memory here, and its profile does not claim `buffersOnDisk`; Settings names it
+among the players that keep it in memory.
+
 ## Dependencies
 
 `@loge/api`, `@loge/player-kit`, React, React Native and `expo`, all peers: the

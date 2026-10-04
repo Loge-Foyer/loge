@@ -79,6 +79,28 @@ it, cannot reach the device log. Everything in `src/` is shared between them.
 - **`src/view.tsx`** — the `PlayerView`, which draws the controller's core and
   nothing else. The controls are the app's.
 
+## Reading ahead
+
+The device's Buffering (`PlayerPreferences.buffering`, decided per stream by
+`bufferingFor`) reaches the native `load` as a cache spec, set before each
+`loadfile` on both platforms:
+
+- **Off** — `cache=no`: no further than playing needs.
+- **Memory** — `cache=auto`, mpv's own cache, as before there was a choice.
+- **Disk** — `cache=yes` and `cache-on-disk=yes`, with `demuxer-cache-dir` in
+  the app's caches, for a film or an episode; a live stream or a file on the
+  device reads ahead in memory instead. The profile says so
+  (`buffersOnDisk`) on iOS and Android.
+  - mpv's cache file only grows — it frees nothing in it until the file is
+    closed — and `demuxer-max-bytes` applies to its index only. So once a
+    second the player reads `file-cache-bytes` out of `demuxer-cache-state`
+    (a node, read whole: the JNI's `cacheFileBytes`, `mpv_node` in Swift)
+    and, at the limit, turns `cache-on-disk` off: no more is written to it,
+    and mpv carries on in memory until the file closes with the player.
+  - With less free than the limit and a gigabyte to spare, it reads ahead in
+    memory from the start. The file is unlinked as soon as it is made
+    (mpv's default), so a crash leaves nothing behind.
+
 ## Software decoding on Android, for now
 
 On Android `hwdec` is `no`. Android's own decoder takes this project's emulator 1080p

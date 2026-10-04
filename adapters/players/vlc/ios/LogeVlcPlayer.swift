@@ -27,6 +27,7 @@ public final class LogeVlcPlayer: SharedObject {
   private var uri: String?
   private var userAgent: String?
   private var referrer: String?
+  private var cachingMs: Double?
   private var length: Int64 = 0
   private var lastSecond: Int64 = -1
   private var released = false
@@ -125,10 +126,11 @@ public final class LogeVlcPlayer: SharedObject {
 
   // MARK: - Commands, all on the main thread
 
-  func load(uri: String, userAgent: String?, referrer: String?, startMs: Double?) {
+  func load(uri: String, userAgent: String?, referrer: String?, startMs: Double?, cachingMs: Double?) {
     self.uri = uri
     self.userAgent = userAgent
     self.referrer = referrer
+    self.cachingMs = cachingMs
     // Without a category, playback is silenced by the ringer switch. Android
     // needs no equivalent.
     try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -152,6 +154,8 @@ public final class LogeVlcPlayer: SharedObject {
     if let userAgent { media.addOption(":http-user-agent=\(userAgent)") }
     if let referrer { media.addOption(":http-referrer=\(referrer)") }
     if startMs > 0 { media.addOption(":start-time=\(startMs / 1000.0)") }
+    // How much it holds before it plays, and keeps ahead after: the device's Buffering, in memory — libVLC has no disk cache.
+    if let cachingMs { media.addOption(":network-caching=\(Int(cachingMs))") }
     length = 0
     lastSecond = -1
     vlc.media = media

@@ -1,5 +1,6 @@
 import {
   AppError,
+  bufferingFor,
   clampRate,
   createPlayerEvents,
   playbackFailed,
@@ -14,10 +15,19 @@ import {
 import {
   createVideoPlayer,
   type AudioTrack as EngineAudioTrack,
+  type BufferOptions,
   type ContentType,
   type SubtitleTrack as EngineSubtitleTrack,
   type VideoPlayer,
 } from 'expo-video';
+
+/**
+ * The device's Buffering at Off: a few seconds ahead, played as soon as they
+ * are in. Memory is the engine's own; so is Disk — expo-video's cache keeps a
+ * file for replaying, keyed by its whole address, which a stream's per-play
+ * token never repeats.
+ */
+const NO_READ_AHEAD: BufferOptions = { preferredForwardBufferDuration: 3, waitsToMinimizeStalling: false, minBufferForPlayback: 1 };
 
 /** The expo-video player behind each controller. This package's view draws it; nothing else touches it. */
 const engines = new WeakMap<MediaPlayer, VideoPlayer>();
@@ -191,6 +201,7 @@ export function createEngine(context: PlayerContext): MediaPlayer {
       subtitles = [];
       toldTracks = '';
       events.setState('loading');
+      if (bufferingFor(context.preferences?.buffering, source).mode === 'off') video.bufferOptions = NO_READ_AHEAD;
       try {
         // Off the UI thread: `replace` loads the asset synchronously on iOS.
         await video.replaceAsync({ uri: source.uri, contentType: CONTENT_TYPES[source.protocol], ...(headers ? { headers: { ...headers } } : {}) });
