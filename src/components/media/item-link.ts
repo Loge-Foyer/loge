@@ -36,6 +36,26 @@ export function itemHref(item: MediaItem): Href {
   return keyHref(item.key);
 }
 
+/**
+ * A title's own page on Media — a sheet on a phone, a page on a TV — where
+ * Media's own cards open. A season opens its show, with that season chosen.
+ * Anything else opens on the ordinary page, as everywhere else in the app.
+ */
+export function titleHref(item: MediaItem): Href {
+  if (item.type === 'season') {
+    return {
+      pathname: '/title/[connectionId]/[itemId]',
+      params: { connectionId: item.show.connectionId, itemId: routeId(item.show.externalId), season: routeId(item.key.externalId) },
+    };
+  }
+  return titleKeyHref(item.key);
+}
+
+/** The Media page of whatever a key names. */
+export function titleKeyHref(key: GlobalMediaKey): Href {
+  return { pathname: '/title/[connectionId]/[itemId]', params: { connectionId: key.connectionId, itemId: routeId(key.externalId) } };
+}
+
 /** The player, for a film or an episode: from `startMs` when resuming, with one player when "Play with…" chose it. */
 export function playHref(key: GlobalMediaKey, options: { readonly startMs?: number; readonly player?: PluginId } = {}): Href {
   return {

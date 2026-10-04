@@ -1,7 +1,7 @@
 import { connectionId } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
-import { fromRouteId, keyHref, routeId } from '@/components/media/item-link';
+import { fromRouteId, keyHref, routeId, titleHref, titleKeyHref } from '@/components/media/item-link';
 
 // What expo-router does to a param: `resolveHref` encodes it once, then the
 // path or query is decoded when it is parsed, and `useLocalSearchParams`
@@ -45,5 +45,39 @@ describe('an adapter id in a route', () => {
       pathname: '/item/[connectionId]/[itemId]',
       params: { connectionId: 'c1', itemId: 'show:s:1~253A1' },
     });
+  });
+});
+
+describe('a title’s page on Media', () => {
+  const c1 = connectionId('c1');
+
+  it('carries the escaped id, as an item link does', () => {
+    expect(titleKeyHref({ connectionId: c1, externalId: 'show:s:1%3A1' })).toEqual({
+      pathname: '/title/[connectionId]/[itemId]',
+      params: { connectionId: 'c1', itemId: 'show:s:1~253A1' },
+    });
+  });
+
+  it('opens a season as its show, with that season chosen', () => {
+    expect(
+      titleHref({
+        type: 'season',
+        key: { connectionId: c1, externalId: 'season:v:7%3A7:1' },
+        title: 'Season 1',
+        show: { connectionId: c1, externalId: 'show:v:7%3A7' },
+        ratings: {},
+        genres: [],
+        images: {},
+      }),
+    ).toEqual({
+      pathname: '/title/[connectionId]/[itemId]',
+      params: { connectionId: 'c1', itemId: 'show:v:7~253A7', season: 'season:v:7~253A7:1' },
+    });
+  });
+
+  it('opens anything else as itself', () => {
+    expect(
+      titleHref({ type: 'movie', key: { connectionId: c1, externalId: 'm1' }, title: 'Film', ratings: {}, genres: [], images: {} }),
+    ).toEqual({ pathname: '/title/[connectionId]/[itemId]', params: { connectionId: 'c1', itemId: 'm1' } });
   });
 });

@@ -672,6 +672,17 @@ typecheck.
   iOS 26 draws its glass round it, Android its toolbar — and is
   `HeaderButton`'s dark circle anywhere else (`components/header-button.tsx`).
   Never add a glass library for the rest.
+- **A title's sheet** (`titleOptions`, Media's `mobile/title-sheet.tsx`) is
+  one `ScrollView`, and every modal it opens is drawn inside it; on Android
+  it is `nestedScrollEnabled`, so its content scrolls before the sheet moves.
+  An iOS form sheet shows a native header only around a stack of its own, so
+  on an iPhone the sheet holds one (`title/_layout.tsx`); Android's cannot
+  hold a nested stack, and floats its ✕ in a sticky bar instead.
+- **On a TV, a scroll view follows the focus with snap markers**
+  (`SnapPoint`, `snapToAlignment="item"`), never by scrolling itself, and
+  what the remote reaches never moves or grows as the focus moves: draw the
+  difference, do not lay it out. A card that widened its frame sent the
+  remote to the end of its row (`docs/platforms/tvos`).
 - **Each content tab is its own UI, and so is each form factor in it:**
   `src/tabs/<tab>/{shared,mobile,tv}`, with an `index.ts` that takes the
   screens from `tv` or `mobile` at runtime (`isTV`) — `mobile` is a phone, a
@@ -754,10 +765,18 @@ Everything above describes the target; what runs today:
   (`../foyer`), and its password, typed again, is the owner
   check. The dev-only mock is a pretend server in memory. Ten profiles at
   most, or the server's limit.
-- **Media is real:** Continue Watching, one row per kind with per-profile
-  order, sort and card style, a full-screen grid per row, and detail pages —
-  from every live source, merged, and kept per profile where the source allows
-  it. Jellyfin and the mock implement the media role.
+- **Media is real,** and modelled on a streaming service's
+  (`docs/ui/media`): Continue Watching, Downloaded, and the profile's own rows
+  — each one kind or several, of every category or of one ("Comedy" across
+  films and series) — chips that narrow the whole home, a full-screen grid per
+  row, and a search page over every Media kind; from every live source,
+  merged, and kept per profile where the source allows it. On a phone and in
+  a browser: a glow behind the top, a hero with Play and Details, posters
+  without words, and a title's sheet that rises to the top of the safe area.
+  On a TV: a top bar, rows whose focused title is drawn as a scene and held
+  on the left, More… after twenty, and a title's page whose Episodes and
+  More like this slide in from the right. Jellyfin and the mock implement the
+  media role.
 - **Videos is real too**, and shows one source at a time: source tabs, kind
   tabs where a source brings more than one, a paging grid of landscape cards,
   and a search box only where `search` is in effect. `RowSpec.connectionId`
@@ -779,9 +798,10 @@ Everything above describes the target; what runs today:
   on Android, iPhone and Apple TV. Each player has its switch, "Play
   with it first" and first on a tab, as device settings; "Play with…" on a detail
   page picks one for an item, and never falls back to another.
-- **Search is closed:** a term rides on a query that already names its kind,
-  so there is no screen that searches everything. `RowSpec.term` goes into the
-  merged grid and `ChannelQuery.term` into the TV sections; only sources whose
+- **Search is closed:** a term rides on a query that already names its kinds,
+  so there is no screen that searches everything — Media's search page asks
+  for every Media kind, and nothing else. `RowSpec.term` goes into the merged
+  grid and `ChannelQuery.term` into the Live sections; only sources whose
   `search` is in effect see one. A search is never saved, and nothing saved
   stands in for one. It starts once typing stops for two seconds, or at once
   on the search key — on Videos, on the key alone — and a list is never keyed
@@ -853,8 +873,9 @@ Everything above describes the target; what runs today:
 - **Yattee** pictures come from the addresses the server signs for them.
 - **Apple TV:** the app builds, installs and runs on the tvOS 27 simulator
   (`npm run tvos`), driven by the remote: every control focusable and
-  pressable, TV-sized type and spacing, a spotlight above the home's rows, and
-  the player on play/pause and the arrows. Brightness, orientation, Face ID,
+  pressable, TV-sized type and spacing, the tabs down the left, Media's
+  rows with the focused title held on the left, and the player on play/pause
+  and the arrows. Brightness, orientation, Face ID,
   files and downloads are stand-ins there.
 - **Storage:** SQLite (`expo-sqlite`) and the keychain on iOS and Android,
   which run a development build; IndexedDB and WebCrypto-encrypted secrets on

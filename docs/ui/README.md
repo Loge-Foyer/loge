@@ -3,6 +3,15 @@
 The visual identity, theming, and the component library. Components take domain
 types and never know which plugin produced them.
 
+This page is the system every tab is built from. A content tab's own UI — its
+design, its components, its controls — has a page of its own:
+[`media/`](media/README.md), and Videos and Live below until theirs are
+written.
+
+Media's screens are modelled on the
+[Netflix UI 2024](https://www.figma.com/community/file/1348399379890177021/netflix-ui-2024?q_id=242a5470-91b1-46a0-bab2-d555e0ca9e42)
+community file on Figma; what stayed Loge's own is in `media/`.
+
 This page describes the target. Today the four tabs, Settings → Adapters' four
 lists, Welcome with its three ways in, the sign-in and import flows, Settings →
 Account, the backup file, backup targets, the players' switches, and the
@@ -126,7 +135,8 @@ What more than one tab draws, in `src/components/`:
 and kind in `services/tab-content.ts` (`docs/adapters`), never by a plugin's
 name.
 
-- **Media** — a source's movies, shows and anime, merged across every source.
+- **Media** — a source's movies, shows and anime, merged across every
+  source ([`media/`](media/README.md)).
 - **Videos** — web video and files, one tab per source. A source that can
   narrow its search (`media.searchScopes`) puts the choice at the search box's
   left — All, Video, Channel, Playlist — and a channel among the videos is
@@ -172,73 +182,8 @@ src/tabs/
 
 ## Media
 
-**Home** (`tabs/media/shared/home.tsx`) is Continue Watching, then Downloaded, then
-one row per kind in the profile's own order and sort. Downloaded is this
-device's finished copies of the library — a web video kept from Videos stays
-Videos' — newest first, as scenes; a card opens the item's page, which opens
-with no network at all, and it is hidden where nothing can be kept. A row a source cannot fill is hidden; a
-source that could not answer gets one line at the top, however many rows it
-would have filled; a profile that has not set up a connection sees "Finish
-setting up" for it. Pull to refresh on a phone; a Refresh button beside
-Customize in a browser, which cannot pull.
-
-**What was saved comes first.** At launch a row shows what its sources answered
-last time — a placeholder, never taken for a fresh answer — until they answer
-again. When one cannot, what was saved from it stays, and its line says how old
-it is: "Home is only used on your home network. Showing what was saved 5 min
-ago." The grid shows a saved first page the same way, and pages on only once
-the source is back. A detail page opened before comes back with the same line.
-All of this only where the source may be kept on the device (`docs/data`).
-
-**Cards** (`components/media/`):
-
-- *Poster* (2:3) — the source's ratings stacked top left (★ community score,
-  then critics' %), a check top right once watched, a bar along the bottom while
-  partly watched. Watch badges only appear when the source reports watch status
-  to this profile.
-- *Landscape* (16:9) — for Continue Watching, or any row switched to scenes: the
-  frame where playback stopped when a source provides one (none does yet), else
-  the episode's still, else the backdrop; "S1 · E3 — Title" or "23 min left"
-  below. In Continue Watching the two halves do different things: the picture,
-  marked with a play glyph, resumes it where it stopped, and the words open its
-  own page — an episode's, not its show's. A source that cannot play leaves the
-  whole card opening the page, as every other row does.
-
-**A row's title** opens its grid: a full-screen page over the tab bar, in the
-row's own sort, with as many columns as the width allows (`FlashList`, keyed by
-the column count). **Detail pages** switch on the item's type — a movie's hero
-and cast, a show's seasons and episodes, an episode's still with a way to its
-show. A title's own row is short: Play — or Resume, with a restart symbol
-beside it — in the accent, and the eye, outlined until it is watched and
-filled once it is. Everything else waits behind "⋯" (`components/more-menu.tsx`):
-Play with…, Download and Add to list, each a page of choices in a card that
-floats below the top right — React Native's own modal, which sits above every
-native screen and takes a remote's focus. On a phone and in a browser "⋯" is
-in the header over the artwork; on a TV, which has none, it ends the row.
-Settings → App → Buttons shows the row's buttons as symbols, the default, or
-with their words; either way each keeps its words for a screen reader. An item with a cover and nothing wider — an IPTV
-provider's films and series — gets the cover beside its title over a softened
-copy of it, rather than a slice of a portrait stretched across the page; what
-a source does not bring (cast, studios, what the file is, watch state) is
-simply not there.
-
-**Customize** is a sheet with everything inline, because a Tamagui portal would
-render behind a native sheet: per row, up and down, shown or hidden, sort and
-direction, poster or scene cards. Rows a profile adds can be removed; the
-default ones can only be hidden. Reset puts the default back.
-
-The layout is a preference, so it travels with the profile to every device.
-An app reads a version it does not know as no layout and shows its defaults,
-rather than drawing a row it cannot:
-
-- **Version 2** brought the Downloaded row: this app adds it to a version 1
-  layout, right after Continue Watching.
-- **Version 3** brought rows of several kinds and of one genre — "Comedy"
-  across films and series, "Comedy movies". A layout is written as a 2 while
-  every row is still one kind of every genre (`layoutOf`), so a device on an
-  older build keeps reading it until a row needs a 3. A kind's own row is
-  known by its id, so one the profile has changed is never added again beside
-  itself.
+Its home, a title's sheet and page, search, the rows and how they are kept
+are in [`media/`](media/README.md).
 
 ## Live
 
@@ -291,8 +236,9 @@ portal, which has no portal to be refused by.
 ## Search
 
 A search box searches the list beneath it and nothing else
-(`components/search-field.tsx`): Media's grid, a Videos source, and each of
-Live's sections.
+(`components/search-field.tsx`): Media's search page — every film, series and
+anime, from the magnifier on its home — a Videos source, and each of Live's
+sections.
 
 - **When it asks.** Once typing stops for two seconds, or at once on the
   keyboard's search key. Videos asks on the key alone: there every search is a
@@ -511,8 +457,7 @@ browser are untouched.
   the row's edge.
 - **Cards have TV sizes of their own** (`components/shelf.tsx`): posters 240
   points wide, about seven across, and scenes 400, about four. Grown with the
-  type they were six and three, and a row was too tall to sit beneath the
-  spotlight without pushing it under the tab bar.
+  type they were six and three, and a row was too tall for a screen.
 - **The tabs run down the left**, a column of symbols while the remote is in
   a page — Media, Videos, Live, Settings, the one shown in the accent — that
   opens with their names, over the page on a veil, while it is in the rail.
@@ -522,12 +467,11 @@ browser are untouched.
 - **No headers on tab roots or detail pages** — the rail names the tab, and
   Menu goes back — and sheets take the whole screen, as do who is watching
   and a profile's PIN, which are pushed (`profileGateOptions`).
-  Customize and Refresh sit at the top of the Media home.
 - **A title's page keeps to its column**: the logo over the picture lines up
   with the year and the buttons beneath it, well inside the screen's edge.
-- **The home's spotlight**: above the rows, whatever card the remote is on,
-  large — its picture, title, a line of facts and two of overview — following
-  the focus. The focus starts on the first card.
+- **Media's home and title page** are its own (`media/`): a top bar, rows
+  whose focused title is drawn as a scene and held on the left, and a page
+  whose Episodes and More like this slide in from the right.
 - **The player** answers the remote: select brings the controls up with the
   focus on play/pause, the arrows move among them, and a panel takes the
   focus. With them away, a double press of left or right jumps as a double

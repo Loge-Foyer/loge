@@ -132,7 +132,9 @@ click that only React Native's own `Pressable` hears. So:
   (`useRemoteFocus`): the picture lifts and wears the ring. That reaches past
   the card — `cardFocusRoom` says how far — so its words sit that much
   lower, and a row's scroll view leaves the room above, where it would cut
-  the ring off.
+  the ring off. Media's TV rows ring their card without the lift
+  (`CARD_RING`): a lift would move it by an amount its neighbours cannot
+  know.
 - **The player** answers the remote (`hooks/use-remote-keys.ts`), and only
   the player in front does: every screen hears the remote, and a zap leaves
   the one before on the screen for a moment.
@@ -197,11 +199,48 @@ click that only React Native's own `Pressable` hears. So:
     coming back to the app, and lets go when anything covers it. Its one
     `BackHandler` listener leaves through `close()`: on tvOS `exitApp` does
     nothing.
-- **Where the focus starts:** the first card of the home, Play on a detail
-  page, the profile in use in who's watching — at launch, the default one —
-  and play/pause in the player.
+- **Where the focus starts:** the first card of the home, Play or Resume on
+  a title's page, the profile in use in who's watching — at launch, the
+  default one — and play/pause in the player. `docs/ui/media` has Media's
+  table, panels included.
+- **A pushed page with layers of its own** — a title's page with a panel
+  open, who's watching with its name field — closes them on Back before it
+  leaves (`useBackLayers`): it holds Menu for the app only while a layer is
+  open, so Menu leaves the page as ever once none is, and the focus goes back
+  to what opened the layer. Never give it a layer in a browser, whose
+  `BackHandler` logs an error.
 
 `docs/ui` has the TV layouts.
+
+## Scrolling with the focus
+
+A row that keeps the focused card at its left margin, and a page that holds
+the row the remote is in near its top, are react-native-tvos' own snapping,
+which scrolls in one motion with the focus engine's own — never a scroll of
+the app's, which would fight it:
+
+- **The scroll view has `snapToAlignment="item"`**, and each card's slot or
+  each row is wrapped in a `SnapPoint` (`components/snap-point.tsx`):
+  `align="start"` puts its leading edge at `snapToItemPadding`, `offset` at a
+  fixed distance. The marker must stay a real view — one flattened away says
+  nothing, and nothing says so — so `SnapPoint` is `collapsable={false}`.
+- **The outermost marker wins**, walking up from the focused view to the
+  scroll view, which is how a card's slot steers its row and the row steers
+  the page. The axis is the scroll view's content: wider than itself is
+  horizontal.
+- **The snap never scrolls above 0.** A page with automatic insets rests at a
+  negative offset under the tab bar it would never come back to, so Media's
+  home keeps its top in its content (`contentInsetAdjustmentBehavior="never"`),
+  and a row keeps room after its last card for that one to reach the margin.
+- **What the remote reaches must not move or grow as the focus moves.** A
+  card that widened its own frame when focused, beside cards moved along by a
+  transform, sent the next press of right straight to the end of the row —
+  and so did a focus guide laid over the whole row. Media's cards keep the
+  poster's frame and only draw the scene wider, and its rows are no focus
+  groups (`docs/ui/media`).
+- **Animations that run together stop together**: an `Animated.parallel`
+  whose scene had been taken away left a card wide and in the way. Each runs
+  on its own, on the native driver.
 
 ## Who's watching
 

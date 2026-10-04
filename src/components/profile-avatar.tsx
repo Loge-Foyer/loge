@@ -11,8 +11,8 @@ function hueFor(id: string) {
 }
 
 // Its colours are the dark theme's in either: on a light page the lightest
-// step written on step 9 vanished from a yellow one. Square is a tile in
-// who's watching; round is everywhere else.
+// step written on step 9 vanished from a yellow one. Square in who's
+// watching and on the profile's own button; round everywhere else.
 export function ProfileAvatar({
   user,
   size = 40,

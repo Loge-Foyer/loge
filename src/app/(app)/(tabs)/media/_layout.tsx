@@ -9,6 +9,7 @@ export default function MediaStack() {
   return (
     <Stack screenOptions={tabStackOptions}>
       <Stack.Screen name="index" options={tabRootOptions('Media', { right: <MediaHeaderRight /> })} />
+      <Stack.Screen name="search" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,3 +1,4 @@
+import type { GlobalMediaKey } from '@loge/api';
 import type { ComponentType } from 'react';
 
 import { isTV } from '@/components/remote';
@@ -12,11 +13,16 @@ import * as tv from './tv';
  */
 export interface MediaUi {
   readonly MediaHome: ComponentType;
+  /** What sits beside the profile at the right of the home's native header. */
   readonly MediaHeaderRight: ComponentType;
-  readonly MediaGrid: ComponentType<{ rowId: string }>;
+  /** A row's grid, narrowed as the home was (`kind`, `genre`, as its address carries them). */
+  readonly MediaGrid: ComponentType<{ rowId: string; kind?: string; genre?: string }>;
+  readonly MediaSearch: ComponentType;
   readonly CustomizeHome: ComponentType<{ rowId?: string }>;
+  /** A title's own page: a sheet on a phone, the whole screen on a TV. */
+  readonly TitleScreen: ComponentType<{ itemKey: GlobalMediaKey; season?: string }>;
 }
 
 const ui: MediaUi = isTV ? tv : mobile;
 
-export const { MediaHome, MediaHeaderRight, MediaGrid, CustomizeHome } = ui;
+export const { MediaHome, MediaHeaderRight, MediaGrid, MediaSearch, CustomizeHome, TitleScreen } = ui;

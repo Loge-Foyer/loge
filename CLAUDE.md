@@ -94,8 +94,9 @@ What runs today:
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos is real: one source at a time, a paging grid, and
   `sources/yattee` — a Yattee Server instance — bringing web video to it.
-- Search, closed: Media's grid searches the kind it shows, TV's Live searches
-  channels and its films and series each search their own. Only sources whose
+- Search, closed: Media's search page asks for every Media kind, its grids
+  the kinds they show, Live searches channels and its films and series each
+  search their own. Only sources whose
   `search` is in effect are asked, and nothing of a search is saved. It starts
   two seconds after the last letter, or on the search key — Videos on the key
   alone.
@@ -140,8 +141,13 @@ What runs today:
   once its source is ready.
 - Apple TV, from the same code: `npm run tvos` turns `ios/` into the TV
   project and builds it. The remote reaches every control, the type and
-  spacing are sized for a room, the home has a spotlight, and what a TV lacks
-  — files, Face ID, downloads — has a stand-in (`docs/platforms/tvos`).
+  spacing are sized for a room, the tabs run down the left, and what a TV
+  lacks — files, Face ID, downloads — has a stand-in (`docs/platforms/tvos`).
+- Media modelled on a streaming service (`docs/ui/media`): rows of kinds and
+  categories, chips that narrow the home, a hero, a title's sheet on a phone
+  and a page on a TV with Episodes sliding in from the right, a search page,
+  and a glow behind the phone's home in a colour of your own. Who's watching
+  on a TV is over Unsplash photographs, credited as they show.
 - A real iPhone or Apple TV gets a Release build — `npm run ios:device`,
   `npm run tvos:device` — with no development client, no Metro and nothing
   attached: a development build on a phone kept it busy for the computer, and

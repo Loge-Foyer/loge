@@ -6,31 +6,38 @@ import { RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
 
 import { rowTitle } from '@/components/labels';
+import { titleHref } from '@/components/media/item-link';
 import { LandscapeCard } from '@/components/media/landscape-card';
 import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
+import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
+import { filterRow, FILTER_ROW_ID, isFiltered, narrowRow } from '@/services/home-filter';
 import { specOf } from '@/services/home-layout';
 
 import { CustomizeButton } from './customize-button';
+import { filterOf } from './links';
 
 const PADDING = 16;
 const GAP = 12;
 
 /**
- * Everything one row holds, as a grid over the whole screen. It pages as it
- * scrolls, in the row's own order; the columns follow the viewport, so the
- * same screen works from a phone to a television.
+ * Everything one row holds, as a grid over the whole screen — narrowed as the
+ * home was when it was opened (`kind`, `genre`), and the filter's own row by
+ * its id. It pages as it scrolls, in the row's own order; the columns follow
+ * the viewport, so the same screen works from a phone to a television.
  */
-export function BrowseScreen({ rowId }: { rowId: string }) {
+export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: string; genre?: string }) {
   const { rows, sources } = useHomeRows();
-  const row = rows?.find((candidate) => candidate.id === rowId);
-  const kindRow = row?.type === 'titles' ? row : undefined;
+  const filter = filterOf({ ...(kind ? { kind } : {}), ...(genre ? { genre } : {}) });
+  const stored = rows?.find((candidate) => candidate.id === rowId);
+  const kindRow =
+    rowId === FILTER_ROW_ID ? filterRow(filter) : stored?.type === 'titles' ? (isFiltered(filter) ? narrowRow(stored, filter) : stored) : undefined;
   const [term, setTerm] = useState('');
   const searching = term.trim().length > 0;
   // A search stays inside this row's kinds: films answer a search of films.
@@ -78,9 +85,9 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
       <Stack.Screen
         options={{
           title: rowTitle(kindRow),
-          headerRight: () => (
-            <CustomizeButton href={{ pathname: '/customize-home', params: { row: kindRow.id } }} label="Sort this list" />
-          ),
+          // The filter's own row is the home's for a moment, not one of the profile's to sort.
+          headerRight: () =>
+            stored && rowId !== FILTER_ROW_ID ? <CustomizeButton href={{ pathname: '/customize-home', params: { row: kindRow.id } }} label="Sort this list" /> : null,
         }}
       />
       <FlashList
@@ -93,12 +100,12 @@ export function BrowseScreen({ rowId }: { rowId: string }) {
         keyExtractor={(item) => `${item.key.connectionId}:${item.key.externalId}`}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingHorizontal: PADDING - GAP / 2, paddingTop: 12, paddingBottom: 48 }}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <YStack px={GAP / 2} pb="$5" items="center">
             {card === 'poster' ? (
-              <PosterCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} />
+              <PosterCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} href={titleHref(item)} preferred={isTV && index === 0} />
             ) : (
-              <LandscapeCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} />
+              <LandscapeCard item={withKept(item)} width={cardWidth} showWatch={showWatch(item)} href={titleHref(item)} preferred={isTV && index === 0} />
             )}
           </YStack>
         )}

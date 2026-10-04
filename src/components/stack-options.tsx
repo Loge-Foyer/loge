@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import type { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 import { XStack } from 'tamagui';
 
 import { ProfileButton } from './profile-button';
@@ -90,3 +91,40 @@ export const sheetOptions: StackOptions = isTV
       sheetGrabberVisible: true,
       headerShown: false,
     };
+
+/**
+ * A title's own page on Media. On a phone a sheet that rises to the top of
+ * the safe area and stops nowhere short of it — open or gone — closed by its
+ * ✕ or a slide down; Android draws a sheet square unless told otherwise. On a
+ * TV the whole screen, pushed, so the remote's focus can be placed; in a
+ * browser a page of its own.
+ */
+export const titleOptions: StackOptions = isTV
+  ? { headerShown: false, presentation: 'card', animation: 'fade' }
+  : isWeb
+    ? { headerShown: false }
+    : {
+        presentation: 'formSheet',
+        sheetAllowedDetents: [1],
+        sheetGrabberVisible: false,
+        sheetCornerRadius: Platform.OS === 'android' ? 28 : -1,
+        sheetShouldOverflowTopInset: false,
+        headerShown: false,
+      };
+
+/**
+ * Whether a title's sheet holds a stack of its own. An iOS sheet shows a
+ * native header only around one — and with it the system's glass for the ✕ —
+ * and a title opened from inside then slides in within the sheet. Android's
+ * sheet cannot hold a stack, and a TV or a browser needs no header.
+ */
+export const titleHasOwnStack = Platform.OS === 'ios' && !isTV;
+
+/** That stack's header: nothing but its buttons, over the picture. */
+export const titleStackOptions: StackOptions = {
+  headerShown: true,
+  headerTransparent: true,
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: 'minimal',
+  title: '',
+};
