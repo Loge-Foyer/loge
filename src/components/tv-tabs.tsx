@@ -16,6 +16,7 @@ import { CHOSEN } from './settings-list';
 import { TvBackContext, type TvBack, type TvSpot } from './tv-back';
 import { useBackLayers } from '@/hooks/use-back-layers';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useRemoteKeys } from '@/hooks/use-remote-keys';
 
 // Where the symbols' column starts, and how wide it is.
 const LEFT = px(40);
@@ -75,6 +76,11 @@ export function TvTabs() {
     }),
     [],
   );
+  // Right from the open rail goes back to what the remote left in the page, and the rail closes behind it:
+  // left to the focus engine, it looked past the rail drawn over the page and went somewhere else, or nowhere.
+  useRemoteKeys((key) => {
+    if (key === 'right' && open) page.current?.requestTVFocus();
+  });
   useBackLayers(
     roots > 0 && !open
       ? () => {
@@ -177,7 +183,7 @@ function Rail({
         />
       </Animated.View>
       <Animated.View style={[styles.edge, { width, overflow: 'hidden', backgroundColor: solid }]}>
-        <FocusGroup ref={railRef} onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
+        <FocusGroup ref={railRef} traps={['right']} onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
           <YStack flex={1} pl={LEFT} pr={px(8)} pt={px(40)} pb={px(40)}>
             {/* Loge's own icon heads the rail, in the symbols' column; the remote never lands on it. */}
             <YStack width={CELL} items="center">

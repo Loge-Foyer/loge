@@ -81,6 +81,10 @@ rail down the left (`components/tv-tabs.tsx`):
 - **Opening:** while the focus is in the rail it widens to show the names,
   over the page, on a veil. The rail is a focus group, which says when the
   focus comes in and goes.
+- **Right closes it**, sending the remote back to what it left in the page
+  (`requestTVFocus()` on the page's focus group). The rail keeps the focus
+  engine from moving right itself (`traps`): drawn over the page, it looked
+  past the rail and went somewhere else, or nowhere.
 - **At launch the remote starts in the page**: a page that names no first
   control — Live — left the system to place it, and it took the rail, top
   left. Until the remote has been in a page once, the rail sends it there.
