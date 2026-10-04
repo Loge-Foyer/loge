@@ -115,10 +115,13 @@ export const titleOptions: StackOptions = isTV
 /**
  * Whether a title's sheet holds a stack of its own. An iOS sheet shows a
  * native header only around one — and with it the system's glass for the ✕ —
- * and a title opened from inside then slides in within the sheet. Android's
- * sheet cannot hold a stack, and a TV or a browser needs no header.
+ * and a title opened from inside then slides in within the sheet. The stack
+ * is given the sheet's height by hand (`title/_layout.tsx`), which an
+ * iPhone's full-height sheet allows; an iPad's is a card of its own size, so
+ * it keeps the bar in the page, as Android does — whose sheet cannot hold a
+ * stack — and a TV or a browser needs no header.
  */
-export const titleHasOwnStack = Platform.OS === 'ios' && !isTV;
+export const titleHasOwnStack = Platform.OS === 'ios' && !Platform.isPad && !isTV;
 
 /** That stack's header: nothing but its buttons, over the picture. */
 export const titleStackOptions: StackOptions = {

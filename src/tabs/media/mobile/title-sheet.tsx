@@ -11,7 +11,7 @@ import { Link, router, Stack, useNavigation } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { H2, Paragraph, SizableText, Spinner, Theme, XStack, YStack } from 'tamagui';
+import { H2, Paragraph, SizableText, Spinner, Theme, useTheme, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { CastButton } from '@/components/cast-button';
@@ -58,6 +58,7 @@ export function TitleSheet({ itemKey, season }: { itemKey: GlobalMediaKey; seaso
   // An iPad shows the sheet in the middle of the screen, narrower than the window.
   const [width, setWidth] = useState(windowWidth);
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const buttons = (inHeader: boolean) => (
     <XStack gap="$2" items="center">
       <CastButton variant="floating" inHeader={inHeader} />
@@ -65,11 +66,13 @@ export function TitleSheet({ itemKey, season }: { itemKey: GlobalMediaKey; seaso
     </XStack>
   );
 
+  // The scroll view is the page itself, with nothing round it: an iOS form sheet sizes only a scroll
+  // view that sits straight in it, and a view round it was left no height — the sheet came up blank.
   return (
-    <YStack flex={1} bg="$background">
+    <>
       {titleHasOwnStack ? <Stack.Screen options={{ headerRight: () => buttons(true) }} /> : null}
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: String(theme.background.val) }}
         contentInsetAdjustmentBehavior="never"
         // Android's sheet hands a drag to what scrolls inside it only where nested scrolling is on.
         nestedScrollEnabled
@@ -100,7 +103,7 @@ export function TitleSheet({ itemKey, season }: { itemKey: GlobalMediaKey; seaso
           </SizableText>
         )}
       </ScrollView>
-    </YStack>
+    </>
   );
 }
 

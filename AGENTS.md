@@ -676,11 +676,14 @@ typecheck.
   `HeaderButton`'s dark circle anywhere else (`components/header-button.tsx`).
   Never add a glass library for the rest.
 - **A title's sheet** (`titleOptions`, Media's `mobile/title-sheet.tsx`) is
-  one `ScrollView`, and every modal it opens is drawn inside it; on Android
-  it is `nestedScrollEnabled`, so its content scrolls before the sheet moves.
-  An iOS form sheet shows a native header only around a stack of its own, so
-  on an iPhone the sheet holds one (`title/_layout.tsx`); Android's cannot
-  hold a nested stack, and floats its ✕ in a sticky bar instead.
+  one `ScrollView` with nothing round it, and every modal it opens is drawn
+  inside it; on Android it is `nestedScrollEnabled`, so its content scrolls
+  before the sheet moves. An iOS form sheet gives a height only to a scroll
+  view sitting straight in it: a view round one, or a nested stack, is left
+  none, and the sheet comes up blank. It shows a native header only around a
+  stack of its own, so on an iPhone the sheet holds one (`title/_layout.tsx`)
+  sized by hand to the sheet; an iPad and Android float the ✕ in a sticky
+  bar instead.
 - **On a TV, a scroll view follows the focus with snap markers**
   (`SnapPoint`, `snapToAlignment="item"`), never by scrolling itself, and
   what the remote reaches never moves or grows as the focus moves: draw the

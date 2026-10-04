@@ -147,18 +147,22 @@ a search is kept (`docs/ui`).
 further, and closes on its ✕ or a slide down (`titleOptions`,
 `components/stack-options.tsx`):
 
-- **One scroll view, with nothing beside it**, and every modal it opens —
-  the title's menu, the overlay picker — drawn inside it: an iOS form sheet
-  stretches a scroll view that is not the second of exactly two children over
-  the whole sheet. On Android the scroll view is `nestedScrollEnabled`, so
-  what scrolls inside moves before the sheet does.
+- **The page is one scroll view, with nothing round it and nothing beside
+  it**, and every modal it opens — the title's menu — drawn inside it. An iOS
+  form sheet gives a height only to a scroll view sitting straight in it — the
+  whole sheet's, or less a header beside it — and leaves anything else none:
+  a view round the scroll view came up blank. On Android the scroll view is
+  `nestedScrollEnabled`, so what scrolls inside moves before the sheet does.
 - **The ✕ on an iPhone** sits in the sheet's own native header, so iOS 26
   draws it in glass: an iOS form sheet shows a header only around a stack of
-  its own, so `title/_layout.tsx` gives it one. A title opened from More like
-  this is pushed inside it, with a back button; ✕ closes the whole sheet.
-- **Elsewhere** — Android, whose form sheet cannot hold a nested stack, and
-  the web — the ✕ floats in a sticky bar at the top of the scroll view, in
-  `HeaderButton`'s dark circle, over the picture.
+  its own, so `title/_layout.tsx` gives it one — and gives that stack the
+  sheet's height by hand, the window's less the top of the safe area, since
+  the sheet would give it none. A title opened from More like this is pushed
+  inside it, with a back button; ✕ closes the whole sheet.
+- **Elsewhere** — an iPad, whose sheet is a card of its own size; Android,
+  whose form sheet cannot hold a nested stack; and the web — the ✕ floats in
+  a sticky bar at the top of the scroll view, in `HeaderButton`'s dark
+  circle, over the picture.
 - **Top to bottom**: the picture, with how far it got; for an episode, its
   series and "S1 · E3", which open the series; the title; its score, years,
   age rating boxed, how long it runs or its seasons, and how it looks
