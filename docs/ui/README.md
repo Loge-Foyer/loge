@@ -195,7 +195,10 @@ are in [`media/`](media/README.md).
 browser, that providers can't be reached there). On a TV its header — the
 providers, the sections, the search box — stands above the list rather than
 scrolling with it, and its sides are the TV's gutter, clear of the tabs'
-rail. Otherwise:
+rail. On a TV, too, a section — Live, Movies, Series — and a group of
+channels show as the remote rests on their chip, a quarter of a second, with
+no select: moving along the chips moves through them, and a chip passed
+quickly is not loaded (`SourceTabs`, `selectOnFocus`). Otherwise:
 
 - **One provider at a time** — a pill for each across the top, then Live,
   Movies and Shows as the provider brings them.

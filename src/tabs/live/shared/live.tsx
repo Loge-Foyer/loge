@@ -82,6 +82,7 @@ export function LiveScreen() {
             setTerm('');
             router.setParams({ kind: id });
           }}
+          selectOnFocus={isTV}
         />
       ) : null}
       {searchable ? <SearchField key={`${selected.connection.id}:${kind}`} placeholder={searchLabel} term={term} onTerm={onTerm} /> : null}
@@ -91,8 +92,9 @@ export function LiveScreen() {
   // Keyed by what a section lists, never by the term. The search box sits in
   // the list's header, so remounting the list for each term took the keyboard
   // away while someone was typing; a new term is a new query, which pages from
-  // its start on its own. On a TV the header stands above the list instead,
-  // where a section's new list does not take the tab — and the remote — with it.
+  // its start on its own. On a TV the header stands above the list instead:
+  // a section chosen as the remote rests on its tab brings a list of its own,
+  // which would take the tab — and the remote — with it.
   const list =
     kind === 'live' ? (
       // No group yet this time is not All (`''`): where Live opens is decided then.
@@ -296,9 +298,11 @@ function dedupe(errors: readonly SourceError[]): readonly SourceError[] {
   return errors.slice(0, 1);
 }
 
+/** The provider's groups, ★ first; on a TV a group shows as the remote rests on its chip. */
 function GroupChips({ groups, selected, onChoose }: { groups: readonly ChannelGroup[]; selected: string | undefined; onChoose: (id: string) => void }) {
   return (
     <SourceTabs
+      selectOnFocus={isTV}
       tabs={[
         // The profile's own favourites, before any group of the provider's.
         { id: FAVORITES_GROUP, label: '', name: 'Favorites', icon: <Star size={px(14)} /> },

@@ -1,6 +1,6 @@
 import { EyeOff } from '@tamagui/lucide-icons-2/icons/EyeOff';
 import { Lock } from '@tamagui/lucide-icons-2/icons/Lock';
-import type { ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { ScrollView } from 'react-native';
 import { Circle, XStack } from 'tamagui';
 
@@ -17,17 +17,35 @@ export interface SourceTab {
   readonly marker?: 'attention' | 'locked' | 'off';
 }
 
-/** One tab per choice, as pills — across the top of Videos, and for profiles in forms. */
+// How long the remote rests on a tab before it is chosen: a run along the
+// tabs passes the ones between, without loading each.
+const SETTLE_MS = 250;
+
+/**
+ * One tab per choice, as pills — across the top of Videos, and for profiles
+ * in forms. With `selectOnFocus`, on a TV, a tab is chosen as the remote rests
+ * on it, with no select: moving along the tabs moves through what they show.
+ */
 export function SourceTabs({
   tabs,
   selected,
   onSelect,
+  selectOnFocus = false,
 }: {
   tabs: readonly SourceTab[];
   /** None while the choice is still being made. */
   selected?: string | undefined;
   onSelect: (id: string) => void;
+  selectOnFocus?: boolean;
 }) {
+  const settling = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(settling.current), []);
+  const rest = (id: string) => {
+    clearTimeout(settling.current);
+    if (id !== selected) settling.current = setTimeout(() => onSelect(id), SETTLE_MS);
+  };
+  // Left before it settled — down into the list, say — it is not chosen.
+  const leave = () => clearTimeout(settling.current);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <XStack gap="$2" role="tablist">
@@ -45,6 +63,7 @@ export function SourceTabs({
               borderWidth={0}
               fontWeight={active ? '600' : '400'}
               onPress={() => onSelect(tab.id)}
+              {...(selectOnFocus ? { onFocus: () => rest(tab.id), onBlur: leave } : {})}
               {...(tab.icon ? { icon: tab.icon } : {})}
               {...(tab.name ? { 'aria-label': tab.name } : {})}
               {...(tab.marker === 'locked' ? { iconAfter: <Lock size={12} />, 'aria-label': `${tab.label}, locked` } : {})}

@@ -130,6 +130,10 @@ click that only React Native's own `Pressable` hears. So:
   directly — and `remotely()` (`components/remote.tsx`) draws it inside a
   `Pressable` on a TV, with a focus ring. Settings rows, switches (an On/Off
   pill: UIKit has no switch on tvOS) and the primary button do the same.
+- **A remote-pressable control reports its own focus**: `remotely()` hands a
+  control's `onFocus`, `onBlur` and `ref` to the remote's own `Pressable`, so
+  a row of chips can choose as the remote rests on one (`SourceTabs`'
+  `selectOnFocus`) and a page can send the remote back to its first one.
 - **Cards are `Pressable` already**, and only show the focus
   (`useRemoteFocus`): the picture lifts and wears the ring. That reaches past
   the card — `cardFocusRoom` says how far — so its words sit that much

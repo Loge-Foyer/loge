@@ -1,5 +1,5 @@
-import { useState, type ComponentType, type ReactNode } from 'react';
-import { Platform, Pressable, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ComponentType, type ReactNode, type Ref } from 'react';
+import { Platform, Pressable, type GestureResponderEvent, type StyleProp, type View, type ViewStyle } from 'react-native';
 
 /** A TV — tvOS or Android TV — driven by a remote: focus moves, and select presses what has it. */
 export const isTV = Platform.isTV === true;
@@ -18,27 +18,42 @@ export const isHandheld = !isTV && process.env.EXPO_OS !== 'web';
  * the select, and says when it has the focus so the control can show it.
  */
 export function Remote({
+  ref,
   onPress,
   disabled,
   preferred = false,
+  onFocus,
+  onBlur,
   style,
   children,
 }: {
+  /** The remote's own control, which `requestTVFocus()` sends the focus to. */
+  ref?: Ref<View>;
   onPress: ((event: GestureResponderEvent) => void) | null | undefined;
   disabled?: boolean | null | undefined;
   /** Where the focus starts on the screen that holds it. */
   preferred?: boolean;
+  /** Told as the remote lands on it and leaves it. */
+  onFocus?: () => void;
+  onBlur?: () => void;
   style?: StyleProp<ViewStyle>;
   children: (focused: boolean) => ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
   return (
     <Pressable
+      {...(ref ? { ref } : {})}
       {...(onPress ? { onPress } : {})}
       disabled={disabled ?? false}
       hasTVPreferredFocus={preferred}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onFocus={() => {
+        setFocused(true);
+        onFocus?.();
+      }}
+      onBlur={() => {
+        setFocused(false);
+        onBlur?.();
+      }}
       {...(style ? { style } : {})}
     >
       {children(focused)}
@@ -111,22 +126,33 @@ type Pressing = {
   readonly onPress?: ((event: GestureResponderEvent) => void) | null | undefined;
   readonly disabled?: boolean | null | undefined;
   readonly hasTVPreferredFocus?: boolean | undefined;
+  readonly onFocus?: unknown;
+  readonly onBlur?: unknown;
+  readonly ref?: unknown;
 } & Readonly<Record<string, unknown>>;
 
 /**
  * A Tamagui control a remote can press. On a TV it is drawn inside `Remote`,
  * and given `focused` while the remote is on it; anywhere else it is the
  * control itself, untouched. It keeps the control's type and its parts —
- * `Button.Text` — so it stands in wherever the control did.
+ * `Button.Text` — so it stands in wherever the control did. On a TV its
+ * `onFocus`, `onBlur` and `ref` are the remote's own control's.
  */
 export function remotely<C extends ComponentType<never>>(Control: C, focused: object = FOCUSED): C {
   if (!isTV) return Control;
   const Inner = Control as unknown as ComponentType<Pressing>;
   function OnTV(props: Pressing) {
-    const { onPress, disabled, hasTVPreferredFocus, ...rest } = props;
+    const { onPress, disabled, hasTVPreferredFocus, onFocus, onBlur, ref, ...rest } = props;
     if (!onPress) return <Inner {...props} />;
     return (
-      <Remote onPress={onPress} disabled={disabled} preferred={hasTVPreferredFocus === true}>
+      <Remote
+        onPress={onPress}
+        disabled={disabled}
+        preferred={hasTVPreferredFocus === true}
+        {...(typeof onFocus === 'function' ? { onFocus: onFocus as () => void } : {})}
+        {...(typeof onBlur === 'function' ? { onBlur: onBlur as () => void } : {})}
+        {...(ref ? { ref: ref as Ref<View> } : {})}
+      >
         {(hasFocus) => <Inner {...rest} disabled={disabled} focusable={false} {...(hasFocus ? focused : {})} />}
       </Remote>
     );
