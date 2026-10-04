@@ -73,7 +73,9 @@ but the config and its test reads.
 The tab bar is the platform's own — iOS tabs, Material 3 navigation on
 Android — and so are the stack headers, sheets and switches. They are drawn
 natively, so they take colours resolved from the Tamagui theme. In a browser the
-tabs become a top navigation bar, which is also each tab's header.
+tabs become a top navigation bar, which is also each tab's header. On a TV
+they run down the left (`components/tv-tabs.tsx`), so the top of the screen
+is each tab's own.
 
 `src/components/stack-options.tsx` holds the four kinds of screen: a tab's root
 (a large native title, with the tab's actions and the profile switcher at the
@@ -511,9 +513,15 @@ browser are untouched.
   points wide, about seven across, and scenes 400, about four. Grown with the
   type they were six and three, and a row was too tall to sit beneath the
   spotlight without pushing it under the tab bar.
-- **No headers on tab roots or detail pages** — the tvOS tab bar names the
-  tab, and Menu goes back — and sheets take the whole screen, as do who is
-  watching and a profile's PIN, which are pushed (`profileGateOptions`).
+- **The tabs run down the left**, a column of symbols while the remote is in
+  a page — Media, Videos, Live, Settings, the one shown in the accent — that
+  opens with their names, over the page on a veil, while it is in the rail.
+  Select changes the tab and sends the remote into it, and the rail closes
+  behind it. Left from a page's first control reaches the rail; right goes
+  back to what the remote left.
+- **No headers on tab roots or detail pages** — the rail names the tab, and
+  Menu goes back — and sheets take the whole screen, as do who is watching
+  and a profile's PIN, which are pushed (`profileGateOptions`).
   Customize and Refresh sit at the top of the Media home.
 - **A title's page keeps to its column**: the logo over the picture lines up
   with the year and the buttons beneath it, well inside the screen's edge.

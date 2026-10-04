@@ -61,6 +61,31 @@ npm run tvos:device  # a real Apple TV: a Release build, with nothing tied to th
 - **`@react-native-tvos/config-tv`** does nothing unless `EXPO_TV=1`: it sets
   the Podfile's platform, the SDK, the device family and a TV launch screen.
 
+## The tabs, down the left
+
+The tvOS tab bar runs across the top, over each tab's page, and a page with
+a bar of its own at the top — Media's — had two. So on a TV the tabs are a
+rail down the left (`components/tv-tabs.tsx`):
+
+- **UIKit cannot do it.** On tvOS a `UITabBarController` has no sidebar —
+  its `UITabBarControllerModeTabSidebar` is marked unavailable there, and only
+  SwiftUI's `TabView` has one — so react-native-screens' native tabs keep the
+  bar on top. The rail is expo-router's headless tabs (`expo-router/ui`), as
+  the browser's top bar is; phones keep the native bar.
+- **Its geometry:** the symbols' column starts inside the title-safe margin,
+  and each tab's page starts just far enough right that its own margin — the
+  80-point gutter — puts what it shows clear of the rail. The rail is the
+  page's own colour, so a row scrolled under it disappears into it.
+- **Opening:** while the focus is in the rail it widens to show the names,
+  over the page, on a veil. The rail is a focus group, which says when the
+  focus comes in and goes.
+- **Select changes the tab and sends the focus into the page** — the page is
+  a focus group too, and `requestTVFocus()` on it lands on what the remote
+  last left there, or on the first control of a page it has not been in —
+  so the rail closes behind it.
+- **Menu on a tab's first screen leaves the app**: there is no system tab bar
+  for it to go to first.
+
 ## What a TV does not have
 
 Five Expo modules ship no tvOS build — brightness, screen orientation, local

@@ -1,0 +1,183 @@
+import { Film } from '@tamagui/lucide-icons-2/icons/Film';
+import { Settings } from '@tamagui/lucide-icons-2/icons/Settings';
+import { SquarePlay } from '@tamagui/lucide-icons-2/icons/SquarePlay';
+import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
+import { LinearGradient } from 'expo-linear-gradient';
+import { TabList, TabSlot, TabTrigger, Tabs, type TabListProps, type TabTriggerSlotProps } from 'expo-router/ui';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet } from 'react-native';
+import { SizableText, useTheme, XStack, YStack } from 'tamagui';
+
+import { clearOf } from './colour';
+import { GUTTER, px } from './density';
+import { FocusGroup, type FocusGroupHandle } from './focus-group';
+import { CHOSEN } from './settings-list';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
+
+// Where the symbols' column starts, and how wide it is.
+const LEFT = px(40);
+const CELL = px(48);
+/** The rail's width while the remote is in a tab: its symbols, on the page's own colour. */
+const RAIL = LEFT + CELL + px(8);
+// Where a tab's page starts: so that its own margin, the TV's title-safe one,
+// puts what it shows just clear of the rail.
+const PAGE = RAIL - GUTTER + px(16);
+// The rail's width while the remote is in it, words and all, drawn over the page.
+const OPEN = LEFT + CELL + px(200);
+const ITEM = px(48);
+const ICON = px(24);
+const OPEN_MS = 160;
+
+type TabIcon = typeof Film;
+// A symbol's colour: the accent's own on the focused pill, the accent for the tab shown, grey otherwise.
+type IconColor = '$accentColor' | '$accent11' | '$color11';
+
+/**
+ * The tabs on a TV, down the left rather than across the top, where each tab
+ * has its own controls: Media, Videos, Live and Settings as a column of
+ * symbols while the remote is in a page, opening with their words, over the
+ * page on a veil, while it is in the rail. UIKit's tab bar cannot do it — on
+ * tvOS a tab bar controller has no sidebar — so this is expo-router's own
+ * headless tabs, as the browser's top bar is. Select changes the tab and
+ * sends the remote into it, so the rail closes behind it. Left from a page's
+ * first control reaches the rail; right goes back to what the remote left in
+ * the page.
+ */
+export function TvTabs() {
+  const [open, setOpen] = useState(false);
+  const reduceMotion = useReduceMotion();
+  const page = useRef<FocusGroupHandle>(null);
+  // Counts the tabs chosen: each sends the focus into the page once that tab is drawn.
+  const [chosen, setChosen] = useState(0);
+  useEffect(() => {
+    if (chosen > 0) page.current?.requestTVFocus();
+  }, [chosen]);
+  const choose = () => setChosen((count) => count + 1);
+  return (
+    <Tabs>
+      <XStack flex={1} bg="$background">
+        <YStack width={PAGE} />
+        <FocusGroup ref={page} style={{ flex: 1 }}>
+          <TabSlot style={{ flex: 1 }} />
+        </FocusGroup>
+      </XStack>
+      <TabList asChild>
+        <Rail open={open} reduceMotion={reduceMotion} onOpen={setOpen}>
+          <TabTrigger name="media" href="/media" asChild>
+            <RailTab icon={Film} label="Media" open={open} onChosen={choose} />
+          </TabTrigger>
+          <TabTrigger name="videos" href="/videos" asChild>
+            <RailTab icon={SquarePlay} label="Videos" open={open} onChosen={choose} />
+          </TabTrigger>
+          <TabTrigger name="live" href="/live" asChild>
+            <RailTab icon={Tv} label="Live" open={open} onChosen={choose} />
+          </TabTrigger>
+          <TabTrigger name="settings" href="/settings" asChild>
+            <RailTab icon={Settings} label="Settings" open={open} onChosen={choose} />
+          </TabTrigger>
+        </Rail>
+      </TabList>
+    </Tabs>
+  );
+}
+
+/** The rail itself: its column, the veil behind it while it is open, and its width, animated between the two. */
+function Rail({
+  open,
+  reduceMotion,
+  onOpen,
+  children,
+}: TabListProps & { open: boolean; reduceMotion: boolean; onOpen: (open: boolean) => void }) {
+  const theme = useTheme();
+  const solid = String(theme.background.val);
+  const [width] = useState(() => new Animated.Value(RAIL));
+  const [veil] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const target = { width: open ? OPEN : RAIL, veil: open ? 1 : 0 };
+    if (reduceMotion) {
+      width.setValue(target.width);
+      veil.setValue(target.veil);
+      return undefined;
+    }
+    // The width is layout, which the native driver cannot animate; the veil's fade can.
+    const run = Animated.parallel([
+      Animated.timing(width, { toValue: target.width, duration: OPEN_MS, useNativeDriver: false }),
+      Animated.timing(veil, { toValue: target.veil, duration: OPEN_MS, useNativeDriver: true }),
+    ]);
+    run.start();
+    return () => run.stop();
+  }, [open, reduceMotion, width, veil]);
+
+  return (
+    <>
+      <Animated.View style={[styles.edge, { width: Math.round(OPEN * 1.6), opacity: veil, pointerEvents: 'none' }]}>
+        <LinearGradient
+          colors={[solid, solid, clearOf(solid)]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      <Animated.View style={[styles.edge, { width, overflow: 'hidden', backgroundColor: solid }]}>
+        <FocusGroup onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
+          <YStack flex={1} pl={LEFT} pr={px(8)} gap="$1.5" justify="center" role="tablist">
+            {children}
+          </YStack>
+        </FocusGroup>
+      </Animated.View>
+    </>
+  );
+}
+
+/**
+ * One tab in the rail: its symbol, and its name while the rail is open — a
+ * pill in the accent while the remote is on it, the accent's colour while it
+ * is the tab shown.
+ */
+function RailTab({
+  isFocused,
+  icon: Icon,
+  label,
+  open,
+  onPress,
+  onChosen,
+}: TabTriggerSlotProps & { icon: TabIcon; label: string; open: boolean; onChosen: () => void }) {
+  const [focused, setFocused] = useState(false);
+  const shown = isFocused ?? false;
+  const color: IconColor = focused ? '$accentColor' : shown ? '$accent11' : '$color11';
+  return (
+    <Pressable
+      onPress={(event) => {
+        onPress?.(event);
+        onChosen();
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: shown }}
+    >
+      <XStack height={ITEM} items="center" rounded="$10" bg={focused ? CHOSEN.bg : 'transparent'}>
+        <YStack width={CELL} items="center">
+          <Icon size={ICON} color={color} />
+        </YStack>
+        {open ? (
+          <SizableText
+            size="$6"
+            fontWeight={shown || focused ? '700' : '500'}
+            color={focused ? CHOSEN.color : shown ? '$accent11' : '$color12'}
+            numberOfLines={1}
+            pr="$4"
+          >
+            {label}
+          </SizableText>
+        ) : null}
+      </XStack>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  edge: { position: 'absolute', top: 0, bottom: 0, left: 0 },
+});

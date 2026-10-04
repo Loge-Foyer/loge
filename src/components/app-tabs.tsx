@@ -1,8 +1,18 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useTheme } from 'tamagui';
 
-/** The platform tab bar on iOS and Android; `app-tabs.web.tsx` is the browser's. */
+import { isTV } from './remote';
+import { TvTabs } from './tv-tabs';
+
+/**
+ * The platform tab bar on iOS and Android, and a rail down the left on a TV,
+ * whose top is each tab's own; `app-tabs.web.tsx` is the browser's.
+ */
 export function AppTabs() {
+  return isTV ? <TvTabs /> : <PlatformTabs />;
+}
+
+function PlatformTabs() {
   const theme = useTheme();
   // The bar is drawn natively, so it gets resolved colours rather than tokens.
   const accent = String(theme.accentBackground.val);

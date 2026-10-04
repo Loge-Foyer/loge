@@ -510,6 +510,11 @@ Not an afterthought. Things to know:
   `disableTVMenuKey()` anywhere else — one flag, and the first to turn it off
   takes it from everyone. Delete the module when react-native-screens with
   `disableDefaultMenuAction` (#4665) arrives.
+- **The tabs are a rail down the left** (`components/tv-tabs.tsx`), not
+  UIKit's tab bar: on tvOS a tab bar controller has no sidebar, and the bar
+  across the top sat over each tab's own. The rail is `expo-router/ui`'s
+  headless tabs, as the browser's bar is; select sends the focus into the
+  page (`requestTVFocus()` on its focus group), and the rail closes.
 - **Only the screen in front acts on the remote.** TV events reach every
   mounted screen, and a zap leaves the player before on the screen for a
   moment: gate `useRemoteKeys` on `useIsFocused()`.
