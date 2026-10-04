@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fnv1a64 } from '../sources/jellyfin/src/hash';
 import { bucket } from '../sources/jellyfin/src/images';
+import { DETAIL_FIELDS } from '../sources/jellyfin/src/query';
 import { normalizeBaseUrl } from '../sources/jellyfin/src/url';
 import * as fixtures from './fixtures/jellyfin';
 import { fakeContext, fakeHttp, target, type Route } from './support/fake-http';
@@ -273,6 +274,58 @@ describe('Jellyfin — listing', () => {
     await expect(listMovies(provider, JSON.stringify({ v: 1, scope: 'all', offsets: [3] }))).rejects.toMatchObject({
       code: 'INVALID_STATE',
     });
+  });
+
+  it('carries each title’s genres and what it is about, so a row can say them', async () => {
+    const { provider, http } = await connect({
+      routes: { 'GET /Items': { status: 200, json: fixtures.page([{ ...fixtures.movie, Genres: ['Comedy', 'Drama'], Overview: 'A heist.' }]) } },
+    });
+    const [film] = (await listMovies(provider)).items;
+    expect(film).toMatchObject({ genres: ['Comedy', 'Drama'], overview: 'A heist.' });
+    expect(http.to('GET /Items')[0]?.query.fields?.split(',')).toEqual(expect.arrayContaining(['Genres', 'Overview']));
+  });
+
+  it('asks for each of a detail page’s fields once', () => {
+    expect(new Set(DETAIL_FIELDS).size).toBe(DETAIL_FIELDS.length);
+  });
+
+  it('narrows to one genre, sent whole beside a search', async () => {
+    const { provider, http } = await connect({ routes: { 'GET /Items': { status: 200, json: fixtures.page([]) } } });
+    await provider.listItems?.({ kind: 'movies', sort: { by: 'title', order: 'asc' }, limit: 5, genre: 'Action, Adventure', term: 'heat' });
+    // The server splits on `|`, never on a comma a genre's name may hold.
+    expect(http.to('GET /Items')[0]?.query).toMatchObject({ genres: 'Action, Adventure', searchTerm: 'heat' });
+  });
+
+  it('lists the genres of one kind across the whole server in one request', async () => {
+    const { provider, http } = await connect({
+      routes: { 'GET /Genres': { status: 200, json: fixtures.page([fixtures.genre('Comedy'), fixtures.genre('Science Fiction')]) } },
+    });
+    await expect(provider.listGenres?.({ kind: 'movies' })).resolves.toEqual(['Comedy', 'Science Fiction']);
+    const [request] = http.to('GET /Genres');
+    expect(request?.query).toMatchObject({ userId: 'user-1', includeItemTypes: 'Movie', enableImages: 'false' });
+    expect(request?.query.parentId).toBeUndefined();
+  });
+
+  it('lists the genres of each chosen library that holds the kind, each once whatever its case', async () => {
+    const byLibrary: Readonly<Record<string, readonly string[]>> = { 'lib-shows': ['Comedy', 'Animation'], 'lib-mixed': ['comedy', 'Drama'] };
+    const { provider, http } = await connect({
+      routes: {
+        'GET /UserViews': { status: 200, json: fixtures.views },
+        'GET /Genres': (request) => ({ status: 200, json: fixtures.page((byLibrary[request.query.parentId ?? ''] ?? []).map(fixtures.genre)) }),
+      },
+      settings: { libraries: { mode: 'except', ids: ['lib-movies'] } },
+    });
+    await expect(provider.listGenres?.({ kind: 'shows' })).resolves.toEqual(['Comedy', 'Animation', 'Drama']);
+    expect(http.to('GET /Genres').map((request) => `${request.query.includeItemTypes}:${request.query.parentId}`)).toEqual([
+      'Series:lib-shows',
+      'Series:lib-mixed',
+    ]);
+  });
+
+  it('lists no genres, and asks nothing, for a kind it does not bring', async () => {
+    const { provider, http } = await connect({ routes: {} });
+    await expect(provider.listGenres?.({ kind: 'videos' })).resolves.toEqual([]);
+    expect(http.requests).toHaveLength(0);
   });
 
   it('lists only libraries of films and series', async () => {

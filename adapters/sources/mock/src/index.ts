@@ -4,8 +4,9 @@
  *
  * It declares a deliberately partial set of capabilities: a mock that can do
  * everything lets broken capability handling go unnoticed. It has no artwork,
- * so the app's placeholders get used, and it cannot be kept offline. Its fields
- * cover every field type the app renders.
+ * so the app's placeholders get used, and it cannot be kept offline. Its genres
+ * have a switch of their own, so a source without them can be tried offline
+ * too. Its fields cover every field type the app renders.
  */
 import { pluginId, type Plugin } from '@loge/api';
 
@@ -20,7 +21,7 @@ export const plugin: Plugin = {
     description: 'A pretend server with a fixed catalogue, for working offline.',
     media: {
       contentKinds: ['movies', 'shows', 'anime', 'videos', 'files'],
-      capabilities: ['browse', 'libraries', 'watchStateRead'],
+      capabilities: ['browse', 'genres', 'libraries', 'watchStateRead'],
     },
     connectionFields: [
       { key: 'libraryName', label: 'Library name', type: 'text', default: 'Mock library' },
@@ -56,6 +57,14 @@ export const plugin: Plugin = {
         ],
       },
       { key: 'libraries', label: 'Libraries to show', type: 'libraries', default: { mode: 'all' } },
+      {
+        key: 'genres',
+        label: 'Genres',
+        type: 'boolean',
+        default: true,
+        description: 'Lists its genres, and narrows to one. Switched off, it is a source that has none.',
+        gates: ['media.genres'],
+      },
     ],
   },
   media: {

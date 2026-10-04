@@ -33,6 +33,7 @@ Players and sync plugins have no capabilities of this kind.
 | Capability | Means | Provider members |
 | --- | --- | --- |
 | `browse` | It lists titles of the kinds it brings, and opens them | `listItems`, `getItem`, `getChildren` |
+| `genres` | It files titles under genres, lists them, and narrows a listing to one | `listGenres`, and `ItemQuery.genre` honoured |
 | `feed` | It can answer with the newest from a set of channels, in one call | `listFeed` |
 
 `getItem` may also fill `MediaDetail.versions` — what the file is: codecs,
@@ -54,6 +55,15 @@ search can answer with only videos, only channels or only playlists lists
 them in `media.searchScopes` (`all`, `video`, `channel`, `playlist`), and
 honours `ItemQuery.scope`; `validateManifest` refuses scopes without `search`.
 The app shows the choice beside the box only for such a source.
+
+**A genre is a call and a promise.** A source that declares `genres` lists
+the genres of a kind within its own libraries setting (`listGenres`), and
+narrows `listItems` to one (`ItemQuery.genre`) — beside a term, where it
+searches. One genre is one name across sources, as `genreKey` in `api`
+matches it: case, accents and spacing aside. The app hands a genre only to a
+source whose `genres` is in effect, and leaves the others out of the row
+rather than answering for them, so a source without genres is simply absent
+from a "Comedy" row and from "More like this".
 
 | `libraries` | It has libraries the user can choose between | `getLibraries` |
 | `watchStateRead` | Items carry what the user watched there; there is a resume list | `getResume` |

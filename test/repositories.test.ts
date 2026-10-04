@@ -192,7 +192,10 @@ describe.each(ENGINES)('the database on %s', (engine: Engine) => {
       await db.users.insert(alex);
       const adding = (id: string) =>
         db.preferences.update(alex.id, (current) => ({
-          homeLayout: { version: 1, rows: [...(current.homeLayout?.rows ?? []), { id, type: 'continue', hidden: false }] },
+          homeLayout: {
+            version: 1,
+            rows: [...(current.homeLayout?.rows ?? []).map((row) => ({ id: row.id, type: 'continue' as const, hidden: false })), { id, type: 'continue', hidden: false }],
+          },
         }));
       await Promise.all([adding('first'), adding('second'), db.deviceSettings.update((current) => ({ ...current, defaultUserId: alex.id }))]);
       expect((await db.preferences.get(alex.id)).homeLayout?.rows.map((row) => row.id)).toEqual(['first', 'second']);

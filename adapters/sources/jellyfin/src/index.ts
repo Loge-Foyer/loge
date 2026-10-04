@@ -21,6 +21,7 @@ export const plugin: Plugin = {
       capabilities: [
         'browse',
         'search',
+        'genres',
         'libraries',
         'watchStateRead',
         'watchStateWrite',

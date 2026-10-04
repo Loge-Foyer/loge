@@ -206,7 +206,7 @@ describe('pressing Play', () => {
 
   it('makes a controller whose headers come from the item’s source', async () => {
     const t = await setUp();
-    await t.services.media.row(t.kids, { kind: 'movies', sort: { by: 'title', order: 'asc' } }, 5);
+    await t.services.media.row(t.kids, { kinds: ['movies'], sort: { by: 'title', order: 'asc' } }, 5);
     t.services.playback.create(t.kids, t.players[0]?.plugin.manifest.id ?? ('' as never), t.connectionId);
     const [made] = t.players[0]?.made ?? [];
     await expect(made?.context.resolveHeaders('stream' as never)).resolves.toEqual({ Authorization: 'Token t' });

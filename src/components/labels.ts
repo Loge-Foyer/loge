@@ -15,12 +15,12 @@ import type {
 
 import type { BackupProblem } from '@/services/backup';
 import type { TargetStatus } from '@/services/backup/targets';
-import type { HomeRow } from '@/services/home-layout';
+import { NEWEST_RELEASES, type HomeRow } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import type { OwnerVerdict } from '@/services/owner-check';
 import type { PinScope, PinStatus } from '@/services/pins';
 import type { SyncStatus } from '@/services/sync/engine';
-import type { ContentTab } from '@/services/tab-content';
+import { TAB_CONTENT, type ContentTab } from '@/services/tab-content';
 
 /** The tabs that show content, by the names on the tab bar. */
 export const TAB_LABELS: Readonly<Record<ContentTab, string>> = {
@@ -479,12 +479,28 @@ export function describeProofVerdict(verdict: OwnerVerdict): string | undefined 
   return verdict === 'refused' ? 'That password isn’t right.' : describeOwnerVerdict(verdict);
 }
 
-/** "Continue watching", "Downloaded", "Movies", or "Movies · Date added" for a row a profile added. */
+/**
+ * A row by what it holds: "Continue watching", "Downloaded", "Movies", "Movies
+ * & shows", "Comedy" where it holds every kind, "Comedy movies" — and its
+ * order after it where a profile chose one of its own, "Movies · Date added".
+ */
 export function rowTitle(row: HomeRow): string {
   if (row.type === 'continue') return 'Continue watching';
   if (row.type === 'downloads') return 'Downloaded';
-  const base = CONTENT_KIND_LABELS[row.kind];
-  return row.extra ? `${base} · ${SORT_LABELS[row.sort.by]}` : base;
+  const kinds = andList(row.kinds.map((kind) => CONTENT_KIND_LABELS[kind]));
+  if (row.genre === undefined) return row.extra ? `${kinds} · ${SORT_LABELS[row.sort.by]}` : kinds;
+  const every = TAB_CONTENT.media.every((kind) => row.kinds.includes(kind));
+  const title = every ? row.genre : `${row.genre} ${kinds.toLowerCase()}`;
+  const newest = row.sort.by === NEWEST_RELEASES.by && row.sort.order === NEWEST_RELEASES.order;
+  return newest ? title : `${title} · ${SORT_LABELS[row.sort.by]}`;
+}
+
+/** "Movies", "Movies & shows", "Movies, shows & anime": a title's list, its first word capitalised. */
+function andList(labels: readonly string[]): string {
+  const [first, ...rest] = labels;
+  if (first === undefined) return '';
+  const words = [first, ...rest.map((label) => label.toLowerCase())];
+  return words.length === 1 ? first : `${words.slice(0, -1).join(', ')} & ${words[words.length - 1] ?? ''}`;
 }
 
 /** "mpv", or "mpv and the built-in player". */

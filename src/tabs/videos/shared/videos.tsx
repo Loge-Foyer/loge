@@ -82,7 +82,7 @@ function SourceVideos({
   const scopes = SEARCH_SCOPES.filter((each) => selected.manifest.media?.searchScopes?.includes(each) ?? false);
   const [scope, setScope] = useState<SearchScope | undefined>(scopes[0]);
   const grid = useGrid({
-    kind,
+    kinds: [kind],
     sort: { by: 'addedAt', order: 'desc' },
     connectionId: selected.connection.id,
     ...(searching ? { term, ...(scope === undefined ? {} : { scope }) } : {}),

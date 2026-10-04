@@ -129,7 +129,7 @@ describe.each(ENGINES)('secrets on %s', (engine: Engine) => {
     if (!ref) throw new Error('setup');
     await credentials.delete(ref);
 
-    const row = await services.media.row(kids.id, { kind: 'movies', sort: NEWEST }, 10);
+    const row = await services.media.row(kids.id, { kinds: ['movies'], sort: NEWEST }, 10);
     expect(row.items).toEqual([]);
     expect(row.sourceErrors).toEqual([expect.objectContaining({ code: 'UNAUTHORIZED', retry: 'never', needsPassword: true })]);
     expect(source.stats.signedInWith).toEqual([]);

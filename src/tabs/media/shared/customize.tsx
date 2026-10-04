@@ -33,7 +33,7 @@ export function CustomizeHomeScreen({ rowId }: { rowId?: string }) {
   const { update, reset } = useHomeLayoutActions();
   const all = rows ?? [];
   const shown = rowId ? all.filter((row) => row.id === rowId) : all;
-  const kinds = TAB_CONTENT.media.filter((kind) => all.some((row) => row.type === 'kind' && row.kind === kind && row.available));
+  const kinds = TAB_CONTENT.media.filter((kind) => all.some((row) => row.type === 'titles' && row.kinds.includes(kind) && row.available));
 
   return (
     <SheetScreen title={rowId && shown[0] ? rowTitle(shown[0]) : 'Home screen'}>
@@ -60,7 +60,7 @@ export function CustomizeHomeScreen({ rowId }: { rowId?: string }) {
                 key={kind}
                 size="$3"
                 icon={Plus}
-                onPress={() => update.mutate((current) => addRow(current, kind, `${kind}-${Date.now().toString(36)}`))}
+                onPress={() => update.mutate((current) => addRow(current, { kinds: [kind] }, `row-${Date.now().toString(36)}`))}
               >
                 {CONTENT_KIND_LABELS[kind]}
               </Button>
@@ -126,7 +126,7 @@ function RowEditor({
         <AppSwitch label={`Show ${rowTitle(row)}`} checked={!row.hidden} onCheckedChange={(on) => onChange({ hidden: !on })} />
       </XStack>
 
-      {row.type === 'kind' && !row.hidden ? (
+      {row.type === 'titles' && !row.hidden ? (
         <YStack gap="$3">
           <YStack gap="$1.5">
             <SizableText size="$2" color="$color10">

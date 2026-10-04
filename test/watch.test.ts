@@ -10,7 +10,7 @@ import { fakeNetwork, silentLog } from './support/fakes';
 import { buildServices, fakeMediaPlugin, movie } from './support/services';
 
 const MINUTE = 60_000;
-const NEWEST = { kind: 'movies', sort: { by: 'releaseDate', order: 'desc' } } as const;
+const NEWEST = { kinds: ['movies'], sort: { by: 'releaseDate', order: 'desc' } } as const;
 const running: { stop(): void }[] = [];
 afterEach(() => {
   for (const drainer of running.splice(0)) drainer.stop();

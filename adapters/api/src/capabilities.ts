@@ -1,6 +1,9 @@
 export const MEDIA_CAPABILITIES = [
   'browse',
   'search',
+  // What it files its titles under — `listGenres` — and only those of one:
+  // `ItemQuery.genre` honoured, as `search` honours `term`.
+  'genres',
   'libraries',
   'collections',
   'playlists',

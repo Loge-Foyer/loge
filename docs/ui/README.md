@@ -192,9 +192,17 @@ direction, poster or scene cards. Rows a profile adds can be removed; the
 default ones can only be hidden. Reset puts the default back.
 
 The layout is a preference, so it travels with the profile to every device.
-Version 2 brought the Downloaded row: this app adds it to a version 1 layout,
-right after Continue Watching, and an app that knows only 1 reads a 2 as no
-layout and shows its defaults, rather than drawing a row it does not know.
+An app reads a version it does not know as no layout and shows its defaults,
+rather than drawing a row it cannot:
+
+- **Version 2** brought the Downloaded row: this app adds it to a version 1
+  layout, right after Continue Watching.
+- **Version 3** brought rows of several kinds and of one genre — "Comedy"
+  across films and series, "Comedy movies". A layout is written as a 2 while
+  every row is still one kind of every genre (`layoutOf`), so a device on an
+  older build keeps reading it until a row needs a 3. A kind's own row is
+  known by its id, so one the profile has changed is never added again beside
+  itself.
 
 ## Live
 

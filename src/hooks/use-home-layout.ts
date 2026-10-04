@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { normalizeLayout, type HomeRow } from '@/services/home-layout';
+import { normalizeLayout, type HomeFeeds, type HomeRow } from '@/services/home-layout';
 import { userKey } from '@/services/query-keys';
 
 import { useServices } from './services-context';
@@ -18,16 +18,21 @@ export function useHomeRows() {
   // A TV and a browser have nowhere to keep a film.
   const { data: budget } = useDownloadBudget();
   const canKeep = (budget?.limitBytes ?? 0) > 0;
+  const feeds = useMemo((): HomeFeeds | undefined => {
+    if (!sources) return undefined;
+    const browsing = sources.filter((source) => source.effective.media?.capabilities.has('browse'));
+    return {
+      kinds: new Set(browsing.flatMap((source) => source.kinds)),
+      genreKinds: new Set(browsing.filter((source) => source.effective.media?.capabilities.has('genres')).flatMap((source) => source.kinds)),
+    };
+  }, [sources]);
   const rows = useMemo(() => {
-    if (!layout.data || !sources) return undefined;
-    const kinds = new Set(
-      sources.filter((source) => source.effective.media?.capabilities.has('browse')).flatMap((source) => source.kinds),
-    );
+    if (!layout.data || !sources || !feeds) return undefined;
     // A source's resume list, or what the app keeps for one that keeps none.
     const canContinue = sources.some((source) => source.watch !== undefined);
-    return normalizeLayout({ version: 2, rows: layout.data }, kinds, canContinue, canKeep);
-  }, [layout.data, sources, canKeep]);
-  return { rows, sources };
+    return normalizeLayout({ version: 3, rows: layout.data }, feeds, canContinue, canKeep);
+  }, [layout.data, sources, feeds, canKeep]);
+  return { rows, sources, feeds };
 }
 
 /** Changes apply at once and are stored behind them; a failed write puts the old rows back. */

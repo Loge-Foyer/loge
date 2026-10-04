@@ -200,7 +200,7 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
       expect(await savedPassword(b, own.id, robin)).toBe('robin-secret');
       const dump = await dumpDatabase(second, b.where);
       for (const secret of ['family-secret', 'sam-secret', 'robin-secret']) expect(dump).not.toContain(secret);
-      const row = await b.services.media.row(sam, { kind: 'movies', sort: NEWEST }, 10);
+      const row = await b.services.media.row(sam, { kinds: ['movies'], sort: NEWEST }, 10);
       expect(row.sourceErrors).toEqual([]);
       expect(row.items.length).toBeGreaterThan(0);
     });
@@ -552,7 +552,7 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
       if (ref) await a.credentials.delete(ref);
       await sync(a);
       await sync(b);
-      const result = await b.services.media.row(sam, { kind: 'movies', sort: NEWEST }, 10);
+      const result = await b.services.media.row(sam, { kinds: ['movies'], sort: NEWEST }, 10);
       expect(result.sourceErrors).toMatchObject([{ needsPassword: true }]);
       expect(media.stats.signedInWith.filter((secrets) => secrets.password === undefined)).toEqual([]);
     });

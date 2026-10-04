@@ -479,7 +479,9 @@ The home, each row's grid and the detail pages already opened are kept on the
 device, per profile and per source:
 
 - **What is kept:** each source's answer for a row (its first page, in the
-  source's own order), the grid's first page, Continue Watching, a show's
+  source's own order — one list per kind it brings, so a row of films and
+  series shares each kind's list with the row of that kind alone), the grid's
+  first page, Continue Watching, a show's
   seasons and episodes, and a detail page once it has been opened — and for
   IPTV, the channel list and the guide (Phase 7). Watch status is kept as the
   source reported it, inside each item; what this device changed since lives
@@ -492,6 +494,12 @@ device, per profile and per source:
   and `source:<kind>:<sort>`, a provider's first page of films or series. The
   same rules hold: only where `offlineMetadata` is in effect, only under the
   fingerprint it was saved with. A link to play is never kept.
+- **Lists of a genre are kept apart, and pruned.** A row's list is
+  `row:<kind>:<sort>`, exactly as before rows could hold several kinds; one
+  narrowed to a genre is `genre:row:<kind>:<sort>:<genre>` (and `genre:grid:…`),
+  and a source's genres of a kind are the value `genres:<kind>`. Any genre in
+  any order can be asked for, so `genre:` lists nobody opened for 30 days are
+  pruned, as details are.
 - **Only where allowed.** Nothing is kept unless the source declares
   `offlineMetadata` — stable ids, artwork versioned by tag — and the
   connection's "Keep metadata on this device" switch is on for that profile.

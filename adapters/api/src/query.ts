@@ -42,6 +42,18 @@ export interface ItemQuery {
    * as a search always did.
    */
   readonly scope?: SearchScope;
+  /**
+   * Only what the source files under this genre, within this kind — one genre,
+   * the way `genreKey` matches one: case, accents and spacing aside. Set only
+   * on a source whose `genres` is in effect; with a term, only where `search`
+   * is too.
+   */
+  readonly genre?: string;
+}
+
+/** Which genres: those a source files titles of one kind under. */
+export interface GenreQuery {
+  readonly kind: ContentKind;
 }
 
 /** Which of an item's children: one of its sections, and the page after `cursor`. */
@@ -63,6 +75,15 @@ function fold(text: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+/**
+ * One genre across sources: case, accents and spacing aside, so "Science
+ * Fiction" from one server and "science  fiction" from another are one row,
+ * and a source filtering on the device matches as the app merges.
+ */
+export function genreKey(name: string): string {
+  return fold(name).trim().replace(/\s+/g, ' ');
 }
 
 /**

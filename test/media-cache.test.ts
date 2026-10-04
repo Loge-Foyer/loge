@@ -9,14 +9,14 @@ import { fakeClock, memoryCredentialStore } from './support/fakes';
 import { buildServices, fakeMediaPlugin, movie } from './support/services';
 
 const NEWEST = { by: 'releaseDate', order: 'desc' } as const;
-const MOVIES = { kind: 'movies', sort: NEWEST } as const;
+const MOVIES = { kinds: ['movies'], sort: NEWEST } as const;
 const DAY = 86_400_000;
 
 function films(connectionId: ConnectionId): MediaItem[] {
   return [2024, 2020, 2016].map((year) => movie(connectionId, `m${year}`, year, { images: { poster: imageRef(`poster-${year}`) } }));
 }
 
-async function setUp(options: { keeps?: boolean; downloads?: boolean; engine?: Engine; where?: ReturnType<typeof reopenable> } = {}) {
+async function setUp(options: { keeps?: boolean; downloads?: boolean; genres?: boolean; engine?: Engine; where?: ReturnType<typeof reopenable> } = {}) {
   let failing: AppErrorCode | undefined;
   const source = fakeMediaPlugin('home', {
     movies: films,
@@ -24,6 +24,7 @@ async function setUp(options: { keeps?: boolean; downloads?: boolean; engine?: E
     children: (parent) => [movie(parent.key.connectionId, `${parent.key.externalId}-child`, 2021)],
     withImages: options.keeps ?? true,
     ...(options.downloads ? { downloads: true } : {}),
+    ...(options.genres ? { genres: true } : {}),
     failWith: () => (failing ? new AppError(failing, 'The source failed.', { retry: failing === 'OFFLINE' ? 'network-change' : 'backoff' }) : undefined),
   });
   const credentials = memoryCredentialStore();
@@ -101,6 +102,31 @@ describe('what sources answered, kept on the device', () => {
     const resume = await services.media.continueWatching(kids);
     expect(titles(resume.items)).toEqual(['r1']);
     expect(resume.sourceErrors[0]?.savedAt).toBe(savedAt);
+  });
+
+  it('stands in for a row of several kinds with what each kind’s own row saved', async () => {
+    const { services, kids, fail } = await setUp();
+    await services.media.row(kids, MOVIES, 10);
+    fail('OFFLINE');
+    const both = { kinds: ['movies', 'shows'], sort: NEWEST } as const;
+    expect(titles((await services.media.saved.row(kids, both, 10))?.items ?? [])).toEqual(['m2024', 'm2020', 'm2016']);
+    const row = await services.media.row(kids, both, 10);
+    expect(titles(row.items)).toEqual(['m2024', 'm2020', 'm2016']);
+    expect(row.sourceErrors.every((error) => error.code === 'OFFLINE')).toBe(true);
+  });
+
+  it('keeps a row of one genre apart from its kind’s, and forgets it after a month nobody opened it', async () => {
+    const { services, kids, connection, clock, db } = await setUp({ genres: true });
+    await services.media.row(kids, MOVIES, 10);
+    await services.media.row(kids, { ...MOVIES, genre: 'Drama' }, 10);
+    const [live] = await services.sources.forUser(kids);
+    if (!live) throw new Error('setup');
+    const genreList = () => db.mediaCache.list(kids, connection.id, 'genre:row:movies:releaseDate:desc:drama', fingerprintOf(live));
+    expect(await genreList()).toBeDefined();
+    clock.advance(31 * DAY);
+    await services.media.prune();
+    expect(await genreList()).toBeUndefined();
+    expect(await services.media.saved.row(kids, MOVIES, 10)).not.toBeNull();
   });
 
   it('is shown before the source answers — and never after the values it was saved under changed', async () => {

@@ -144,6 +144,7 @@ the connection's values already resolved for one profile.
 | --- | --- |
 | `browse` | `listItems`, `getItem`, `getChildren` |
 | `search` | none of its own: `listItems` honours `ItemQuery.term`, and `listChannels` honours `ChannelQuery.term` where `channels` is declared too |
+| `genres` | `listGenres`; and `listItems` honours `ItemQuery.genre`, one genre matched as `genreKey` matches it |
 | `libraries` | `getLibraries` |
 | `watchStateRead` | `getResume` (items carry `watch` too) |
 | `remoteImages` | `resolveImage` (synchronous), `resolveHeaders` |

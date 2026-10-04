@@ -5,10 +5,12 @@ import {
   AppError,
   categoryOfPluginId,
   compareItems,
+  genreKey,
   matchesTerm,
   pluginId,
   type ConnectedMediaProvider,
   type ContentKind,
+  type GenreQuery,
   type HttpClient,
   type MediaItem,
   type GlobalMediaKey,
@@ -102,8 +104,12 @@ export function movie(connectionId: ConnectionId, id: string, year: number, extr
 }
 
 export interface FakeSourceOptions {
-  /** Films per call of `connect`, given the connection id it runs for. */
+  /** Films per call of `connect`, given the connection id it runs for — and every kind's, unless `shows` is given too. */
   readonly movies?: (connectionId: ConnectionId) => readonly MediaItem[];
+  /** Series, for a source whose kinds answer apart: films for `movies`, these for `shows`. */
+  readonly shows?: (connectionId: ConnectionId) => readonly MediaItem[];
+  /** Lists the genres of what it holds, and narrows to one (`genres`), recording each in `stats.genres`. */
+  readonly genres?: boolean;
   readonly resume?: (connectionId: ConnectionId) => readonly MediaItem[];
   /** A show's seasons, or a season's episodes. */
   readonly children?: (parent: MediaItem) => readonly MediaItem[];
@@ -149,6 +155,10 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
     downloadRequests: [] as DownloadRequest[],
     /** The term each `listItems` was given — `undefined` where it was asked to browse. */
     terms: [] as (string | undefined)[],
+    /** The kind each `listItems` was asked for. */
+    kinds: [] as ContentKind[],
+    /** The genre each `listItems` was narrowed to — `undefined` for every genre — and `list <kind>` for each `listGenres`. */
+    genres: [] as (string | undefined)[],
   };
   const category = options.category ?? 'sources';
   const manifest: PluginManifest = {
@@ -166,6 +176,7 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
         ...(options.playback ? (['playback'] as const) : []),
         ...(options.withImages ? (['remoteImages', 'offlineMetadata'] as const) : []),
         ...(options.searches ? (['search'] as const) : []),
+        ...(options.genres ? (['genres'] as const) : []),
         ...(options.downloads ? (['downloads'] as const) : []),
       ],
     },
@@ -180,6 +191,14 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
       ? [{ key: 'cacheMetadata', label: 'Cache', type: 'boolean', default: true, gates: ['media.offlineMetadata'] }]
       : [],
   };
+  const itemsOf = (kind: ContentKind, connectionId: ConnectionId): readonly MediaItem[] =>
+    options.shows === undefined
+      ? (options.movies?.(connectionId) ?? [])
+      : kind === 'movies'
+        ? (options.movies?.(connectionId) ?? [])
+        : kind === 'shows'
+          ? options.shows(connectionId)
+          : [];
   const plugin: Plugin = {
     manifest,
     media: {
@@ -204,8 +223,13 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
           listItems: async (query) => {
             await fail();
             stats.terms.push(query.term);
-            const matching = (options.movies?.(target.connectionId) ?? []).filter((item) =>
-              query.term === undefined ? true : matchesTerm(query.term, 'title' in item ? item.title : ''),
+            stats.kinds.push(query.kind);
+            stats.genres.push(query.genre);
+            const genre = query.genre === undefined ? undefined : genreKey(query.genre);
+            const matching = itemsOf(query.kind, target.connectionId).filter(
+              (item) =>
+                (query.term === undefined || matchesTerm(query.term, 'title' in item ? item.title : '')) &&
+                (genre === undefined || item.genres.some((each) => genreKey(each) === genre)),
             );
             const all = matching.toSorted(compareItems(query.sort));
             const offset = query.cursor ? Number(query.cursor) : 0;
@@ -223,6 +247,15 @@ export function fakeMediaPlugin(id: string, options: FakeSourceOptions = {}) {
             await fail();
             return { items: options.children?.(parent) ?? [] };
           },
+          ...(options.genres
+            ? {
+                listGenres: async (query: GenreQuery) => {
+                  await fail();
+                  stats.genres.push(`list ${query.kind}`);
+                  return [...new Set(itemsOf(query.kind, target.connectionId).flatMap((item) => item.genres))];
+                },
+              }
+            : {}),
           ...(options.keepsNoWatchState
             ? {}
             : {

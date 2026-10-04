@@ -226,6 +226,11 @@ export function film(id: string, year: number) {
   };
 }
 
+/** A genre as `/Genres` lists it: an item of its own, of type Genre, trimmed to what is read. */
+export function genre(name: string) {
+  return { Name: name, ServerId: 'server-1', Id: `genre-${name.toLowerCase().replace(/\s+/g, '-')}`, Type: 'Genre', ImageTags: {}, BackdropImageTags: [], LocationType: 'FileSystem' };
+}
+
 export function page(items: readonly unknown[], total = items.length) {
   return { Items: items, TotalRecordCount: total, StartIndex: 0 };
 }

@@ -1,6 +1,8 @@
+import type { ContentKind } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
-import { describeSourceError, describeSyncStatus, timeAgo } from '@/components/labels';
+import { describeSourceError, describeSyncStatus, rowTitle, timeAgo } from '@/components/labels';
+import type { TitlesRow } from '@/services/home-layout';
 
 describe('describing a source that could not answer', () => {
   it('says a home server is skipped on mobile data', () => {
@@ -72,5 +74,36 @@ describe('how long ago', () => {
     expect(timeAgo(now - 30 * 3_600_000, now)).toBe('yesterday');
     expect(timeAgo(now - 12 * 86_400_000, now)).toBe('12 days ago');
     expect(timeAgo(now + 60_000, now)).toBe('just now');
+  });
+});
+
+describe('a row’s title', () => {
+  const titles = (kinds: readonly ContentKind[], extra: Partial<TitlesRow> = {}): TitlesRow => ({
+    id: 'r',
+    type: 'titles',
+    kinds,
+    sort: { by: 'releaseDate', order: 'desc' },
+    card: 'poster',
+    hidden: false,
+    extra: false,
+    ...extra,
+  });
+
+  it('names what it holds', () => {
+    expect(rowTitle({ id: 'continue', type: 'continue', hidden: false })).toBe('Continue watching');
+    expect(rowTitle(titles(['movies']))).toBe('Movies');
+    expect(rowTitle(titles(['movies', 'shows']))).toBe('Movies & shows');
+    expect(rowTitle(titles(['movies', 'shows', 'anime']))).toBe('Movies, shows & anime');
+  });
+
+  it('names its genre, alone where it holds every kind', () => {
+    expect(rowTitle(titles(['movies', 'shows', 'anime'], { genre: 'Comedy' }))).toBe('Comedy');
+    expect(rowTitle(titles(['movies'], { genre: 'Comedy' }))).toBe('Comedy movies');
+    expect(rowTitle(titles(['movies', 'shows'], { genre: 'Comedy' }))).toBe('Comedy movies & shows');
+  });
+
+  it('says its order where the profile chose one of its own', () => {
+    expect(rowTitle(titles(['movies'], { extra: true, sort: { by: 'addedAt', order: 'desc' } }))).toBe('Movies · Date added');
+    expect(rowTitle(titles(['movies'], { genre: 'Comedy', extra: true, sort: { by: 'rating', order: 'desc' } }))).toBe('Comedy movies · Rating');
   });
 });

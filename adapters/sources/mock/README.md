@@ -47,10 +47,12 @@ One field of each type a connection form renders:
 - *Simulated latency* — `slow` waits 1.5 s through the injected clock; `flaky`
   fails every third call with a retryable error.
 - *Libraries to show*.
+- *Genres* — on by default. Gates `genres`: off, it is a source with none, so
+  a row of one genre leaves it out, offline.
 
 It deliberately does **not** declare every capability: a mock that can do
 everything lets broken capability handling go unnoticed. It declares
-`browse`, `libraries` and `watchStateRead`, and declines the rest. It has no
+`browse`, `genres`, `libraries` and `watchStateRead`, and declines the rest. It has no
 artwork (`remoteImages`), so the app's placeholders get exercised, and it
 declines `offlineMetadata` and `search` as well.
 

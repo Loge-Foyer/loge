@@ -15,6 +15,7 @@ import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
+import { specOf } from '@/services/home-layout';
 
 import { CustomizeButton } from './customize-button';
 
@@ -29,11 +30,11 @@ const GAP = 12;
 export function BrowseScreen({ rowId }: { rowId: string }) {
   const { rows, sources } = useHomeRows();
   const row = rows?.find((candidate) => candidate.id === rowId);
-  const kindRow = row?.type === 'kind' ? row : undefined;
+  const kindRow = row?.type === 'titles' ? row : undefined;
   const [term, setTerm] = useState('');
   const searching = term.trim().length > 0;
-  // A search stays inside this row's kind: films answer a search of films.
-  const grid = useGrid(kindRow ? { kind: kindRow.kind, sort: kindRow.sort, ...(searching ? { term } : {}) } : undefined);
+  // A search stays inside this row's kinds: films answer a search of films.
+  const grid = useGrid(kindRow ? { ...specOf(kindRow), ...(searching ? { term } : {}) } : undefined);
   const onTerm = useCallback((next: string) => setTerm(next), []);
   const refresh = useRefreshMedia();
   const theme = useTheme();

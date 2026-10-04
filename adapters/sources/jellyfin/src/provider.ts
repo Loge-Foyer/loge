@@ -1,6 +1,7 @@
 import {
   AppError,
   compareItems,
+  genreKey,
   headersRef,
   mergeSorted,
   selectsLibrary,
@@ -24,7 +25,7 @@ import { toDetail, toLibrary, toMediaItem } from './map';
 import { pageAcross, readCursor, writeCursor } from './merge';
 import { describe, downloadContainer, downloadOptions, downloadProfile, externalSubtitles, parseOption } from './download';
 import { deviceProfile, TICKS_PER_MS, toDescriptor, type PlaySession } from './playback';
-import { DETAIL_FIELDS, IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
+import { DETAIL_FIELDS, genresParams, IMAGE_TYPES, ITEM_TYPE, itemsParams, LIST_FIELDS } from './query';
 import { normalizeBaseUrl, queryString } from './url';
 
 // Libraries change rarely; a limited selection needs them on every page.
@@ -126,7 +127,7 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
           toPage(
             await client.get(
               '/Items',
-              itemsParams({ userId, itemType: itemType.jellyfin, sort: query.sort, parentId, startIndex, limit, term: query.term }),
+              itemsParams({ userId, itemType: itemType.jellyfin, sort: query.sort, parentId, startIndex, limit, term: query.term, genre: query.genre }),
               signal,
             ),
             itemType.type,
@@ -166,12 +167,29 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       if (parent.type === 'season') {
         const json = await client.get(
           `/Shows/${encodeURIComponent(parent.show.externalId)}/Episodes`,
-          { ...common, seasonId: parent.key.externalId, fields: [...LIST_FIELDS, 'Overview'] },
+          { ...common, seasonId: parent.key.externalId, fields: LIST_FIELDS },
           signal,
         );
         return toPage(json, 'episode');
       }
       return { items: [] };
+    },
+
+    listGenres: async (query, signal) => {
+      const itemType = ITEM_TYPE[query.kind];
+      if (!itemType) return [];
+      const [userId, where] = await Promise.all([client.userId(signal), scope(query.kind)]);
+      const lists = await Promise.all(
+        where.parents.map(async (parentId) => {
+          const page = readItemsPage(await client.get('/Genres', genresParams({ userId, itemType: itemType.jellyfin, parentId }), signal));
+          if (!page) throw unreadable();
+          return page.items.flatMap((dto) => dto.name ?? []);
+        }),
+      );
+      // Each genre once, spelled as the first library to name it spells it.
+      const genres = new Map<string, string>();
+      for (const name of lists.flat()) if (!genres.has(genreKey(name))) genres.set(genreKey(name), name);
+      return [...genres.values()];
     },
 
     getLibraries: async (signal) => {

@@ -6,7 +6,7 @@ import type { ConnectionId } from './ids';
 import type { ChannelGroup, ChannelPage, ChannelQuery, GuideQuery, Programme } from './live';
 import type { GlobalMediaKey, HeadersRef, ImageRef, ImageSource, Library, MediaDetail, MediaItem } from './media';
 import type { PlaybackDescriptor, PlaybackRequest, ProgressReport } from './playback';
-import type { ChildQuery, ItemPage, ItemQuery } from './query';
+import type { ChildQuery, GenreQuery, ItemPage, ItemQuery } from './query';
 
 /** One connection's values, resolved for the profile it runs for. */
 export type MediaTarget = PluginTarget;
@@ -42,6 +42,12 @@ export interface ConnectedMediaProvider {
    */
   getChildren?(parent: MediaItem, signal?: CancelSignal, query?: ChildQuery): Promise<ItemPage>;
   getLibraries?(signal?: CancelSignal): Promise<readonly Library[]>;
+  /**
+   * The genres it files titles of `query.kind` under, within the connection's
+   * own libraries setting: each once, spelled as the source spells them, in
+   * any order — the app merges sources and sorts.
+   */
+  listGenres?(query: GenreQuery, signal?: CancelSignal): Promise<readonly string[]>;
   /** Items in progress, most recently played first. */
   getResume?(limit: number, signal?: CancelSignal): Promise<readonly MediaItem[]>;
   /** Builds an address, so it never waits. `null` when there is nothing to show. */
@@ -94,12 +100,14 @@ export interface MediaRole {
  * own but a promise about the ones already here. A source that declares it
  * honours `ItemQuery.term`, and `ChannelQuery.term` as well where it declares
  * `channels`. Searching therefore pages, sorts and merges exactly as browsing
- * does, and the app needs no second path through any of it.
+ * does, and the app needs no second path through any of it. `genres` is a call
+ * and the same kind of promise: it lists them, and honours `ItemQuery.genre`.
  */
 export const MEDIA_CAPABILITY_MEMBERS: Readonly<
   Partial<Record<MediaCapability, readonly (keyof ConnectedMediaProvider)[]>>
 > = {
   browse: ['listItems', 'getItem', 'getChildren'],
+  genres: ['listGenres'],
   libraries: ['getLibraries'],
   watchStateRead: ['getResume'],
   remoteImages: ['resolveImage'],

@@ -7,12 +7,11 @@ export const ITEM_TYPE: Readonly<Partial<Record<ContentKind, { readonly jellyfin
   shows: { jellyfin: 'Series', type: 'show' },
 };
 
-// Cards need little; the detail page asks for the rest.
-export const LIST_FIELDS = ['SortName', 'DateCreated', 'ChildCount', 'RecursiveItemCount'] as const;
+// Cards need little — their genres and a line about them too, for a home's
+// hero and a TV's row; the detail page asks for the rest.
+export const LIST_FIELDS = ['SortName', 'DateCreated', 'ChildCount', 'RecursiveItemCount', 'Genres', 'Overview'] as const;
 export const DETAIL_FIELDS = [
   ...LIST_FIELDS,
-  'Overview',
-  'Genres',
   'People',
   'Studios',
   'Taglines',
@@ -46,6 +45,7 @@ export function itemsParams(options: {
   readonly startIndex: number;
   readonly limit: number;
   readonly term?: string | undefined;
+  readonly genre?: string | undefined;
 }): Readonly<Record<string, QueryValue>> {
   const { sortBy, sortOrder } = sortParams(options.sort);
   const term = options.term?.trim();
@@ -53,6 +53,9 @@ export function itemsParams(options: {
     // The server searches as it searches — its own matching, its own ranking —
     // and still answers in the sort asked for, so pages merge as they always do.
     ...(term ? { searchTerm: term } : {}),
+    // One genre, as one plain string: the server splits `genres` on `|`, and a
+    // list here would be joined with commas — which a genre's name may hold.
+    ...(options.genre ? { genres: options.genre } : {}),
     userId: options.userId,
     parentId: options.parentId,
     includeItemTypes: options.itemType,
@@ -68,5 +71,22 @@ export function itemsParams(options: {
     imageTypeLimit: 1,
     enableImageTypes: IMAGE_TYPES,
     enableTotalRecordCount: true,
+  };
+}
+
+/** The genres titles of one type are filed under, in one library or across the whole server. */
+export function genresParams(options: {
+  readonly userId: string;
+  readonly itemType: string;
+  readonly parentId: string | undefined;
+}): Readonly<Record<string, QueryValue>> {
+  return {
+    userId: options.userId,
+    parentId: options.parentId,
+    includeItemTypes: options.itemType,
+    sortBy: 'SortName',
+    sortOrder: 'Ascending',
+    enableImages: false,
+    enableTotalRecordCount: false,
   };
 }

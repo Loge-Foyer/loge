@@ -1,8 +1,10 @@
 import {
   AppError,
   compareItems,
+  genreKey,
   selectsLibrary,
   type ConnectedMediaProvider,
+  type ContentKind,
   type MediaContext,
   type MediaItem,
   type MediaTarget,
@@ -30,6 +32,8 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
   };
 
   const visible = catalogue.entries.filter((entry) => selectsLibrary(selection, entry.libraryId));
+  const itemsOf = (kind: ContentKind): readonly MediaItem[] =>
+    kind === 'videos' ? catalogue.videos : visible.map((entry) => entry.item).filter((item) => kindOf(item) === kind);
 
   return {
     connectionId,
@@ -42,7 +46,9 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
 
     listItems: (query) =>
       respond(() => {
-        const all = (query.kind === 'videos' ? catalogue.videos : visible.map((entry) => entry.item).filter((item) => kindOf(item) === query.kind))
+        const genre = query.genre === undefined ? undefined : genreKey(query.genre);
+        const all = itemsOf(query.kind)
+          .filter((item) => genre === undefined || item.genres.some((each) => genreKey(each) === genre))
           .slice()
           .sort(compareItems(query.sort));
         const offset = query.cursor ? Number(query.cursor) : 0;
@@ -83,6 +89,13 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       }),
 
     getLibraries: () => respond(() => catalogue.libraries),
+
+    listGenres: (query) =>
+      respond(() => {
+        const genres = new Map<string, string>();
+        for (const name of itemsOf(query.kind).flatMap((item) => item.genres)) if (!genres.has(genreKey(name))) genres.set(genreKey(name), name);
+        return [...genres.values()];
+      }),
 
     getResume: (limit) =>
       respond(() => {

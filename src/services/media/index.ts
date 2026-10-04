@@ -1,5 +1,6 @@
 import {
   AppError,
+  genreKey,
   type CancelSignal,
   type ChannelGroup,
   type ChannelPage,
@@ -37,15 +38,26 @@ import { showsOn } from '../tab-content';
 import { inProgress, type WatchService } from '../watch';
 import { itemKeyOf } from '../watch/item-key';
 import { isAborted, sourceError, toAppError, type SourceError } from './errors';
-import { byLastPlayed, isExhausted, mergeRows, takeMerged, type MergeState, type SourceCursor } from './merge';
+import { byLastPlayed, isExhausted, mergeGenres, mergeRows, takeMerged, type MergeState, type SourceCursor } from './merge';
 import { fingerprintOf, type ProviderPool } from './pool';
 
 export type { SourceError } from './errors';
 export type { MergeState } from './merge';
 
 export interface RowSpec {
-  readonly kind: ContentKind;
+  /**
+   * What the row holds. A query names one kind, so each is asked of its
+   * sources apart and the answers merged in `sort` order: films and series in
+   * one row read as one list.
+   */
+  readonly kinds: readonly ContentKind[];
   readonly sort: ItemSort;
+  /**
+   * Only what a source files under this genre. Asked of the sources whose
+   * `genres` is in effect, and of no other — one that cannot narrow to a genre
+   * is left out rather than answered for.
+   */
+  readonly genre?: string;
   /**
    * One source only, for a tab that shows one at a time. Absent means every
    * source that brings the kind, merged — which is what Media wants and Videos
@@ -77,6 +89,12 @@ export interface GridPage extends RowResult {
   readonly total?: number;
   /** Where the next page starts; absent on the last one. */
   readonly next?: MergeState;
+}
+
+/** The genres sources file titles under, merged, and which sources could not say. */
+export interface GenreResult {
+  readonly genres: readonly string[];
+  readonly sourceErrors: readonly SourceError[];
 }
 
 /** A detail page, and — when the source could not answer — why, next to what was saved from it. */
@@ -138,6 +156,8 @@ export interface MediaService {
   row(userId: UserId, spec: RowSpec, limit: number, signal?: CancelSignal): Promise<RowResult>;
   continueWatching(userId: UserId, limit?: number, signal?: CancelSignal): Promise<RowResult>;
   gridPage(userId: UserId, spec: RowSpec, state: MergeState | null, pageSize: number, signal?: CancelSignal): Promise<GridPage>;
+  /** Every genre the sources of these kinds file titles under: each once, in order. */
+  genres(userId: UserId, kinds: readonly ContentKind[], signal?: CancelSignal): Promise<GenreResult>;
   item(userId: UserId, key: GlobalMediaKey, signal?: CancelSignal): Promise<ItemResult>;
   /** An item's children: a show's seasons, a season's episodes, one section of a channel — a page at a time where the source pages. */
   children(userId: UserId, parent: MediaItem, signal?: CancelSignal, query?: ChildQuery): Promise<ChildrenResult>;
@@ -195,11 +215,24 @@ const CHILDREN = 'children:';
 const GUIDE_KEPT_MS = 7 * 24 * 60 * 60 * 1000;
 
 const GUIDE = 'guide:';
+// Lists narrowed to a genre have no natural bound — any genre, any sort — so
+// they are pruned as what was opened once is.
+const GENRE = 'genre:';
 /** A grid scoped to one source keeps its own saved pages, apart from the merged ones. */
 const scope = (spec: RowSpec) => (spec.connectionId === undefined ? '' : `:@${spec.connectionId}`);
+/**
+ * One kind's list for a row or a grid. A row of one kind and no genre keeps
+ * the key it always had, and a row of several kinds shares each kind's list
+ * with the row of that kind alone.
+ */
+const kindList = (what: 'row' | 'grid', kind: ContentKind, spec: RowSpec) =>
+  spec.genre === undefined
+    ? `${what}:${kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`
+    : `${GENRE}${what}:${kind}:${spec.sort.by}:${spec.sort.order}:${genreKey(spec.genre)}${scope(spec)}`;
 const listKey = {
-  row: (spec: RowSpec) => `row:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
-  grid: (spec: RowSpec) => `grid:${spec.kind}:${spec.sort.by}:${spec.sort.order}${scope(spec)}`,
+  row: (kind: ContentKind, spec: RowSpec) => kindList('row', kind, spec),
+  grid: (kind: ContentKind, spec: RowSpec) => kindList('grid', kind, spec),
+  genres: (kind: ContentKind) => `genres:${kind}`,
   resume: 'resume',
   // A section's first page is kept apart from the item's other sections.
   children: (parent: MediaItem, section?: string) => `${CHILDREN}${parent.key.externalId}${section === undefined ? '' : `#${section}`}`,
@@ -218,6 +251,18 @@ const daysBetween = (from: string, to: string): readonly string[] => {
 };
 
 const searches = (term: string | undefined) => (term ?? '').trim() !== '';
+
+/** One source, and one kind asked of it. */
+interface Lane {
+  readonly source: Source;
+  readonly kind: ContentKind;
+}
+
+/** A source, and the key what it answers is saved under. */
+interface Saving {
+  readonly source: Source;
+  readonly key: string;
+}
 
 // Gone or no longer possible: what was saved for it is wrong now, not merely old.
 const invalidates = (error: AppError) => error.code === 'NOT_FOUND' || error.code === 'INVALID_STATE';
@@ -321,20 +366,21 @@ export function createMediaService(deps: {
   };
 
   /**
-   * Every source at once, each one's list saved as it arrives. A source that
-   * fails becomes a `SourceError` beside what did arrive — with what was saved
-   * from it standing in, when there is something.
+   * Every lane at once — a source, and what is asked of it — each one's list
+   * saved under its own key as it arrives. A source that fails becomes a
+   * `SourceError` beside what did arrive — with what was saved from it
+   * standing in, when there is something.
    */
-  const fanOut = async (
+  const fanOut = async <L extends Saving>(
     userId: UserId,
-    list: readonly Source[],
-    key: string,
-    fetch: (provider: ConnectedMediaProvider) => Promise<readonly MediaItem[]>,
+    lanes: readonly L[],
+    fetch: (provider: ConnectedMediaProvider, lane: L) => Promise<readonly MediaItem[]>,
   ) => {
     const results = await Promise.all(
-      list.map(async (source): Promise<{ items?: readonly MediaItem[]; error?: SourceError }> => {
+      lanes.map(async (lane): Promise<{ items?: readonly MediaItem[]; error?: SourceError }> => {
+        const { source, key } = lane;
         try {
-          const items = await call(source, fetch);
+          const items = await call(source, (provider) => fetch(provider, lane));
           await saveList(userId, source, key, items);
           return { items };
         } catch (error) {
@@ -358,15 +404,23 @@ export function createMediaService(deps: {
       return showsOn('media', source.manifest.category, kinds) || showsOn('videos', source.manifest.category, kinds);
     });
 
-  const listing = async (userId: UserId, spec: Pick<RowSpec, 'kind' | 'connectionId'>, searching = false) =>
-    (await libraryOf(userId)).filter(
+  /**
+   * What a row or a grid asks: each source that brings one of its kinds, once
+   * for each kind it brings — a query names one.
+   */
+  const lanesOf = async (userId: UserId, spec: Pick<RowSpec, 'kinds' | 'connectionId' | 'genre'>, searching = false): Promise<readonly Lane[]> => {
+    const library = (await libraryOf(userId)).filter(
       (source) =>
         can(source, 'browse') &&
-        (source.effective.media?.contentKinds.includes(spec.kind) ?? false) &&
-        // A term goes only to a source that promised to honour one.
+        // A term goes only to a source that promised to honour one, and a genre likewise.
         (!searching || can(source, 'search')) &&
+        (spec.genre === undefined || can(source, 'genres')) &&
         (spec.connectionId === undefined || source.connection.id === spec.connectionId),
     );
+    return spec.kinds.flatMap((kind) =>
+      library.filter((source) => source.effective.media?.contentKinds.includes(kind) ?? false).map((source) => ({ source, kind })),
+    );
+  };
 
   const listItems = (provider: ConnectedMediaProvider, query: ItemQuery, signal?: CancelSignal): Promise<ItemPage> => {
     if (!provider.listItems) throw missing('listItems');
@@ -384,13 +438,16 @@ export function createMediaService(deps: {
    * too — no I/O — so the saved items' artwork resolves on the first render:
    * nothing would tell a card to try again once the provider connected.
    */
-  const savedLists = async (userId: UserId, list: readonly Source[], key: string) => {
+  const savedLists = async <L extends Saving>(userId: UserId, lanes: readonly L[]) => {
     const found = await Promise.all(
-      list.filter(keeps).map(async (source) => {
-        const saved = await quietly(cache.list(userId, source.connection.id, key, fingerprintOf(source)));
-        if (saved && can(source, 'remoteImages')) await pool.provider(source).catch(() => undefined);
-        return saved ? { source, saved } : undefined;
-      }),
+      lanes
+        .filter((lane) => keeps(lane.source))
+        .map(async (lane) => {
+          const { source, key } = lane;
+          const saved = await quietly(cache.list(userId, source.connection.id, key, fingerprintOf(source)));
+          if (saved && can(source, 'remoteImages')) await pool.provider(source).catch(() => undefined);
+          return saved ? { lane, saved } : undefined;
+        }),
     );
     return found.filter((entry) => entry !== undefined);
   };
@@ -485,23 +542,34 @@ export function createMediaService(deps: {
     }
   };
 
+  const resumeLanes = async (userId: UserId) =>
+    (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead')).map((source) => ({ source, key: listKey.resume }));
+
   const saved: SavedMedia = {
     row: async (userId, spec, limit) => {
-      const found = await savedLists(userId, await listing(userId, spec), listKey.row(spec));
+      const lanes = (await lanesOf(userId, spec)).map((lane) => ({ ...lane, key: listKey.row(lane.kind, spec) }));
+      const found = await savedLists(userId, lanes);
       if (found.length === 0) return null;
       return { items: await watch.overlay(userId, mergeRows(found.map(({ saved: list }) => list.items), spec.sort, limit)), sourceErrors: [] };
     },
     continueWatching: async (userId, limit = CONTINUE_LIMIT) => {
-      const list = (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead'));
-      const found = await savedLists(userId, list, listKey.resume);
-      const items = await resumeRow(userId, found.map(({ saved: entry }) => entry.items), list, limit);
+      const lanes = await resumeLanes(userId);
+      const found = await savedLists(userId, lanes);
+      const items = await resumeRow(
+        userId,
+        found.map(({ saved: entry }) => entry.items),
+        lanes.map((lane) => lane.source),
+        limit,
+      );
       return found.length === 0 && items.length === 0 ? null : { items, sourceErrors: [] };
     },
     gridFirstPage: async (userId, spec, pageSize) => {
-      const found = await savedLists(userId, await listing(userId, spec), listKey.grid(spec));
+      const lanes = (await lanesOf(userId, spec)).map((lane) => ({ ...lane, key: listKey.grid(lane.kind, spec) }));
+      const found = await savedLists(userId, lanes);
       if (found.length === 0) return null;
-      const cursors: SourceCursor[] = found.map(({ source, saved: list }) => ({
-        connectionId: source.connection.id,
+      const cursors: SourceCursor[] = found.map(({ lane, saved: list }) => ({
+        connectionId: lane.source.connection.id,
+        kind: lane.kind,
         buffer: list.items,
         state: 'done',
       }));
@@ -511,35 +579,45 @@ export function createMediaService(deps: {
 
   return {
     row: async (userId, spec, limit, signal) => {
-      const { lists, sourceErrors } = await fanOut(userId, await listing(userId, spec), listKey.row(spec), async (provider) =>
-        (await listItems(provider, { kind: spec.kind, sort: spec.sort, limit }, signal)).items,
+      const lanes = (await lanesOf(userId, spec)).map((lane) => ({ ...lane, key: listKey.row(lane.kind, spec) }));
+      const { lists, sourceErrors } = await fanOut(userId, lanes, async (provider, lane) =>
+        (await listItems(provider, { kind: lane.kind, sort: spec.sort, limit, ...(spec.genre === undefined ? {} : { genre: spec.genre }) }, signal)).items,
       );
       return { items: await watch.overlay(userId, mergeRows(lists, spec.sort, limit)), sourceErrors };
     },
 
     continueWatching: async (userId, limit = CONTINUE_LIMIT, signal) => {
-      const list = (await libraryOf(userId)).filter((source) => can(source, 'watchStateRead'));
-      const { lists, sourceErrors } = await fanOut(userId, list, listKey.resume, (provider) => {
+      const lanes = await resumeLanes(userId);
+      const { lists, sourceErrors } = await fanOut(userId, lanes, (provider) => {
         if (!provider.getResume) throw missing('getResume');
         return provider.getResume(limit, signal);
       });
-      return { items: await resumeRow(userId, lists, list, limit), sourceErrors };
+      return {
+        items: await resumeRow(
+          userId,
+          lists,
+          lanes.map((lane) => lane.source),
+          limit,
+        ),
+        sourceErrors,
+      };
     },
 
     gridPage: async (userId, spec, state, pageSize, signal) => {
       const term = spec.term?.trim();
       const searching = term !== undefined && term.length > 0;
-      const list = await listing(userId, spec, searching);
-      const byId = new Map(list.map((source) => [source.connection.id, source]));
-      const key = listKey.grid(spec);
-      // The sources of the first page stay fixed while scrolling; one gone since is dropped.
+      const lanes = await lanesOf(userId, spec, searching);
+      const laneOf = (connectionId: ConnectionId, kind: ContentKind) => `${connectionId}|${kind}`;
+      const byLane = new Map(lanes.map((lane) => [laneOf(lane.source.connection.id, lane.kind), lane.source]));
+      // The lanes of the first page stay fixed while scrolling; one gone since is dropped.
       const start: readonly SourceCursor[] = state
-        ? state.sources.filter((cursor) => byId.has(cursor.connectionId))
-        : list.map((source) => ({ connectionId: source.connection.id, buffer: [], state: 'open' as const }));
+        ? state.sources.filter((cursor) => byLane.has(laneOf(cursor.connectionId, cursor.kind)))
+        : lanes.map((lane) => ({ connectionId: lane.source.connection.id, kind: lane.kind, buffer: [], state: 'open' as const }));
       const sourceErrors: SourceError[] = [];
       const refilled = await Promise.all(
         start.map(async (cursor) => {
-          const source = byId.get(cursor.connectionId);
+          const source = byLane.get(laneOf(cursor.connectionId, cursor.kind));
+          const key = listKey.grid(cursor.kind, spec);
           let next = cursor;
           for (let attempt = 0; source && next.state === 'open' && next.buffer.length < pageSize && attempt < REFILLS_PER_PAGE; attempt += 1) {
             try {
@@ -547,10 +625,11 @@ export function createMediaService(deps: {
                 listItems(
                   provider,
                   {
-                    kind: spec.kind,
+                    kind: cursor.kind,
                     sort: spec.sort,
                     limit: pageSize,
                     ...(next.cursor ? { cursor: next.cursor } : {}),
+                    ...(spec.genre === undefined ? {} : { genre: spec.genre }),
                     ...(searching ? { term } : {}),
                     ...(searching && spec.scope !== undefined && source.manifest.media?.searchScopes?.includes(spec.scope) ? { scope: spec.scope } : {}),
                   },
@@ -564,6 +643,7 @@ export function createMediaService(deps: {
               const total = page.total ?? next.total;
               next = {
                 connectionId: cursor.connectionId,
+                kind: cursor.kind,
                 buffer: [...next.buffer, ...page.items],
                 state: more ? 'open' : 'done',
                 ...(more && page.nextCursor ? { cursor: page.nextCursor } : {}),
@@ -580,7 +660,7 @@ export function createMediaService(deps: {
               const stand = state === null && attempt === 0 && !searching ? await savedFor(userId, source, key, failure) : undefined;
               sourceErrors.push(sourceError(source, failure, stand?.savedAt));
               next = stand
-                ? { connectionId: cursor.connectionId, buffer: stand.items, state: 'failed' }
+                ? { connectionId: cursor.connectionId, kind: cursor.kind, buffer: stand.items, state: 'failed' }
                 : { ...next, state: 'failed' };
             }
           }
@@ -596,6 +676,32 @@ export function createMediaService(deps: {
         ...(totals.every((total) => total !== undefined)
           ? { total: totals.reduce<number>((sum, total) => sum + (total ?? 0), 0) }
           : {}),
+      };
+    },
+
+    genres: async (userId, kinds, signal) => {
+      const lanes = (await lanesOf(userId, { kinds })).filter((lane) => can(lane.source, 'genres'));
+      const results = await Promise.all(
+        lanes.map(async ({ source, kind }): Promise<{ genres: readonly string[]; error?: SourceError }> => {
+          const key = listKey.genres(kind);
+          try {
+            const genres = await call(source, (provider) => {
+              if (!provider.listGenres) throw missing('listGenres');
+              return provider.listGenres({ kind }, signal);
+            });
+            if (keeps(source)) await quietly(cache.putValue(userId, source.connection.id, key, fingerprintOf(source), { value: genres, savedAt: clock.now() }));
+            return { genres };
+          } catch (error) {
+            if (isAborted(error)) throw error;
+            const failure = toAppError(error, log);
+            const stand = keeps(source) ? await quietly(cache.value<readonly string[]>(userId, source.connection.id, key, fingerprintOf(source))) : undefined;
+            return { genres: stand?.value ?? [], error: sourceError(source, failure, stand?.savedAt) };
+          }
+        }),
+      );
+      return {
+        genres: mergeGenres(results.map((result) => result.genres)),
+        sourceErrors: results.flatMap((result) => (result.error ? [result.error] : [])),
       };
     },
 
@@ -780,6 +886,7 @@ export function createMediaService(deps: {
 
     prune: async () => {
       await quietly(cache.prune(clock.now() - PRUNE_AFTER_MS, CHILDREN));
+      await quietly(cache.prune(clock.now() - PRUNE_AFTER_MS, GENRE));
       // A day's guide is old news in a week.
       await quietly(cache.prune(clock.now() - GUIDE_KEPT_MS, GUIDE));
     },

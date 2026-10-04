@@ -38,7 +38,9 @@ Movies and shows.
 
 ## What it can do
 
-`browse` (films, series, seasons, episodes, detail pages), `libraries`,
+`browse` (films, series, seasons, episodes, detail pages), `search`,
+`genres` (the server's genres of films or series, and a listing narrowed to
+one), `libraries`,
 `watchStateRead` (watched, progress, continue watching), `playback`,
 `watchStateWrite` (progress and watched, back to the server), `remoteImages`,
 `offlineMetadata`.
@@ -57,7 +59,10 @@ Worth knowing:
 - **Item artwork needs no sign-in,** so its addresses carry no token.
 - **Libraries can't be combined in one query:** Jellyfin has no multi-library
   filter. "Only these" and "all except" ask each chosen library for a page and
-  merge the pages in order.
+  merge the pages in order — and its genres from each, once each.
+- **A genre goes whole.** `/Items` splits `genres` on `|`, so a genre is sent
+  as one plain string, never a list the client would join with commas. Rows
+  carry each title's genres and overview, for a home's hero and a TV's row.
 
 ## Playing
 

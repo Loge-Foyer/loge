@@ -1,4 +1,4 @@
-import { compareItems, connectionId, matchesTerm, mergeSorted, type MediaItem, type Movie } from '@loge/api';
+import { compareItems, connectionId, genreKey, matchesTerm, mergeSorted, type MediaItem, type Movie } from '@loge/api';
 import { describe, expect, it } from 'vitest';
 
 function movie(id: string, extra: Partial<Movie> = {}): MediaItem {
@@ -89,5 +89,13 @@ describe('matching a search term', () => {
   it('skips the texts an item does not have', () => {
     expect(matchesTerm('erste', undefined, 'Das Erste')).toBe(true);
     expect(matchesTerm('erste', undefined)).toBe(false);
+  });
+});
+
+describe('one genre across sources', () => {
+  it('is one genre, case, accents and spacing aside', () => {
+    expect(genreKey('Science Fiction')).toBe(genreKey('science  fiction'));
+    expect(genreKey(' Science Fíction ')).toBe(genreKey('Science Fiction'));
+    expect(genreKey('Science Fiction')).not.toBe(genreKey('Science-Fiction'));
   });
 });

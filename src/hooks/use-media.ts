@@ -1,9 +1,10 @@
-import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@loge/api';
+import { CONTENT_KINDS, genreKey, type ConnectionId, type ContentKind, type GlobalMediaKey, type HeadersRef, type ImageRef, type MediaItem } from '@loge/api';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { PixelRatio } from 'react-native';
 
+import { isSameTitle, likeThis } from '@/services/home-filter';
 import type { GridPage, MergeState, RowResult, RowSpec } from '@/services/media';
 import { isRemoteKey, remoteKey, userKey } from '@/services/query-keys';
 
@@ -24,7 +25,16 @@ const remote = {
 const whileBackingOff = (result: RowResult | undefined, focused: boolean) =>
   focused && result?.sourceErrors.some((error) => error.retry === 'backoff') ? 30_000 : false;
 
-const rowKey = (spec: RowSpec) => [spec.kind, spec.sort.by, spec.sort.order] as const;
+/**
+ * What a row holds, as one part of its key: its kinds in the tab's order —
+ * one row however they were listed — and its genre as `genreKey` names it.
+ */
+const rowWhat = (spec: Pick<RowSpec, 'kinds' | 'genre'>) => {
+  const kinds = [...spec.kinds].sort((a, b) => CONTENT_KINDS.indexOf(a) - CONTENT_KINDS.indexOf(b)).join('+');
+  return spec.genre === undefined ? kinds : `${kinds}#${genreKey(spec.genre)}`;
+};
+
+const rowKey = (spec: RowSpec) => [rowWhat(spec), spec.sort.by, spec.sort.order] as const;
 
 /**
  * Several rows at once, so the home can gather what every row could not reach
@@ -35,6 +45,9 @@ export function useHomeRowQueries(specs: readonly RowSpec[]) {
   const userId = useActiveUserId();
   const { media } = useServices();
   const focused = useIsFocused();
+  // Where a row's key says what it holds: rows are matched by position, so
+  // another row's answer must never stand in for this one.
+  const what = remoteKey(userId, 'row').length;
   const saved = useQueries({
     queries: specs.map((spec) => ({
       queryKey: remoteKey(userId, 'saved', 'row', ...rowKey(spec)),
@@ -46,8 +59,9 @@ export function useHomeRowQueries(specs: readonly RowSpec[]) {
       queryKey: remoteKey(userId, 'row', ...rowKey(spec)),
       queryFn: ({ signal }: { signal: AbortSignal }) => media.row(userId, spec, ROW_LIMIT, signal),
       staleTime: 5 * MINUTE,
-      // Saved rows first; else, while the sort changes, the previous rows.
-      placeholderData: (previous: RowResult | undefined) => saved[index]?.data ?? previous,
+      // Saved rows first; else, while the sort changes, the same row as it was.
+      placeholderData: (previous: RowResult | undefined, previousQuery?: { readonly queryKey: readonly unknown[] }) =>
+        saved[index]?.data ?? (previousQuery?.queryKey[what] === rowWhat(spec) ? previous : undefined),
       refetchInterval: (query: { state: { data: RowResult | undefined } }) => whileBackingOff(query.state.data, focused),
       ...remote,
     })),
@@ -81,7 +95,7 @@ export function useGrid(spec: RowSpec | undefined) {
   const searching = (spec?.term ?? '').trim().length > 0;
   const saved = useQuery({
     // Scoped to one source where the grid is: two sources' films are not one list.
-    queryKey: remoteKey(userId, 'saved', 'grid', spec?.kind, spec?.sort.by, spec?.sort.order, spec?.connectionId),
+    queryKey: remoteKey(userId, 'saved', 'grid', spec ? rowWhat(spec) : undefined, spec?.sort.by, spec?.sort.order, spec?.connectionId),
     queryFn: () => (spec && !searching ? media.saved.gridFirstPage(userId, spec, GRID_PAGE) : null),
     enabled: spec !== undefined && !searching,
   });
@@ -99,7 +113,7 @@ export function useGrid(spec: RowSpec | undefined) {
     queryKey: remoteKey(
       userId,
       'grid',
-      spec?.kind,
+      spec ? rowWhat(spec) : undefined,
       spec?.sort.by,
       spec?.sort.order,
       spec?.connectionId,
@@ -114,6 +128,43 @@ export function useGrid(spec: RowSpec | undefined) {
     getNextPageParam: (last) => last.next ?? null,
     staleTime: 5 * MINUTE,
     placeholderData: (_previous: InfiniteData<GridPage, MergeState | null> | undefined) => placeholder,
+    enabled: spec !== undefined,
+    ...remote,
+  });
+}
+
+/** Every genre the sources of these kinds file titles under, merged and in order. */
+export function useGenres(kinds: readonly ContentKind[], enabled = true) {
+  const userId = useActiveUserId();
+  const { media } = useServices();
+  return useQuery({
+    queryKey: remoteKey(userId, 'genres', rowWhat({ kinds })),
+    queryFn: ({ signal }) => media.genres(userId, kinds, signal),
+    // Genres come and go with a whole library, not with an episode.
+    staleTime: 30 * MINUTE,
+    enabled: enabled && kinds.length > 0,
+    ...remote,
+  });
+}
+
+/**
+ * Titles like this one: its first genre, the best rated first — without the
+ * title itself, from whichever source, and only of its own type.
+ */
+export function useMoreLikeThis(item: MediaItem | undefined) {
+  const userId = useActiveUserId();
+  const { media } = useServices();
+  const spec = item ? likeThis(item) : undefined;
+  return useQuery({
+    // Under `row`, so what changes a row's watch state changes this too.
+    queryKey: remoteKey(userId, 'row', 'like', ...(spec ? rowKey(spec) : [])),
+    queryFn: ({ signal }) => {
+      if (!spec) throw new Error('Nothing is like this.');
+      return media.row(userId, spec, ROW_LIMIT + 1, signal);
+    },
+    select: (result: RowResult): RowResult =>
+      item ? { ...result, items: result.items.filter((other) => other.type === item.type && !isSameTitle(other, item)).slice(0, ROW_LIMIT) } : result,
+    staleTime: 5 * MINUTE,
     enabled: spec !== undefined,
     ...remote,
   });

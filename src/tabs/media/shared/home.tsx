@@ -22,7 +22,7 @@ import { useContinueWatching, useHomeRowQueries, useRefreshMedia } from '@/hooks
 import { useActiveUserId } from '@/hooks/use-session';
 import { usePendingSources } from '@/hooks/use-sources';
 import { categoryHref } from '@/screens/settings/plugin-route';
-import type { HomeRowView } from '@/services/home-layout';
+import { specOf, type HomeRowView } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import { TAB_CONTENT } from '@/services/tab-content';
 
@@ -32,7 +32,7 @@ import { Spotlight } from './spotlight';
 
 const isWeb = process.env.EXPO_OS === 'web';
 
-type KindRow = Extract<HomeRowView, { type: 'kind' }>;
+type KindRow = Extract<HomeRowView, { type: 'titles' }>;
 
 /**
  * The library across every source that brings films, series or anime: what is
@@ -50,9 +50,9 @@ export function MediaHomeScreen() {
   const landscapeWidth = useLandscapeWidth();
 
   const visible = (rows ?? []).filter((row) => !row.hidden && row.available);
-  const kindRows = visible.filter((row): row is KindRow => row.type === 'kind');
+  const kindRows = visible.filter((row): row is KindRow => row.type === 'titles');
   const showContinue = visible.some((row) => row.type === 'continue');
-  const results = useHomeRowQueries(kindRows.map((row) => ({ kind: row.kind, sort: row.sort })));
+  const results = useHomeRowQueries(kindRows.map(specOf));
   const continuing = useContinueWatching(showContinue);
   const { data: kept = [] } = useDownloads();
   // On a TV: the card the remote is on, shown large above the rows.
