@@ -4,6 +4,7 @@ import { Check } from '@tamagui/lucide-icons-2/icons/Check';
 import { Star } from '@tamagui/lucide-icons-2/icons/Star';
 import { Circle, SizableText, Theme, XStack, YStack } from 'tamagui';
 
+import { px } from '@/components/density';
 import { formatCommunityRating } from '@/components/labels';
 
 // Over artwork of any colour, a dark translucent pill stays legible — in a
@@ -55,6 +56,28 @@ export function ProgressBar({ value }: { value: number }) {
         <YStack height="100%" width={`${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`} bg="$accent9" />
       </YStack>
     </Theme>
+  );
+}
+
+/**
+ * A fact in a box, as a title's line of facts sets them apart: its age rating
+ * filled, how it looks — "4K", "HDR", "Atmos" — outlined.
+ */
+export function BoxBadge({ label, filled = false }: { label: string; filled?: boolean }) {
+  return (
+    <XStack
+      px={px(4)}
+      py={px(1)}
+      rounded="$1"
+      borderWidth={1}
+      borderColor={filled ? '$color4' : '$color8'}
+      bg={filled ? '$color4' : 'transparent'}
+      items="center"
+    >
+      <SizableText size="$1" fontWeight="700" color="$color11">
+        {label}
+      </SizableText>
+    </XStack>
   );
 }
 

@@ -663,6 +663,10 @@ typecheck.
   the scroll view it finds over the whole sheet unless it is the second of
   exactly two children, so anything put beside it — a title, Done — is drawn
   under the content.
+- **A button over a picture goes in a native header** where there is one —
+  iOS 26 draws its glass round it, Android its toolbar — and is
+  `HeaderButton`'s dark circle anywhere else (`components/header-button.tsx`).
+  Never add a glass library for the rest.
 - **Each content tab is its own UI, and so is each form factor in it:**
   `src/tabs/<tab>/{shared,mobile,tv}`, with an `index.ts` that takes the
   screens from `tv` or `mobile` at runtime (`isTV`) — `mobile` is a phone, a

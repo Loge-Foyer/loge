@@ -1,7 +1,7 @@
 import type { MediaItem } from '@loge/api';
 import { ListVideo } from '@tamagui/lucide-icons-2/icons/ListVideo';
 import { Play } from '@tamagui/lucide-icons-2/icons/Play';
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { Pressable } from 'react-native';
 import { SizableText, XStack, YStack } from 'tamagui';
 
@@ -27,11 +27,14 @@ export function LandscapeCard({
   resumes = false,
   onFocusItem,
   preferred = false,
+  href,
 }: {
   item: MediaItem;
   width: number;
   showWatch: boolean;
   resumes?: boolean;
+  /** Where its page is, where that is not the item's ordinary page. */
+  href?: Href;
   /** On a TV: the remote is on it now. */
   onFocusItem?: (item: MediaItem) => void;
   /** On a TV: where the focus starts. */
@@ -45,15 +48,15 @@ export function LandscapeCard({
         ? (item.owner?.name ?? '')
         : (timeLeft(item) ?? (item.year === undefined ? '' : String(item.year)));
 
-  const card = { item, width, title, subtitle, showWatch, preferred, onFocus: () => onFocusItem?.(item) };
+  const card = { item, width, title, subtitle, showWatch, preferred, page: href ?? itemHref(item), onFocus: () => onFocusItem?.(item) };
   return resumes ? <SplitCard {...card} /> : <WholeCard {...card} />;
 }
 
 /** One link: the page. */
-function WholeCard({ item, width, title, subtitle, showWatch, preferred, onFocus }: CardProps) {
+function WholeCard({ item, width, title, subtitle, showWatch, preferred, page, onFocus }: CardProps) {
   const { focused, handlers } = useRemoteFocus(onFocus);
   return (
-    <Link href={itemHref(item)} asChild>
+    <Link href={page} asChild>
       <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hasTVPreferredFocus={preferred} {...handlers}>
         {({ pressed }) => (
           <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>
@@ -67,7 +70,7 @@ function WholeCard({ item, width, title, subtitle, showWatch, preferred, onFocus
 }
 
 /** Two links: the picture plays it from where it stopped, the words open its page. */
-function SplitCard({ item, width, title, subtitle, showWatch, preferred, onFocus }: CardProps) {
+function SplitCard({ item, width, title, subtitle, showWatch, preferred, page, onFocus }: CardProps) {
   const picture = useRemoteFocus(onFocus);
   const words = useRemoteFocus(onFocus);
 
@@ -89,7 +92,7 @@ function SplitCard({ item, width, title, subtitle, showWatch, preferred, onFocus
           )}
         </Pressable>
       </Link>
-      <Link href={itemHref(item)} asChild>
+      <Link href={page} asChild>
         <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hitSlop={{ top: 4, bottom: 8 }} {...words.handlers}>
           {({ pressed }) => (
             <YStack opacity={pressed ? 0.8 : 1}>
@@ -109,6 +112,7 @@ interface CardProps {
   readonly subtitle: string;
   readonly showWatch: boolean;
   readonly preferred: boolean;
+  readonly page: Href;
   readonly onFocus: () => void;
 }
 

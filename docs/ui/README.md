@@ -84,6 +84,40 @@ first, sticky row (`components/sheet.tsx`): an iOS form sheet stretches the
 scroll view it finds over the whole sheet, and a title beside it ended up
 under the content.
 
+**Buttons over a picture** — ✕, "⋯", Cast — are the platform's own wherever
+there is a native header to put them in (`components/header-button.tsx`):
+
+- In a header on iOS 26 and later, the system draws its glass round each
+  button, so `HeaderButton` draws only its symbol (`inHeader`); Android's
+  Material toolbar takes them as they are.
+- Anywhere else — no header, an older iOS — the same button is a dark
+  translucent circle with a white symbol, legible over any picture.
+- No glass library is added for the places a header cannot reach: what the
+  system draws, it draws; the rest is the circle.
+
+## Shared pieces
+
+What more than one tab draws, in `src/components/`:
+
+- **The overlay picker** (`overlay-picker.tsx`) — a list over the whole
+  screen, for choosing one of many: categories, a series' seasons, a row's
+  category. Large grey rows, the chosen one bold in the page's own colour and
+  scrolled to as it opens, and a round ✕ at the bottom; none on a TV, where
+  Menu closes it. It is React Native's own modal, so it sits above a native
+  sheet and takes a remote's focus.
+- **A row's title** (`media/row-title.tsx`) — grey capitals, tracked: the
+  theme's `$color10`, never a colour of its own.
+- **Cast** (`cast-button.tsx`) is built — a header button, or a floating
+  one — and drawn nowhere while `CASTING` is false: there is no casting yet.
+- **A title's menu** (`media/title-menu.tsx`) — Play with…, Download and Add
+  to list, each a page of choices; `initialPage` opens it on one of them, for
+  a page that gives each its own button.
+- **Boxed facts** (`media/badges.tsx`, `BoxBadge`) — an age rating filled,
+  how a title looks and sounds ("4K", "Dolby Vision") outlined.
+- **On a TV**: `snap-point.tsx` marks where a scroll view holds what has the
+  focus, and `focus-group.tsx` says when the focus comes into a group and goes
+  (`docs/platforms/tvos`).
+
 ## Four tabs
 
 **Media, Videos, Live, Settings.** What appears on each is decided by category

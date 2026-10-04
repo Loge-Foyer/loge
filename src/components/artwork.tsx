@@ -113,6 +113,7 @@ export function ArtworkLogo({
   height,
   label,
   fallback,
+  position = 'left',
 }: {
   connectionId: ConnectionId;
   image: ImageRef | undefined;
@@ -120,6 +121,8 @@ export function ArtworkLogo({
   height: number;
   label: string;
   fallback: ReactNode;
+  /** Where the logo sits in its box: at the start of a column of words, or in the middle of a card. */
+  position?: 'left' | 'center';
 }) {
   const resolved = useArtwork(connectionId, image, width, height);
   const headers = useArtworkHeaders(connectionId, resolved?.headersRef);
@@ -133,7 +136,7 @@ export function ArtworkLogo({
       source={source}
       style={{ width, height }}
       contentFit="contain"
-      contentPosition="left"
+      contentPosition={position}
       cachePolicy={resolved.cachePolicy}
       accessibilityLabel={label}
     />

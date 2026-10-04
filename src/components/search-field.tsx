@@ -41,12 +41,15 @@ export function SearchField<S extends string>({
   onTerm,
   searchOn = 'pause',
   scope,
+  autoFocus = false,
 }: {
   placeholder: string;
   term: string;
   onTerm: (term: string) => void;
   searchOn?: 'pause' | 'submit';
   scope?: SearchScopeChoice<S>;
+  /** For a page that is there to search: the keyboard comes up with it. */
+  autoFocus?: boolean;
 }) {
   const [typed, setTyped] = useState(term);
 
@@ -90,6 +93,7 @@ export function SearchField<S extends string>({
           // Answer the moment it is asked for, rather than waiting out the pause.
           onSubmitEditing={() => onTerm(typed)}
           clearButtonMode="never"
+          autoFocus={autoFocus}
         />
       </XStack>
       {typed.length > 0 ? (

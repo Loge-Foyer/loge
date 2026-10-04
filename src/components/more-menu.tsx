@@ -3,41 +3,17 @@ import { ChevronLeft } from '@tamagui/lucide-icons-2/icons/ChevronLeft';
 import { ChevronRight } from '@tamagui/lucide-icons-2/icons/ChevronRight';
 import { Ellipsis } from '@tamagui/lucide-icons-2/icons/Ellipsis';
 import type { ReactNode } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SizableText, XStack, YStack } from 'tamagui';
 
 import { GUTTER, px } from './density';
-import { FOCUSED, useRemoteFocus } from './remote';
+import { HeaderButton } from './header-button';
+import { useRemoteFocus } from './remote';
 
-// From iOS 26 — and tvOS 26 — a header's buttons sit in the system's own
-// glass, which follows light and dark; anywhere else the "⋯" over artwork
-// needs a backdrop of its own to be seen.
-const SYSTEM_GLASS = Platform.OS === 'ios' && Number.parseInt(String(Platform.Version), 10) >= 26;
-// A browser's header gives its right-hand buttons no margin of their own.
-const EDGE = Platform.OS === 'web' ? 8 : 0;
-
-/** The "⋯" a page keeps its lesser actions behind. */
+/** The "⋯" a page keeps its lesser actions behind, in its header. */
 export function MoreButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const { focused, handlers } = useRemoteFocus();
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={{ marginRight: EDGE }} {...handlers}>
-      {({ pressed }) => (
-        <YStack
-          width={px(36)}
-          height={px(36)}
-          rounded={999}
-          items="center"
-          justify="center"
-          bg={SYSTEM_GLASS ? 'transparent' : 'rgba(0, 0, 0, 0.55)'}
-          opacity={pressed ? 0.7 : 1}
-          {...(focused ? FOCUSED : {})}
-        >
-          <Ellipsis size={px(20)} color={SYSTEM_GLASS ? '$color12' : 'white'} />
-        </YStack>
-      )}
-    </Pressable>
-  );
+  return <HeaderButton icon={Ellipsis} label={label} onPress={onPress} inHeader />;
 }
 
 /**

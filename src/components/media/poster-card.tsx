@@ -1,5 +1,5 @@
 import type { MediaItem } from '@loge/api';
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { Pressable } from 'react-native';
 import { SizableText, YStack } from 'tamagui';
 
@@ -21,6 +21,8 @@ export function PosterCard({
   onFocusItem,
   preferred = false,
   caption,
+  href,
+  words = true,
 }: {
   item: MediaItem;
   width: number;
@@ -31,11 +33,15 @@ export function PosterCard({
   onFocusItem?: (item: MediaItem) => void;
   /** On a TV: where the focus starts. */
   preferred?: boolean;
+  /** Where it opens, where that is not the item's ordinary page. */
+  href?: Href;
+  /** The title and year beneath it; a row of posters that speak for themselves goes without. */
+  words?: boolean;
 }) {
   const progress = showWatch ? progressOf(item) : undefined;
   const { focused, handlers } = useRemoteFocus(() => onFocusItem?.(item));
   return (
-    <Link href={itemHref(item)} asChild>
+    <Link href={href ?? itemHref(item)} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={item.year ? `${item.title}, ${item.year}` : item.title}
@@ -50,14 +56,16 @@ export function PosterCard({
               {showWatch && item.watch?.played ? <WatchedBadge /> : null}
               {progress === undefined ? null : <ProgressBar value={progress} />}
             </YStack>
-            <YStack gap="$0.5" pt={cardFocusRoom(width * 1.5)}>
-              <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
-                {item.title}
-              </SizableText>
-              <SizableText size="$2" color={caption ? '$accent11' : '$color10'} numberOfLines={1}>
-                {caption ?? item.year ?? ' '}
-              </SizableText>
-            </YStack>
+            {words ? (
+              <YStack gap="$0.5" pt={cardFocusRoom(width * 1.5)}>
+                <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
+                  {item.title}
+                </SizableText>
+                <SizableText size="$2" color={caption ? '$accent11' : '$color10'} numberOfLines={1}>
+                  {caption ?? item.year ?? ' '}
+                </SizableText>
+              </YStack>
+            ) : null}
           </YStack>
         )}
       </Pressable>

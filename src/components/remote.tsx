@@ -76,6 +76,19 @@ export const CARD_FOCUSED = {
 } as const;
 
 /**
+ * A focused card's ring without the lift, for a card whose size is its own to
+ * change — a row's card that widens as it takes the focus, whose neighbours
+ * move by its width and not by a scale they cannot know.
+ */
+export const CARD_RING = {
+  rounded: '$5',
+  outlineColor: '$accent10',
+  outlineWidth: 4,
+  outlineStyle: 'solid',
+  outlineOffset: 3,
+} as const;
+
+/**
  * How far a focused card's picture reaches past its own box on a TV, for a
  * picture `height` tall: lifted by `CARD_FOCUSED`'s scale, then ringed. The
  * words beneath keep this much clear and a row keeps it free above, or the
