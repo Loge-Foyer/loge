@@ -1,13 +1,14 @@
 import type { MediaItem } from '@loge/api';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, type View } from 'react-native';
 import { SizableText, YStack } from 'tamagui';
 
 import { px } from '@/components/density';
 import { playHref, titleHref } from '@/components/media/item-link';
 import { RowTitle } from '@/components/media/row-title';
 import { SnapPoint } from '@/components/snap-point';
+import { useTvBack } from '@/components/tv-back';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import type { HomeFilter } from '@/services/home-filter';
 
@@ -66,6 +67,11 @@ export function TvRow({
     clearTimeout(leaving.current);
     leaving.current = setTimeout(() => setInside(false), 0);
   };
+  // Back's first press sends the remote to the row's first card; the row snaps back to its start with it.
+  const back = useTvBack();
+  const firstCard = useRef<View>(null);
+  const toFirst = () => firstCard.current?.requestTVFocus();
+  const owner = (index: number) => `${row.row.id}:${index}`;
   const withKept = useKeptWatch(row.items);
   const cards = row.items.slice(0, TV_ROW_CARDS).map(withKept);
   const more = row.row.type === 'titles' && row.items.length > TV_ROW_CARDS;
@@ -87,6 +93,7 @@ export function TvRow({
         {cards.map((item, index) => (
           <SnapPoint key={`${item.key.connectionId}|${item.key.externalId}`} align="start" style={{ width: layout.slot }}>
             <TvCard
+              {...(index === 0 ? { ref: firstCard } : {})}
               item={item}
               layout={layout}
               expanded={current === index}
@@ -94,8 +101,14 @@ export function TvRow({
               showWatch={row.row.type !== 'downloads' && watchFrom(item)}
               preferred={preferFirst && index === 0}
               reduceMotion={reduceMotion}
-              onFocus={() => enter(index)}
-              onBlur={leave}
+              onFocus={() => {
+                enter(index);
+                back?.at(owner(index), { first: index === 0, toFirst });
+              }}
+              onBlur={() => {
+                leave();
+                back?.left(owner(index));
+              }}
               // Continue Watching plays where it stopped; holding select opens its page instead.
               onPress={() => {
                 const startMs = resumeAtOf(item);
@@ -111,8 +124,14 @@ export function TvRow({
               layout={layout}
               shift={shiftOf(layout, cards.length, current)}
               reduceMotion={reduceMotion}
-              onFocus={() => enter(cards.length)}
-              onBlur={leave}
+              onFocus={() => {
+                enter(cards.length);
+                back?.at(owner(cards.length), { first: false, toFirst });
+              }}
+              onBlur={() => {
+                leave();
+                back?.left(owner(cards.length));
+              }}
               onPress={() => router.push(browseHref(row.row.id, filter))}
             />
           </SnapPoint>

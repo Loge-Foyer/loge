@@ -85,8 +85,18 @@ rail down the left (`components/tv-tabs.tsx`):
   a focus group too, and `requestTVFocus()` on it lands on what the remote
   last left there, or on the first control of a page it has not been in —
   so the rail closes behind it.
-- **Menu on a tab's first screen leaves the app**: there is no system tab bar
-  for it to go to first.
+- **Back on a tab's first screen walks outwards** (`components/tv-back.tsx`):
+  the first press sends the remote to the first control of the row, list or
+  column it is in — a row of cards scrolls back to its start, a list of
+  channels to its top — then to the rail, and with the rail open, out of the
+  app. A control that knows its row says so as the remote lands on it
+  (`useTvBack().at`, and `left` as it goes); one that does not sends the first
+  press straight to the rail. A tab's first screen marks itself
+  (`useTvTabRoot`), and while one is in front and the rail is closed the tabs
+  hold Menu for the app, as the player does. With the rail open they let go,
+  so the last press is the system's own: `exitApp` does nothing on tvOS. A
+  screen pushed inside a tab — Media's search — is no first screen, so Menu
+  goes back from it as ever.
 
 ## What a TV does not have
 

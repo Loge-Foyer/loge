@@ -5,8 +5,8 @@ import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
 import { Star } from '@tamagui/lucide-icons-2/icons/Star';
 import { TvMinimalPlay } from '@tamagui/lucide-icons-2/icons/TvMinimalPlay';
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
+import { FlatList, Pressable, RefreshControl, useWindowDimensions, type View } from 'react-native';
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
 import { ActionMenu } from '@/components/action-menu';
@@ -23,6 +23,7 @@ import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { usePosterWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
+import { useTvBack, useTvTabRoot } from '@/components/tv-back';
 import { useServices } from '@/hooks/services-context';
 import { useFavoriteChannels, useListActions } from '@/hooks/use-lists';
 import { nowAndNext, useChannelGroups, useChannels, useGuide, useLastLiveGroup, useNow, useRememberLiveGroup, useSourcePage } from '@/hooks/use-live';
@@ -50,6 +51,7 @@ export function LiveScreen() {
   const params = useLocalSearchParams<{ source?: string; kind?: string; group?: string }>();
   const [term, setTerm] = useState('');
   const onTerm = useCallback((next: string) => setTerm(next), []);
+  useTvTabRoot();
 
   if (!sources) return <Screen>{null}</Screen>;
   if (sources.length === 0) return <LiveEmptyState />;
@@ -199,6 +201,14 @@ function Channels({ source, group, term, header }: { source: TabSource; group: s
   );
   const scroller = useRef<FlatList<Channel>>(null);
   useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
+  // On a TV, Back's first press sends the remote to the first channel: the list goes back to its top, and
+  // the row — unmounted far down a long list — is asked once it is drawn again.
+  const back = useTvBack();
+  const firstRow = useRef<View>(null);
+  const toFirst = () => {
+    scroller.current?.scrollToOffset({ offset: 0, animated: false });
+    requestAnimationFrame(() => requestAnimationFrame(() => firstRow.current?.requestTVFocus()));
+  };
 
   // What a long press — a held select, with a remote — was on, while its menu is up.
   const [held, setHeld] = useState<Channel>();
@@ -239,8 +249,11 @@ function Channels({ source, group, term, header }: { source: TabSource; group: s
             <SourceNotices errors={dedupe(errors)} onRetry={() => void onRefresh()} />
           </YStack>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ChannelRow
+            {...(index === 0 ? { rowRef: firstRow } : {})}
+            onFocusRow={() => back?.at(`channel:${item.key.externalId}`, { first: index === 0, toFirst })}
+            onBlurRow={() => back?.left(`channel:${item.key.externalId}`)}
             channel={item}
             connectionId={connectionId}
             group={shown}
@@ -327,6 +340,9 @@ export function playChannel(channel: Channel, group: string | undefined) {
 }
 
 function ChannelRow({
+  rowRef,
+  onFocusRow,
+  onBlurRow,
   channel,
   connectionId,
   group,
@@ -335,6 +351,10 @@ function ChannelRow({
   favorite,
   onHold,
 }: {
+  /** On a TV: the row's own focusable frame, and where the remote is in the list. */
+  rowRef?: Ref<View>;
+  onFocusRow?: () => void;
+  onBlurRow?: () => void;
   channel: Channel;
   connectionId: ConnectionId;
   group: string | undefined;
@@ -351,13 +371,21 @@ function ChannelRow({
   return (
     <XStack gap="$3" items="center">
       <Pressable
+        {...(rowRef ? { ref: rowRef } : {})}
         style={{ flex: 1 }}
         onPress={() => playChannel(channel, group)}
         onLongPress={() => onHold(channel)}
         accessibilityRole="button"
         accessibilityLabel={`Watch ${channel.name}${favorite ? ', a favourite' : ''}${now ? `, now ${now.title}` : ''}`}
         accessibilityHint={favorite ? 'Hold to remove it from your favourites' : 'Hold to add it to your favourites'}
-        {...row.handlers}
+        onFocus={() => {
+          row.handlers.onFocus();
+          onFocusRow?.();
+        }}
+        onBlur={() => {
+          row.handlers.onBlur();
+          onBlurRow?.();
+        }}
       >
         {({ pressed }) => (
           <XStack gap="$3" items="center" opacity={pressed ? 0.75 : 1} bg={row.focused ? '$accent4' : '$color2'} rounded="$4" p="$2.5">
@@ -375,7 +403,15 @@ function ChannelRow({
         accessibilityRole="button"
         accessibilityLabel={`Today on ${channel.name}`}
         hitSlop={8}
-        {...guide.handlers}
+        // Its row's calendar is in the list as its row is: Back sends the remote to the first channel from here too.
+        onFocus={() => {
+          guide.handlers.onFocus();
+          onFocusRow?.();
+        }}
+        onBlur={() => {
+          guide.handlers.onBlur();
+          onBlurRow?.();
+        }}
       >
         <CalendarDays size={22} color={guide.focused ? '$accent11' : '$color10'} />
       </Pressable>
@@ -415,6 +451,13 @@ function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: C
   const errors = page.data?.pages[0]?.sourceError ? [page.data.pages[0].sourceError] : [];
   const scroller = useRef<FlashListRef<MediaItem>>(null);
   useTopOnNewTerm(term, () => scroller.current?.scrollToOffset({ offset: 0, animated: false }));
+  // On a TV, Back's first press sends the remote to the first poster, drawn again at the top if it was recycled.
+  const back = useTvBack();
+  const firstPoster = useRef<View>(null);
+  const toFirst = () => {
+    scroller.current?.scrollToOffset({ offset: 0, animated: false });
+    requestAnimationFrame(() => requestAnimationFrame(() => firstPoster.current?.requestTVFocus()));
+  };
   return (
     <FlashList
       ref={scroller}
@@ -432,9 +475,17 @@ function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: C
           <SourceNotices errors={errors} onRetry={() => void onRefresh()} />
         </YStack>
       }
-      renderItem={({ item }) => (
+      renderItem={({ item, index }) => (
         <YStack px={6} pb="$5" items="center">
-          <PosterCard item={withKept(item)} width={cardWidth} showWatch={source.watch !== undefined} {...captionOf(captions, item)} />
+          <PosterCard
+            {...(index === 0 ? { ref: firstPoster } : {})}
+            item={withKept(item)}
+            width={cardWidth}
+            showWatch={source.watch !== undefined}
+            onFocusItem={() => back?.at(`poster:${item.key.externalId}`, { first: index === 0, toFirst })}
+            onBlurItem={() => back?.left(`poster:${item.key.externalId}`)}
+            {...captionOf(captions, item)}
+          />
         </YStack>
       )}
       ListEmptyComponent={

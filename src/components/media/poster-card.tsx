@@ -1,6 +1,7 @@
 import type { MediaItem } from '@loge/api';
 import { Link, type Href } from 'expo-router';
-import { Pressable } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, type View } from 'react-native';
 import { SizableText, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
@@ -15,22 +16,27 @@ import { itemHref } from './item-link';
  * a source that does not report watch status to this profile.
  */
 export function PosterCard({
+  ref,
   item,
   width,
   showWatch,
   onFocusItem,
+  onBlurItem,
   preferred = false,
   caption,
   href,
   words = true,
 }: {
+  /** The card's own focusable frame, which `requestTVFocus()` sends the remote to. */
+  ref?: Ref<View>;
   item: MediaItem;
   width: number;
   showWatch: boolean;
   /** In place of the year: where a series someone is watching got to — "S2 · E5". */
   caption?: string;
-  /** On a TV: the remote is on it now. */
+  /** On a TV: the remote is on it now, and has left it. */
   onFocusItem?: (item: MediaItem) => void;
+  onBlurItem?: (item: MediaItem) => void;
   /** On a TV: where the focus starts. */
   preferred?: boolean;
   /** Where it opens, where that is not the item's ordinary page. */
@@ -43,10 +49,15 @@ export function PosterCard({
   return (
     <Link href={href ?? itemHref(item)} asChild>
       <Pressable
+        {...(ref ? { ref } : {})}
         accessibilityRole="link"
         accessibilityLabel={item.year ? `${item.title}, ${item.year}` : item.title}
         hasTVPreferredFocus={preferred}
         {...handlers}
+        onBlur={() => {
+          handlers.onBlur();
+          onBlurItem?.(item);
+        }}
       >
         {({ pressed }) => (
           <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>

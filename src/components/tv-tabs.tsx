@@ -4,7 +4,7 @@ import { SquarePlay } from '@tamagui/lucide-icons-2/icons/SquarePlay';
 import { Tv } from '@tamagui/lucide-icons-2/icons/Tv';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabListProps, type TabTriggerSlotProps } from 'expo-router/ui';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 import { SizableText, useTheme, XStack, YStack } from 'tamagui';
 
@@ -13,6 +13,8 @@ import { clearOf } from './colour';
 import { GUTTER, px } from './density';
 import { FocusGroup, type FocusGroupHandle } from './focus-group';
 import { CHOSEN } from './settings-list';
+import { TvBackContext, type TvBack, type TvSpot } from './tv-back';
+import { useBackLayers } from '@/hooks/use-back-layers';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 // Where the symbols' column starts, and how wide it is.
@@ -37,17 +39,51 @@ type IconColor = '$accentColor' | '$accent11' | '$color11';
  * The tabs on a TV, down the left rather than across the top, where each tab
  * has its own controls: Loge's icon at the top, then Media, Videos, Live and
  * Settings as a column of symbols while the remote is in a page, opening with
- * their words, over the page on a veil, while it is in the rail. UIKit's tab bar cannot do it — on
- * tvOS a tab bar controller has no sidebar — so this is expo-router's own
- * headless tabs, as the browser's top bar is. Select changes the tab and
- * sends the remote into it, so the rail closes behind it. Left from a page's
- * first control reaches the rail; right goes back to what the remote left in
- * the page.
+ * their words, over the page on a veil, while it is in the rail. UIKit's tab
+ * bar cannot do it — on tvOS a tab bar controller has no sidebar — so this is
+ * expo-router's own headless tabs, as the browser's top bar is. Select
+ * changes the tab and sends the remote into it, so the rail closes behind it.
+ * Left from a page's first control reaches the rail; right goes back to what
+ * the remote left in the page.
+ *
+ * Back on a tab's first screen walks outwards: to the first control of the
+ * row, list or column the remote is in; then to the rail; then, with the rail
+ * open, out of the app. Menu is held for the app only until the rail is
+ * open, so the last press is the system's own — `exitApp` does nothing on
+ * tvOS (`components/tv-back.tsx`).
  */
 export function TvTabs() {
   const [open, setOpen] = useState(false);
   const reduceMotion = useReduceMotion();
   const page = useRef<FocusGroupHandle>(null);
+  const rail = useRef<FocusGroupHandle>(null);
+  // Where the remote is, as the control it is on last said; and how many tabs' first screens are in front.
+  const spot = useRef<{ readonly owner: unknown; readonly spot: TvSpot } | undefined>(undefined);
+  const [roots, setRoots] = useState(0);
+  const back = useMemo<TvBack>(
+    () => ({
+      at: (owner, here) => {
+        spot.current = { owner, spot: here };
+      },
+      left: (owner) => {
+        if (spot.current?.owner === owner) spot.current = undefined;
+      },
+      root: (inFront) => {
+        spot.current = undefined;
+        setRoots((count) => count + (inFront ? 1 : -1));
+      },
+    }),
+    [],
+  );
+  useBackLayers(
+    roots > 0 && !open
+      ? () => {
+          const here = spot.current?.spot;
+          if (here && !here.first) here.toFirst();
+          else rail.current?.requestTVFocus();
+        }
+      : undefined,
+  );
   // Counts the tabs chosen: each sends the focus into the page once that tab is drawn.
   const [chosen, setChosen] = useState(0);
   useEffect(() => {
@@ -55,40 +91,43 @@ export function TvTabs() {
   }, [chosen]);
   const choose = () => setChosen((count) => count + 1);
   return (
-    <Tabs>
-      <XStack flex={1} bg="$background">
-        <YStack width={PAGE} />
-        <FocusGroup ref={page} style={{ flex: 1 }}>
-          <TabSlot style={{ flex: 1 }} />
-        </FocusGroup>
-      </XStack>
-      <TabList asChild>
-        <Rail open={open} reduceMotion={reduceMotion} onOpen={setOpen}>
-          <TabTrigger name="media" href="/media" asChild>
-            <RailTab icon={Film} label="Media" open={open} onChosen={choose} />
-          </TabTrigger>
-          <TabTrigger name="videos" href="/videos" asChild>
-            <RailTab icon={SquarePlay} label="Videos" open={open} onChosen={choose} />
-          </TabTrigger>
-          <TabTrigger name="live" href="/live" asChild>
-            <RailTab icon={Tv} label="Live" open={open} onChosen={choose} />
-          </TabTrigger>
-          <TabTrigger name="settings" href="/settings" asChild>
-            <RailTab icon={Settings} label="Settings" open={open} onChosen={choose} />
-          </TabTrigger>
-        </Rail>
-      </TabList>
-    </Tabs>
+    <TvBackContext value={back}>
+      <Tabs>
+        <XStack flex={1} bg="$background">
+          <YStack width={PAGE} />
+          <FocusGroup ref={page} style={{ flex: 1 }}>
+            <TabSlot style={{ flex: 1 }} />
+          </FocusGroup>
+        </XStack>
+        <TabList asChild>
+          <Rail railRef={rail} open={open} reduceMotion={reduceMotion} onOpen={setOpen}>
+            <TabTrigger name="media" href="/media" asChild>
+              <RailTab icon={Film} label="Media" open={open} onChosen={choose} />
+            </TabTrigger>
+            <TabTrigger name="videos" href="/videos" asChild>
+              <RailTab icon={SquarePlay} label="Videos" open={open} onChosen={choose} />
+            </TabTrigger>
+            <TabTrigger name="live" href="/live" asChild>
+              <RailTab icon={Tv} label="Live" open={open} onChosen={choose} />
+            </TabTrigger>
+            <TabTrigger name="settings" href="/settings" asChild>
+              <RailTab icon={Settings} label="Settings" open={open} onChosen={choose} />
+            </TabTrigger>
+          </Rail>
+        </TabList>
+      </Tabs>
+    </TvBackContext>
   );
 }
 
 /** The rail itself: its column, the veil behind it while it is open, and its width, animated between the two. */
 function Rail({
+  railRef,
   open,
   reduceMotion,
   onOpen,
   children,
-}: TabListProps & { open: boolean; reduceMotion: boolean; onOpen: (open: boolean) => void }) {
+}: TabListProps & { railRef: RefObject<FocusGroupHandle | null>; open: boolean; reduceMotion: boolean; onOpen: (open: boolean) => void }) {
   const theme = useTheme();
   const solid = String(theme.background.val);
   const [width] = useState(() => new Animated.Value(RAIL));
@@ -121,7 +160,7 @@ function Rail({
         />
       </Animated.View>
       <Animated.View style={[styles.edge, { width, overflow: 'hidden', backgroundColor: solid }]}>
-        <FocusGroup onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
+        <FocusGroup ref={railRef} onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
           <YStack flex={1} pl={LEFT} pr={px(8)} pt={px(40)} pb={px(40)}>
             {/* Loge's own icon heads the rail, in the symbols' column; the remote never lands on it. */}
             <YStack width={CELL} items="center">

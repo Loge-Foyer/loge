@@ -19,6 +19,7 @@ import { Screen } from '@/components/screen';
 import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth } from '@/components/shelf';
 import { SourceTabs } from '@/components/source-tabs';
+import { useTvTabRoot } from '@/components/tv-back';
 import { useServices } from '@/hooks/services-context';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
@@ -46,6 +47,7 @@ const SCOPE_LABELS: Readonly<Record<SearchScope, string>> = {
 export function VideosScreen() {
   const { data: sources } = useTabSources('videos');
   const params = useLocalSearchParams<{ source?: string; kind?: string }>();
+  useTvTabRoot();
 
   if (!sources) return <Screen>{null}</Screen>;
   if (sources.length === 0) return <VideosEmptyState />;

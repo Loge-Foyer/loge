@@ -1,7 +1,7 @@
 import type { MediaItem } from '@loge/api';
 import { Plus } from '@tamagui/lucide-icons-2/icons/Plus';
-import { useEffect, useState } from 'react';
-import { Animated, Pressable } from 'react-native';
+import { useEffect, useState, type Ref } from 'react';
+import { Animated, Pressable, type View } from 'react-native';
 import { H3, SizableText, Theme, YStack } from 'tamagui';
 
 import { Artwork, ArtworkLogo } from '@/components/artwork';
@@ -23,6 +23,7 @@ const WIDEN_MS = 180;
  * only drawn so.
  */
 export function TvCard({
+  ref,
   item,
   layout,
   expanded,
@@ -35,6 +36,8 @@ export function TvCard({
   onPress,
   onLongPress,
 }: {
+  /** The card's own focusable frame, which `requestTVFocus()` sends the remote to. */
+  ref?: Ref<View>;
   item: MediaItem;
   layout: RowLayout;
   expanded: boolean;
@@ -54,6 +57,7 @@ export function TvCard({
   const title = item.type === 'episode' ? item.showTitle || item.title : item.title;
   return (
     <Pressable
+      {...(ref ? { ref } : {})}
       onPress={onPress}
       {...(onLongPress ? { onLongPress } : {})}
       hasTVPreferredFocus={preferred}

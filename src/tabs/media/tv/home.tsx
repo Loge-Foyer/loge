@@ -7,6 +7,7 @@ import { listNames } from '@/components/labels';
 import { SourceNotices } from '@/components/media/source-notices';
 import { usePosterWidth } from '@/components/shelf';
 import { SnapPoint } from '@/components/snap-point';
+import { useTvTabRoot } from '@/components/tv-back';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import type { HomeFilter } from '@/services/home-filter';
 
@@ -30,6 +31,7 @@ const TOP = px(40);
 export function TvHome() {
   const [filter, setFilter] = useState<HomeFilter>({});
   const home = useMediaHome(filter);
+  useTvTabRoot();
   const reduceMotion = useReduceMotion();
   // The rows' width: the page's, once it is laid out — narrower than the screen beside the tabs' rail.
   const { width: screen } = useWindowDimensions();

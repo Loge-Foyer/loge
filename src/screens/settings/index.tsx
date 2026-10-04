@@ -22,6 +22,7 @@ import { AppSwitch } from '@/components/app-switch';
 import { useDownloadBudget, useDownloadSettings } from '@/hooks/use-downloads';
 import type { DownloadBudget } from '@/services/downloads';
 import { ChoiceRow, LinkRow, SettingsRow, SettingsSection } from '@/components/settings-list';
+import { useTvTabRoot } from '@/components/tv-back';
 import { useServices } from '@/hooks/services-context';
 import { useAccount, useMaxProfiles, useSyncStatus } from '@/hooks/use-account';
 import { useConnectedPlugins } from '@/hooks/use-connections';
@@ -69,6 +70,7 @@ const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
 
 /** Every setting lives here: the account, the profile, the device's plugins, and the app itself. */
 export function SettingsScreen() {
+  useTvTabRoot();
   const budget = useDownloadBudget();
   const downloadSettings = useDownloadSettings();
   const userId = useActiveUserId();

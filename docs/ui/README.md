@@ -475,6 +475,8 @@ browser are untouched.
   Select changes the tab and sends the remote into it, and the rail closes
   behind it. Left from a page's first control reaches the rail; right goes
   back to what the remote left.
+- **Back on a tab's first screen walks outwards**: to the first of the row,
+  list or column the remote is in, then to the rail, then out of the app.
 - **No headers on tab roots or detail pages** — the rail names the tab, and
   Menu goes back — and sheets take the whole screen, as do who is watching
   and a profile's PIN, which are pushed (`profileGateOptions`).

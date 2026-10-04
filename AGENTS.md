@@ -515,6 +515,12 @@ Not an afterthought. Things to know:
   across the top sat over each tab's own. The rail is `expo-router/ui`'s
   headless tabs, as the browser's bar is; select sends the focus into the
   page (`requestTVFocus()` on its focus group), and the rail closes.
+- **Back on a tab's first screen walks outwards**: the first of the row the
+  remote is in, then the rail, then out (`components/tv-back.tsx`). A tab's
+  first screen calls `useTvTabRoot()`; a control that knows its row reports
+  `useTvBack().at(owner, { first, toFirst })` as the remote lands on it and
+  `left(owner)` as it goes. Never hold Menu for a whole tab another way: the
+  last press must stay the system's, which leaves the app.
 - **Only the screen in front acts on the remote.** TV events reach every
   mounted screen, and a zap leaves the player before on the screen for a
   moment: gate `useRemoteKeys` on `useIsFocused()`.
