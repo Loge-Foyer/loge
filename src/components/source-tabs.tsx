@@ -5,6 +5,7 @@ import { ScrollView, type View } from 'react-native';
 import { Circle, XStack } from 'tamagui';
 
 import { Button } from '@/components/button';
+import { focusRoomStyles } from '@/components/remote';
 import { useTvBack } from '@/components/tv-back';
 
 export interface SourceTab {
@@ -53,7 +54,8 @@ export function SourceTabs({
   const firstTab = useRef<View>(null);
   const toFirst = () => firstTab.current?.requestTVFocus();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    // On a TV the focused tab's ring reaches past the row: the scroll view leaves it room, or cuts it off.
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={focusRoomStyles.style} contentContainerStyle={focusRoomStyles.contentContainerStyle}>
       <XStack gap="$2" role="tablist">
         {tabs.map((tab, index) => {
           const active = tab.id === selected;

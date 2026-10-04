@@ -10,7 +10,7 @@ import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges
 import { titleHref } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { RowTitle } from '@/components/media/row-title';
-import { CARD_RING, FOCUSED, useRemoteFocus } from '@/components/remote';
+import { CARD_RING, FOCUS_ROOM, FOCUSED, useRemoteFocus } from '@/components/remote';
 import { CHOSEN } from '@/components/settings-list';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useChildren, useMoreLikeThis } from '@/hooks/use-media';
@@ -81,7 +81,13 @@ export function EpisodesPanel({
     <YStack flex={1} gap="$4">
       {list.length > 1 ? (
         <FocusGroup>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: px(12), paddingVertical: px(6) }}>
+          {/* Room round the chips for the focused one's ring, which the scroll view would cut off. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ margin: -FOCUS_ROOM }}
+            contentContainerStyle={{ gap: px(12), padding: FOCUS_ROOM }}
+          >
             {list.map((each) => (
               <SeasonChip
                 key={each.key.externalId}

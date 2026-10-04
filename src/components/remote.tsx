@@ -122,6 +122,20 @@ export const FOCUSED = {
   outlineOffset: 2,
 } as const;
 
+/**
+ * How far a focused control — a chip, a pill — reaches past its own box on a
+ * TV, lifted and ringed: enough for one up to about a hundred points tall. A
+ * scroll view of them clips what reaches past it, so it leaves this much room
+ * round them, and pulls itself out by as much so nothing moves
+ * (`focusRoomStyles`). None anywhere else.
+ */
+export const FOCUS_ROOM = isTV ? 12 : 0;
+
+/** For a horizontal scroll view of controls: room round them for the ring, taken back outside. */
+export const focusRoomStyles = isTV
+  ? { style: { margin: -FOCUS_ROOM }, contentContainerStyle: { padding: FOCUS_ROOM } }
+  : { style: undefined, contentContainerStyle: undefined };
+
 type Pressing = {
   readonly onPress?: ((event: GestureResponderEvent) => void) | null | undefined;
   readonly disabled?: boolean | null | undefined;
