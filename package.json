@@ -5,7 +5,6 @@
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@expo/ui": "~57.0.21",
-    "@noble/hashes": "^2.4.0",
     "@loge/api": "*",
     "@loge/iptv-m3u": "*",
     "@loge/iptv-mock": "*",
@@ -33,6 +32,7 @@
     "@loge/sync-mock": "*",
     "@loge/sync-mock-backup": "*",
     "@loge/sync-onedrive": "*",
+    "@noble/hashes": "^2.4.0",
     "@shopify/flash-list": "2.0.2",
     "@tamagui/config": "2.7.7",
     "@tamagui/core": "2.7.7",
@@ -87,6 +87,7 @@
     "@types/sql.js": "^1.4.11",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "eslint-import-resolver-typescript": "^3.10.1",
     "fake-indexeddb": "^6.2.5",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"

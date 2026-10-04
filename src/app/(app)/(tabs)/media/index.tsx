@@ -1,3 +1,3 @@
-import { MediaHomeScreen } from '@/screens/media/home';
+import { MediaHome } from '@/tabs/media';
 
-export default MediaHomeScreen;
+export default MediaHome;

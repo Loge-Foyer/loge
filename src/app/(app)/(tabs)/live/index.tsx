@@ -1,3 +1,3 @@
-import { LiveScreen } from '@/screens/tv';
+import { LiveHome } from '@/tabs/live';
 
-export default LiveScreen;
+export default LiveHome;

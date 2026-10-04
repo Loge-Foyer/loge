@@ -5,7 +5,6 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
 
-import { CustomizeButton } from '@/components/customize-button';
 import { rowTitle } from '@/components/labels';
 import { LandscapeCard } from '@/components/media/landscape-card';
 import { PosterCard } from '@/components/media/poster-card';
@@ -16,6 +15,8 @@ import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useGrid, useRefreshMedia } from '@/hooks/use-media';
+
+import { CustomizeButton } from './customize-button';
 
 const PADDING = 16;
 const GAP = 12;

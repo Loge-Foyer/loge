@@ -131,6 +131,32 @@ const playerKitTypesOnly = {
   ],
 };
 
+// Each tab is a UI of its own (docs/ui): a tab never reaches into another, its
+// phone and TV halves never into each other — what both use sits in `shared/` —
+// and nothing outside src/tabs reaches in but the routes, through @/tabs/<tab>.
+const TABS = ['media', 'videos', 'live'];
+const tabZones = [
+  ...TABS.map((tab) => ({
+    target: `./src/tabs/${tab}`,
+    from: TABS.filter((other) => other !== tab).map((other) => `./src/tabs/${other}`),
+    message: 'A tab never imports another tab. What two tabs need belongs in src/components, src/hooks or src/services.',
+  })),
+  ...TABS.flatMap((tab) => [
+    { target: `./src/tabs/${tab}/mobile`, from: `./src/tabs/${tab}/tv`, message: 'The phone’s UI never imports the TV’s. Share it through shared/.' },
+    { target: `./src/tabs/${tab}/tv`, from: `./src/tabs/${tab}/mobile`, message: 'The TV’s UI never imports the phone’s. Share it through shared/.' },
+    {
+      target: `./src/tabs/${tab}/shared`,
+      from: [`./src/tabs/${tab}/mobile`, `./src/tabs/${tab}/tv`],
+      message: 'shared/ is what both form factors use, so it imports neither.',
+    },
+  ]),
+  {
+    target: ['./src/components', './src/hooks', './src/services', './src/screens', './src/platform', './src/persistence', './src/composition'],
+    from: './src/tabs',
+    message: 'Only routes import a tab, through @/tabs/<tab>. Move what is shared out of the tab instead.',
+  },
+];
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -139,6 +165,10 @@ module.exports = defineConfig([
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: missingOnHermes,
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'import/no-restricted-paths': ['error', { zones: tabZones }] },
   },
   {
     files: ['src/**/*.{ts,tsx}'],

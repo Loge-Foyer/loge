@@ -6,15 +6,14 @@ import { FlatList, Pressable } from 'react-native';
 import { H3, XStack, YStack } from 'tamagui';
 
 import { GUTTER, px } from '@/components/density';
+import { LandscapeCard } from '@/components/media/landscape-card';
+import { PosterCard } from '@/components/media/poster-card';
+import { SourceNotices } from '@/components/media/source-notices';
 import { cardFocusRoom, useRemoteFocus } from '@/components/remote';
 import { PosterSkeleton, ThumbnailSkeleton } from '@/components/shelf';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import type { CardStyle } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
-
-import { LandscapeCard } from './landscape-card';
-import { PosterCard } from './poster-card';
-import { SourceNotices } from './source-notices';
 
 const GAP = px(12);
 const SKELETONS = [0, 1, 2, 3, 4, 5];

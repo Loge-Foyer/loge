@@ -1,8 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import { BrowseScreen } from '@/screens/media/browse';
+import { MediaGrid } from '@/tabs/media';
 
 export default function Browse() {
   const { rowId } = useLocalSearchParams<{ rowId: string }>();
-  return <BrowseScreen rowId={rowId} />;
+  return <MediaGrid rowId={rowId} />;
 }

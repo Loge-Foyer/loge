@@ -8,11 +8,8 @@ import { RefreshControl } from 'react-native';
 import { Paragraph, SizableText, XStack, YStack, useTheme } from 'tamagui';
 
 import { Button } from '@/components/button';
-import { CustomizeButton } from '@/components/customize-button';
 import { EmptyState } from '@/components/empty-state';
 import { listKinds, listNames, rowTitle } from '@/components/labels';
-import { MediaRow } from '@/components/media/media-row';
-import { Spotlight } from '@/components/media/spotlight';
 import { SourceNotices } from '@/components/media/source-notices';
 import { PrimaryButton } from '@/components/primary-button';
 import { isTV } from '@/components/remote';
@@ -28,6 +25,10 @@ import { categoryHref } from '@/screens/settings/plugin-route';
 import type { HomeRowView } from '@/services/home-layout';
 import type { SourceError } from '@/services/media';
 import { TAB_CONTENT } from '@/services/tab-content';
+
+import { CustomizeButton } from './customize-button';
+import { MediaRow } from './media-row';
+import { Spotlight } from './spotlight';
 
 const isWeb = process.env.EXPO_OS === 'web';
 

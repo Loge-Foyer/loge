@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import { CustomizeHomeScreen } from '@/screens/media/customize-home';
+import { CustomizeHome as CustomizeHomeScreen } from '@/tabs/media';
 
 export default function CustomizeHome() {
   const { row } = useLocalSearchParams<{ row?: string }>();

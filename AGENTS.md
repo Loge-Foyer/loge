@@ -663,6 +663,13 @@ typecheck.
   the scroll view it finds over the whole sheet unless it is the second of
   exactly two children, so anything put beside it — a title, Done — is drawn
   under the content.
+- **Each content tab is its own UI, and so is each form factor in it:**
+  `src/tabs/<tab>/{shared,mobile,tv}`, with an `index.ts` that takes the
+  screens from `tv` or `mobile` at runtime (`isTV`) — `mobile` is a phone, a
+  tablet and a browser. Routes import only `@/tabs/<tab>`. Lint
+  (`import/no-restricted-paths`) refuses a tab importing another, `mobile` and
+  `tv` importing each other, `shared` importing either, and anything outside
+  `src/tabs` but a route reaching in (`docs/ui`).
 - **Four tabs:** Media, Videos, Live, Settings. Settings → Adapters is five
   rows — Sources, IPTV, Players, Sync, Metadata — each opening that category's
   list for this platform (`settings/adapters/[category]`, then

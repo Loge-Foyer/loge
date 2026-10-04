@@ -107,9 +107,36 @@ name.
 Phase 6 gives Videos new icons, gives Live the TV ones, and makes the web's top
 bar compact on narrow screens; today it wraps below about 400 px wide.
 
+### One UI per tab, and per device
+
+Each content tab is a UI of its own — its own design, its own components and
+its own controls — in `src/tabs/<tab>/`, and so is each form factor within it:
+
+```
+src/tabs/
+  media/   index.ts   shared/   mobile/   tv/
+  videos/  index.ts   shared/   mobile/   tv/
+  live/    index.ts   shared/   mobile/   tv/
+```
+
+- **`mobile/`** is a phone, a tablet and a browser; **`tv/`** a television and
+  its remote. **`shared/`** is what both use — hooks, pure logic, and a screen
+  that is the same on both.
+- **A tab's `index.ts`** declares the screens its routes draw, and takes them
+  from `tv` or `mobile` at runtime (`isTV`), so one bundle serves every device
+  and each form factor must provide every screen. Routes import only
+  `@/tabs/<tab>`.
+- **Lint keeps them apart** (`import/no-restricted-paths` in
+  `eslint.config.js`): a tab never imports another, `mobile` and `tv` never
+  import each other, `shared` imports neither, and nothing outside `src/tabs`
+  reaches in but the routes. What two tabs need belongs in `src/components`,
+  `src/hooks` or `src/services`.
+- **Videos and Live** draw one screen on both for now, which branches on
+  `isTV` where a TV differs, until each gets a design of its own.
+
 ## Media
 
-**Home** (`screens/media/home.tsx`) is Continue Watching, then Downloaded, then
+**Home** (`tabs/media/shared/home.tsx`) is Continue Watching, then Downloaded, then
 one row per kind in the profile's own order and sort. Downloaded is this
 device's finished copies of the library — a web video kept from Videos stays
 Videos' — newest first, as scenes; a card opens the item's page, which opens
@@ -171,7 +198,7 @@ layout and shows its defaults, rather than drawing a row it does not know.
 
 ## Live
 
-`screens/tv.tsx`. With no IPTV connection it shows the way to add one (in a
+`tabs/live/shared/live.tsx`. With no IPTV connection it shows the way to add one (in a
 browser, that providers can't be reached there). Otherwise:
 
 - **One provider at a time** — a pill for each across the top, then Live,

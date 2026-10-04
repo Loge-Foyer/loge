@@ -1,3 +1,3 @@
-import { VideosScreen } from '@/screens/videos';
+import { VideosHome } from '@/tabs/videos';
 
-export default VideosScreen;
+export default VideosHome;
