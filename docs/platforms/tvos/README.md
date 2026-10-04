@@ -72,6 +72,8 @@ rail down the left (`components/tv-tabs.tsx`):
   SwiftUI's `TabView` has one — so react-native-screens' native tabs keep the
   bar on top. The rail is expo-router's headless tabs (`expo-router/ui`), as
   the browser's top bar is; phones keep the native bar.
+- **Loge's icon heads it**, in the symbols' column, where the remote never
+  lands (`components/app-mark.tsx`).
 - **Its geometry:** the symbols' column starts inside the title-safe margin,
   and each tab's page starts just far enough right that its own margin — the
   80-point gutter — puts what it shows clear of the rail. The rail is the

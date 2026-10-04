@@ -462,8 +462,9 @@ browser are untouched.
 - **Cards have TV sizes of their own** (`components/shelf.tsx`): posters 240
   points wide, about seven across, and scenes 400, about four. Grown with the
   type they were six and three, and a row was too tall for a screen.
-- **The tabs run down the left**, a column of symbols while the remote is in
-  a page — Media, Videos, Live, Settings, the one shown in the accent — that
+- **The tabs run down the left**, under Loge's icon, a column of symbols
+  while the remote is in a page — Media, Videos, Live, Settings, the one shown
+  in the accent — that
   opens with their names, over the page on a veil, while it is in the rail.
   Select changes the tab and sends the remote into it, and the rail closes
   behind it. Left from a page's first control reaches the rail; right goes

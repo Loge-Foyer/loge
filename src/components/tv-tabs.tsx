@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 import { SizableText, useTheme, XStack, YStack } from 'tamagui';
 
+import { AppMark } from './app-mark';
 import { clearOf } from './colour';
 import { GUTTER, px } from './density';
 import { FocusGroup, type FocusGroupHandle } from './focus-group';
@@ -34,9 +35,9 @@ type IconColor = '$accentColor' | '$accent11' | '$color11';
 
 /**
  * The tabs on a TV, down the left rather than across the top, where each tab
- * has its own controls: Media, Videos, Live and Settings as a column of
- * symbols while the remote is in a page, opening with their words, over the
- * page on a veil, while it is in the rail. UIKit's tab bar cannot do it — on
+ * has its own controls: Loge's icon at the top, then Media, Videos, Live and
+ * Settings as a column of symbols while the remote is in a page, opening with
+ * their words, over the page on a veil, while it is in the rail. UIKit's tab bar cannot do it — on
  * tvOS a tab bar controller has no sidebar — so this is expo-router's own
  * headless tabs, as the browser's top bar is. Select changes the tab and
  * sends the remote into it, so the rail closes behind it. Left from a page's
@@ -121,8 +122,14 @@ function Rail({
       </Animated.View>
       <Animated.View style={[styles.edge, { width, overflow: 'hidden', backgroundColor: solid }]}>
         <FocusGroup onFocusEnter={() => onOpen(true)} onFocusLeave={() => onOpen(false)} style={{ flex: 1 }}>
-          <YStack flex={1} pl={LEFT} pr={px(8)} gap="$1.5" justify="center" role="tablist">
-            {children}
+          <YStack flex={1} pl={LEFT} pr={px(8)} pt={px(40)} pb={px(40)}>
+            {/* Loge's own icon heads the rail, in the symbols' column; the remote never lands on it. */}
+            <YStack width={CELL} items="center">
+              <AppMark size={px(30)} />
+            </YStack>
+            <YStack flex={1} gap="$1.5" justify="center" role="tablist">
+              {children}
+            </YStack>
           </YStack>
         </FocusGroup>
       </Animated.View>
