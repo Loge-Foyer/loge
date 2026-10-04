@@ -10,7 +10,7 @@ import { FlatList, Pressable, RefreshControl, useWindowDimensions } from 'react-
 import { SizableText, Spinner, XStack, YStack, useTheme } from 'tamagui';
 
 import { ActionMenu } from '@/components/action-menu';
-import { px } from '@/components/density';
+import { GUTTER, px } from '@/components/density';
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABELS, episodeCode, listNames } from '@/components/labels';
 import { ChannelSummary } from '@/components/media/channel-row';
@@ -91,20 +91,28 @@ export function LiveScreen() {
   // Keyed by what a section lists, never by the term. The search box sits in
   // the list's header, so remounting the list for each term took the keyboard
   // away while someone was typing; a new term is a new query, which pages from
-  // its start on its own.
-  if (kind === 'live') {
-    // No group yet this time is not All (`''`): where Live opens is decided then.
-    return (
+  // its start on its own. On a TV the header stands above the list instead,
+  // where a section's new list does not take the tab — and the remote — with it.
+  const list =
+    kind === 'live' ? (
+      // No group yet this time is not All (`''`): where Live opens is decided then.
       <Channels
         key={selected.connection.id}
         source={selected}
         group={params.group === undefined ? undefined : fromRouteId(params.group)}
         term={term}
-        header={header}
+        header={isTV ? null : header}
       />
+    ) : (
+      <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} term={term} header={isTV ? null : header} />
     );
-  }
-  return <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} term={term} header={header} />;
+  if (!isTV) return list;
+  return (
+    <YStack flex={1} pt={px(40)}>
+      <YStack px={GUTTER}>{header}</YStack>
+      {list}
+    </YStack>
+  );
 }
 
 function LiveEmptyState() {
@@ -154,7 +162,7 @@ function useRefresh() {
   return { onRefresh, control: <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={String(theme.color10.val)} /> };
 }
 
-function Channels({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
+function Channels({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement | null }) {
   const connectionId = source.connection.id;
   const groups = useChannelGroups(connectionId);
   const kept = useFavoriteChannels(connectionId);
@@ -207,12 +215,14 @@ function Channels({ source, group, term, header }: { source: TabSource; group: s
         // The first tap after typing reaches a chip or ✕, rather than only putting the keyboard away.
         keyboardShouldPersistTaps="handled"
         keyExtractor={(channel) => channel.key.externalId}
-        contentInsetAdjustmentBehavior="automatic"
+        // On a TV the page's header is above the list, and the top is the page's.
+        contentInsetAdjustmentBehavior={isTV ? 'never' : 'automatic'}
         // On a TV the list's scroller sits in a focus guide as tall as what it
         // holds, so a short list — ★ above all — stopped part way down the
         // screen. Content a screen tall makes the guide a screen tall; flex on
-        // the list would make it nothing at all.
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, ...(isTV ? { minHeight: height } : {}) }}
+        // the list would make it nothing at all. Its sides are the TV's gutter,
+        // clear of the tabs' rail.
+        contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: 16, paddingBottom: 48, ...(isTV ? { minHeight: height } : {}) }}
         ListHeaderComponent={
           <YStack gap="$3" pb="$3">
             {header}
@@ -374,17 +384,21 @@ const captionOf = (captions: ReadonlyMap<string, string>, item: MediaItem) => {
   return caption ? { caption } : {};
 };
 
-function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: ContentKind | undefined; term: string; header: React.ReactElement }) {
+function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: ContentKind | undefined; term: string; header: React.ReactElement | null }) {
   const page = useSourcePage(source.connection.id, kind, NEWEST, term);
   // What this profile has begun here comes first — where the app keeps watch status for this provider, and not in a search.
   const searching = term.trim() !== '';
   const type = kind === 'movies' ? 'movie' : kind === 'shows' ? 'show' : undefined;
   const begun = useInProgress(source.connection.id, type, !searching && source.watch === 'app');
-  const { width } = useWindowDimensions();
+  // The grid's own width, once laid out: beside a TV's rail it is narrower than the window.
+  const { width: window } = useWindowDimensions();
+  const [measured, setMeasured] = useState(0);
+  const width = measured || window;
   const posterWidth = usePosterWidth();
   const { onRefresh, control } = useRefresh();
-  const columns = Math.min(10, Math.max(3, Math.floor((width - 32 + 12) / (posterWidth + 12))));
-  const cardWidth = Math.floor((width - 32 - (columns - 1) * 12) / columns);
+  const sides = 2 * GUTTER;
+  const columns = Math.min(10, Math.max(3, Math.floor((width - sides + 12) / (posterWidth + 12))));
+  const cardWidth = Math.floor((width - sides - (columns - 1) * 12) / columns);
   const firsts = searching ? [] : (begun.data ?? []);
   const firstKeys = new Set(firsts.map((each) => itemKeyOf(each.item.key)));
   const captions = new Map(firsts.flatMap((each) => (each.episode ? [[itemKeyOf(each.item.key), episodeCode(each.episode)] as const] : [])));
@@ -405,8 +419,9 @@ function SourceGrid({ source, kind, term, header }: { source: TabSource; kind: C
       data={items}
       numColumns={columns}
       keyExtractor={(item) => item.key.externalId}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 16, paddingBottom: 48 }}
+      contentInsetAdjustmentBehavior={isTV ? 'never' : 'automatic'}
+      onLayout={(event) => setMeasured(event.nativeEvent.layout.width)}
+      contentContainerStyle={{ paddingHorizontal: GUTTER - 6, paddingTop: 16, paddingBottom: 48 }}
       ListHeaderComponent={
         <YStack px={6} gap="$3" pb="$3">
           {header}

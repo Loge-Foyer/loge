@@ -192,7 +192,10 @@ are in [`media/`](media/README.md).
 ## Live
 
 `tabs/live/shared/live.tsx`. With no IPTV connection it shows the way to add one (in a
-browser, that providers can't be reached there). Otherwise:
+browser, that providers can't be reached there). On a TV its header — the
+providers, the sections, the search box — stands above the list rather than
+scrolling with it, and its sides are the TV's gutter, clear of the tabs'
+rail. Otherwise:
 
 - **One provider at a time** — a pill for each across the top, then Live,
   Movies and Shows as the provider brings them.
