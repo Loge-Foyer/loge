@@ -34,9 +34,9 @@ import { useActiveUserId } from '@/hooks/use-session';
 import { useSources } from '@/hooks/use-sources';
 import { WATCH_STATUS_DEFAULTS } from '@/services/account-settings';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import { APPEARANCES, BUTTON_LABELS, type AppearanceSetting, type ButtonLabels } from '@/services/ports';
 import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
+import { APPEARANCE_NAMES, AppearanceRow, BUTTON_LABEL_NAMES, ButtonsRow } from './appearance';
 import { BufferingRows } from './buffering';
 import { downloadOptionsSummary } from './download-options';
 import { GlowSwatch, glowColourName } from './glow';
@@ -47,17 +47,6 @@ const WATCH_STATUS_ROWS: Readonly<Record<ContentTab, { readonly title: string; r
   media: { title: 'Media', subtitle: 'Films and series from a source that keeps none' },
   videos: { title: 'Videos', subtitle: 'Web videos and files: where you got to' },
   live: { title: 'Films & series on Live', subtitle: 'An IPTV provider’s — never live channels' },
-};
-
-const BUTTON_LABEL_NAMES: Readonly<Record<ButtonLabels, string>> = {
-  symbols: 'Symbols',
-  symbolsAndText: 'Symbols and text',
-};
-
-const APPEARANCE_NAMES: Readonly<Record<AppearanceSetting, string>> = {
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark',
 };
 
 const CATEGORY_ICONS: Readonly<Record<PluginCategory, typeof Film>> = {
@@ -165,15 +154,16 @@ export function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="App" footer="How this device behaves. Each device chooses for itself.">
-        <ChoiceRow
-          title="Appearance"
-          subtitle="Light or dark, or as this device is set"
-          options={APPEARANCES}
-          label={(option) => APPEARANCE_NAMES[option]}
-          value={appearance}
-          disabled={appSettings.data === undefined || set.isPending}
-          onChoose={(option) => set.mutate({ appearance: option })}
-        />
+        {/* On a TV, how the app looks is a page of its own: App, read across a room, ran too long. */}
+        {isTV ? (
+          <SettingsRow
+            title="Appearance"
+            subtitle={`${APPEARANCE_NAMES[appearance]} · Buttons: ${BUTTON_LABEL_NAMES[buttonLabels].toLowerCase()}`}
+            href="/settings/appearance"
+          />
+        ) : (
+          <AppearanceRow />
+        )}
         {/* A TV's home has no glow. */}
         {isTV ? null : (
           <SettingsRow
@@ -231,15 +221,7 @@ export function SettingsScreen() {
             }
           />
         )}
-        <ChoiceRow
-          title="Buttons"
-          subtitle="On a title's page: Play, watched and the rest"
-          options={BUTTON_LABELS}
-          label={(option) => BUTTON_LABEL_NAMES[option]}
-          value={buttonLabels}
-          disabled={appSettings.data === undefined || set.isPending}
-          onChoose={(option) => set.mutate({ buttonLabels: option })}
-        />
+        {isTV ? null : <ButtonsRow />}
         <BufferingRows />
       </SettingsSection>
 

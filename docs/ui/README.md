@@ -281,7 +281,10 @@ sections.
   sources there that keep none: Media, Videos, Live's films and series. The
   account's, the same for every profile and device; a source that keeps its
   own — a media server — keeps it there.
-- **App** — how this device behaves, whoever is watching: its Appearance —
+- **App** — how this device behaves, whoever is watching. On a TV, where the
+  list is read across a room, how it looks is a page of its own —
+  Appearance, with the scheme and the buttons — and its row says both
+  (`screens/settings/appearance.tsx`). Its Appearance —
   System, Light or Dark — the tab it opens on
   (Media, Videos or Live), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;
