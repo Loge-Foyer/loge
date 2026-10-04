@@ -173,9 +173,34 @@ click that only React Native's own `Pressable` hears. So:
     `BackHandler` listener leaves through `close()`: on tvOS `exitApp` does
     nothing.
 - **Where the focus starts:** the first card of the home, Play on a detail
-  page, the default profile in the picker, play/pause in the player.
+  page, the profile in use in who's watching — at launch, the default one —
+  and play/pause in the player.
 
 `docs/ui` has the TV layouts.
+
+## Who's watching
+
+The TV has a picker of its own (`screens/profile-picker/tv.tsx`), pushed for
+the reason above:
+
+- **A photograph fills the screen**, one of seven bundled in
+  `assets/backgrounds`, darkened from the left so the profiles read over it.
+  One at random as it opens; after 20 to 45 seconds another fades in over it,
+  and so on, but only while the screen is in front and the app is. With Reduce
+  Motion on, the next one simply replaces it.
+- **Its credit is at the bottom right** — the photographer, and Unsplash's mark
+  and name — and changes with it. The photographs come from Unsplash, under
+  its licence rather than the AGPL (`NOTICE`).
+- **The profiles run down the left**, squares in slots of one height. The one
+  the remote is on grows and wears the ring, and its name fades in beside it;
+  the others show their faces alone. It grows as it is drawn, not as it is laid
+  out, so nothing else moves.
+- **While the app runs, a pencil** sits beside the focused profile, one press
+  of left away, and opens its page in Settings.
+- **+ comes last**, gone at the account's limit. It turns into a name field
+  with Add, the field takes the focus, and select brings up the keyboard. Back
+  puts the field away before it leaves the screen (`useBackLayers`, which holds
+  Menu for the app while the field is open).
 
 ## The icon and the top shelf
 

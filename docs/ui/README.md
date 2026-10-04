@@ -453,6 +453,16 @@ link's place, and a server account that no longer lets this device in points
 to signing in to it again. A yes clears the PIN this device asks for — on This
 device, only its own — and opens the profile; PIN lock then offers to set one.
 
+**Who's watching** (`screens/profile-picker/`) is one hook drawn two ways.
+On a phone, a tablet and in a browser: the question at the top, with Cancel
+and Edit — Settings → Profiles — beside it while the app runs, and the
+profiles as square tiles, two to a row on a phone and more from `$md`, a lock
+where a PIN is asked and the ring on the one in use; Add profile comes last
+until the account is full, and opens a name field. On a TV: a photograph
+across the screen, another every 20 to 45 seconds with its credit, and the
+profiles down the left — the one the remote is on grown, ringed and named, a
+pencil beside it while the app runs, + last (`docs/platforms/tvos`).
+
 **Screens scroll with taps passing through** (`components/screen.tsx`,
 `keyboardShouldPersistTaps="handled"`): otherwise the first tap on a button
 after typing only puts the keyboard away, and Continue seems to do nothing.
