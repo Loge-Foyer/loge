@@ -5,8 +5,9 @@ import { Link, Stack, useNavigation } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useLayoutEffect, useState } from 'react';
 import { Animated, Platform, RefreshControl, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { H1, Paragraph, XStack, YStack, useMedia, useTheme } from 'tamagui';
+import { Paragraph, XStack, YStack, useMedia, useTheme } from 'tamagui';
 
+import { AppMark } from '@/components/app-mark';
 import { Button } from '@/components/button';
 import { CastButton } from '@/components/cast-button';
 import { GUTTER, px } from '@/components/density';
@@ -16,8 +17,6 @@ import { listNames } from '@/components/labels';
 import { SourceNotices } from '@/components/media/source-notices';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useAppSettings } from '@/hooks/use-app-settings';
-import { useProfiles } from '@/hooks/use-profiles';
-import { useActiveUserId } from '@/hooks/use-session';
 import { APP_DEFAULTS } from '@/services/app-settings';
 import type { HomeFilter } from '@/services/home-filter';
 
@@ -44,8 +43,6 @@ export function MobileHome() {
   const [filter, setFilter] = useState<HomeFilter>({});
   const home = useMediaHome(filter);
   const settings = useAppSettings().data ?? APP_DEFAULTS;
-  const userId = useActiveUserId();
-  const name = useProfiles().data?.find((profile) => profile.id === userId)?.name;
   const navigation = useNavigation();
   const theme = useTheme();
   const wide = useMedia().md;
@@ -55,7 +52,6 @@ export function MobileHome() {
   const header = useHeaderHeight();
   const [scrollY] = useState(() => new Animated.Value(0));
   const [scrolled, setScrolled] = useState(false);
-  const title = name ? `For ${name}` : 'Media';
 
   // Android's bar is see-through over the glow, and takes its colour once the page runs under it.
   useLayoutEffect(() => {
@@ -63,8 +59,32 @@ export function MobileHome() {
     navigation.setOptions({ headerStyle: { backgroundColor: scrolled ? String(theme.color3.val) : 'transparent' } });
   }, [navigation, scrolled, theme]);
 
-  if (!home.ready) return <YStack flex={1} bg="$background" />;
-  if (home.sources.length === 0) return home.pending.length > 0 ? <SetUpScreen pending={home.pending} /> : <MediaEmptyState />;
+  // The same header in every state: no title, the app's icon at its left, Search and the profile at its right.
+  // It is see-through only over the glow; a page with nothing behind it keeps the bar's own.
+  const bar = (overGlow: boolean) => (
+    <Stack.Screen
+      options={{
+        title: '',
+        headerLargeTitleEnabled: false,
+        headerLeft: () => <AppMark />,
+        // On iOS 26 a header item sits in the system's glass unless it asks not to; the icon is no button.
+        unstable_headerLeftItems: () => [{ type: 'custom', element: <AppMark />, hidesSharedBackground: true }],
+        headerTransparent: overGlow,
+        // From iOS 26 the system's own edge effect; before it a blur once the page runs under the bar.
+        ...(Platform.OS === 'ios' ? { headerBlurEffect: overGlow && !SYSTEM_GLASS ? ('systemChromeMaterial' as const) : ('none' as const) } : {}),
+      }}
+    />
+  );
+
+  if (!home.ready) return <YStack flex={1} bg="$background">{bar(true)}</YStack>;
+  if (home.sources.length === 0) {
+    return (
+      <>
+        {bar(false)}
+        {home.pending.length > 0 ? <SetUpScreen pending={home.pending} /> : <MediaEmptyState />}
+      </>
+    );
+  }
 
   const hero = heroOf(home.rows.filter((row) => row.row.type === 'titles').map((row) => row.items));
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -74,14 +94,7 @@ export function MobileHome() {
 
   return (
     <YStack flex={1} bg="$background">
-      <Stack.Screen
-        options={{
-          title,
-          headerTransparent: true,
-          // A large title over the glow; from iOS 26 the system's own edge effect, before it a blur once the title has gone small.
-          ...(Platform.OS === 'ios' ? { headerLargeStyle: { backgroundColor: 'transparent' }, ...(SYSTEM_GLASS ? {} : { headerBlurEffect: 'systemChromeMaterial' as const }) } : {}),
-        }}
-      />
+      {bar(true)}
       {settings.homeGlow ? (
         <Animated.View
           style={{
@@ -117,11 +130,9 @@ export function MobileHome() {
       >
         <YStack gap="$5" pt="$2">
           {isWeb ? (
-            // A browser's top bar is its header: the title and Search are the page's own.
+            // A browser's top bar is its header: the icon and Search are the page's own.
             <XStack px={GUTTER} pt="$3" items="center" justify="space-between">
-              <H1 size="$8" color="$color12">
-                {title}
-              </H1>
+              <AppMark size={36} />
               <XStack gap="$2" items="center">
                 <CastButton />
                 <SearchButton />

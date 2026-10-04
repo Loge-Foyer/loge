@@ -120,12 +120,15 @@ a search is kept (`docs/ui`).
 - **The glow** behind the top of the page, in the profile's device's colour,
   fading out as the page scrolls (Settings → App, `docs/ui`). Not drawn when
   it is off.
-- **The header** is the tab's native one, its large title "For {name}" over
-  the glow. At its right, Search and the profile's square — and Cast, built
-  and hidden — in the system's glass on iOS 26. Below iOS 26 the bar blurs
-  once the title has gone small; Android's toolbar is clear over the glow and
-  takes `$color3` once the page runs under it. A browser's top bar is its
-  header, so there the page has a row of its own: the title and Search.
+- **The header** is the tab's native one, with no title: Loge's icon at its
+  far left (`components/app-mark.tsx`), and at its right Search and the
+  profile's square — and Cast, built and hidden — in the system's glass on
+  iOS 26; the icon asks to stay out of it (`hidesSharedBackground`). It is
+  see-through over the glow; below iOS 26 the bar blurs once the page runs
+  under it, and Android's toolbar takes `$color3` then. The empty and
+  set-up states keep the same header on the bar's own colour. A browser's
+  top bar is its header, so there the page has a row of its own: the icon
+  and Search.
 - **The chips**, then any set-up callouts and source notices.
 - **The hero**: the first film or series in the rows, in order, that is not
   watched and has a poster (`shared/hero.ts`) — its poster on a phone, a wide
