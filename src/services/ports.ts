@@ -180,6 +180,9 @@ export const BUFFERINGS: readonly BufferingMode[] = ['off', 'memory', 'disk'];
 
 export type AppearanceSetting = (typeof APPEARANCES)[number];
 
+/** The glow's colour: the theme's accent, light or dark as the page is, or one chosen, as `#rrggbb`. */
+export type GlowColour = 'accent' | `#${string}`;
+
 export interface AppSettings {
   /** The tab the app opens on when it starts. */
   readonly openOn: ContentTab;
@@ -234,6 +237,10 @@ export interface AppSettings {
   readonly buffering: BufferingMode;
   /** The most a disk cache may hold, for one stream at a time. */
   readonly bufferDiskBytes: number;
+  /** A wash of colour behind the top of Media's home, on a phone and in a browser. A TV has none. */
+  readonly homeGlow: boolean;
+  /** The glow's colour. `accent` follows the theme's accent, so it changes with light and dark. */
+  readonly glowColour: GlowColour;
 }
 
 export interface DeviceSettingsRepository {

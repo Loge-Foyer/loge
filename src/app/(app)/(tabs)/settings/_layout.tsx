@@ -10,6 +10,7 @@ export default function SettingsStack() {
       <Stack.Screen name="index" options={tabRootOptions('Settings')} />
       <Stack.Screen name="account/index" options={{ title: 'Account' }} />
       <Stack.Screen name="pin" options={{ title: 'PIN lock' }} />
+      <Stack.Screen name="glow" options={{ title: 'Glow colour' }} />
       <Stack.Screen name="profiles/index" options={{ title: 'Profiles' }} />
       <Stack.Screen name="backup/import" options={{ title: 'Import a backup' }} />
       <Stack.Screen name="backup/key" options={{ title: 'Backup key' }} />

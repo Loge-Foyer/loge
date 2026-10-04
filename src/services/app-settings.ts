@@ -40,6 +40,9 @@ export const APP_DEFAULTS: AppSettings = {
   // Each engine's own read-ahead, as before there was a choice.
   buffering: 'memory',
   bufferDiskBytes: GB,
+  // The brass the rest of the app is drawn in, until someone picks another.
+  homeGlow: true,
+  glowColour: 'accent',
 };
 
 /**

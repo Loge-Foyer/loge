@@ -38,6 +38,7 @@ import { CONTENT_TABS, type ContentTab } from '@/services/tab-content';
 
 import { BufferingRows } from './buffering';
 import { downloadOptionsSummary } from './download-options';
+import { GlowSwatch, glowColourName } from './glow';
 import { categoryHref } from './plugin-route';
 
 /** What each tab's switch keeps watch status for. */
@@ -91,6 +92,8 @@ export function SettingsScreen() {
   const { setWatchStatus } = useAccountSettingActions();
   const buttonLabels = appSettings.data?.buttonLabels ?? APP_DEFAULTS.buttonLabels;
   const appearance = appSettings.data?.appearance ?? APP_DEFAULTS.appearance;
+  const homeGlow = appSettings.data?.homeGlow ?? APP_DEFAULTS.homeGlow;
+  const glowColour = appSettings.data?.glowColour ?? APP_DEFAULTS.glowColour;
   const defaultProfile = profiles.find((profile) => profile.id === defaultUserId);
 
   /** A list's line: what is set up in it, or what it is for. */
@@ -169,6 +172,24 @@ export function SettingsScreen() {
           disabled={appSettings.data === undefined || set.isPending}
           onChoose={(option) => set.mutate({ appearance: option })}
         />
+        {/* A TV's home has no glow. */}
+        {isTV ? null : (
+          <SettingsRow
+            title="Home screen glow"
+            subtitle="A wash of colour behind the top of Media"
+            trailing={
+              <AppSwitch
+                label="Home screen glow"
+                checked={homeGlow}
+                disabled={appSettings.data === undefined || set.isPending}
+                onCheckedChange={(next) => set.mutate({ homeGlow: next })}
+              />
+            }
+          />
+        )}
+        {isTV || !homeGlow ? null : (
+          <SettingsRow title="Glow colour" subtitle={glowColourName(glowColour)} icon={<GlowSwatch colour={glowColour} />} href="/settings/glow" />
+        )}
         <ChoiceRow
           title="Open on"
           subtitle="The tab the app starts on"

@@ -335,6 +335,15 @@ Live's sections.
   eight and no more than half of what is free; its row says what it is
   used for and names the players that keep it in memory instead
   (`screens/settings/buffering.tsx`, `docs/playback`).
+  - **Home screen glow** — on a phone and in a browser, a wash of colour from
+    the top of Media's home down into the page: half the tint on black, less
+    on white, ending in the page's own colour (`components/glow.tsx`). On by
+    default, in the accent, which follows light and dark.
+  - **Glow colour** picks another (`screens/settings/glow.tsx`): a preview of
+    the home, a wheel for hue and saturation, a slider for brightness, the
+    accent and five deep presets, kept as `#rrggbb` once the finger lifts.
+    Nothing on that page scrolls, so nothing can take a drag from the wheel.
+    A TV has no glow, and neither row.
 - **Downloads** — Options, what to ask a source for when keeping a copy
   (`settings/downloads/options`); then Downloads, what this device keeps and
   what is still coming down. Options is hidden where nothing can be kept — a
