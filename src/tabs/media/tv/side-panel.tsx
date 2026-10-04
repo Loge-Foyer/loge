@@ -1,11 +1,11 @@
 import type { Episode, MediaItem, Show } from '@loge/api';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Animated, Pressable, ScrollView, useWindowDimensions, type View } from 'react-native';
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { GUTTER, px } from '@/components/density';
-import { FocusGroup } from '@/components/focus-group';
+import { FocusGroup, type FocusGroupHandle } from '@/components/focus-group';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
 import { titleHref } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
@@ -72,6 +72,14 @@ export function EpisodesPanel({
   // Once the remote has moved to another season, the next episode no longer takes the focus as it is drawn.
   const [browsed, setBrowsed] = useState(false);
   const season = seasonToOpen(list, chosen);
+  // Coming up into the seasons lands on the one shown, which choosing on focus would otherwise change.
+  const chips = useRef(new Map<string, View>());
+  const guide = useRef<FocusGroupHandle>(null);
+  const shownId = season?.key.externalId;
+  useEffect(() => {
+    const view = shownId === undefined ? undefined : chips.current.get(shownId);
+    if (view) guide.current?.setDestinations([view]);
+  }, [shownId]);
   const episodes = useChildren(season);
   const withKept = useKeptWatch(episodes.data?.items ?? []);
   const shown = (episodes.data?.items ?? []).map(withKept).filter(isEpisode);
@@ -80,7 +88,7 @@ export function EpisodesPanel({
   return (
     <YStack flex={1} gap="$4">
       {list.length > 1 ? (
-        <FocusGroup>
+        <FocusGroup ref={guide}>
           {/* Room round the chips for the focused one's ring, which the scroll view would cut off. */}
           <ScrollView
             horizontal
@@ -91,6 +99,10 @@ export function EpisodesPanel({
             {list.map((each) => (
               <SeasonChip
                 key={each.key.externalId}
+                chipRef={(view) => {
+                  if (view) chips.current.set(each.key.externalId, view);
+                  else chips.current.delete(each.key.externalId);
+                }}
                 label={each.title}
                 chosen={each.key.externalId === season?.key.externalId}
                 onFocus={() => {
@@ -120,10 +132,20 @@ export function EpisodesPanel({
 }
 
 /** A season's chip: the season it names shows as the remote lands on it. */
-function SeasonChip({ label, chosen, onFocus }: { label: string; chosen: boolean; onFocus: () => void }) {
+function SeasonChip({
+  chipRef,
+  label,
+  chosen,
+  onFocus,
+}: {
+  chipRef: (view: View | null) => void;
+  label: string;
+  chosen: boolean;
+  onFocus: () => void;
+}) {
   const { focused, handlers } = useRemoteFocus(onFocus);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: chosen }} {...handlers}>
+    <Pressable ref={chipRef} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: chosen }} {...handlers}>
       <XStack height={px(44)} px="$4" items="center" rounded="$10" bg={chosen ? CHOSEN.bg : '$color3'} {...(focused ? FOCUSED : {})}>
         <SizableText size="$4" fontWeight="600" color={chosen ? CHOSEN.color : '$color12'} numberOfLines={1}>
           {label}

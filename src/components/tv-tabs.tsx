@@ -90,17 +90,34 @@ export function TvTabs() {
     if (chosen > 0) page.current?.requestTVFocus();
   }, [chosen]);
   const choose = () => setChosen((count) => count + 1);
+  // A page that names no first control — Live — leaves the system to place the focus at launch, and it
+  // takes the rail, top left. Until the remote has been in a page once, the rail sends it there.
+  const settled = useRef(false);
+  const openRail = (next: boolean) => {
+    if (next && !settled.current) {
+      settled.current = true;
+      page.current?.requestTVFocus();
+      return;
+    }
+    setOpen(next);
+  };
   return (
     <TvBackContext value={back}>
       <Tabs>
         <XStack flex={1} bg="$background">
           <YStack width={PAGE} />
-          <FocusGroup ref={page} style={{ flex: 1 }}>
+          <FocusGroup
+            ref={page}
+            onFocusEnter={() => {
+              settled.current = true;
+            }}
+            style={{ flex: 1 }}
+          >
             <TabSlot style={{ flex: 1 }} />
           </FocusGroup>
         </XStack>
         <TabList asChild>
-          <Rail railRef={rail} open={open} reduceMotion={reduceMotion} onOpen={setOpen}>
+          <Rail railRef={rail} open={open} reduceMotion={reduceMotion} onOpen={openRail}>
             <TabTrigger name="media" href="/media" asChild>
               <RailTab icon={Film} label="Media" open={open} onChosen={choose} />
             </TabTrigger>

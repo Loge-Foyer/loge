@@ -81,6 +81,9 @@ rail down the left (`components/tv-tabs.tsx`):
 - **Opening:** while the focus is in the rail it widens to show the names,
   over the page, on a veil. The rail is a focus group, which says when the
   focus comes in and goes.
+- **At launch the remote starts in the page**: a page that names no first
+  control — Live — left the system to place it, and it took the rail, top
+  left. Until the remote has been in a page once, the rail sends it there.
 - **Select changes the tab and sends the focus into the page** — the page is
   a focus group too, and `requestTVFocus()` on it lands on what the remote
   last left there, or on the first control of a page it has not been in —
@@ -144,6 +147,13 @@ click that only React Native's own `Pressable` hears. So:
   control's `onFocus`, `onBlur` and `ref` to the remote's own `Pressable`, so
   a row of chips can choose as the remote rests on one (`SourceTabs`'
   `selectOnFocus`) and a page can send the remote back to its first one.
+- **Coming into a row of chips that choose on focus lands on the chosen
+  one**: the row is a focus group whose destination is that chip
+  (`setDestinations`). Left to the focus engine, the remote landed on
+  whichever chip was nearest — and resting there chose it.
+- **A scroll view of controls leaves room for the focus** (`FOCUS_ROOM`,
+  `focusRoomStyles`): a focused chip's lift and ring reach past it, and a
+  scroll view cuts off what does.
 - **Cards are `Pressable` already**, and only show the focus
   (`useRemoteFocus`): the picture lifts and wears the ring. That reaches past
   the card — `cardFocusRoom` says how far — so its words sit that much
