@@ -136,7 +136,9 @@ it runs today, built with [Tamagui](https://tamagui.dev):
     Server is the first: what is trending, and a search for videos, channels
     and playlists. A channel has a page of its own.
   - **TV** — live channels from a Stalker portal.
-    - Channels in their groups, with what is on now and next.
+    - Channels in their groups, with what is on now and next — each in its
+      own country's time, even where the provider wrote one country's guide
+      in UTC.
     - A day's guide, and a ★ of favourite channels.
     - The provider's films and series.
   - **Settings** — the account, profiles and PIN lock, watch status, what the

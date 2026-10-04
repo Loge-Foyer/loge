@@ -795,6 +795,9 @@ Everything above describes the target; what runs today:
   stored as passwords (`PasswordField.visible`); a Guide time zone setting
   turns a guide stamped on the portal's wall clock back into instants; calls
   share one sign-in properly, and plugin requests carry no ambient cookies.
+  Another country's guide, written in UTC and taken for the portal's own
+  clock, is put right by each channel's country — its guide id, group or
+  name (`countryOf`) — with no setting to touch.
 - **Yattee** pictures come from the addresses the server signs for them.
 - **Apple TV:** the app builds, installs and runs on the tvOS 27 simulator
   (`npm run tvos`), driven by the remote: every control focusable and

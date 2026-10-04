@@ -126,7 +126,8 @@ What runs today:
 - TV: a ★ of favourite channels before the provider's groups, per profile on
   the account (database v8, backup schema 3), and a held channel's menu to add
   or remove one. Stalker shows its MAC address, takes a Guide time zone, and
-  shares one sign-in properly.
+  shares one sign-in properly; another country's guide, written in UTC and
+  taken for the portal's own clock, is put right by each channel's country.
 - Yattee's pictures from the addresses the server signs; artwork drawn again
   once its source is ready.
 - Apple TV, from the same code: `npm run tvos` turns `ios/` into the TV
