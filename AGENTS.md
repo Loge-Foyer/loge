@@ -636,8 +636,11 @@ typecheck.
 - **One theme entry point:** `src/tamagui.config.ts`. Never add a second theme
   or styling system beside it. Its colours are `src/tamagui.themes.ts`, apart
   only so `test/theme.test.ts` can read them without React Native; nothing
-  else imports it. `@expo/ui` is installed because expo-router depends on it
-  — do not use it for screens.
+  else imports it. `@expo/ui` came with expo-router: never build a screen
+  from it. Where a native control is wanted that Tamagui has no equal for —
+  a menu of choices, as a series' seasons on a phone — use its universal
+  `Picker` (`appearance="menu"`) inside a `Host`, themed with the page's
+  colours.
 - **Two schemes, light and dark**, as Settings → App → Appearance says: greys
   for the page and its words, the brass accent for what is pressed and
   chosen. Write a token, never a colour that assumes one scheme. Status words

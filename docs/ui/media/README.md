@@ -167,8 +167,10 @@ further, and closes on its ✕ or a slide down (`titleOptions`,
   the source says what the file is, opening `media-info`; then "Episodes" and
   "More like this" as tabs, the chosen one marked with the accent along its
   top.
-- **Episodes**: "Season 1 ▾" opens the seasons in the overlay picker. Each
-  episode is its still with a play glyph — which plays it, from where it
+- **Episodes**: the seasons are the platform's own menu — the season shown,
+  and on a tap SwiftUI's menu with a check on it on iOS, Material's dropdown
+  on Android, a select in a browser (`@expo/ui`'s `Picker`); a series of one
+  season just names it. Each episode is its still with a play glyph — which plays it, from where it
   stopped — then its number and name and how long it runs, which open its own
   sheet, a symbol for its copy where one can be kept, and two lines of what
   it is about.

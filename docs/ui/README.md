@@ -106,13 +106,17 @@ there is a native header to put them in (`components/header-button.tsx`):
 - No glass library is added for the places a header cannot reach: what the
   system draws, it draws; the rest is the circle.
 
+**A short choice** — a series' seasons on a phone — is the platform's own
+menu: `@expo/ui`'s universal `Picker` with `appearance="menu"`, inside a
+`Host` given the page's scheme and its words' colour. Never a screen built
+from `@expo/ui`.
+
 ## Shared pieces
 
 What more than one tab draws, in `src/components/`:
 
 - **The overlay picker** (`overlay-picker.tsx`) — a list over the whole
-  screen, for choosing one of many: categories, a series' seasons, a row's
-  category. Large grey rows, the chosen one bold in the page's own colour and
+  screen, for choosing one of many: categories, a row's category. Large grey rows, the chosen one bold in the page's own colour and
   scrolled to as it opens, and a round ✕ at the bottom; none on a TV, where
   Menu closes it. It is React Native's own modal, so it sits above a native
   sheet and takes a remote's focus.

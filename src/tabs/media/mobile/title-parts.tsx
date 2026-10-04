@@ -1,5 +1,5 @@
 import type { Episode, MediaDetail, MediaItem, Show } from '@loge/api';
-import { ChevronDown } from '@tamagui/lucide-icons-2/icons/ChevronDown';
+import { Host, Picker } from '@expo/ui';
 import { CircleAlert } from '@tamagui/lucide-icons-2/icons/CircleAlert';
 import { CircleCheck } from '@tamagui/lucide-icons-2/icons/CircleCheck';
 import { Download } from '@tamagui/lucide-icons-2/icons/Download';
@@ -7,8 +7,8 @@ import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { Star } from '@tamagui/lucide-icons-2/icons/Star';
 import { Link } from 'expo-router';
 import { useState, type ReactElement } from 'react';
-import { Pressable } from 'react-native';
-import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
+import { Pressable, useColorScheme } from 'react-native';
+import { Paragraph, SizableText, Spinner, useTheme, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { Button } from '@/components/button';
@@ -18,7 +18,6 @@ import { BoxBadge, progressOf, ProgressBar, WatchedBadge } from '@/components/me
 import { titleHref } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { TitleMenu } from '@/components/media/title-menu';
-import { OverlayPicker } from '@/components/overlay-picker';
 import { useDownloadActions, useDownloadBudget, useDownloadOf } from '@/hooks/use-downloads';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useChildren, useMoreLikeThis } from '@/hooks/use-media';
@@ -150,10 +149,10 @@ export function SheetTabs<T extends string>({ tabs, chosen, onChoose }: { tabs: 
 }
 
 /**
- * A series' episodes, a season at a time: "Season 1 ▾" opens the seasons over
- * everything, and each episode is its still — which plays it, from where it
- * stopped — its number and name, which open its own sheet, and what it is
- * about.
+ * A series' episodes, a season at a time: the seasons are the platform's own
+ * menu (`SeasonMenu`), and each episode is its still — which plays it, from
+ * where it stopped — its number and name, which open its own sheet, and what
+ * it is about.
  */
 export function Episodes({
   show,
@@ -177,7 +176,6 @@ export function Episodes({
   const seasons = useChildren(show);
   const list = seasons.data?.items ?? [];
   const [chosen, setChosen] = useState(initial);
-  const [picking, setPicking] = useState(false);
   const season = seasonToOpen(list, chosen);
   const episodes = useChildren(season);
   const withKept = useKeptWatch(episodes.data?.items ?? []);
@@ -185,17 +183,13 @@ export function Episodes({
   if (list.length === 0) return null;
   return (
     <YStack gap="$4">
-      <Button
-        size="$3"
-        self="flex-start"
-        bg="$color3"
-        borderWidth={0}
-        iconAfter={<ChevronDown size={px(16)} color="$color11" />}
-        aria-label={`${season?.title ?? 'Season'}, choose another`}
-        onPress={() => setPicking(true)}
-      >
-        {season?.title ?? 'Season'}
-      </Button>
+      {list.length > 1 && season ? (
+        <SeasonMenu seasons={list} selected={season.key.externalId} onSelect={setChosen} />
+      ) : (
+        <SizableText size="$4" fontWeight="600" color="$color12">
+          {season?.title ?? 'Season'}
+        </SizableText>
+      )}
       {episodes.isPending ? <Spinner color="$accent9" self="flex-start" /> : null}
       {(episodes.data?.items ?? [])
         .map(withKept)
@@ -212,15 +206,27 @@ export function Episodes({
             onPlay={() => onPlay(episode)}
           />
         ))}
-      <OverlayPicker
-        open={picking}
-        label="Seasons"
-        options={list.map((each) => ({ id: each.key.externalId, label: each.title }))}
-        selected={season?.key.externalId}
-        onSelect={setChosen}
-        onClose={() => setPicking(false)}
-      />
     </YStack>
+  );
+}
+
+/**
+ * The seasons, in the platform's own menu rather than one drawn here: the
+ * season shown, and on a tap SwiftUI's menu with a check on it on iOS,
+ * Material's dropdown on Android, a select in a browser (`@expo/ui`'s
+ * `Picker`). It is drawn in the page's own words' colour and scheme.
+ */
+function SeasonMenu({ seasons, selected, onSelect }: { seasons: readonly MediaItem[]; selected: string; onSelect: (id: string) => void }) {
+  const theme = useTheme();
+  const scheme = useColorScheme();
+  return (
+    <Host matchContents colorScheme={scheme ?? 'unspecified'} seedColor={String(theme.color12.val)}>
+      <Picker selectedValue={selected} onValueChange={(id) => onSelect(String(id))} appearance="menu">
+        {seasons.map((season) => (
+          <Picker.Item key={season.key.externalId} label={season.title} value={season.key.externalId} />
+        ))}
+      </Picker>
+    </Host>
   );
 }
 
