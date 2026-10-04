@@ -6,7 +6,7 @@ import { FlatList, Pressable } from 'react-native';
 import { H3, XStack, YStack } from 'tamagui';
 
 import { GUTTER, px } from '@/components/density';
-import { useRemoteFocus } from '@/components/remote';
+import { cardFocusRoom, useRemoteFocus } from '@/components/remote';
 import { PosterSkeleton, ThumbnailSkeleton } from '@/components/shelf';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import type { CardStyle } from '@/services/home-layout';
@@ -57,6 +57,7 @@ export function MediaRow({
 }) {
   const { focused, handlers } = useRemoteFocus();
   const withKept = useKeptWatch(items);
+  const room = cardFocusRoom(card === 'poster' ? width * 1.5 : (width * 9) / 16);
   const heading: ReactNode = (
     <XStack items="center" gap="$1">
       <H3 size="$6" color={focused ? '$accent11' : '$color12'}>
@@ -94,7 +95,9 @@ export function MediaRow({
           data={items}
           keyExtractor={(item) => `${item.key.connectionId}:${item.key.externalId}`}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: GUTTER, gap: GAP }}
+          // Room above for a focused card, which a scroll view would cut off, taken back from the gap above it.
+          style={room > 0 ? { marginTop: -room } : undefined}
+          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: room, gap: GAP }}
           getItemLayout={(_data, index) => ({ length: width + GAP, offset: (width + GAP) * index, index })}
           renderItem={({ item, index }) => {
             const focus = { ...(onFocusItem ? { onFocusItem } : {}), preferred: preferFirst && index === 0 };

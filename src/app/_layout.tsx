@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import { profileGateOptions } from '@/components/stack-options';
 import { ThemeRoot } from '@/components/theme-root';
 import { ServicesProvider } from '@/composition/provider';
 import { useSyncEffects } from '@/hooks/use-account';
@@ -59,8 +60,8 @@ function RootStack() {
       <Stack.Protected guard={gate.kind === 'ready' || gate.kind === 'starting'}>
         <Stack.Screen name="index" options={AT_ONCE} />
         <Stack.Screen name="(app)" options={AT_ONCE} />
-        <Stack.Screen name="who-is-watching" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="unlock/[userId]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="who-is-watching" options={profileGateOptions} />
+        <Stack.Screen name="unlock/[userId]" options={profileGateOptions} />
       </Stack.Protected>
       <Stack.Protected guard={gate.kind === 'failed'}>
         <Stack.Screen name="boot" options={AT_ONCE} />

@@ -104,7 +104,10 @@ click that only React Native's own `Pressable` hears. So:
   `Pressable` on a TV, with a focus ring. Settings rows, switches (an On/Off
   pill: UIKit has no switch on tvOS) and the primary button do the same.
 - **Cards are `Pressable` already**, and only show the focus
-  (`useRemoteFocus`).
+  (`useRemoteFocus`): the picture lifts and wears the ring. That reaches past
+  the card — `cardFocusRoom` says how far — so its words sit that much
+  lower, and a row's scroll view leaves the room above, where it would cut
+  the ring off.
 - **The player** answers the remote (`hooks/use-remote-keys.ts`), and only
   the player in front does: every screen hears the remote, and a zap leaves
   the one before on the screen for a moment.
@@ -146,6 +149,9 @@ click that only React Native's own `Pressable` hears. So:
   React Native's root view, where `hasTVPreferredFocus`, `nextFocus*` and a
   focus guide's destinations do nothing (`autoFocus` and the traps still
   work). The sheets, still full-screen modals here, have the same limit.
+  Who is watching and a profile's PIN are pushed too
+  (`profileGateOptions`): as modals they were a card in the middle of the
+  screen, and the picker could not put the focus on the profile in use.
 - **Back (Menu) closes the layer on top** — the channel list, then a panel,
   then the controls, then the banner — and only then the player
   (`backStep` in `screens/player-layers.ts`). A layer counts only where

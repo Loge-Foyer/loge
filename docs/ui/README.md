@@ -415,10 +415,20 @@ browser are untouched.
   sizes written by hand (`px`), and sets the title-safe gutter (80 points of
   1920) and a wider column.
 - **Focus is shown**: a focused button or card lifts and wears an accent ring,
-  a settings row lights up, a switch is an On/Off pill.
+  a settings row lights up, a switch is an On/Off pill. A card's words sit
+  clear of its lifted picture, and a row leaves room above it
+  (`cardFocusRoom`), or the ring is drawn through the title and cut off at
+  the row's edge.
+- **Cards have TV sizes of their own** (`components/shelf.tsx`): posters 240
+  points wide, about seven across, and scenes 400, about four. Grown with the
+  type they were six and three, and a row was too tall to sit beneath the
+  spotlight without pushing it under the tab bar.
 - **No headers on tab roots or detail pages** — the tvOS tab bar names the
-  tab, and Menu goes back — and sheets take the whole screen. Customize and
-  Refresh sit at the top of the Media home.
+  tab, and Menu goes back — and sheets take the whole screen, as do who is
+  watching and a profile's PIN, which are pushed (`profileGateOptions`).
+  Customize and Refresh sit at the top of the Media home.
+- **A title's page keeps to its column**: the logo over the picture lines up
+  with the year and the buttons beneath it, well inside the screen's edge.
 - **The home's spotlight**: above the rows, whatever card the remote is on,
   large — its picture, title, a line of facts and two of overview — following
   the focus. The focus starts on the first card.

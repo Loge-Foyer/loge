@@ -75,6 +75,16 @@ export const CARD_FOCUSED = {
   outlineOffset: 3,
 } as const;
 
+/**
+ * How far a focused card's picture reaches past its own box on a TV, for a
+ * picture `height` tall: lifted by `CARD_FOCUSED`'s scale, then ringed. The
+ * words beneath keep this much clear and a row keeps it free above, or the
+ * ring is drawn through the title and cut off at the row's edge. None
+ * anywhere else.
+ */
+export const cardFocusRoom = (height: number) =>
+  isTV ? Math.ceil((height * (CARD_FOCUSED.scale - 1)) / 2) + CARD_FOCUSED.outlineOffset + CARD_FOCUSED.outlineWidth : 0;
+
 /** How a focused control looks on a TV: lifted, and ringed in the accent. */
 export const FOCUSED = {
   scale: 1.06,

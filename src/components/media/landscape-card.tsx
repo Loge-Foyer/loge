@@ -7,7 +7,7 @@ import { SizableText, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { episodeCode, timeLeft, videoCountLabel } from '@/components/labels';
-import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
+import { CARD_FOCUSED, cardFocusRoom, useRemoteFocus } from '@/components/remote';
 
 import { PILL, progressOf, ProgressBar, WatchedBadge } from './badges';
 import { itemHref, playHref } from './item-link';
@@ -58,7 +58,7 @@ function WholeCard({ item, width, title, subtitle, showWatch, preferred, onFocus
         {({ pressed }) => (
           <YStack width={width} gap="$1.5" opacity={pressed ? 0.8 : 1}>
             <Picture item={item} width={width} title={title} showWatch={showWatch} focused={focused} />
-            <Words item={item} title={title} subtitle={subtitle} focused={focused} />
+            <Words item={item} title={title} subtitle={subtitle} focused={focused} room={cardFocusRoom((width * 9) / 16)} />
           </YStack>
         )}
       </Pressable>
@@ -93,7 +93,7 @@ function SplitCard({ item, width, title, subtitle, showWatch, preferred, onFocus
         <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${subtitle}`} hitSlop={{ top: 4, bottom: 8 }} {...words.handlers}>
           {({ pressed }) => (
             <YStack opacity={pressed ? 0.8 : 1}>
-              <Words item={item} title={title} subtitle={subtitle} focused={words.focused} />
+              <Words item={item} title={title} subtitle={subtitle} focused={words.focused} room={cardFocusRoom((width * 9) / 16)} />
             </YStack>
           )}
         </Pressable>
@@ -155,10 +155,11 @@ function Picture({
   );
 }
 
-function Words({ item, title, subtitle, focused }: { item: MediaItem; title: string; subtitle: string; focused: boolean }) {
+/** The title and what it is, `room` below the picture: clear of it when it is focused on a TV. */
+function Words({ item, title, subtitle, focused, room }: { item: MediaItem; title: string; subtitle: string; focused: boolean; room: number }) {
   const left = item.type === 'episode' ? timeLeft(item) : undefined;
   return (
-    <YStack gap="$0.5">
+    <YStack gap="$0.5" pt={room}>
       <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
         {title}
       </SizableText>

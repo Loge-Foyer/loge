@@ -3,14 +3,17 @@ import { ScrollView } from 'react-native';
 import { H3, XStack, YStack, useMedia } from 'tamagui';
 
 import { px } from './density';
+import { isTV } from './remote';
 
 /**
- * Card widths follow the viewport, so the same shelf works from phone to TV —
- * and grow on a TV with the type beneath them (`density.ts`): about seven
- * posters across 1920 points.
+ * Card widths follow the viewport, so the same shelf works from phone to TV.
+ * A TV has its own: about seven posters across 1920 points, and four scenes.
+ * Grown with the type (`density.ts`), they were six and three, a row too tall
+ * to sit beneath the spotlight without pushing it under the tab bar.
  */
 export function usePosterWidth() {
   const media = useMedia();
+  if (isTV) return 240;
   if (media.xl) return px(200);
   if (media.lg) return px(176);
   if (media.md) return px(150);
@@ -20,6 +23,7 @@ export function usePosterWidth() {
 /** The width of a landscape card, for continuing and for rows shown as scenes. */
 export function useLandscapeWidth() {
   const media = useMedia();
+  if (isTV) return 400;
   if (media.xl) return px(380);
   if (media.lg) return px(340);
   if (media.md) return px(300);

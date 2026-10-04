@@ -7,6 +7,11 @@ import { Button } from '@/components/button';
 
 const PIN_LENGTH = 4;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
+// Three to a row, laid out as rows rather than wrapped: a TV's larger gap and
+// focus ring once pushed the third key of each row onto the next.
+const ROWS = [KEYS.slice(0, 3), KEYS.slice(3, 6), KEYS.slice(6, 9), KEYS.slice(9, 12)];
+const KEY = px(76);
+const KEY_GAP = px(12);
 
 interface PinPadProps {
   title: string;
@@ -59,7 +64,7 @@ export function PinPad({ title, message, tone = 'hint', disabled = false, onComp
         {Array.from({ length: PIN_LENGTH }, (_, index) => (
           <Circle
             key={index}
-            size={16}
+            size={px(16)}
             borderWidth={2}
             borderColor={tone === 'error' ? '$red9' : '$accent9'}
             bg={index < digits.length ? '$accent9' : 'transparent'}
@@ -69,34 +74,38 @@ export function PinPad({ title, message, tone = 'hint', disabled = false, onComp
       <SizableText size="$3" color={tone === 'error' ? '$red11' : '$color10'} minH="$2" text="center">
         {message ?? ' '}
       </SizableText>
-      <XStack flexWrap="wrap" width={264} gap="$3" justify="center">
-        {KEYS.map((key, index) =>
-          key === '' ? (
-            <YStack key={index} width={76} height={76} />
-          ) : (
-            <Button
-              key={index}
-              width={76}
-              height={76}
-              p={0}
-              rounded={38}
-              bg="$color3"
-              borderWidth={0}
-              pressStyle={{ bg: '$color5' }}
-              disabled={disabled}
-              onPress={() => press(key)}
-              aria-label={key === 'back' ? 'Delete digit' : key}
-              {...(key === 'back' ? { icon: <Delete size={24} color="$color11" /> } : {})}
-            >
-              {key === 'back' ? null : (
-                <SizableText size="$8" color="$color12">
-                  {key}
-                </SizableText>
-              )}
-            </Button>
-          ),
-        )}
-      </XStack>
+      <YStack gap={KEY_GAP}>
+        {ROWS.map((row, rowIndex) => (
+          <XStack key={rowIndex} gap={KEY_GAP}>
+            {row.map((key, index) =>
+              key === '' ? (
+                <YStack key={index} width={KEY} height={KEY} />
+              ) : (
+                <Button
+                  key={index}
+                  width={KEY}
+                  height={KEY}
+                  p={0}
+                  rounded={KEY / 2}
+                  bg="$color3"
+                  borderWidth={0}
+                  pressStyle={{ bg: '$color5' }}
+                  disabled={disabled}
+                  onPress={() => press(key)}
+                  aria-label={key === 'back' ? 'Delete digit' : key}
+                  {...(key === 'back' ? { icon: <Delete size={px(24)} color="$color11" /> } : {})}
+                >
+                  {key === 'back' ? null : (
+                    <SizableText size="$8" color="$color12">
+                      {key}
+                    </SizableText>
+                  )}
+                </Button>
+              ),
+            )}
+          </XStack>
+        ))}
+      </YStack>
     </YStack>
   );
 }

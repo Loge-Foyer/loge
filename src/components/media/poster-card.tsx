@@ -4,7 +4,7 @@ import { Pressable } from 'react-native';
 import { SizableText, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
-import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
+import { CARD_FOCUSED, cardFocusRoom, useRemoteFocus } from '@/components/remote';
 
 import { progressOf, ProgressBar, RatingBadges, WatchedBadge } from './badges';
 import { itemHref } from './item-link';
@@ -50,7 +50,7 @@ export function PosterCard({
               {showWatch && item.watch?.played ? <WatchedBadge /> : null}
               {progress === undefined ? null : <ProgressBar value={progress} />}
             </YStack>
-            <YStack gap="$0.5">
+            <YStack gap="$0.5" pt={cardFocusRoom(width * 1.5)}>
               <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
                 {item.title}
               </SizableText>

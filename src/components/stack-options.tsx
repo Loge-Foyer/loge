@@ -70,6 +70,14 @@ export const playerOptions: StackOptions = {
 };
 
 /**
+ * Who is watching, and a profile's PIN: a modal on a phone. On a TV the whole
+ * screen, pushed as the player is — a native modal there was a card in the
+ * middle, outside React Native's root view, where the picker could not put
+ * the focus on the profile in use.
+ */
+export const profileGateOptions: StackOptions = isTV ? { presentation: 'card', animation: 'fade' } : { presentation: 'modal' };
+
+/**
  * A native sheet on iOS and Android, a plain page in a browser. What it shows
  * must be inline — a Tamagui portal would render behind the native sheet. A
  * TV has no sheets: it takes the whole screen, and Menu or Done closes it.

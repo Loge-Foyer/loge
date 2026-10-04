@@ -12,7 +12,7 @@ import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { Trash2 } from '@tamagui/lucide-icons-2/icons/Trash2';
 import { useMutation } from '@tanstack/react-query';
 import { Link, router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { H1, H3, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
@@ -44,6 +44,9 @@ import type { SourceError } from '@/services/media';
 import { CollectionPage } from './channel';
 import type { PlayerSummary } from '@/services/players';
 import type { Playlist } from '@/services/ports';
+
+// The page's column, which what lies over the hero lines up with.
+const PAGE_WIDTH = px(1100);
 
 /** A film, a series with its seasons and episodes, or one episode — whatever the key points at. */
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
@@ -121,7 +124,7 @@ function Detail({
   return (
     <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
       <Hero item={item} />
-      <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={px(1100)} self="center">
+      <YStack px="$4" pt="$3" pb="$12" gap="$5" width="100%" maxW={PAGE_WIDTH} self="center">
         {sourceError ? <SourceNotices errors={[sourceError]} onRetry={() => void refresh()} /> : null}
         <Meta item={item} />
         <Actions item={item} canPlay={canPlay} canMarkWatched={canMarkWatched} canDownload={canDownload} offersChoices={offersChoices} />
@@ -170,24 +173,41 @@ function Hero({ item }: { item: MediaItem }) {
       <Artwork connectionId={item.key.connectionId} image={image} width={width} aspect={aspect} label={item.title} rounded="$0" />
       <Scrim from="top" strength={0.35} />
       <Scrim from="bottom" />
-      <YStack position="absolute" l="$4" r="$4" b="$4" gap="$2" maxW={px(680)}>
-        {item.type === 'episode' ? (
-          <SizableText size="$3" fontWeight="600" color="$color11">
-            {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
-          </SizableText>
-        ) : null}
-        <ArtworkLogo
-          connectionId={item.key.connectionId}
-          image={item.type === 'episode' ? undefined : item.images.logo}
-          width={Math.min(360, width * 0.6)}
-          height={Math.min(120, width * 0.2)}
-          label={title}
-          fallback={
-            <H1 size="$10" color="$color12" numberOfLines={2}>
-              {title}
-            </H1>
-          }
-        />
+      <OverHero>
+        <YStack gap="$2" maxW={px(680)}>
+          {item.type === 'episode' ? (
+            <SizableText size="$3" fontWeight="600" color="$color11">
+              {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
+            </SizableText>
+          ) : null}
+          <ArtworkLogo
+            connectionId={item.key.connectionId}
+            image={item.type === 'episode' ? undefined : item.images.logo}
+            width={Math.min(360, width * 0.6)}
+            height={Math.min(120, width * 0.2)}
+            label={title}
+            fallback={
+              <H1 size="$10" color="$color12" numberOfLines={2}>
+                {title}
+              </H1>
+            }
+          />
+        </YStack>
+      </OverHero>
+    </YStack>
+  );
+}
+
+/**
+ * What lies over a hero, in the page's column: a title's logo lines up with
+ * the year and the buttons beneath it rather than with the picture's edge —
+ * which, on a TV, the column keeps well inside of.
+ */
+function OverHero({ children }: { children: ReactNode }) {
+  return (
+    <YStack position="absolute" l={0} r={0} b="$4" items="center">
+      <YStack width="100%" maxW={PAGE_WIDTH} px="$4">
+        {children}
       </YStack>
     </YStack>
   );
@@ -203,14 +223,16 @@ function CoverHero({ item, poster, width, height }: { item: MediaItem; poster: I
       <Artwork connectionId={item.key.connectionId} image={poster} width={width} aspect={width / tall} label={item.title} rounded="$0" blur={30} />
       <Scrim from="top" strength={0.6} />
       <Scrim from="bottom" />
-      <XStack position="absolute" l="$4" r="$4" b="$4" gap="$4" items="flex-end">
-        <Artwork connectionId={item.key.connectionId} image={poster} width={coverWidth} aspect={2 / 3} label={item.title} rounded="$5" />
-        <YStack flex={1} pb="$1">
-          <H1 size="$9" color="$color12" numberOfLines={3}>
-            {item.title}
-          </H1>
-        </YStack>
-      </XStack>
+      <OverHero>
+        <XStack gap="$4" items="flex-end">
+          <Artwork connectionId={item.key.connectionId} image={poster} width={coverWidth} aspect={2 / 3} label={item.title} rounded="$5" />
+          <YStack flex={1} pb="$1">
+            <H1 size="$9" color="$color12" numberOfLines={3}>
+              {item.title}
+            </H1>
+          </YStack>
+        </XStack>
+      </OverHero>
     </YStack>
   );
 }

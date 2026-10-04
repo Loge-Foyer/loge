@@ -498,7 +498,8 @@ Not an afterthought. Things to know:
   presents one outside React Native's root view, where `hasTVPreferredFocus`,
   `nextFocus*` and a focus guide's destinations do nothing; `autoFocus` and
   the traps still work. A screen that must place the focus is pushed on a TV
-  — the player is (`playerOptions`).
+  — the player is (`playerOptions`), and so are who is watching and a
+  profile's PIN (`profileGateOptions`).
 - **Menu pops a pushed screen before React Native hears it** — UIKit's own
   recognizer on the navigation controller, even with
   `TVEventControl.enableTVMenuKey()` on (react-native-screens #4618). A screen

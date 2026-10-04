@@ -5,7 +5,7 @@ import { SizableText, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
 import { followersLabel } from '@/components/labels';
-import { CARD_FOCUSED, useRemoteFocus } from '@/components/remote';
+import { CARD_FOCUSED, cardFocusRoom, useRemoteFocus } from '@/components/remote';
 
 import { itemHref } from './item-link';
 
@@ -25,7 +25,7 @@ export function ChannelCard({ item, width, preferred = false }: { item: VideoCha
             <YStack height={Math.round((width * 9) / 16)} items="center" justify="center" rounded="$4" bg="$color2" {...(focused ? CARD_FOCUSED : {})}>
               <Artwork connectionId={item.key.connectionId} image={item.images.avatar} width={face} aspect={1} label={item.title} rounded={999} />
             </YStack>
-            <YStack gap="$0.5">
+            <YStack gap="$0.5" pt={cardFocusRoom((width * 9) / 16)}>
               <SizableText size="$3" color={focused ? '$accent11' : '$color12'} numberOfLines={1}>
                 {item.title}
               </SizableText>
