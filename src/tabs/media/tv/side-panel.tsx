@@ -4,14 +4,13 @@ import { Animated, Pressable, ScrollView, useWindowDimensions } from 'react-nati
 import { Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui';
 
 import { Artwork } from '@/components/artwork';
-import { Button } from '@/components/button';
 import { GUTTER, px } from '@/components/density';
 import { FocusGroup } from '@/components/focus-group';
 import { progressOf, ProgressBar, WatchedBadge } from '@/components/media/badges';
 import { titleHref } from '@/components/media/item-link';
 import { PosterCard } from '@/components/media/poster-card';
 import { RowTitle } from '@/components/media/row-title';
-import { CARD_RING, useRemoteFocus } from '@/components/remote';
+import { CARD_RING, FOCUSED, useRemoteFocus } from '@/components/remote';
 import { CHOSEN } from '@/components/settings-list';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
 import { useChildren, useMoreLikeThis } from '@/hooks/use-media';
@@ -50,7 +49,9 @@ export function SidePanel({ title, reduceMotion, children }: { title: string; re
 /**
  * A series' episodes: its seasons along the top, then each episode — its
  * still, its number and name, how long it runs, what it is about. Select plays
- * it, from where it stopped; the remote starts on the one to watch next.
+ * it, from where it stopped; the remote starts on the one to watch next. A
+ * season shows as soon as the remote is on its chip, with no select: moving
+ * along the chips is moving through the seasons.
  */
 export function EpisodesPanel({
   show,
@@ -68,6 +69,8 @@ export function EpisodesPanel({
   const seasons = useChildren(show);
   const list = seasons.data?.items ?? [];
   const [chosen, setChosen] = useState(initial);
+  // Once the remote has moved to another season, the next episode no longer takes the focus as it is drawn.
+  const [browsed, setBrowsed] = useState(false);
   const season = seasonToOpen(list, chosen);
   const episodes = useChildren(season);
   const withKept = useKeptWatch(episodes.data?.items ?? []);
@@ -79,22 +82,18 @@ export function EpisodesPanel({
       {list.length > 1 ? (
         <FocusGroup>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: px(12), paddingVertical: px(6) }}>
-            {list.map((each) => {
-              const on = each.key.externalId === season?.key.externalId;
-              return (
-                <Button
-                  key={each.key.externalId}
-                  size="$4"
-                  rounded="$10"
-                  borderWidth={0}
-                  bg={on ? CHOSEN.bg : '$color3'}
-                  color={on ? CHOSEN.color : '$color12'}
-                  onPress={() => setChosen(each.key.externalId)}
-                >
-                  {each.title}
-                </Button>
-              );
-            })}
+            {list.map((each) => (
+              <SeasonChip
+                key={each.key.externalId}
+                label={each.title}
+                chosen={each.key.externalId === season?.key.externalId}
+                onFocus={() => {
+                  if (each.key.externalId === season?.key.externalId) return;
+                  setChosen(each.key.externalId);
+                  setBrowsed(true);
+                }}
+              />
+            ))}
           </ScrollView>
         </FocusGroup>
       ) : null}
@@ -105,12 +104,26 @@ export function EpisodesPanel({
             key={episode.key.externalId}
             episode={episode}
             showWatch={showWatch}
-            preferred={episode.key.externalId === next?.key.externalId}
+            preferred={!browsed && episode.key.externalId === next?.key.externalId}
             onPress={canPlay ? () => onPlay(episode) : undefined}
           />
         ))}
       </ScrollView>
     </YStack>
+  );
+}
+
+/** A season's chip: the season it names shows as the remote lands on it. */
+function SeasonChip({ label, chosen, onFocus }: { label: string; chosen: boolean; onFocus: () => void }) {
+  const { focused, handlers } = useRemoteFocus(onFocus);
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: chosen }} {...handlers}>
+      <XStack height={px(44)} px="$4" items="center" rounded="$10" bg={chosen ? CHOSEN.bg : '$color3'} {...(focused ? FOCUSED : {})}>
+        <SizableText size="$4" fontWeight="600" color={chosen ? CHOSEN.color : '$color12'} numberOfLines={1}>
+          {label}
+        </SizableText>
+      </XStack>
+    </Pressable>
   );
 }
 

@@ -218,9 +218,11 @@ dark in either scheme — all of it sits on a picture:
 - **Episodes and More like this slide in from the right** (`tv/side-panel.tsx`),
   about half the screen, on a dark veil. Up, down and right keep the remote
   in a panel; left goes back to the actions. Episodes has the seasons along
-  its top and each episode as its still, its number and name, how long it
-  runs and two lines of what it is about; select plays it, and the focus
-  starts on the one to watch next. More like this is three posters across;
+  its top — a season shows as soon as the remote is on its chip, with no
+  select, so moving along the chips moves through the seasons — and each
+  episode as its still, its number and name, how long it runs and two lines
+  of what it is about; select plays it, and the focus starts on the one to
+  watch next, until the remote has moved to another season. More like this is three posters across;
   select opens one's own page over this one.
 - **Back closes the panel first**, and the focus goes back to what opened it;
   then the page (`useBackLayers`, `docs/platforms/tvos`).
