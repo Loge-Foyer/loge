@@ -53,11 +53,13 @@ export function SourceTabs({
   // the one chosen — not on whichever is nearest, which choosing on focus would then choose.
   const views = useRef(new Map<string, View>());
   const guide = useRef<FocusGroupHandle>(null);
+  // Set again as the tabs change too: a provider's groups arrive after the row, and the chosen one's chip with them.
+  const ids = tabs.map((tab) => tab.id).join('\n');
   useEffect(() => {
     if (!selectOnFocus || selected === undefined) return;
     const chosen = views.current.get(selected);
     if (chosen) guide.current?.setDestinations([chosen]);
-  }, [selectOnFocus, selected]);
+  }, [selectOnFocus, selected, ids]);
   const back = useTvBack();
   const row = useId();
   const toFirst = () => views.current.get(tabs[0]?.id ?? '')?.requestTVFocus();

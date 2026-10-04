@@ -149,8 +149,10 @@ click that only React Native's own `Pressable` hears. So:
   `selectOnFocus`) and a page can send the remote back to its first one.
 - **Coming into a row of chips that choose on focus lands on the chosen
   one**: the row is a focus group whose destination is that chip
-  (`setDestinations`). Left to the focus engine, the remote landed on
-  whichever chip was nearest — and resting there chose it.
+  (`setDestinations`), set again whenever the chips change — a provider's
+  groups arrive after the row. Left to the focus engine, the remote landed
+  on whichever chip was nearest, or on the last one it left, and resting
+  there chose it.
 - **A scroll view of controls leaves room for the focus** (`FOCUS_ROOM`,
   `focusRoomStyles`): a focused chip's lift and ring reach past it, and a
   scroll view cuts off what does.
