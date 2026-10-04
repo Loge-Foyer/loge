@@ -125,10 +125,6 @@ function fakePortal(options: PortalOptions = {}) {
         if (options.countries) return { status: 200, json: { js: { total_items: 3, data: countryChannels } } };
         return { status: 200, json: { js: { total_items: 3, data: [...channelPage(1).js.data, ...channelPage(2).js.data] } } };
       }
-      if (type === 'itv' && action === 'get_short_epg') {
-        const start = now / 1000 - 600;
-        return { status: 200, json: { js: [epg(request.query.ch_id ?? '', start), epg(request.query.ch_id ?? '', start + 1800)] } };
-      }
       if (type === 'itv' && action === 'get_epg_info') {
         if (options.countries) return { status: 200, json: { js: { data: countryGuide } } };
         const start = now / 1000;
@@ -344,18 +340,16 @@ describe('Stalker — live TV', () => {
     expect(http.to(LOAD).at(-1)?.query.genre).toBe('*');
   });
 
-  it('asks each channel for now and next, and all of them at once for a longer guide', async () => {
+  it('answers one channel’s now and next from the whole portal’s guide, as it does a day', async () => {
     const { provider, http } = await connect();
     const getGuide = need(provider, 'getGuide');
     const at = (ms: number) => new Date(ms).toISOString();
     const nowAndNext = await getGuide({ channels: [key('ch:101'), key('ch:999', 'connection-2')], from: at(now), to: at(now + 3_600_000) });
-    expect(http.to(LOAD).filter((request) => request.query.action === 'get_short_epg').map((request) => request.query.ch_id)).toEqual(['101']);
-    expect(nowAndNext.map((programme) => [programme.title, programme.startsAt])).toEqual([
-      [`Show at ${now / 1000 - 600}`, at(now - 600_000)],
-      [`Show at ${now / 1000 + 1200}`, at(now + 1_200_000)],
-    ]);
+    // `get_short_epg` picks by the box's clock, UTC, against the portal's own: hours off.
+    expect(http.to(LOAD).some((request) => request.query.action === 'get_short_epg')).toBe(false);
+    expect(nowAndNext.map((programme) => [programme.title, programme.startsAt])).toEqual([[`Show at ${now / 1000}`, at(now)]]);
     const day = await getGuide({ channels: [key('ch:101'), key('ch:102')], from: at(now), to: at(now + 24 * 3_600_000) });
-    expect(http.to(LOAD).find((request) => request.query.action === 'get_epg_info')?.query.period).toBe('24');
+    expect(http.to(LOAD).filter((request) => request.query.action === 'get_epg_info').map((request) => request.query.period)).toEqual(['1', '24']);
     expect(day).toHaveLength(3);
     expect(day[0]).toEqual({ channel: key('ch:101'), title: `Show at ${now / 1000}`, description: 'About it.', startsAt: at(now), endsAt: at(now + 1_800_000) });
   });

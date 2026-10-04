@@ -21,7 +21,6 @@ import {
 
 import {
   epgInfoFor,
-  epgList,
   ids,
   linkOf,
   fromSeason,
@@ -43,9 +42,6 @@ import {
 } from './map';
 import { abandonable, createPortal, isPortalAnswer, unreadable } from './portal';
 
-// Now and next, for a few channels, is one short call each; a longer window is one call for all.
-const SHORT_EPG_CHANNELS = 6;
-const SHORT_EPG_WINDOW_MS = 6 * 3_600_000;
 const LONGEST_GUIDE_HOURS = 48;
 const EPISODE_PAGES = 20;
 // Every channel, or every channel's guide, in one answer: far more than a page,
@@ -305,12 +301,12 @@ export function createProvider(target: MediaTarget, context: MediaContext): Conn
       );
       const inWindow = (programme: Programme) => Date.parse(programme.endsAt) > from && Date.parse(programme.startsAt) < to;
       const now = context.clock.now();
-      if (wanted.length <= SHORT_EPG_CHANNELS && to - now <= SHORT_EPG_WINDOW_MS) {
-        const lists = await Promise.all(
-          wanted.map(async ({ key, id }) => epgList(await portal.call('itv', 'get_short_epg', { ch_id: id, size: 10 }, signal)).flatMap((entry) => toProgramme(entry, key, readingOf(id)) ?? [])),
-        );
-        return lists.flat().filter(inWindow);
-      }
+      // Even one channel's now and next comes from the whole portal's guide.
+      // `get_short_epg` picks its programmes by the box's clock — UTC, as this
+      // plugin says — against the portal's own wall clock: a portal in Berlin
+      // answered at 02:49 with what aired from 00:30 to 02:45, and not what
+      // was on. The whole guide starts at the portal's own hour, and one
+      // answer serves every list, banner and zap within five minutes.
       // The portal counts its hours from its own clock: a guide shifted by its
       // zone needs that many more to reach the end of the window asked for.
       const shift = zone ? Math.ceil(Math.abs(zoneOffsetMs(zone, now) ?? 0) / 3_600_000) : 0;

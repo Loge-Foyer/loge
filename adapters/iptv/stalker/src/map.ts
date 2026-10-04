@@ -238,11 +238,6 @@ export function epgInfoFor(js: unknown, channelId: string): readonly unknown[] {
   return list(record(record(js)?.data)?.[channelId]);
 }
 
-export function epgList(js: unknown): readonly unknown[] {
-  // `get_short_epg` answers a list; some portals wrap it as a page.
-  return Array.isArray(js) ? js : list(record(js)?.data);
-}
-
 /** `create_link`'s address, without the player hint a MAG box reads first — or why there is none. */
 export function linkOf(js: unknown): { readonly url?: string; readonly error?: string } {
   const body = record(js);

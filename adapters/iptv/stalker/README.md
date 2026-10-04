@@ -49,9 +49,12 @@ series.
   says so, and it is not latched as a refusal.
 - **Live TV:** `itv get_genres` (without "All") and `get_ordered_list`, paged as
   the portal pages. Catch-up comes from `tv_archive_duration`. The guide is
-  `get_short_epg` for now and next on a few channels, and one `get_epg_info`
-  for a longer window — the guide of every channel on the portal, which is
-  shared by every list that asks in the same five minutes.
+  one `get_epg_info` — the guide of every channel on the portal, which is
+  shared by every list, banner and zap that asks in the same five minutes —
+  even for one channel's now and next. `get_short_epg` picks its programmes
+  by the box's clock, which this plugin says is UTC, against the portal's own
+  wall clock: a portal in Berlin answered at 02:49 with what aired from 00:30
+  to 02:45, and not what was on.
 - **Answers about the whole portal** — `get_all_channels`, which a channel
   played before its list was read needs, and `get_epg_info` — get a minute,
   where a page gets fifteen seconds.
@@ -183,9 +186,9 @@ What that portal showed: 96 genres and 4,658 channels, a day of guide per
 channel, 14 films and 14 series on a first page of 8,975, a series' season and
 its five episodes, and a link to play an episode and a channel. Two things it
 taught, both now in the code above: it keeps its series in a section of its
-own, and its ids hold colons. Its `get_short_epg` answers with the programme
-on now and no more, so "now and next" shows one — the day guide, which comes
-from `get_epg_info`, has the rest.
+own, and its ids hold colons. Its `get_short_epg` answered with less than
+now and next — two hours behind, it turned out, read by the box's UTC clock
+against the portal's own — so the guide comes from `get_epg_info` alone.
 
 **One MAC address is one device** on a provider's side. Never invent a second
 to try something, and never loop a failed handshake: a refusal is latched on
