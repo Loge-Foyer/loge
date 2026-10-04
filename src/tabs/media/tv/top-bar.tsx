@@ -16,7 +16,7 @@ import { OverlayPicker } from '@/components/overlay-picker';
 import { ProfileButton } from '@/components/profile-button';
 import { CHOSEN } from '@/components/settings-list';
 import { useGenres } from '@/hooks/use-media';
-import type { HomeFilter } from '@/services/home-filter';
+import { isFiltered, type HomeFilter } from '@/services/home-filter';
 
 import { chipsFor } from '../shared/filter-chips';
 import { SEARCH_HREF } from '../shared/links';
@@ -25,9 +25,10 @@ import { SEARCH_HREF } from '../shared/links';
 const EVERY_GENRE = '';
 
 /**
- * What heads a TV's home: the profile and Search, where a phone has them in
- * its header; the chips that narrow the home; and Customize and Refresh. One
- * focus group, so up from the rows lands where the remote last was in it.
+ * What heads a TV's home: the profile, the chips that narrow the home, then
+ * Customize, Refresh and — at the top right, while nothing narrows the home —
+ * Search, as a phone has it. One focus group, so up from the rows lands where
+ * the remote last was in it.
  */
 export function TopBar({
   filter,
@@ -49,7 +50,6 @@ export function TopBar({
     <FocusGroup>
       <XStack px={GUTTER} gap="$3" items="center" flexWrap="wrap">
         <ProfileButton />
-        <Button size="$4" circular icon={<Search size={px(22)} />} aria-label="Search" onPress={() => router.push(SEARCH_HREF)} />
         {chips.map((chip) => {
           if (chip.type === 'clear') return <Button key="clear" size="$4" circular icon={<X size={px(20)} />} aria-label="Show everything" onPress={() => onFilter({})} />;
           if (chip.type === 'kind') {
@@ -74,6 +74,8 @@ export function TopBar({
         <Button size="$4" icon={<RefreshCw size={px(18)} />} disabled={refreshing} onPress={onRefresh}>
           Refresh
         </Button>
+        {/* Search is the whole home's: none while a chip narrows it. */}
+        {isFiltered(filter) ? null : <Button size="$4" circular icon={<Search size={px(22)} />} aria-label="Search" onPress={() => router.push(SEARCH_HREF)} />}
       </XStack>
       <OverlayPicker
         open={choosing}

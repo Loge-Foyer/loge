@@ -94,9 +94,9 @@ What runs today:
   device and per tab — are per device, and "Play with…" picks one for an
   item. Videos is real: one source at a time, a paging grid, and
   `sources/yattee` — a Yattee Server instance — bringing web video to it.
-- Search, closed: Media's search page asks for every Media kind, its grids
-  the kinds they show, Live searches channels and its films and series each
-  search their own. Only sources whose
+- Search, closed: Media's search page — from the top right of its home,
+  while nothing narrows it — asks for every Media kind; Live searches
+  channels and its films and series each search their own. Only sources whose
   `search` is in effect are asked, and nothing of a search is saved. It starts
   two seconds after the last letter, or on the search key — Videos on the key
   alone.

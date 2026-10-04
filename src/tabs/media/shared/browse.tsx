@@ -1,7 +1,7 @@
 import type { MediaItem } from '@loge/api';
 import { FlashList } from '@shopify/flash-list';
 import { Stack } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { SizableText, Spinner, YStack, useTheme } from 'tamagui';
 
@@ -12,7 +12,6 @@ import { PosterCard } from '@/components/media/poster-card';
 import { SourceNotices } from '@/components/media/source-notices';
 import { isTV } from '@/components/remote';
 import { Screen } from '@/components/screen';
-import { SearchField } from '@/components/search-field';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useHomeRows } from '@/hooks/use-home-layout';
 import { useKeptWatch } from '@/hooks/use-kept-watch';
@@ -30,7 +29,8 @@ const GAP = 12;
  * Everything one row holds, as a grid over the whole screen — narrowed as the
  * home was when it was opened (`kind`, `genre`), and the filter's own row by
  * its id. It pages as it scrolls, in the row's own order; the columns follow
- * the viewport, so the same screen works from a phone to a television.
+ * the viewport, so the same screen works from a phone to a television. It has
+ * no search box: Media's search is the home's, at its top right.
  */
 export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: string; genre?: string }) {
   const { rows, sources } = useHomeRows();
@@ -38,11 +38,7 @@ export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: str
   const stored = rows?.find((candidate) => candidate.id === rowId);
   const kindRow =
     rowId === FILTER_ROW_ID ? filterRow(filter) : stored?.type === 'titles' ? (isFiltered(filter) ? narrowRow(stored, filter) : stored) : undefined;
-  const [term, setTerm] = useState('');
-  const searching = term.trim().length > 0;
-  // A search stays inside this row's kinds: films answer a search of films.
-  const grid = useGrid(kindRow ? { ...specOf(kindRow), ...(searching ? { term } : {}) } : undefined);
-  const onTerm = useCallback((next: string) => setTerm(next), []);
+  const grid = useGrid(kindRow ? specOf(kindRow) : undefined);
   const refresh = useRefreshMedia();
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -93,8 +89,6 @@ export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: str
       <FlashList
         // A new column count is a new layout, not an update of the old one.
         key={columns}
-        // The first tap after typing reaches ✕ or a card, rather than only putting the keyboard away.
-        keyboardShouldPersistTaps="handled"
         data={items}
         numColumns={columns}
         keyExtractor={(item) => `${item.key.connectionId}:${item.key.externalId}`}
@@ -111,7 +105,6 @@ export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: str
         )}
         ListHeaderComponent={
           <YStack px={GAP / 2} pb="$4" gap="$3">
-            <SearchField placeholder={`Search ${rowTitle(kindRow).toLowerCase()}`} term={term} onTerm={onTerm} />
             {total === undefined ? null : (
               <SizableText size="$2" color="$color10">
                 {total === 1 ? '1 title' : `${total} titles`}
@@ -127,7 +120,7 @@ export function BrowseScreen({ rowId, kind, genre }: { rowId: string; kind?: str
             </YStack>
           ) : (
             <SizableText px={GAP / 2} color="$color10">
-              {searching ? 'Nothing here matches that.' : 'Nothing here yet.'}
+              Nothing here yet.
             </SizableText>
           )
         }

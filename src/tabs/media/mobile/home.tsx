@@ -12,13 +12,14 @@ import { Button } from '@/components/button';
 import { CastButton } from '@/components/cast-button';
 import { GUTTER, px } from '@/components/density';
 import { Glow } from '@/components/glow';
+import { ProfileButton } from '@/components/profile-button';
 import { SYSTEM_GLASS } from '@/components/header-button';
 import { listNames } from '@/components/labels';
 import { SourceNotices } from '@/components/media/source-notices';
 import { useLandscapeWidth, usePosterWidth } from '@/components/shelf';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { APP_DEFAULTS } from '@/services/app-settings';
-import type { HomeFilter } from '@/services/home-filter';
+import { isFiltered, type HomeFilter } from '@/services/home-filter';
 
 import { heroOf } from '../shared/hero';
 import { MediaEmptyState, SetUpCallout, SetUpScreen } from '../shared/home-states';
@@ -59,6 +60,8 @@ export function MobileHome() {
     navigation.setOptions({ headerStyle: { backgroundColor: scrolled ? String(theme.color3.val) : 'transparent' } });
   }, [navigation, scrolled, theme]);
 
+  // Search is the whole home's: it is offered only while nothing narrows it.
+  const searchable = !isFiltered(filter);
   // The same header in every state: no title, the app's icon at its left, Search and the profile at its right.
   // It is see-through only over the glow; a page with nothing behind it keeps the bar's own.
   const bar = (overGlow: boolean) => (
@@ -69,6 +72,12 @@ export function MobileHome() {
         headerLeft: () => <AppMark />,
         // On iOS 26 a header item sits in the system's glass unless it asks not to; the icon is no button.
         unstable_headerLeftItems: () => [{ type: 'custom', element: <AppMark />, hidesSharedBackground: true }],
+        headerRight: () => (
+          <XStack gap="$3" items="center">
+            {searchable ? <MobileHeaderRight /> : null}
+            <ProfileButton />
+          </XStack>
+        ),
         headerTransparent: overGlow,
         // From iOS 26 the system's own edge effect; before it a blur once the page runs under the bar.
         ...(Platform.OS === 'ios' ? { headerBlurEffect: overGlow && !SYSTEM_GLASS ? ('systemChromeMaterial' as const) : ('none' as const) } : {}),
@@ -135,7 +144,7 @@ export function MobileHome() {
               <AppMark size={36} />
               <XStack gap="$2" items="center">
                 <CastButton />
-                <SearchButton />
+                {searchable ? <SearchButton /> : null}
               </XStack>
             </XStack>
           ) : null}

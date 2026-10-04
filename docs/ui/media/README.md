@@ -105,9 +105,11 @@ The chips over the home narrow every row at once (`services/home-filter.ts`,
 
 ## Search
 
-`shared/search.tsx`, from the magnifier in the home's header (a TV's top
-bar): every film, series and anime the sources hold, as posters, at least
-three across. It asks once typing pauses for two seconds, or at once on the
+`shared/search.tsx`, from the magnifier at the top right of the home — on a
+phone in its header, on a TV at the end of its top bar — and only while
+nothing narrows the home: Search is the whole home's, so a chosen kind or
+category hides it, and a row's grid has no search box. Every film, series
+and anime the sources hold, as posters, at least three across. It asks once typing pauses for two seconds, or at once on the
 search key; only sources whose `search` is in effect are asked, and nothing of
 a search is kept (`docs/ui`).
 
@@ -121,8 +123,9 @@ a search is kept (`docs/ui`).
   fading out as the page scrolls (Settings → App, `docs/ui`). Not drawn when
   it is off.
 - **The header** is the tab's native one, with no title: Loge's icon at its
-  far left (`components/app-mark.tsx`), and at its right Search and the
-  profile's square — and Cast, built and hidden — in the system's glass on
+  far left (`components/app-mark.tsx`), and at its right Search — while
+  nothing narrows the home — and the profile's square — and Cast, built and
+  hidden — in the system's glass on
   iOS 26; the icon asks to stay out of it (`hidesSharedBackground`). It is
   see-through over the glow; below iOS 26 the bar blurs once the page runs
   under it, and Android's toolbar takes `$color3` then. The empty and
@@ -192,7 +195,8 @@ further, and closes on its ✕ or a slide down (`titleOptions`,
 the page is Media's own:
 
 - **The top bar** (`tv/top-bar.tsx`), one focus group: the profile's square
-  with a chevron, Search, the chips, then Customize and Refresh.
+  with a chevron, the chips, then Customize, Refresh and, at the top right
+  while nothing narrows the home, Search.
 - **The rows** (`tv/row.tsx`): a row's title is grey capitals the remote
   never lands on, and beneath its cards two lines about the one the remote
   is on — "S3 · E4 · Old Friends" and "20 min left", or the title, year and
