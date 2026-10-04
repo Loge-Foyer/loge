@@ -1,5 +1,6 @@
 import type { ConnectionId, GlobalMediaKey, HeadersRef, ImageRef, MediaItem } from '@loge/api';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { PixelRatio } from 'react-native';
 
@@ -18,9 +19,10 @@ const remote = {
   refetchOnWindowFocus: true,
 } as const;
 
-// A source that is starting up or overloaded is asked again, gently, until it answers.
-const whileBackingOff = (result: RowResult | undefined) =>
-  result?.sourceErrors.some((error) => error.retry === 'backoff') ? 30_000 : false;
+// A source that is starting up or overloaded is asked again, gently, until it
+// answers — while its screen is in front: the tabs stay beneath the player.
+const whileBackingOff = (result: RowResult | undefined, focused: boolean) =>
+  focused && result?.sourceErrors.some((error) => error.retry === 'backoff') ? 30_000 : false;
 
 const rowKey = (spec: RowSpec) => [spec.kind, spec.sort.by, spec.sort.order] as const;
 
@@ -32,6 +34,7 @@ const rowKey = (spec: RowSpec) => [spec.kind, spec.sort.by, spec.sort.order] as 
 export function useHomeRowQueries(specs: readonly RowSpec[]) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const focused = useIsFocused();
   const saved = useQueries({
     queries: specs.map((spec) => ({
       queryKey: remoteKey(userId, 'saved', 'row', ...rowKey(spec)),
@@ -45,7 +48,7 @@ export function useHomeRowQueries(specs: readonly RowSpec[]) {
       staleTime: 5 * MINUTE,
       // Saved rows first; else, while the sort changes, the previous rows.
       placeholderData: (previous: RowResult | undefined) => saved[index]?.data ?? previous,
-      refetchInterval: (query: { state: { data: RowResult | undefined } }) => whileBackingOff(query.state.data),
+      refetchInterval: (query: { state: { data: RowResult | undefined } }) => whileBackingOff(query.state.data, focused),
       ...remote,
     })),
   });
@@ -54,6 +57,7 @@ export function useHomeRowQueries(specs: readonly RowSpec[]) {
 export function useContinueWatching(enabled = true) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const focused = useIsFocused();
   const saved = useQuery({
     queryKey: remoteKey(userId, 'saved', 'continue'),
     queryFn: () => media.saved.continueWatching(userId),
@@ -64,7 +68,7 @@ export function useContinueWatching(enabled = true) {
     queryFn: ({ signal }) => media.continueWatching(userId, undefined, signal),
     staleTime: 30_000,
     placeholderData: (previous: RowResult | undefined) => saved.data ?? previous,
-    refetchInterval: (query) => whileBackingOff(query.state.data),
+    refetchInterval: (query) => whileBackingOff(query.state.data, focused),
     enabled,
     ...remote,
   });

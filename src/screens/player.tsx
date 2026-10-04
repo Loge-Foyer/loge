@@ -1,4 +1,4 @@
-import { segmentAt, type AudioTrack, type Chapter, type ConnectionId, type Episode, type GlobalMediaKey, type MediaItem, type MediaPlayer, type MediaSegment, type PluginId, type SubtitleTrack } from '@loge/api';
+import { segmentAt, type AudioTrack, type Channel, type Chapter, type ConnectionId, type Episode, type GlobalMediaKey, type MediaItem, type MediaPlayer, type MediaSegment, type PluginId, type SubtitleTrack } from '@loge/api';
 import type { PlayerView } from '@loge/player-kit';
 import { AudioLines } from '@tamagui/lucide-icons-2/icons/AudioLines';
 import { Captions } from '@tamagui/lucide-icons-2/icons/Captions';
@@ -17,22 +17,24 @@ import { Play } from '@tamagui/lucide-icons-2/icons/Play';
 import { RotateCcw } from '@tamagui/lucide-icons-2/icons/RotateCcw';
 import { RotateCw } from '@tamagui/lucide-icons-2/icons/RotateCw';
 import { X } from '@tamagui/lucide-icons-2/icons/X';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useIsFocused, useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type PanResponderInstance } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Animated, AppState, BackHandler, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type PanResponderInstance } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SizableText, Slider, Spinner, Theme, XStack, YStack } from 'tamagui';
 
 import { px } from '@/components/density';
 import { Button } from '@/components/button';
 import { clockTime, describeMissing, episodeCode } from '@/components/labels';
+import { ChannelBanner } from '@/components/media/channel-banner';
 import { isFavorites, liveHref, playHref } from '@/components/media/item-link';
 import { FocusGroup } from '@/components/focus-group';
 import { FOCUSED, isHandheld, isTV, useRemoteFocus } from '@/components/remote';
 import { PrimaryButton } from '@/components/primary-button';
 import { useAppSettings } from '@/hooks/use-app-settings';
-import { nowAndNext, useGuide, useLineup, useNow } from '@/hooks/use-live';
+import { nowAndNext, useGuide, useLineupAround, useNow } from '@/hooks/use-live';
+import { useLiveRecovery } from '@/hooks/use-live-recovery';
 import { useItem } from '@/hooks/use-media';
 import { useNextEpisode, usePlaybackPlan, usePlaybackReports, usePlayer, usePlayerOrientation, type PlayerSnapshot } from '@/hooks/use-playback';
 import { APP_DEFAULTS } from '@/services/app-settings';
@@ -40,9 +42,14 @@ import type { PlayerButton, PlayerJump, PlayerSlider } from '@/services/ports';
 import { useServices } from '@/hooks/services-context';
 import { useRemoteKeys } from '@/hooks/use-remote-keys';
 import { ChannelPanel } from '@/screens/player-channels';
+import { backStep, liveOverlay, zapTarget, type BackStep, type LiveOverlayState, type PlayerLayers } from '@/screens/player-layers';
 import { categoryHref } from '@/screens/settings/plugin-route';
 
 const HIDE_AFTER_MS = 3_500;
+/** How long a TV's banner stays once the channel plays, or after a press of right. */
+const BANNER_MS = 5_000;
+/** How long a run of up and down presses waits for the next before it tunes: each tune is a new link and a new stream. */
+const ZAP_SETTLE_MS = 500;
 /** How long a remote's left or right waits for a second press: a click comes slower than a finger's tap. */
 const DOUBLE_PRESS_MS = 400;
 /** How bright a double tap's side flashes at its peak: barely, a white veil over the picture. */
@@ -80,12 +87,19 @@ export function PlayerScreen({
   });
   const report = usePlaybackReports(item, live !== undefined, startMs);
   const { controller, snapshot } = usePlayer(plan, connectionId, report);
+  const focused = useIsFocused();
+  // A channel whose stream stopped comes back by itself, and says so, rather than showing a failure.
+  const recovering = useLiveRecovery({ live: live !== undefined, state: planError ? 'failed' : snapshot.state, error: snapshot.error ?? planError, focused, retry });
+  const layersRef = useRef<LayerControl>(undefined);
+  usePlayerBack(layersRef);
   const shrunk = usePlayerLeaving(controller, live !== undefined, snapshot.state === 'playing');
   const { playback } = useServices();
   const View = plan?.kind === 'play' ? playback.view(plan.player) : undefined;
   const next = useNextEpisode(item?.type === 'episode' ? item : undefined);
 
-  const problem = !live && detail.error
+  const problem = recovering
+    ? undefined
+    : !live && detail.error
     ? detail.error.message
     : planError
       ? `This could not be started: ${planError.message}`
@@ -95,7 +109,10 @@ export function PlayerScreen({
           ? 'Every player is switched off on this device.'
           : snapshot.state === 'failed'
             ? (snapshot.error?.message ?? 'This stopped playing.')
-            : undefined;
+            : live && snapshot.state === 'ended'
+              ? // A provider plays one stream per subscription line, and ends the one before when another starts.
+                'The channel stopped. A subscription often plays one stream at a time, so another device may have started playing on it.'
+              : undefined;
 
   return (
     // Its own provider: a full-screen modal is measured apart from the screen
@@ -122,6 +139,8 @@ export function PlayerScreen({
               {...(next.data ? { next: next.data } : {})}
               {...(player ? { player } : {})}
               {...(live ? { live: { channel: key, title: live.title, ...(live.group ? { group: live.group } : {}) } } : {})}
+              recovering={recovering}
+              controlRef={layersRef}
             />
           )}
         </YStack>
@@ -140,6 +159,51 @@ function close() {
   else router.replace('/');
 }
 
+/** What the player's top layers are, and how to close one: `Controls` keeps it current. */
+interface LayerControl {
+  readonly layers: PlayerLayers;
+  close(step: Exclude<BackStep, 'leave'>): void;
+}
+
+/** The native stack's own event, which the generic navigation type does not list. */
+type TransitionEvents = { addListener(type: 'transitionEnd', listener: (event: { readonly data: { readonly closing: boolean } }) => void): () => void };
+
+/**
+ * Back closes what is on top — the channel list, a panel, then on a TV the
+ * controls and the banner — and only then the player (`backStep`). Android's
+ * Back reaches here as it is; an Apple TV's Menu only while it is held for the
+ * app (`tvMenu`), since UIKit pops a pushed screen before the app hears it. It
+ * is held while the player is in front, and taken again after each transition
+ * and on coming back to the app, which re-arm UIKit's own.
+ */
+function usePlayerBack(controlRef: RefObject<LayerControl | undefined>) {
+  const { tvMenu } = useServices();
+  const navigation = useNavigation() as unknown as TransitionEvents;
+  useFocusEffect(
+    useCallback(() => {
+      const release = tvMenu.hold();
+      const back = BackHandler.addEventListener('hardwareBackPress', () => {
+        const step = backStep(controlRef.current?.layers, isTV);
+        if (step === 'leave') close();
+        else controlRef.current?.close(step);
+        return true;
+      });
+      const stopTransition = navigation.addListener('transitionEnd', (event) => {
+        if (!event.data.closing) tvMenu.refresh();
+      });
+      const active = AppState.addEventListener('change', (state) => {
+        if (state === 'active') tvMenu.refresh();
+      });
+      return () => {
+        back.remove();
+        stopTransition();
+        active.remove();
+        release();
+      };
+    }, [tvMenu, navigation, controlRef]),
+  );
+}
+
 function Controls({
   item,
   controller,
@@ -150,11 +214,17 @@ function Controls({
   next,
   player,
   live,
+  recovering,
+  controlRef,
 }: {
   item: MediaItem | undefined;
   controller: MediaPlayer | undefined;
   snapshot: PlayerSnapshot;
   starting: boolean;
+  /** A channel coming back by itself after its stream stopped. */
+  recovering: boolean;
+  /** Where Back finds the layers open now, and closes one. */
+  controlRef: RefObject<LayerControl | undefined>;
   /** Where the file is divided, for the scrubber. */
   chapters?: readonly Chapter[];
   /** What is worth offering to skip, as the source marked it. */
@@ -165,7 +235,11 @@ function Controls({
   /** A channel: its name, and the group it was opened from — for now and next, and the channels around it. */
   live?: { readonly channel: GlobalMediaKey; readonly title: string; readonly group?: string };
 }) {
-  const [visible, setVisible] = useState(true);
+  // A channel on a TV is watched with the controls away: up and down zap, a
+  // banner says what is on, and only select brings the controls.
+  const tvLive = isTV && live !== undefined;
+  const focused = useIsFocused();
+  const [visible, setVisible] = useState(!tvLive);
   const [touchedAt, setTouchedAt] = useState(0);
   const [panel, setPanel] = useState<'audio' | 'subtitles' | 'speed' | 'chapters'>();
   // A channel's group, slid in from the left; the controls stay away while it is.
@@ -179,8 +253,72 @@ function Controls({
   const { state, positionMs, durationMs } = snapshot;
   const playing = state === 'playing';
   const waiting = starting || state === 'loading' || state === 'buffering';
-  // Out of the way while it plays; back at a touch, and whenever it stops.
-  const shown = (visible || !playing) && !channels;
+
+  // The banner: up as a channel opens or zaps, gone a few seconds after it plays, back with right.
+  const [banner, setBanner] = useState(tvLive);
+  const [bannerAt, setBannerAt] = useState(0);
+  const showBanner = () => {
+    setBanner(true);
+    setBannerAt(Date.now());
+  };
+  useEffect(() => {
+    if (!banner || !playing) return;
+    const timer = setTimeout(() => setBanner(false), BANNER_MS);
+    return () => clearTimeout(timer);
+  }, [banner, playing, bannerAt]);
+
+  // The channels either side, and where a run of up and down presses points:
+  // the tune follows once they stop, so a quick run is one new stream, not one per press.
+  const lineup = useLineupAround(live?.channel, live?.group, isFavorites(live?.group));
+  const [aim, setAim] = useState<Channel>();
+  const aimTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(aimTimer.current), []);
+  const zap = (offset: -1 | 1) => {
+    if (!live) return;
+    const target = zapTarget(lineup.list, aim?.key.externalId ?? live.channel.externalId, offset, lineup.more);
+    if (target.kind === 'more') return lineup.loadMore();
+    if (target.kind !== 'channel') return;
+    setAim(target.channel);
+    if (tvLive) showBanner();
+    clearTimeout(aimTimer.current);
+    aimTimer.current = setTimeout(() => router.replace(liveHref(target.channel.key, target.channel.name, live.group)), ZAP_SETTLE_MS);
+  };
+  const playingChannel = live ? (lineup.found ? lineup.list[lineup.at] : { key: live.channel, name: live.title, groupIds: [] }) : undefined;
+
+  // On a TV's channel, what is over the picture is the overlay's to say; elsewhere the controls
+  // are out of the way while it plays, back at a touch, and whenever it stops.
+  const overlayState: LiveOverlayState = { state, starting, controls: visible, banner: banner || aim !== undefined, recovering, channels };
+  const overlay = tvLive ? liveOverlay(overlayState) : undefined;
+  const shown = overlay ? overlay === 'controls' : (visible || !playing) && !channels;
+
+  // What Back finds open, and closes one at a time: a layer counts only where hiding it shows something else.
+  const channelPanelRef = useRef<{ close(): void }>(undefined);
+  useLayoutEffect(() => {
+    controlRef.current = {
+      layers: {
+        channels,
+        panel: panel !== undefined,
+        controls: overlay ? overlay === 'controls' && liveOverlay({ ...overlayState, controls: false }) !== 'controls' : shown && playing,
+        banner: overlay === 'banner' && liveOverlay({ ...overlayState, banner: false }) !== 'banner',
+      },
+      close: (step) => {
+        if (step === 'channels') channelPanelRef.current?.close();
+        else if (step === 'panel') setPanel(undefined);
+        else if (step === 'controls') setVisible(false);
+        else {
+          setBanner(false);
+          clearTimeout(aimTimer.current);
+          setAim(undefined);
+        }
+      },
+    };
+  });
+  useEffect(
+    () => () => {
+      controlRef.current = undefined;
+    },
+    [controlRef],
+  );
 
   useEffect(() => {
     if (!shown || !playing || panel || scrub !== undefined) return;
@@ -374,16 +512,25 @@ function Controls({
 
   // A TV remote. Play/pause plays and pauses. With the controls up, the
   // arrows move the focus among them, and keep them up while they do; select
-  // is the focused control's own. With them away, select, up and down bring
-  // them back — focus on play — and left and right are the picture's sides.
-  // A channel, being live, has no use for those: left opens its group. While
-  // that is open, the arrows are its own.
+  // is the focused control's own. With them away, select brings them back —
+  // focus on play. On a channel, up and down zap, left opens its group, right
+  // brings the banner; elsewhere up and down bring the controls too, and left
+  // and right are the picture's sides. While the group is open, the arrows are
+  // its own. Every screen hears the remote, so only the one in front acts: a
+  // zap leaves the player before for a moment.
   useRemoteKeys((key) => {
+    if (!focused) return;
     if (key === 'playPause') return toggle();
     if (channels) return;
     if (shown) {
       if (key !== 'select') touch();
       return;
+    }
+    if (tvLive) {
+      if (key === 'up' || key === 'down') return zap(key === 'up' ? -1 : 1);
+      if (key === 'left') return openChannels();
+      if (key === 'right') return showBanner();
+      return touch();
     }
     if (key === 'select' || key === 'up' || key === 'down') return touch();
     if (live) return key === 'left' ? openChannels() : touch();
@@ -487,9 +634,7 @@ function Controls({
                 <X size={26} color="white" />
               </IconButton>
               <YStack flex={1}>
-                {live ? (
-                  <LiveBar channel={live.channel} title={live.title} {...(live.group ? { group: live.group } : {})} onChannels={openChannels} />
-                ) : null}
+                {live ? <LiveBar channel={live.channel} title={live.title} lineup={lineup} onZap={zap} onChannels={openChannels} /> : null}
                 {item?.type === 'episode' ? (
                   <SizableText size="$2" color="rgba(255,255,255,0.75)" numberOfLines={1}>
                     {[item.showTitle, episodeCode(item)].filter(Boolean).join(' · ')}
@@ -685,7 +830,8 @@ function Controls({
           </SizableText>
         </YStack>
       ) : null}
-      {channels && live ? <ChannelPanel channel={live.channel} group={live.group} onClose={closeChannels} /> : null}
+      {overlay === 'banner' && playingChannel ? <ChannelBanner channel={aim ?? playingChannel} waiting={waiting || recovering || aim !== undefined} reconnecting={recovering} /> : null}
+      {channels && live ? <ChannelPanel channel={live.channel} group={live.group} onClose={closeChannels} controlRef={channelPanelRef} /> : null}
     </View>
   );
 }
@@ -785,16 +931,23 @@ function EdgeSlider({ side, inset, kind, value, active }: { side: 'left' | 'righ
  * either side in its group — or among the favourites, when it was opened
  * from the ★ list — with the whole group a press away.
  */
-function LiveBar({ channel, title, group, onChannels }: { channel: GlobalMediaKey; title: string; group?: string; onChannels: () => void }) {
-  const { list, at, more } = useLineup(channel, group, isFavorites(group));
+function LiveBar({
+  channel,
+  title,
+  lineup,
+  onZap,
+  onChannels,
+}: {
+  channel: GlobalMediaKey;
+  title: string;
+  lineup: { readonly list: readonly Channel[]; readonly at: number; readonly more: boolean };
+  onZap: (offset: -1 | 1) => void;
+  onChannels: () => void;
+}) {
+  const { list, at, more } = lineup;
   const guide = useGuide(channel.connectionId, [channel]);
   const now = useNow();
   const { now: airing, next } = nowAndNext(guide.data?.value, channel, now);
-  const zap = (offset: number) => {
-    const target = at >= 0 ? list[(at + offset + list.length) % list.length] : undefined;
-    if (!target || target.key.externalId === channel.externalId) return;
-    router.replace(liveHref(target.key, target.name, group));
-  };
   return (
     <XStack items="center" gap="$3">
       <YStack flex={1} gap="$1">
@@ -820,10 +973,10 @@ function LiveBar({ channel, title, group, onChannels }: { channel: GlobalMediaKe
       <XStack gap="$2">
         {list.length > 1 && at >= 0 ? (
           <>
-            <IconButton label="Previous channel" onPress={() => zap(-1)}>
+            <IconButton label="Previous channel" onPress={() => onZap(-1)}>
               <ChevronUp size={28} color="white" />
             </IconButton>
-            <IconButton label="Next channel" onPress={() => zap(1)}>
+            <IconButton label="Next channel" onPress={() => onZap(1)}>
               <ChevronDown size={28} color="white" />
             </IconButton>
           </>

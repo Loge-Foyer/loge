@@ -426,6 +426,12 @@ browser are untouched.
   focus on play/pause, the arrows move among them, and a panel takes the
   focus. With them away, a double press of left or right jumps as a double
   tap does; its scrubber is a progress bar (`docs/platforms/tvos`).
+- **A channel is watched with the controls away**: a banner at the bottom —
+  logo or number, name, now with its time, progress and description, and
+  next — comes in as it opens or zaps and leaves after five seconds. Up and
+  down zap, right brings the banner back, select the controls.
+- **Back closes the layer on top**: the channel list, a panel, the controls,
+  the banner, and then the player.
 
 ## On the web
 

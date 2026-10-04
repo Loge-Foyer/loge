@@ -845,6 +845,20 @@ export interface SystemVolume {
   release(): Promise<void>;
 }
 
+/**
+ * The Apple TV remote's Menu button, kept for the app while a screen needs it
+ * — the player, whose layers close one by one before it does. A pushed screen
+ * would otherwise be popped by UIKit before the app heard the press. On a
+ * phone, Android TV or a page, Back reaches the app already, and this does
+ * nothing.
+ */
+export interface TvMenu {
+  /** Menu reaches `BackHandler` until the returned function is called. Counted: the last one released gives it back. */
+  hold(): () => void;
+  /** Takes it again after a screen came or went, which re-arms UIKit's own. */
+  refresh(): void;
+}
+
 /** Which ways the screen may turn: upright, as the app is laid out, or any way — a film fills a phone on its side. */
 export interface ScreenOrientationControl {
   upright(): Promise<void>;

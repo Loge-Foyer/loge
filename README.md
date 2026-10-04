@@ -141,6 +141,10 @@ it runs today, built with [Tamagui](https://tamagui.dev):
       in UTC.
     - A day's guide, and a ★ of favourite channels.
     - The provider's films and series.
+    - On a TV, a channel plays with the controls away: up and down zap, a
+      banner says what is on, select brings the controls, and Back closes
+      what is open before it leaves. A stream that stops comes back by
+      itself.
   - **Settings** — the account, profiles and PIN lock, watch status, what the
     app does on this device, and downloads.
     - The adapters in five lists — Sources, IPTV, Players, Sync, Metadata —

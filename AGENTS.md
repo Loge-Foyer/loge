@@ -419,6 +419,13 @@ design; these are the rules:
   per stream: never on disk for a live stream, which would only grow, nor for
   a file on the device. An engine claims disk with `buffersOnDisk` in its
   profile and nothing else; Settings offers Disk only where one here does.
+- **One stream per subscription line.** Engines are let go through
+  `PlaybackService.release`, never `dispose()` straight, and a channel's link
+  is asked for only once none is left: a zap replaces the player screen, and
+  the leaving one's engine outlives the new one's start.
+- **A channel comes back by itself** (`useLiveRecovery`): three tries at
+  most, never after a refused sign-in or a failure not to repeat. Never
+  write another retry loop around a stream.
 - **A controller is made inside an effect, never kept across one**, and a
   descriptor lives in that screen's state, never in the query cache
   (`hooks/use-playback.ts`). Fast Refresh and strict mode run effects twice:
@@ -492,6 +499,22 @@ Not an afterthought. Things to know:
   `nextFocus*` and a focus guide's destinations do nothing; `autoFocus` and
   the traps still work. A screen that must place the focus is pushed on a TV
   — the player is (`playerOptions`).
+- **Menu pops a pushed screen before React Native hears it** — UIKit's own
+  recognizer on the navigation controller, even with
+  `TVEventControl.enableTVMenuKey()` on (react-native-screens #4618). A screen
+  whose Back must close layers first holds Menu through `TvMenu.hold()`
+  (`modules/loge-tv-menu`, counted with React Native's one global switch),
+  listens on `BackHandler`, and leaves through `close()` itself: `exitApp`
+  does nothing on tvOS. Never call `enableTVMenuKey()` or
+  `disableTVMenuKey()` anywhere else — one flag, and the first to turn it off
+  takes it from everyone. Delete the module when react-native-screens with
+  `disableDefaultMenuAction` (#4665) arrives.
+- **Only the screen in front acts on the remote.** TV events reach every
+  mounted screen, and a zap leaves the player before on the screen for a
+  moment: gate `useRemoteKeys` on `useIsFocused()`.
+- **Nothing beneath the player polls or ticks.** The tabs stay mounted under
+  it; live queries' `refetchInterval` and `useNow` stop while their screen is
+  not focused, and move on at once when it is again.
 
 ## iOS and Android run Hermes
 
@@ -803,6 +826,11 @@ Everything above describes the target; what runs today:
   Another country's guide, written in UTC and taken for the portal's own
   clock, is put right by each channel's country — its guide id, group or
   name (`countryOf`) — with no setting to touch.
+- **On a TV, a channel is watched with the controls away:** a banner as it
+  opens or zaps, up and down zap, select brings the controls, and Back closes
+  the channel list, a panel, the controls and the banner before it leaves —
+  Menu included, held for the app by `modules/loge-tv-menu`. A channel whose
+  stream stops comes back by itself.
 - **Buffering** in Settings → App: Off, Memory or Disk with its limit, which
   mpv honours with a disk cache and the other engines in memory.
 - **Yattee** pictures come from the addresses the server signs for them.

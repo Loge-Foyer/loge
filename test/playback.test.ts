@@ -213,6 +213,27 @@ describe('pressing Play', () => {
     expect(t.services.playback.view(t.players[0]?.plugin.manifest.id ?? ('' as never))).toBe(t.players[0]?.plugin.View);
   });
 
+  it('asks for a channel’s stream only once the last engine is let go, so one line never plays two', async () => {
+    const t = await setUp();
+    const first = t.players[0]?.plugin.manifest.id ?? ('' as never);
+    const engine = t.services.playback.create(t.kids, first, t.connectionId);
+    let planned = false;
+    const channel = t.services.playback.plan(t.kids, t.item.key, { live: true }).then((plan) => {
+      planned = true;
+      return plan;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Still waiting: the engine before has not gone.
+    expect(planned).toBe(false);
+    expect(t.source.stats.playbackRequests).toHaveLength(0);
+    await t.services.playback.release(engine);
+    expect(await channel).toMatchObject({ kind: 'play' });
+    expect(t.players[0]?.made[0]?.disposed).toBe(true);
+    // A film waits for nothing.
+    t.services.playback.create(t.kids, first, t.connectionId);
+    expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play' });
+  });
+
   it('finds the next episode: the next in its season, then the next season’s first, then none', async () => {
     const t = await setUp();
     const next = (season: number, number: number) => t.services.playback.nextEpisode(t.kids, episode(t.connectionId, season, number));

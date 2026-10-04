@@ -124,7 +124,7 @@ export function usePlayer(plan: PlaybackPlan | undefined, connectionId: Connecti
       active = false;
       unsubscribe();
       // Once the view has let go of it: released first, a native view would hold a player that is gone.
-      setTimeout(() => void player.dispose(), 0);
+      setTimeout(() => void playback.release(player), 0);
     };
   }, [playback, userId, connectionId, plan]);
 

@@ -105,9 +105,11 @@ click that only React Native's own `Pressable` hears. So:
   pill: UIKit has no switch on tvOS) and the primary button do the same.
 - **Cards are `Pressable` already**, and only show the focus
   (`useRemoteFocus`).
-- **The player** answers the remote (`hooks/use-remote-keys.ts`):
-  - Select, up or down bring the controls up, and the focus starts on
-    play/pause every time they do. Left and right reach back and forward;
+- **The player** answers the remote (`hooks/use-remote-keys.ts`), and only
+  the player in front does: every screen hears the remote, and a zap leaves
+  the one before on the screen for a moment.
+  - Select brings the controls up — on a film, up and down too — and the
+    focus starts on play/pause every time they do. Left and right reach back and forward;
     down goes into the row beneath — audio, subtitles, speed, as Settings
     arranges it — and up into the row at the top. Each row is a focus group
     (`components/focus-group.tsx`), so up and down always land in it, on the
@@ -117,10 +119,24 @@ click that only React Native's own `Pressable` hears. So:
     twice quickly, one flashes and jumps as a double tap does, and the
     controls stay away, so the next double press jumps again; pressed once,
     the controls come up.
-  - On a channel, which is live and has nothing to jump through, left opens
-    its group, sliding in from the left with the focus on the channel
-    playing; up and down move through it, select zaps, and right closes it.
-    The live bar's Channels button opens it too while the controls are up.
+  - **A channel is watched with the controls away.** It opens with a banner
+    at the bottom — its logo or number, its name, what is on now, when, how
+    far along and what it is about, and what is next — and the banner leaves
+    five seconds after the picture comes (`components/media/channel-banner.tsx`).
+    While it loads, buffers or reconnects, the banner stays, with a spinner;
+    a pause brings the controls.
+    - Up and down zap — up to the channel above, as ▲ and the channel list
+      have it. The banner shows where the presses point at once; the tune
+      follows half a second after the last, so a quick run is one new
+      stream, not one per press. Past the last channel loaded comes the
+      group's next page; round to the first only once the group is all in.
+    - Right brings the banner back; select, the controls.
+    - Left opens the channel's group, sliding in from the left with the focus
+      on the channel playing; up and down move through it, select zaps, and
+      right closes it. The live bar's Channels button opens it too while the
+      controls are up.
+    - Which overlay shows, and where up and down go, are pure
+      (`screens/player-layers.ts`: `liveOverlay`, `zapTarget`).
   - Play/pause plays and pauses; the scrubber is a progress bar.
   - While the controls are away, the focus rests on an invisible view over
     the picture, which select presses. The full-screen tap-catcher a phone
@@ -130,6 +146,26 @@ click that only React Native's own `Pressable` hears. So:
   React Native's root view, where `hasTVPreferredFocus`, `nextFocus*` and a
   focus guide's destinations do nothing (`autoFocus` and the traps still
   work). The sheets, still full-screen modals here, have the same limit.
+- **Back (Menu) closes the layer on top** — the channel list, then a panel,
+  then the controls, then the banner — and only then the player
+  (`backStep` in `screens/player-layers.ts`). A layer counts only where
+  hiding it shows something else: the controls a pause holds up are no
+  layer, and Back leaves. Android TV's Back reaches the app as it is.
+  - **On Apple TV, Menu has to be kept for the app.** A pushed screen sits in
+    a `UINavigationController`, and the controller's own Menu tap pops it
+    before React Native hears the press — even with
+    `TVEventControl.enableTVMenuKey()` on (react-native-screens #4618).
+    `modules/loge-tv-menu` switches that recognizer off while the player is in
+    front, and keeps it off as UIKit switches it on again with every screen
+    that comes and goes. It is react-native-screens' own fix (#4665,
+    `disableDefaultMenuAction`), which no release carries yet: delete the
+    module once one does.
+  - The player takes the hold in a focus effect (`TvMenu` in
+    `services/ports.ts`, counted with React Native's one global switch in
+    `platform/tv-menu.ts`), takes it again after each transition and on
+    coming back to the app, and lets go when anything covers it. Its one
+    `BackHandler` listener leaves through `close()`: on tvOS `exitApp` does
+    nothing.
 - **Where the focus starts:** the first card of the home, Play on a detail
   page, the default profile in the picker, play/pause in the player.
 

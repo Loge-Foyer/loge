@@ -406,7 +406,23 @@ over the tabs, with `start` in milliseconds for a resume:
   no item to read and nothing reported, no scrubber and no skipping, but LIVE,
   what is on now and next, and channel up and down through the group it was
   opened from. A channel whose only stream is raw MPEG-TS says, in a browser or
-  on an iPhone, which player would play it.
+  on an iPhone, which player would play it. On a TV it opens with a banner
+  rather than the controls, and up and down zap (`docs/platforms/tvos`).
+- **A channel comes back by itself** when its stream stops — it ended,
+  buffered for fifteen seconds, or failed with a hint to try again later
+  (`services/live-recovery.ts`, `hooks/use-live-recovery.ts`): a new link and
+  a new engine after one second, then four, then ten, and the count starts
+  again after a minute of playing. Never after a refused sign-in or a
+  failure not to repeat, nor while the screen is covered. Meanwhile it says
+  it is reconnecting, and the failure shows only once the tries are spent.
+- **One stream per subscription line.** A zap replaces the player screen, and
+  the one leaving lets its engine go only after the new one has started, so a
+  channel's link is asked for once no engine is left (`PlaybackService
+  .release`, a few seconds at most). A run of up and down presses is one tune
+  at its end, not one per press.
+- **Back closes the top layer first** — the channel list, a panel, and on a
+  TV the controls and the banner — and only then the player
+  (`docs/platforms/tvos`).
 - **A channel's group slides in from the left** (`screens/player-channels.tsx`)
   — the Channels button beside up and down, or on a TV left with the controls
   away — while the channel plays on. It is the group's own pages, the very

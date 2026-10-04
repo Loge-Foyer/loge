@@ -1,6 +1,7 @@
 import type { ConnectionId, ContentKind, GlobalMediaKey, ItemSort, Programme } from '@loge/api';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useIsFocused } from 'expo-router';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 import { asChannel } from '@/services/lists';
 import type { SourceError } from '@/services/media';
@@ -25,10 +26,14 @@ const GUIDE_STEP_MS = 5 * MINUTE;
 const BACKING_OFF_MS = 30_000;
 const freshFor = (error: SourceError | undefined, fresh: number) => (error ? 0 : fresh);
 const askAgain = (error: SourceError | undefined) => (error?.retry === 'backoff' ? BACKING_OFF_MS : false);
+/** How many pages are asked for, looking for the channel playing, before giving up on finding it. */
+export const PAGES_TO_FIND = 10;
 
 export function useChannelGroups(connectionId: ConnectionId | undefined) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  // Nothing asked again for a screen another covers — the TV tab beneath the player most of all.
+  const focused = useIsFocused();
   return useQuery({
     queryKey: remoteKey(userId, 'live', connectionId, 'groups'),
     queryFn: ({ signal }) => {
@@ -37,7 +42,7 @@ export function useChannelGroups(connectionId: ConnectionId | undefined) {
     },
     enabled: connectionId !== undefined,
     staleTime: (query) => freshFor(query.state.data?.sourceError, 30 * MINUTE),
-    refetchInterval: (query) => askAgain(query.state.data?.sourceError),
+    refetchInterval: (query) => focused && askAgain(query.state.data?.sourceError),
   });
 }
 
@@ -45,6 +50,7 @@ export function useChannelGroups(connectionId: ConnectionId | undefined) {
 export function useChannels(connectionId: ConnectionId | undefined, groupId: string | undefined, term?: string, options: { enabled?: boolean } = {}) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const focused = useIsFocused();
   const searching = (term ?? '').trim();
   return useInfiniteQuery({
     // The term is part of the key: one search's channels never show under another's.
@@ -62,7 +68,7 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
     getNextPageParam: (last) => last.value.nextCursor ?? null,
     enabled: connectionId !== undefined && options.enabled !== false,
     staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
-    refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
+    refetchInterval: (query) => focused && askAgain(query.state.data?.pages[0]?.sourceError),
   });
 }
 
@@ -72,15 +78,15 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
  * favourites, when it was opened from the ★ list. `at` is where the channel
  * stands among those loaded, -1 until a page holds it.
  */
-export function useLineup(channel: GlobalMediaKey, group: string | undefined, favorites: boolean) {
-  const channels = useChannels(channel.connectionId, group, undefined, { enabled: !favorites });
-  const kept = useFavoriteChannels(favorites ? channel.connectionId : undefined);
+export function useLineup(channel: GlobalMediaKey | undefined, group: string | undefined, favorites: boolean) {
+  const channels = useChannels(channel?.connectionId, group, undefined, { enabled: !favorites && channel !== undefined });
+  const kept = useFavoriteChannels(favorites ? channel?.connectionId : undefined);
   const list = favorites ? (kept.data ?? []).map(asChannel) : (channels.data?.pages.flatMap((page) => page.value.channels) ?? []);
   const more = !favorites && channels.hasNextPage;
   const fetchingMore = channels.isFetchingNextPage;
   return {
     list,
-    at: list.findIndex((each) => each.key.externalId === channel.externalId),
+    at: channel ? list.findIndex((each) => each.key.externalId === channel.externalId) : -1,
     settled: favorites ? !kept.isPending : !channels.isPending,
     pages: channels.data?.pages.length ?? 0,
     more,
@@ -89,6 +95,21 @@ export function useLineup(channel: GlobalMediaKey, group: string | undefined, fa
       if (more && !fetchingMore) void channels.fetchNextPage();
     },
   };
+}
+
+/**
+ * A lineup paged on until the channel playing turns up in it — for a while:
+ * past `PAGES_TO_FIND` pages, a big group's later ones wait for the list's
+ * end. Zapping and the channel list both need to know where it stands.
+ */
+export function useLineupAround(channel: GlobalMediaKey | undefined, group: string | undefined, favorites: boolean) {
+  const lineup = useLineup(channel, group, favorites);
+  const found = lineup.at >= 0;
+  const pageOn = useEffectEvent(() => lineup.loadMore());
+  useEffect(() => {
+    if (channel && lineup.settled && !found && lineup.more && !lineup.fetchingMore && lineup.pages < PAGES_TO_FIND) pageOn();
+  }, [channel, lineup.settled, found, lineup.more, lineup.fetchingMore, lineup.pages]);
+  return { ...lineup, found, ready: lineup.settled && (found || !lineup.more || lineup.pages >= PAGES_TO_FIND) };
 }
 
 /** The Live group this profile chose last on a provider, on this device: `null` for none. */
@@ -109,13 +130,25 @@ export function useRememberLiveGroup(connectionId: ConnectionId) {
   });
 }
 
-/** The time, held in state and moved on every `stepMs`: render stays pure, and what shows the time follows it. */
+/**
+ * The time, held in state and moved on every `stepMs`: render stays pure, and
+ * what shows the time follows it. Still while its screen is covered — the TV
+ * tab beneath the player redrew every row of its list twice a minute — and
+ * moved on at once when it is in front again.
+ */
 export function useNow(stepMs = 30_000) {
+  const focused = useIsFocused();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), stepMs);
-    return () => clearInterval(timer);
-  }, [stepMs]);
+    if (!focused) return;
+    const tick = () => setNow(Date.now());
+    const soon = setTimeout(tick, 0);
+    const timer = setInterval(tick, stepMs);
+    return () => {
+      clearTimeout(soon);
+      clearInterval(timer);
+    };
+  }, [stepMs, focused]);
   return now;
 }
 
@@ -123,6 +156,7 @@ export function useNow(stepMs = 30_000) {
 export function useGuide(connectionId: ConnectionId | undefined, channels: readonly GlobalMediaKey[], options: { hours?: number; from?: number } = {}) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const focused = useIsFocused();
   const now = useNow(GUIDE_STEP_MS);
   const start = options.from ?? Math.floor(now / GUIDE_STEP_MS) * GUIDE_STEP_MS;
   const from = new Date(start).toISOString();
@@ -135,7 +169,7 @@ export function useGuide(connectionId: ConnectionId | undefined, channels: reado
     },
     enabled: connectionId !== undefined && channels.length > 0,
     staleTime: (query) => freshFor(query.state.data?.sourceError, 5 * MINUTE),
-    refetchInterval: (query) => askAgain(query.state.data?.sourceError) || 5 * MINUTE,
+    refetchInterval: (query) => focused && (askAgain(query.state.data?.sourceError) || 5 * MINUTE),
   });
 }
 
@@ -153,6 +187,7 @@ export function nowAndNext(programmes: readonly Programme[] | undefined, channel
 export function useSourcePage(connectionId: ConnectionId | undefined, kind: ContentKind | undefined, sort: ItemSort, term?: string) {
   const userId = useActiveUserId();
   const { media } = useServices();
+  const focused = useIsFocused();
   const searching = (term ?? '').trim();
   return useInfiniteQuery({
     queryKey: remoteKey(userId, 'source', connectionId, kind, sort.by, sort.order, searching || undefined),
@@ -169,6 +204,6 @@ export function useSourcePage(connectionId: ConnectionId | undefined, kind: Cont
     getNextPageParam: (last) => last.nextCursor ?? null,
     enabled: connectionId !== undefined && kind !== undefined,
     staleTime: (query) => freshFor(query.state.data?.pages[0]?.sourceError, 10 * MINUTE),
-    refetchInterval: (query) => askAgain(query.state.data?.pages[0]?.sourceError),
+    refetchInterval: (query) => focused && askAgain(query.state.data?.pages[0]?.sourceError),
   });
 }

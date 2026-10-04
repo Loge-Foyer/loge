@@ -16,6 +16,7 @@ import { currentPlatform, isTV } from '@/platform/platform-id';
 import { createRunLock } from '@/platform/run-lock';
 import { screenBrightness } from '@/platform/brightness';
 import { pictureInPicture } from '@/platform/picture-in-picture';
+import { tvMenu } from '@/platform/tv-menu';
 import { systemVolume } from '@/platform/volume';
 import { screenOrientation } from '@/platform/screen-orientation';
 import { createAccountService } from '@/services/account';
@@ -270,6 +271,7 @@ export function createServices(): AppServices {
       brightness: screenBrightness,
       volume: systemVolume,
       pictureInPicture,
+      tvMenu,
     },
     start: async () => {
       // Upright, as every screen but the player's is laid out; iOS starts that way already.

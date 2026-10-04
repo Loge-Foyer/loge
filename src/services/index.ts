@@ -11,7 +11,7 @@ import type { PlaybackService } from './playback';
 import type { AccountSettingsService } from './account-settings';
 import type { AppSettingsService } from './app-settings';
 import type { PlayerService } from './players';
-import type { FileExchange, PictureInPicture, ScreenBrightness, ScreenOrientationControl, SystemVolume } from './ports';
+import type { FileExchange, PictureInPicture, ScreenBrightness, ScreenOrientationControl, SystemVolume, TvMenu } from './ports';
 import type { PluginCatalog } from './plugin-catalog';
 import type { ProfileService } from './profiles';
 import type { SessionService } from './session';
@@ -62,6 +62,8 @@ export interface Services {
   readonly volume: SystemVolume;
   /** Picture in picture where the platform gives it, rather than an engine. */
   readonly pictureInPicture: PictureInPicture;
+  /** An Apple TV remote's Menu, kept for the player while its layers close one by one. */
+  readonly tvMenu: TvMenu;
   /** Watch status for sources that master it: written here first, carried to them by the outbox. */
   readonly watch: WatchService;
   /** What a title is, from a metadata connection — so watch status the app keeps covers every copy of a film. */

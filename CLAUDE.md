@@ -128,6 +128,12 @@ What runs today:
   or remove one. Stalker shows its MAC address, takes a Guide time zone, and
   shares one sign-in properly; another country's guide, written in UTC and
   taken for the portal's own clock, is put right by each channel's country.
+- On a TV, a channel is watched with the controls away: a banner as it opens
+  or zaps, up and down zap, select brings the controls, and Back (Menu
+  included, held by `modules/loge-tv-menu`) closes the channel list, a panel,
+  the controls and the banner before the player. A channel whose stream
+  stops comes back by itself, three tries at most, and a zap asks for its
+  stream only once the engine before has gone.
 - Settings → App → Buffering: Off, Memory or Disk with a limit — a disk cache
   in mpv, memory in the other engines (`docs/playback`).
 - Yattee's pictures from the addresses the server signs; artwork drawn again
