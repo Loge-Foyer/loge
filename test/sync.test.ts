@@ -141,11 +141,13 @@ describe.each(ENGINE_PAIRS)('two devices on %s and %s', (first: Engine, second: 
     });
 
     it('carries which tabs the account keeps watch status on', async () => {
-      const { a, b } = await onOneAccount();
+      const { a, b, server } = await onOneAccount();
       await a.services.accountSettings.setWatchStatus({ media: true, videos: false });
       await sync(a);
       await sync(b);
-      expect(await b.services.accountSettings.watchStatus()).toEqual({ media: true, videos: false, tv: true });
+      expect(await b.services.accountSettings.watchStatus()).toEqual({ media: true, videos: false, live: true });
+      // Live keeps the record's first name, which older apps and every backup read.
+      expect(recordOf(server, 'setting', 'watchStatus')).toMatchObject({ data: { value: { media: true, videos: false, tv: true } } });
     });
   });
 

@@ -369,7 +369,7 @@ The steps, the same on both engines:
     "mark as unwatched" — wins whole; within a round watched holds and the
     position is the last push's, so a rewind reaches every device.
   - **A snapshot** of the item last played — which source, which item, its
-    title and cover — so the TV tab lists what is being watched with no
+    title and cover — so the Live tab lists what is being watched with no
     request; it comes back from the account untrusted, and is checked first.
   - While something plays, a minute's progress at a time is written, every
     pause and stop always: each write is journaled, and an account on your
@@ -398,6 +398,15 @@ The steps, the same on both engines:
     the row under the catalogue's id written, merged with any already there,
     and the title's removed — so every device of the account follows. Watched
     holds if either was; where it got to is the one touched last.
+- **v11** — the TV tab became **Live**, and the two device settings that named
+  it say so: the tab the app opens on (`app.openOn`), and the player first on
+  each tab (`players.tabs`). A device that already chose for Live keeps that
+  choice. Nothing else changes, and no table does.
+  - **The account's watch-status setting keeps `tv`.** It is journaled, on
+    your server and in every backup, and older apps read it by that name, so
+    the app translates at the setting's edge (`RECORD_KEYS` in
+    `services/account-settings.ts`) rather than renaming a record.
+  - A tab the app no longer has is never opened: `openOn` falls back to Media.
 
 The media cache survives v3 and v4: its fingerprints and the installation ids
 never contained a plugin id, so Jellyfin sessions and device ids outlive the

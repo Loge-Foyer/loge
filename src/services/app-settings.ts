@@ -1,4 +1,5 @@
 import { PLAYER_BUTTONS, type AppSettings, type DeviceSettingsRepository, type PlayerButton } from './ports';
+import { CONTENT_TABS } from './tab-content';
 
 const GB = 1024 * 1024 * 1024;
 
@@ -77,7 +78,11 @@ export function createAppSettingsService(deps: {
 }): AppSettingsService {
   const { deviceSettings, defaults = APP_DEFAULTS } = deps;
   return {
-    get: async () => ({ ...defaults, ...(await deviceSettings.get()).app }),
+    get: async () => {
+      const settings = { ...defaults, ...(await deviceSettings.get()).app };
+      // The app opens by redirecting to this tab, so one it no longer has is never taken.
+      return CONTENT_TABS.includes(settings.openOn) ? settings : { ...settings, openOn: defaults.openOn };
+    },
     set: async (change) => {
       await deviceSettings.update((current) => ({ ...current, app: { ...current.app, ...change } }));
     },

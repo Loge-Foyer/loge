@@ -1,11 +1,11 @@
 /**
  * Mock IPTV — a pretend portal: channels in groups, a guide, and a few films
- * and series, the same on every run, so the TV tab can be built and tested
+ * and series, the same on every run, so the Live tab can be built and tested
  * offline. Playing reaches public test streams, so it needs the network.
  *
  * Like the other mocks it declines some capabilities on purpose: no artwork,
  * no watch state, no libraries. Its guide can be switched off per connection,
- * which is what exercises a toggle's effect on the TV tab. It runs in a
+ * which is what exercises a toggle's effect on the Live tab. It runs in a
  * browser too, having no portal to be refused by.
  */
 import { pluginId, type Plugin } from '@loge/api';

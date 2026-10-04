@@ -46,7 +46,7 @@ export interface PlaybackOptions {
   readonly startMs?: number;
   readonly audioTrackId?: string;
   readonly subtitleTrackId?: string;
-  /** A channel, played live: it plays from TV, whoever brings it. */
+  /** A channel, played live: it plays from Live, whoever brings it. */
   readonly live?: boolean;
   /** "Play with…": this player and no other, asked for by the user. */
   readonly player?: PluginId;

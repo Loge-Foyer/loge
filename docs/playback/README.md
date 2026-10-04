@@ -148,7 +148,7 @@ either still plays.
 `services/players.ts`): never journaled, never on your server, never in a
 backup. A device that has chosen nothing starts on the composition root's
 `playerDefaults` — the one place that may name players: mpv first, and first
-on Media; VLC next, and first on TV, where the raw MPEG-TS channels are; the
+on Media; VLC next, and first on Live, where the raw MPEG-TS channels are; the
 built-in player on, and first nowhere. A stored order or set of firsts wins
 over them, and taking one tab never drops another's default. In a browser
 neither mpv nor VLC is here, so the built-in player plays everything.
@@ -199,9 +199,9 @@ their players apart.
 
 Settings → Adapters → Players lists this platform's players, each with its
 switch and settings, and which plays first. A player's page also makes it
-first on a tab — Media, Videos, TV — which goes before the device's choice
+first on a tab — Media, Videos, Live — which goes before the device's choice
 there (`DeviceSettings.players.tabs`). Channels, and everything an IPTV
-provider brings, play from TV (`tabOfPlaying` in `services/tab-content.ts`).
+provider brings, play from Live (`tabOfPlaying` in `services/tab-content.ts`).
 Videos does not choose yet: `tabOfPlaying` counts a source's items as Media's,
 so "first on Videos" is kept, and shown, but plays nothing first.
 A player with no engine on this platform says so, and never plays.
@@ -349,7 +349,7 @@ and TV on). `Source.watch` says who keeps it — the source, the app, or nobody
   refusal for load, or no network, pauses them for a minute. Writing never
   waits on TMDB: a mark uses whatever this device already knows.
 - **Laid over lists where they are drawn** (`useKeptWatch`): local state, so a
-  mark shows at once and no source is asked again. The TV tab lists what was
+  mark shows at once and no source is asked again. The Live tab lists what was
   begun first (`keptInProgress`).
 - **Resolved field by field** (spec §10): a later round wins whole; within one,
   watched holds and the position is the last push's — a deliberate rewind on
@@ -426,7 +426,7 @@ over the tabs, with `start` in milliseconds for a resume:
 - **A channel's group slides in from the left** (`screens/player-channels.tsx`)
   — the Channels button beside up and down, or on a TV left with the controls
   away — while the channel plays on. It is the group's own pages, the very
-  ones the TV tab holds, or the ★ list's (`useLineup`): it opens on the
+  ones the Live tab holds, or the ★ list's (`useLineup`): it opens on the
   channel playing, marked, with the remote's focus on it, paging on to find it
   for ten pages at most before it opens at the top instead. Select zaps — the
   player starts again on the new channel, and the list goes with it. Right,

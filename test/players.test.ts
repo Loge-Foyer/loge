@@ -45,16 +45,16 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     const [system, first, second] = [plays(builtIn), plays(phoneOnly), plays(iosOnly)];
     const playerDefaults = {
       order: [first.manifest.id, second.manifest.id, system.manifest.id],
-      tabs: { media: first.manifest.id, tv: second.manifest.id },
+      tabs: { media: first.manifest.id, live: second.manifest.id },
     };
     const { services } = buildServices({ plugins: [system, first, second], engine, platform: 'ios', playerDefaults });
     const standing = async () => (await services.players.list()).map((each) => [each.manifest.id, each.preferred, each.firstOn]);
     expect(await standing()).toEqual([
       ['players/phone-only', true, ['media']],
-      ['players/ios-only', false, ['tv']],
+      ['players/ios-only', false, ['live']],
       ['players/built-in', false, []],
     ]);
-    expect((await services.players.choosing('tv')).preferred).toBe(second.manifest.id);
+    expect((await services.players.choosing('live')).preferred).toBe(second.manifest.id);
     expect((await services.players.choosing('media')).preferred).toBe(first.manifest.id);
     // A tab with no first of its own takes the device's.
     expect((await services.players.choosing('videos')).preferred).toBe(first.manifest.id);
@@ -63,7 +63,7 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     await services.players.setFirstOn(system.manifest.id, 'media', true);
     expect(await standing()).toEqual([
       ['players/phone-only', true, []],
-      ['players/ios-only', false, ['tv']],
+      ['players/ios-only', false, ['live']],
       ['players/built-in', false, ['media']],
     ]);
     // An order of the device's own replaces the default one.
@@ -75,7 +75,7 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     expect((await browser.services.players.list()).map((each) => [each.manifest.id, each.preferred, each.firstOn])).toEqual([
       ['players/built-in', true, []],
     ]);
-    expect((await browser.services.players.choosing('tv')).preferred).toBe(system.manifest.id);
+    expect((await browser.services.players.choosing('live')).preferred).toBe(system.manifest.id);
   });
 
   it('keeps the controls the app’s: one row, in its own order, for every player', async () => {
@@ -135,16 +135,16 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     const engine1 = { ...builtIn, manifest: { ...builtIn.manifest, player: { profiles: { ios: HLS } } } };
     const engine2 = { ...phoneOnly, manifest: { ...phoneOnly.manifest, player: { profiles: { ios: HLS } } } };
     const { services } = buildServices({ plugins: [engine1, engine2, iosOnly], engine, platform: 'ios' });
-    await services.players.setFirstOn(engine2.manifest.id, 'tv', true);
+    await services.players.setFirstOn(engine2.manifest.id, 'live', true);
     await services.players.setFirstOn(engine2.manifest.id, 'media', true);
     // Taking a tab from another player leaves it only the one it keeps.
     await services.players.setFirstOn(engine1.manifest.id, 'media', true);
     // Letting go of a tab it does not hold changes nothing.
-    await services.players.setFirstOn(engine1.manifest.id, 'tv', false);
+    await services.players.setFirstOn(engine1.manifest.id, 'live', false);
     const summary = (list: Awaited<ReturnType<typeof services.players.list>>) => list.map((each) => [each.manifest.id, each.playsHere, each.firstOn]);
     expect(summary(await services.players.list())).toEqual([
       ['players/built-in', true, ['media']],
-      ['players/phone-only', true, ['tv']],
+      ['players/phone-only', true, ['live']],
       ['players/ios-only', false, []],
     ]);
     await services.players.setEnabled(engine2.manifest.id, false);
@@ -175,8 +175,8 @@ describe.each(ENGINES)('players on %s', (engine: Engine) => {
     await services.appSettings.set({ buffering: 'disk', bufferDiskBytes: 2 * 1024 ** 3 });
     expect(await services.appSettings.get()).toMatchObject({ buffering: 'disk', bufferDiskBytes: 2 * 1024 ** 3 });
     await services.players.setPreferred(phoneOnly.manifest.id);
-    await services.players.setFirstOn(builtIn.manifest.id, 'tv', true);
+    await services.players.setFirstOn(builtIn.manifest.id, 'live', true);
     expect(await db.journal.entries()).toHaveLength(before);
-    expect((await db.deviceSettings.get()).players).toEqual({ off: [], preferred: phoneOnly.manifest.id, tabs: { tv: builtIn.manifest.id } });
+    expect((await db.deviceSettings.get()).players).toEqual({ off: [], preferred: phoneOnly.manifest.id, tabs: { live: builtIn.manifest.id } });
   });
 });

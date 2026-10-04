@@ -1,6 +1,7 @@
 import { AppError } from '@loge/api';
 
 import { qualifiedIdOf, qualifiedPluginStates, sessionRefOf } from '../plugin-ids';
+import { liveTabSetting } from '../tab-ids';
 
 import type { SqlDatabase, SqlExecutor } from './sql';
 
@@ -155,6 +156,16 @@ export const MIGRATIONS: readonly SqlMigration[] = [
   { version: 8, up: (tx) => tx.exec(V8) },
   { version: 9, up: (tx) => tx.exec(V9) },
   { version: 10, up: (tx) => tx.exec(V10) },
+  {
+    version: 11,
+    up: async (tx) => {
+      // The TV tab became Live, and the settings that named it say so.
+      for (const row of await tx.all<{ key: string; value: string }>("SELECT key, value FROM device_settings WHERE key IN ('app', 'players')")) {
+        const next = liveTabSetting(row.key, JSON.parse(row.value));
+        if (next !== undefined) await tx.run('UPDATE device_settings SET value = ? WHERE key = ?', [JSON.stringify(next), row.key]);
+      }
+    },
+  },
 ];
 
 // What a metadata adapter — TMDB — said an item of a source is: its catalogue

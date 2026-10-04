@@ -51,7 +51,7 @@ const PAGE_WIDTH = px(1100);
 /** A film, a series with its seasons and episodes, or one episode — whatever the key points at. */
 export function DetailScreen({ connectionId, itemId, season }: { connectionId: ConnectionId; itemId: string; season?: string }) {
   const detail = useItem({ connectionId, externalId: itemId });
-  // Every source of the profile: an IPTV provider's films open here from the TV tab.
+  // Every source of the profile: an IPTV provider's films open here from the Live tab.
   const { data: sources = [] } = useSources();
   const source = sources.find((candidate) => candidate.connection.id === connectionId);
   const capabilities = source?.effective.media?.capabilities;

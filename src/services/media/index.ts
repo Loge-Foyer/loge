@@ -98,7 +98,7 @@ export interface LiveResult<T> {
   readonly sourceError?: SourceError;
 }
 
-/** One source's own page of one kind, in its own order — the TV tab's films and series. */
+/** One source's own page of one kind, in its own order — the Live tab's films and series. */
 export interface SourcePage extends ItemPage {
   readonly sourceError?: SourceError;
 }
@@ -351,7 +351,7 @@ export function createMediaService(deps: {
     };
   };
 
-  /** The library's sources: what Media and Videos show. IPTV keeps to TV. */
+  /** The library's sources: what Media and Videos show. IPTV keeps to Live. */
   const libraryOf = async (userId: UserId) =>
     (await sourcesOf(userId)).filter((source) => {
       const kinds = source.effective.media?.contentKinds ?? [];

@@ -4,10 +4,10 @@ import { fullScreenOptions, tabRootOptions, tabStackOptions } from '@/components
 
 export const unstable_settings = { anchor: 'index' };
 
-export default function TvStack() {
+export default function LiveStack() {
   return (
     <Stack screenOptions={tabStackOptions}>
-      <Stack.Screen name="index" options={tabRootOptions('TV')} />
+      <Stack.Screen name="index" options={tabRootOptions('Live')} />
       <Stack.Screen name="channel/[connectionId]/[channelId]" options={fullScreenOptions} />
     </Stack>
   );

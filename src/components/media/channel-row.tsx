@@ -10,7 +10,7 @@ import { nowAndNext } from '@/hooks/use-live';
 /**
  * A channel at a glance: its logo or number, its name — with a ★ when it is
  * one of the profile's favourites — what is on now and how far along, and
- * what is next. The TV tab's rows and the player's list of channels both draw
+ * what is next. The Live tab's rows and the player's list of channels both draw
  * it, each inside its own row; `compact` leaves out what is next.
  */
 export function ChannelSummary({

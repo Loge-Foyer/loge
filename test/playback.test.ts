@@ -76,22 +76,22 @@ describe('choosing a player', () => {
   it('puts a tab’s own first before the device’s — while it is on, and only on that tab', async () => {
     const t = await setUp();
     const second = t.players[1]?.plugin.manifest.id ?? ('' as never);
-    await t.services.players.setFirstOn(second, 'tv', true);
-    expect((await t.services.players.choosing('tv')).preferred).toBe('players/second');
+    await t.services.players.setFirstOn(second, 'live', true);
+    expect((await t.services.players.choosing('live')).preferred).toBe('players/second');
     expect((await t.services.players.choosing('media')).preferred).toBe('players/first');
     expect((await t.services.players.choosing()).preferred).toBe('players/first');
     await t.services.players.setEnabled(second, false);
-    expect((await t.services.players.choosing('tv')).preferred).toBe('players/first');
+    expect((await t.services.players.choosing('live')).preferred).toBe('players/first');
     // Chosen for a tab again, it is switched on again.
-    await t.services.players.setFirstOn(second, 'tv', true);
-    expect((await t.services.players.choosing('tv')).preferred).toBe('players/second');
+    await t.services.players.setFirstOn(second, 'live', true);
+    expect((await t.services.players.choosing('live')).preferred).toBe('players/second');
   });
 });
 
 describe('the tab something plays from', () => {
   it('is TV for a channel and for everything IPTV brings, and Media for a source’s films and series', () => {
-    expect(tabOfPlaying('sources', true)).toBe('tv');
-    expect(tabOfPlaying('iptv', false)).toBe('tv');
+    expect(tabOfPlaying('sources', true)).toBe('live');
+    expect(tabOfPlaying('iptv', false)).toBe('live');
     expect(tabOfPlaying('sources', false)).toBe('media');
   });
 });
@@ -141,7 +141,7 @@ describe('pressing Play', () => {
 
   it('asks with the profile of the player first on the item’s tab: a channel plays from TV', async () => {
     const t = await setUp();
-    await t.services.players.setFirstOn(t.players[1]?.plugin.manifest.id ?? ('' as never), 'tv', true);
+    await t.services.players.setFirstOn(t.players[1]?.plugin.manifest.id ?? ('' as never), 'live', true);
     expect(await t.services.playback.plan(t.kids, t.item.key)).toMatchObject({ kind: 'play', player: 'players/first' });
     expect(await t.services.playback.plan(t.kids, t.item.key, { live: true })).toMatchObject({ kind: 'play', player: 'players/second' });
     expect(t.source.stats.playbackRequests.map((request) => request.profile)).toEqual([hlsOnly, everything]);

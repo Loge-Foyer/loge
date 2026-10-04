@@ -15,7 +15,7 @@ Every adapter has exactly one category, which is also its folder under
 | Category | Its contract | Scope | Where it shows |
 | --- | --- | --- | --- |
 | `sources` | the media role | account | Media (movies, shows, anime) and Videos (videos, files) |
-| `iptv` | the media role, with live members | account | TV: Live, Movies, Series |
+| `iptv` | the media role, with live members | account | Live: Live, Movies, Series |
 | `players` | the player role, with `@loge/player-kit`'s view | device | the player |
 | `sync` | the account role (your own server) or the backup role (a file) | device | Settings → Account, and Sync |
 | `metadata` | the metadata role: what a title is | account | nowhere: watch status the app keeps is keyed by what it answers |
@@ -227,9 +227,9 @@ and kind:
 | --- | --- |
 | Media | a source's movies, shows and anime — one library across every source |
 | Videos | a source's videos and files — one tab per source |
-| TV | everything an IPTV plugin brings, in Live, Movies and Series; and a source's `live` channels |
+| Live | everything an IPTV plugin brings, in Live, Movies and Series; and a source's `live` channels |
 
-IPTV movies and series appear on TV only, never on Media. That mapping lives in
+IPTV movies and series appear on Live only, never on Media. That mapping lives in
 one place, `src/services/tab-content.ts`. Nothing in the app ever asks *which*
 plugin a source is: it branches on the category and the effective capabilities
 of a resolved source.

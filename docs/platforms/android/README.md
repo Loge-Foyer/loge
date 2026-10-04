@@ -69,7 +69,7 @@ there is `http://10.0.2.2:8090` — or `adb reverse tcp:8090 tcp:8090`, and
 - **VLC** is libVLC 3.7 (`org.videolan.android:libvlc-all`), quietened with
   `--quiet`. It brings its own `libc++_shared.so` as libmpv does, and the
   app's `with-newest-libcxx` still packages libmpv's, which libVLC loads too.
-  It plays first on TV on a new device.
+  It plays first on Live on a new device.
 
 ## The backup file
 

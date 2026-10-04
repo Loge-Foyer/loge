@@ -32,7 +32,7 @@ export const PAGES_TO_FIND = 10;
 export function useChannelGroups(connectionId: ConnectionId | undefined) {
   const userId = useActiveUserId();
   const { media } = useServices();
-  // Nothing asked again for a screen another covers — the TV tab beneath the player most of all.
+  // Nothing asked again for a screen another covers — the Live tab beneath the player most of all.
   const focused = useIsFocused();
   return useQuery({
     queryKey: remoteKey(userId, 'live', connectionId, 'groups'),
@@ -74,7 +74,7 @@ export function useChannels(connectionId: ConnectionId | undefined, groupId: str
 
 /**
  * The channels around one, as the player zaps and lists them: its group's,
- * page by page — the very pages the TV tab holds — or the profile's
+ * page by page — the very pages the Live tab holds — or the profile's
  * favourites, when it was opened from the ★ list. `at` is where the channel
  * stands among those loaded, -1 until a page holds it.
  */
@@ -132,7 +132,7 @@ export function useRememberLiveGroup(connectionId: ConnectionId) {
 
 /**
  * The time, held in state and moved on every `stepMs`: render stays pure, and
- * what shows the time follows it. Still while its screen is covered — the TV
+ * what shows the time follows it. Still while its screen is covered — the Live
  * tab beneath the player redrew every row of its list twice a minute — and
  * moved on at once when it is in front again.
  */

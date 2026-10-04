@@ -21,8 +21,8 @@ export function AppTabs() {
           <TabTrigger name="videos" href="/videos" asChild>
             <TopBarTab icon={SquarePlay} label="Videos" />
           </TabTrigger>
-          <TabTrigger name="tv" href="/tv" asChild>
-            <TopBarTab icon={Tv} label="TV" />
+          <TabTrigger name="live" href="/live" asChild>
+            <TopBarTab icon={Tv} label="Live" />
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TopBarTab icon={Settings} label="Settings" />

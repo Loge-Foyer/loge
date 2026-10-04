@@ -45,14 +45,14 @@ const GUIDE_CHANNELS = 40;
  * beside its channels here, never in the library. One provider at a time: a
  * tab across the top for each, then Live, Movies and Series as it brings them.
  */
-export function TvScreen() {
-  const { data: sources } = useTabSources('tv');
+export function LiveScreen() {
+  const { data: sources } = useTabSources('live');
   const params = useLocalSearchParams<{ source?: string; kind?: string; group?: string }>();
   const [term, setTerm] = useState('');
   const onTerm = useCallback((next: string) => setTerm(next), []);
 
   if (!sources) return <Screen>{null}</Screen>;
-  if (sources.length === 0) return <TvEmptyState />;
+  if (sources.length === 0) return <LiveEmptyState />;
   const selected = sources.find((source) => source.connection.id === params.source) ?? sources[0];
   if (!selected) return null;
   const kind = selected.kinds.find((each) => each === params.kind) ?? selected.kinds[0];
@@ -95,7 +95,7 @@ export function TvScreen() {
   if (kind === 'live') {
     // No group yet this time is not All (`''`): where Live opens is decided then.
     return (
-      <Live
+      <Channels
         key={selected.connection.id}
         source={selected}
         group={params.group === undefined ? undefined : fromRouteId(params.group)}
@@ -107,7 +107,7 @@ export function TvScreen() {
   return <SourceGrid key={`${selected.connection.id}:${kind}`} source={selected} kind={kind} term={term} header={header} />;
 }
 
-function TvEmptyState() {
+function LiveEmptyState() {
   const { catalog } = useServices();
   const providers = catalog.inCategory('iptv').map((manifest) => manifest.displayName);
   // IPTV plugins leave out the platforms they cannot reach: in a browser, no provider is offered.
@@ -154,7 +154,7 @@ function useRefresh() {
   return { onRefresh, control: <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={String(theme.color10.val)} /> };
 }
 
-function Live({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
+function Channels({ source, group, term, header }: { source: TabSource; group: string | undefined; term: string; header: React.ReactElement }) {
   const connectionId = source.connection.id;
   const groups = useChannelGroups(connectionId);
   const kept = useFavoriteChannels(connectionId);
@@ -354,7 +354,7 @@ function ChannelRow({
       <Pressable
         onPress={() =>
           router.push({
-            pathname: '/tv/channel/[connectionId]/[channelId]',
+            pathname: '/live/channel/[connectionId]/[channelId]',
             params: { connectionId, channelId: routeId(channel.key.externalId), name: channel.name, ...(group ? { group: routeId(group) } : {}) },
           })
         }

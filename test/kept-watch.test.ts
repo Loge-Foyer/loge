@@ -63,7 +63,7 @@ describe.each(ENGINES)('watch status the app keeps, on %s', (engine: Engine) => 
     expect(await keeperOf(t, t.library)).toBeUndefined();
     await t.services.accountSettings.setWatchStatus({ media: true });
     expect(await keeperOf(t, t.library)).toBe('app');
-    await t.services.accountSettings.setWatchStatus({ tv: false });
+    await t.services.accountSettings.setWatchStatus({ live: false });
     expect(await keeperOf(t, t.tv)).toBeUndefined();
     // And the media server keeps its own whatever the account says.
     expect(await keeperOf(t, t.home)).toBe('source');

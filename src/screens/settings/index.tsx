@@ -44,7 +44,7 @@ import { categoryHref } from './plugin-route';
 const WATCH_STATUS_ROWS: Readonly<Record<ContentTab, { readonly title: string; readonly subtitle: string }>> = {
   media: { title: 'Media', subtitle: 'Films and series from a source that keeps none' },
   videos: { title: 'Videos', subtitle: 'Web videos and files: where you got to' },
-  tv: { title: 'TV films & series', subtitle: 'An IPTV provider’s — never live channels' },
+  live: { title: 'Films & series on Live', subtitle: 'An IPTV provider’s — never live channels' },
 };
 
 const BUTTON_LABEL_NAMES: Readonly<Record<ButtonLabels, string>> = {

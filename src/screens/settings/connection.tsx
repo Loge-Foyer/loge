@@ -22,7 +22,7 @@ import { Label, Paragraph, SizableText, Spinner, XStack, YStack } from 'tamagui'
 
 import { Button } from '@/components/button';
 import { ConfirmButton } from '@/components/confirm-button';
-import { describeProbeError, listAll, listKinds, PER_PROFILE_DESCRIPTIONS, PER_PROFILE_LABELS } from '@/components/labels';
+import { describeProbeError, listAll, listKinds, PER_PROFILE_DESCRIPTIONS, PER_PROFILE_LABELS, TAB_LABELS } from '@/components/labels';
 import { FieldInput, type FormField, type LibrariesProbe } from '@/components/manifest-form';
 import { PinPad } from '@/components/pin-pad';
 import { PrimaryButton } from '@/components/primary-button';
@@ -65,7 +65,7 @@ import {
 import { hasErrors, hasFieldErrors, validateDraft, type DraftErrors } from '@/services/field-values';
 import type { ProbeTarget } from '@/services/media';
 import { accountWide } from '@/services/scope';
-import { showsOn } from '@/services/tab-content';
+import { CONTENT_TABS, showsOn } from '@/services/tab-content';
 
 const NO_ERRORS: DraftErrors = { shared: {}, profiles: {} };
 const NONE_SHOWN: Credentials = {};
@@ -191,11 +191,7 @@ function enabledField(manifest: PluginManifest): BooleanField {
     };
   }
   const kinds = manifest.media?.contentKinds ?? [];
-  const tabs = [
-    ...(showsOn('media', manifest.category, kinds) ? ['Media'] : []),
-    ...(showsOn('videos', manifest.category, kinds) ? ['Videos'] : []),
-    ...(showsOn('tv', manifest.category, kinds) ? ['TV'] : []),
-  ];
+  const tabs = CONTENT_TABS.filter((tab) => showsOn(tab, manifest.category, kinds)).map((tab) => TAB_LABELS[tab]);
   return {
     key: 'enabled',
     label: 'Switched on',

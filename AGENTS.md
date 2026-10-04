@@ -196,9 +196,9 @@ These are specific to Loge and matter more than anything above.
   takes the children. Update in place.
 - **Migrations are numbered, committed, never edited, never destructive.** A
   newer database is refused. A table rebuild is a `foreignKeysOff` step. The
-  latest three: v8 a profile's favourite channels, v9 watch status the app
-  keeps and the account's own settings, v10 what a metadata adapter said an
-  IPTV title is. `docs/data` has what each does.
+  latest three: v9 watch status the app keeps and the account's own
+  settings, v10 what a metadata adapter said an IPTV title is, v11 the TV tab
+  renamed Live in device settings. `docs/data` has what each does.
 - **Journaling is the repositories' job,** in the same transaction. A write that
   changes nothing writes nothing. Only account-wide state is journaled: device
   settings, sync-category connections, the account's own rows (`account`,
@@ -663,7 +663,7 @@ typecheck.
   the scroll view it finds over the whole sheet unless it is the second of
   exactly two children, so anything put beside it — a title, Done — is drawn
   under the content.
-- **Four tabs:** Media, Videos, TV, Settings. Settings → Adapters is five
+- **Four tabs:** Media, Videos, Live, Settings. Settings → Adapters is five
   rows — Sources, IPTV, Players, Sync, Metadata — each opening that category's
   list for this platform (`settings/adapters/[category]`, then
   `[category]/[name]`: the id's two parts are the two segments, so no id is
@@ -723,7 +723,7 @@ because training data goes stale between SDK releases.
 **Phase 7 — it plays. Phase 8 brought more players; VLC left in Phase 9, and is back.**
 Everything above describes the target; what runs today:
 
-- **Four tabs** — Media, Videos, TV, Settings. TV holds one IPTV provider at
+- **Four tabs** — Media, Videos, Live, Settings. Live holds one IPTV provider at
   a time: Live with group chips, channels with now and next, a day guide per
   channel, channels played live with channel up and down; its films and
   series as posters. Settings → Adapters is five lists, by category, of the
@@ -789,7 +789,7 @@ Everything above describes the target; what runs today:
   that keeps none, on the tabs Settings → Watch status keeps it on — the
   account's setting. One journaled row per profile and thing watched, keyed
   by `watchIdentity` (the TMDB id a portal matched it to, else its title),
-  merged field by field on sync; the TV tab lists what was begun first, and
+  merged field by field on sync; the Live tab lists what was begun first, and
   every card has its check.
 - **Metadata (database v10):** a fifth adapter category, and TMDB in it, with
   the household's own key — account-wide, like a source. Items an IPTV
@@ -816,7 +816,7 @@ Everything above describes the target; what runs today:
   a replaced account. `toAppUser(user, pins)` makes `pinProtected` the PIN
   this device asks for; sync and backups keep the account's ref.
 - **Favourite channels (database v8, backup schema 3):** a ★ before a
-  provider's groups on TV, kept per profile on the account; holding a channel
+  provider's groups on Live, kept per profile on the account; holding a channel
   — holding select, with a remote — adds it or takes it out.
 - **Artwork is resolved again once its source is ready** — connected, or
   answered — so a card drawn from what was saved does not keep its plate.

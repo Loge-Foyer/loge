@@ -7,6 +7,7 @@ import { INDEXEDDB_UPGRADES, INDEXEDDB_VERSION, STORES, upgradeIndexedDb } from 
 import { prepareSqlite } from '@/persistence/sqlite/database';
 import { MIGRATIONS, migrate, type SqlMigration } from '@/persistence/sqlite/migrations';
 import { serializeSqlConnection } from '@/persistence/sqlite/sql';
+import { liveTabSetting } from '@/persistence/tab-ids';
 
 import { openTestDatabase, tempDatabasePath } from './support/engines';
 import { fakeClock, silentLog } from './support/fakes';
@@ -248,6 +249,35 @@ describe('SQLite migrations', () => {
     expect(await versionOf(path)).toBe(MIGRATIONS.length);
   });
 
+  it('carry a v10 database over to v11: where the app opens, and who plays first on a tab, say Live where they said TV', async () => {
+    const path = tempFile();
+    const v10 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 10));
+    await v10.exec(`
+      INSERT INTO device_settings (key, value)
+        VALUES ('app', '{"openOn":"tv","forceLandscape":false}'),
+               ('players', '{"order":["players/mpv"],"tabs":{"media":"players/mpv","tv":"players/vlc"}}'),
+               ('defaultUserId', '"u-alex"');
+    `);
+    await v10.close();
+
+    const v11 = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection(path)), MIGRATIONS.slice(0, 11));
+    const rows = await v11.all<{ key: string; value: string }>('SELECT key, value FROM device_settings ORDER BY key');
+    expect(Object.fromEntries(rows.map((row) => [row.key, JSON.parse(row.value) as unknown]))).toEqual({
+      app: { openOn: 'live', forceLandscape: false },
+      defaultUserId: 'u-alex',
+      players: { order: ['players/mpv'], tabs: { media: 'players/mpv', live: 'players/vlc' } },
+    });
+    await v11.close();
+    expect(await versionOf(path)).toBe(11);
+  });
+
+  it('keep a choice already made for Live, and leave settings that never named TV as they were', () => {
+    expect(liveTabSetting('players', { tabs: { tv: 'players/vlc', live: 'players/mpv' } })).toEqual({ tabs: { live: 'players/mpv' } });
+    expect(liveTabSetting('app', { openOn: 'videos' })).toBeUndefined();
+    expect(liveTabSetting('players', { tabs: { media: 'players/mpv' } })).toBeUndefined();
+    expect(liveTabSetting('defaultUserId', 'tv')).toBeUndefined();
+  });
+
   it('insist on steps numbered one after another', async () => {
     const db = await prepareSqlite(serializeSqlConnection(nodeSqliteConnection()), []);
     await expect(migrate(db, [{ version: 2, up: async () => undefined }])).rejects.toThrow('numbered 2');
@@ -306,6 +336,8 @@ describe('IndexedDB upgrades', () => {
         tx.objectStore('mediaLists').add({ userId: 'u-alex', connectionId: 'c-home', listKey: 'resume', fingerprint: 'print', items: [], savedAt: 1 });
         tx.objectStore('deviceSettings').add({ key: 'plugins', value: { jellyfin: { enabled: true }, 'custom-server': { enabled: true } } });
         tx.objectStore('deviceSettings').add({ key: 'defaultUserId', value: 'u-alex' });
+        tx.objectStore('deviceSettings').add({ key: 'app', value: { openOn: 'tv' } });
+        tx.objectStore('deviceSettings').add({ key: 'players', value: { tabs: { media: 'players/mpv', tv: 'players/vlc' } } });
         tx.objectStore('journal').add({ userId: 'u-alex', entity: 'user', entityId: 'u-alex', operation: 'upsert', changedAt: 1, localVersion: 1 });
       };
       opening.onsuccess = () => resolve(opening.result);
@@ -327,7 +359,12 @@ describe('IndexedDB upgrades', () => {
     expect([...(await db.staleSecrets.list())].sort()).toEqual(
       ['ref-account', 'ref-account-alex', 'session:c-account:account', 'session:c-account:shared', 'session:c-account:u-alex'].sort(),
     );
-    expect(await db.deviceSettings.get()).toEqual({ defaultUserId: 'u-alex' });
+    // v11: the TV tab became Live.
+    expect(await db.deviceSettings.get()).toEqual({
+      defaultUserId: 'u-alex',
+      app: { openOn: 'live' },
+      players: { tabs: { media: 'players/mpv', live: 'players/vlc' } },
+    });
     expect(await db.account.get()).toBeUndefined();
     expect(await db.journal.entries()).toEqual([]);
     // The key generator carries on: a seq the old log saw is never handed out again.

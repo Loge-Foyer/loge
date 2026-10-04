@@ -279,7 +279,7 @@ function PlayerScreen({ manifest }: { manifest: PluginManifest }) {
         </SettingsSection>
       ) : null}
       {player?.playsHere ? (
-        <SettingsSection title="First on a tab" footer="A tab’s choice goes before the device’s. Channels, and a provider’s films and series, play from TV.">
+        <SettingsSection title="First on a tab" footer="A tab’s choice goes before the device’s. Channels, and a provider’s films and series, play from Live.">
           {CONTENT_TABS.map((tab) => {
             const other = firstOn(tab);
             return (

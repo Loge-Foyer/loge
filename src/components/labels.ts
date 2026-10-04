@@ -26,7 +26,7 @@ import type { ContentTab } from '@/services/tab-content';
 export const TAB_LABELS: Readonly<Record<ContentTab, string>> = {
   media: 'Media',
   videos: 'Videos',
-  tv: 'TV',
+  live: 'Live',
 };
 
 export const CONTENT_KIND_LABELS: Readonly<Record<ContentKind, string>> = {

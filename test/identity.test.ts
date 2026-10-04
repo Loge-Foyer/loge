@@ -179,7 +179,7 @@ describe.each(ENGINES)('what a title is, on %s', (engine: Engine) => {
     const t = await setUp({ 'movie:Inception:2010': { tmdb: '27205' } });
     await t.services.accountSettings.setWatchStatus({ media: true });
     await t.services.identity.resolve(t.kids, [film(t.library, 'file:1', 'Inception (2010)')]);
-    await t.services.accountSettings.setWatchStatus({ tv: false });
+    await t.services.accountSettings.setWatchStatus({ live: false });
     await t.services.identity.resolve(t.kids, [film(t.tv, 'vod:1', 'Inception (2010)')]);
     expect(t.catalogue.asked).toEqual([]);
   });

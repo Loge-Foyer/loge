@@ -37,9 +37,9 @@ export function AppTabs() {
         />
         <NativeTabs.Trigger.Label>Videos</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="tv">
+      <NativeTabs.Trigger name="live">
         <NativeTabs.Trigger.Icon sf={{ default: 'play.tv', selected: 'play.tv.fill' }} md="live_tv" />
-        <NativeTabs.Trigger.Label>TV</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Live</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />

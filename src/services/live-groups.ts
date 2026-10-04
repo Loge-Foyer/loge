@@ -4,7 +4,7 @@ import type { DeviceSettings, LocalDatabase } from './ports';
 
 /**
  * The Live group a profile chose last on each provider, on this device, so
- * the TV tab opens there when the profile keeps no favourites on it. Device
+ * the Live tab opens there when the profile keeps no favourites on it. Device
  * state like the default profile: never journaled, never on your server,
  * never in a backup — and a profile's or a provider's goes with it
  * (`services/removal.ts`). `''` is All. ★ is never kept: favourites come

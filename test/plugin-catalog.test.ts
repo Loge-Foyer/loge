@@ -52,7 +52,7 @@ describe('the plugin catalogue', () => {
     const phone = createPluginCatalog([library, portal, player], { platform: 'ios', ...quiet });
     expect(phone.showingOn('media').map(({ id }) => id)).toEqual(['sources/library']);
     expect(phone.showingOn('videos')).toEqual([]);
-    expect(phone.showingOn('tv').map(({ id }) => id)).toEqual(['iptv/portal', 'sources/library']);
+    expect(phone.showingOn('live').map(({ id }) => id)).toEqual(['iptv/portal', 'sources/library']);
   });
 });
 
@@ -61,19 +61,19 @@ describe('where content appears', () => {
     const kinds = ['movies', 'shows', 'anime', 'videos', 'files', 'live'] as const;
     expect(kindsForTab('media', 'sources', kinds)).toEqual(['movies', 'shows', 'anime']);
     expect(kindsForTab('videos', 'sources', kinds)).toEqual(['videos', 'files']);
-    expect(kindsForTab('tv', 'sources', kinds)).toEqual(['live']);
+    expect(kindsForTab('live', 'sources', kinds)).toEqual(['live']);
   });
 
   it('keeps everything IPTV brings on TV — its films and series never reach the library', () => {
     const kinds = ['live', 'movies', 'shows'] as const;
     expect(kindsForTab('media', 'iptv', kinds)).toEqual([]);
     expect(kindsForTab('videos', 'iptv', kinds)).toEqual([]);
-    expect(kindsForTab('tv', 'iptv', kinds)).toEqual(['live', 'movies', 'shows']);
+    expect(kindsForTab('live', 'iptv', kinds)).toEqual(['live', 'movies', 'shows']);
   });
 
   it('shows nothing of a player or a sync plugin, whatever it declares', () => {
     for (const category of ['players', 'sync'] as const) {
-      for (const tab of ['media', 'videos', 'tv'] as const) expect(showsOn(tab, category, ['movies', 'live'])).toBe(false);
+      for (const tab of ['media', 'videos', 'live'] as const) expect(showsOn(tab, category, ['movies', 'live'])).toBe(false);
     }
   });
 });

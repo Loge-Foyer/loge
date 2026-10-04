@@ -16,7 +16,7 @@ import { useRemoteKeys } from '@/hooks/use-remote-keys';
 /** Every row the same height, so the list opens on the channel playing without measuring the ones above it. */
 const ROW = px(72);
 const SLIDE_MS = 220;
-/** The guide is asked for the channels around the one playing, as the TV tab asks for the ones near its top. */
+/** The guide is asked for the channels around the one playing, as the Live tab asks for the ones near its top. */
 const GUIDE_BEFORE = 10;
 const GUIDE_AFTER = 30;
 

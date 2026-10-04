@@ -135,7 +135,7 @@ it runs today, built with [Tamagui](https://tamagui.dev):
   - **Videos** — web video and plain files, one source at a time. Yattee
     Server is the first: what is trending, and a search for videos, channels
     and playlists. A channel has a page of its own.
-  - **TV** — live channels from a Stalker portal.
+  - **Live** — live channels from a Stalker portal.
     - Channels in their groups, with what is on now and next — each in its
       own country's time, even where the provider wrote one country's guide
       in UTC.
@@ -186,7 +186,7 @@ it runs today, built with [Tamagui](https://tamagui.dev):
   TMDB key, the German and the English copy of a film share one record.
 - **Downloads:** a copy of a film or an episode from Jellyfin, or of a Yattee
   video, kept on a phone and played with no network.
-- **Search**, on Media, Videos and TV — each box searching what is in front
+- **Search**, on Media, Videos and Live — each box searching what is in front
   of you, never everything at once. It starts once typing stops for two
   seconds, or at once on the search key; on Videos, where each search is a
   request to the source, on the search key alone.

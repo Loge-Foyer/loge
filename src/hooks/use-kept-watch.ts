@@ -46,7 +46,7 @@ export function useKeptWatch(items: readonly MediaItem[]): (item: MediaItem) => 
   );
 }
 
-/** What this profile has begun on one provider and not finished — what the TV tab lists first. */
+/** What this profile has begun on one provider and not finished — what the Live tab lists first. */
 export function useInProgress(connectionId: ConnectionId | undefined, type: 'movie' | 'show' | undefined, enabled = true) {
   const userId = useActiveUserId();
   const { watch } = useServices();

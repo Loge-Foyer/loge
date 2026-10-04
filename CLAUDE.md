@@ -56,7 +56,7 @@ keychain, not WebCrypto: IndexedDB commits early, SQLite deadlocks.
 
 **Phase 7 — it plays. Phase 8 brought more players; VLC left in Phase 9, and is back.**
 
-The design: four tabs — Media, Videos, TV, Settings. Plugins come in five
+The design: four tabs — Media, Videos, Live, Settings. Plugins come in five
 categories, and Settings → Adapters shows one list per category for this
 platform. A device holds one account, local or on your own server
 (PocketBase), with up to ten profiles. Source, IPTV and metadata connections
@@ -88,7 +88,7 @@ What runs today:
   mpv plays too, an Expo module in its adapter: Matroska, DTS and TrueHD as
   the file, raw MPEG-TS, a file's own subtitles drawn with libass — on Android
   and, built but not yet played, on iPhone. VLC is back — libVLC 3.7 on
-  Android, VLCKit 3.7 on iPhone and Apple TV — and plays first on TV. A
+  Android, VLCKit 3.7 on iPhone and Apple TV — and plays first on Live. A
   browser plays raw MPEG-TS through mpegts.js.
   Players' switches, which plays first — on the
   device and per tab — are per device, and "Play with…" picks one for an
@@ -105,7 +105,7 @@ What runs today:
   in.
 - Watch status the app keeps (database v9): for IPTV films and series, web
   video and files, chosen per tab on the account; one row per thing watched,
-  every language's copy of a film at once, and the TV tab lists what was
+  every language's copy of a film at once, and the Live tab lists what was
   begun first.
 - A fifth adapter category, metadata, and TMDB in it (database v10): with the
   household's own key, it says which film or series an IPTV title is when the

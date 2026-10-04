@@ -63,11 +63,11 @@ export const players: readonly PlayerPlugin[] = [systemPlayer, mpv, vlc];
 
 /**
  * What a new device plays with until someone chooses: mpv first, and first on
- * Media; VLC next, and first on TV, where raw MPEG-TS channels are; the
+ * Media; VLC next, and first on Live, where raw MPEG-TS channels are; the
  * built-in player on, and first nowhere. Where mpv and VLC do not run — a
  * browser — the built-in player is all there is, and plays everything.
  */
 export const playerDefaults: PlayerDefaults = {
   order: [mpv.manifest.id, vlc.manifest.id, systemPlayer.manifest.id],
-  tabs: { media: mpv.manifest.id, tv: vlc.manifest.id },
+  tabs: { media: mpv.manifest.id, live: vlc.manifest.id },
 };

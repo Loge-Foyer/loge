@@ -86,7 +86,7 @@ under the content.
 
 ## Four tabs
 
-**Media, Videos, TV, Settings.** What appears on each is decided by category
+**Media, Videos, Live, Settings.** What appears on each is decided by category
 and kind in `services/tab-content.ts` (`docs/adapters`), never by a plugin's
 name.
 
@@ -100,11 +100,11 @@ name.
   and its sections — Videos, Shorts, Live, Playlists — as a grid that pages on
   as it scrolls. A playlist's page is its videos, in its order, and whose list
   it is; a video's page leads to its channel.
-- **TV** — everything IPTV brings, in Live, Movies and Series sections, plus any
+- **Live** — everything IPTV brings, in Live, Movies and Series sections, plus any
   source's `live` channels. Media and Videos never show IPTV content.
 - **Settings** — the account, profiles, plugins, about.
 
-Phase 6 gives Videos new icons, gives TV the TV ones, and makes the web's top
+Phase 6 gives Videos new icons, gives Live the TV ones, and makes the web's top
 bar compact on narrow screens; today it wraps below about 400 px wide.
 
 ## Media
@@ -169,7 +169,7 @@ Version 2 brought the Downloaded row: this app adds it to a version 1 layout,
 right after Continue Watching, and an app that knows only 1 reads a 2 as no
 layout and shows its defaults, rather than drawing a row it does not know.
 
-## TV
+## Live
 
 `screens/tv.tsx`. With no IPTV connection it shows the way to add one (in a
 browser, that providers can't be reached there). Otherwise:
@@ -197,11 +197,11 @@ browser, that providers can't be reached there). Otherwise:
   list zaps through the favourites. The list is the profile's, so only its
   guide is asked of the provider; a search filters it on the device. The guide is asked for the channels near the top, refreshed every five
   minutes. A tap plays the channel; the calendar opens its day
-  (`tv/channel/[connectionId]/[channelId]`): today from midnight, what is on
+  (`live/channel/[connectionId]/[channelId]`): today from midnight, what is on
   now marked, and Watch live.
 - **In the player**, a channel's group — or the ★ list it was played from —
   slides in from the left, over the picture, from the Channels button or a
-  TV remote's left (`docs/playback`). A row there is the TV tab's own, drawn
+  TV remote's left (`docs/playback`). A row there is the Live tab's own, drawn
   compact (`components/media/channel-row.tsx`).
 - **Movies** and **Shows** — posters in the provider's own order, one provider,
   never merged with the library; a poster opens the ordinary detail page, with
@@ -221,7 +221,7 @@ portal, which has no portal to be refused by.
 
 A search box searches the list beneath it and nothing else
 (`components/search-field.tsx`): Media's grid, a Videos source, and each of
-TV's sections.
+Live's sections.
 
 - **When it asks.** Once typing stops for two seconds, or at once on the
   keyboard's search key. Videos asks on the key alone: there every search is a
@@ -251,12 +251,12 @@ TV's sections.
   beneath take the scope's words ("Set a PIN for this device"). The Profile
   row says which: "On — the same PIN on every device", "Off on this device".
 - **Watch status** — which tabs the account keeps watch status on, for the
-  sources there that keep none: Media, Videos, TV's films and series. The
+  sources there that keep none: Media, Videos, Live's films and series. The
   account's, the same for every profile and device; a source that keeps its
   own — a media server — keeps it there.
 - **App** — how this device behaves, whoever is watching: its Appearance —
   System, Light or Dark — the tab it opens on
-  (Media, Videos or TV), whether it asks who's watching every time it starts
+  (Media, Videos or Live), whether it asks who's watching every time it starts
   (on by default on a TV, where whoever picks up the remote is someone else;
   the default profile is kept for when it is off), force landscape on
   playback, whether a title's buttons show their words beside their
@@ -289,7 +289,7 @@ TV's sections.
     device's, or keep both.
   - **Metadata** lists its connections like a source's — TMDB, with your own
     key, its `enabled` switch and Test connection. Its row says which is set
-    up. It brings nothing to a tab: watch status the app keeps on TV is keyed
+    up. It brings nothing to a tab: watch status the app keeps on Live is keyed
     by what it answers, so a provider's German and English copies of a film
     are one.
 - **Credits** end every adapter's page (`settings/adapters/[category]/[name]`):

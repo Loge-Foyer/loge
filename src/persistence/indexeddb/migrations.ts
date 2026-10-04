@@ -1,4 +1,5 @@
 import { qualifiedIdOf, qualifiedPluginStates, sessionRefOf } from '../plugin-ids';
+import { liveTabSetting } from '../tab-ids';
 
 /**
  * The object stores, as IndexedDB's versioned upgrades. They mirror the SQLite
@@ -167,6 +168,14 @@ export const INDEXEDDB_UPGRADES: readonly Upgrade[] = [
     const identities = db.createObjectStore('identities', { keyPath: ['userId', 'connectionId', 'externalId'] });
     identities.createIndex('byUser', 'userId');
     identities.createIndex('byConnection', 'connectionId');
+  },
+
+  // The TV tab became Live: as SQLite's v11.
+  (_db, tx) => {
+    rewriteEach<{ readonly key: string; readonly value: unknown }>(tx, 'deviceSettings', (setting) => {
+      const value = liveTabSetting(setting.key, setting.value);
+      return value === undefined ? undefined : { ...setting, value };
+    });
   },
 ];
 

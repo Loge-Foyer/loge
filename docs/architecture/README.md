@@ -208,7 +208,7 @@ one place, `services/tab-content.ts`:
 - a source's movies, shows and anime on Media
 - a source's videos and files on Videos
 - everything an IPTV plugin brings — live channels, and its movies and series —
-  on TV, and a source's `live` channels there too
+  on Live, and a source's `live` channels there too
 
 ## Talking to sources
 

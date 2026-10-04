@@ -36,7 +36,7 @@ export interface WatchChange {
   readonly key: GlobalMediaKey;
 }
 
-/** What the TV tab lists first: something begun on one provider, with how far along. */
+/** What the Live tab lists first: something begun on one provider, with how far along. */
 export interface InProgress {
   /** A film as it was played, or — for a series — the series, as its latest episode knew it. */
   readonly item: MediaItem;
